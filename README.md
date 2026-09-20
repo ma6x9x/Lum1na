@@ -1,18 +1,19 @@
-<div align="center">
-
-  <img src="docs/Lum1naLogo.JPG" alt="Lum1na logo" width="240" />
-
-  # Lum1na
-
-  Next Gen iOS research and jailbreak experimentation
-
-  <p>
-    <img alt="Status" src="https://img.shields.io/badge/status-early%20development-orange">
-    <img alt="Platform" src="https://img.shields.io/badge/platform-iOS%20%7C%20iPadOS-lightgrey">
-    <img alt="Focus" src="https://img.shields.io/badge/focus-experimental%20research-purple">
-  </p>
-
-</div>
+<table>
+  <tr>
+    <td align="center" bgcolor="#000000">
+      <br />
+      <img src="docs/Lum1naLogo.JPG" alt="Lum1na logo" width="240" />
+      <h1><font color="#FFFFFF">Lum1na</font></h1>
+      <p><font color="#F5F5F5">Next Gen iOS research and jailbreak experimentation</font></p>
+      <p>
+        <img alt="Status" src="https://img.shields.io/badge/status-early%20development-FFFFFF?labelColor=111111&color=666666" />
+        <img alt="Platform" src="https://img.shields.io/badge/platform-iOS%20%7C%20iPadOS-FFFFFF?labelColor=111111&color=777777" />
+        <img alt="Focus" src="https://img.shields.io/badge/focus-experimental%20research-FFFFFF?labelColor=111111&color=888888" />
+      </p>
+      <br />
+    </td>
+  </tr>
+</table>
 
 Lum1na is an experimental research project focused on iOS and iPadOS jailbreak tooling, device capability checks, and low-level experimentation for A12/A12X-era devices.
 
