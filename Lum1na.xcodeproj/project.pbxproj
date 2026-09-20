@@ -74,9 +74,12 @@
 				"Exploit/UPLLeak.m",
 				"Lum1na.xcodeproj",
 				"Lum1naTests",
+				"Lum1naTests/Lum1naTests.swift",
 				"README.md",
 				"Tests",
+				"Tests/Lum1naTests.swift",
 				"UITests",
+				"UITests/Lum1naUITests.swift",
 			);
 			target = E6DAA27F305DD93E00B0914F /* Lum1na */;
 		};
