@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Hero beacon: rounded star inside a liquid-glass ring.
+/// Hero beacon: rounded star inside a liquid-(gl)ass ring.
 /// Breath + spin intensify while `isActive` (jailbreak / stage run).
 struct StarBeaconView: View {
     var isActive: Bool
@@ -26,17 +26,14 @@ struct StarBeaconView: View {
                 .blur(radius: 8)
                 .scaleEffect(breath ? 1.06 : 0.94)
 
-            Circle()
-                .stroke(Lum1naPalette.ringGradient, lineWidth: 3)
-                .frame(width: 150, height: 150)
-                .blur(radius: 0.2)
-                .opacity(0.95)
-                .overlay(
+            LiquidGlassDisc(diameter: 158)
+                .overlay {
                     Circle()
-                        .stroke(Color.white.opacity(0.25), lineWidth: 1)
+                        .stroke(Lum1naPalette.ringGradient, lineWidth: 2.5)
                         .frame(width: 150, height: 150)
-                )
-                .background(ringGlass)
+                        .blur(radius: 0.2)
+                        .opacity(0.95)
+                }
 
             Image(systemName: "star.fill")
                 .resizable()
@@ -74,12 +71,5 @@ struct StarBeaconView: View {
         withAnimation(.easeInOut(duration: 3.4).repeatForever(autoreverses: true)) {
             breath = true
         }
-    }
-
-    private var ringGlass: some View {
-        Circle()
-            .fill(.ultraThinMaterial)
-            .frame(width: 158, height: 158)
-            .opacity(0.35)
     }
 }

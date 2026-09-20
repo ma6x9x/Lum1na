@@ -180,16 +180,29 @@ struct ContentView: View {
                             .padding(.horizontal, 14)
                             .padding(.vertical, 10)
                             .foregroundStyle(.white)
-                            .background(Capsule().fill(.ultraThinMaterial))
-                            .overlay(
-                                Capsule()
-                                    .stroke(
+                            .background {
+                                Capsule(style: .continuous)
+                                    .fill(.ultraThinMaterial)
+                                    .overlay {
+                                        Capsule(style: .continuous)
+                                            .fill(
+                                                LinearGradient(
+                                                    colors: [Color.white.opacity(0.14), Color.clear],
+                                                    startPoint: .top,
+                                                    endPoint: .center
+                                                )
+                                            )
+                                    }
+                            }
+                            .overlay {
+                                Capsule(style: .continuous)
+                                    .strokeBorder(
                                         manager.selectedStage == stage
                                             ? Lum1naPalette.magenta.opacity(0.9)
-                                            : Color.white.opacity(0.2),
+                                            : Color.white.opacity(0.16),
                                         lineWidth: 1
                                     )
-                            )
+                            }
                     }
                     .buttonStyle(.plain)
                     .disabled(manager.isRunning)
