@@ -1,34 +1,116 @@
-// Lum1naTheme.swift
 import SwiftUI
 
-struct LiquidGlassEffect: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .background(
-                LinearGradient(
-                    colors: [Color.purple.opacity(0.1), Color.blue.opacity(0.1), Color.purple.opacity(0.1)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
+enum Lum1naPalette {
+    static let field = Color(red: 0.027, green: 0.024, blue: 0.059) // #07060F
+    static let magenta = Color(red: 0.92, green: 0.28, blue: 0.72)
+    static let violet = Color(red: 0.56, green: 0.35, blue: 0.98)
+    static let ice = Color(red: 0.45, green: 0.85, blue: 0.98)
+    static let rain = Color(red: 0.55, green: 0.62, blue: 0.78)
+
+    static var wordmarkGradient: LinearGradient {
+        LinearGradient(
+            colors: [magenta, .white, ice],
+            startPoint: .leading,
+            endPoint: .trailing
+        )
+    }
+
+    static var ringGradient: AngularGradient {
+        AngularGradient(
+            colors: [magenta, violet, ice, magenta],
+            center: .center
+        )
+    }
+}
+
+struct LiquidGlassCard<Content: View>: View {
+    var cornerRadius: CGFloat = 22
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        content()
+            .background(glassBackground)
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
             .overlay(
-                RoundedRectangle(cornerRadius: 20)
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
                     .stroke(
                         LinearGradient(
-                            colors: [.white.opacity(0.3), .white.opacity(0.1)],
+                            colors: [
+                                Color.white.opacity(0.35),
+                                Lum1naPalette.magenta.opacity(0.35),
+                                Lum1naPalette.ice.opacity(0.25),
+                                Color.white.opacity(0.08)
+                            ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         ),
                         lineWidth: 1
                     )
             )
-            .blur(radius: 0.5)
-            .shadow(color: .purple.opacity(0.2), radius: 10, x: 0, y: 5)
+    }
+
+    @ViewBuilder
+    private var glassBackground: some View {
+        if #available(iOS 26.0, *) {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .fill(.clear)
+                .glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
+        } else {
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .background(
+                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                        .fill(Color.white.opacity(0.06))
+                )
+        }
     }
 }
 
-extension View {
-    func liquidGlass() -> some View {
-        self.modifier(LiquidGlassEffect())
+struct LiquidGlassCapsuleButtonStyle: ButtonStyle {
+    var prominent: Bool = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 16, weight: .semibold, design: .rounded))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 22)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity)
+            .background(background(isPressed: configuration.isPressed))
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(
+                        LinearGradient(
+                            colors: [
+                                Lum1naPalette.magenta.opacity(0.9),
+                                Lum1naPalette.ice.opacity(0.9)
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ),
+                        lineWidth: prominent ? 1.4 : 1
+                    )
+            )
+            .scaleEffect(configuration.isPressed ? 0.98 : 1)
+            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
+    }
+
+    @ViewBuilder
+    private func background(isPressed: Bool) -> some View {
+        if prominent {
+            LinearGradient(
+                colors: [
+                    Lum1naPalette.violet.opacity(isPressed ? 0.85 : 1),
+                    Lum1naPalette.ice.opacity(isPressed ? 0.55 : 0.75)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        } else if #available(iOS 26.0, *) {
+            Capsule().fill(.clear).glassEffect(.regular, in: .capsule)
+        } else {
+            Capsule().fill(.ultraThinMaterial)
+        }
     }
 }
