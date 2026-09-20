@@ -23,6 +23,8 @@ enum Lum1naPalette {
     }
 }
 
+/// Liquid-glass look using materials (works on Xcode 16 / iOS 16+).
+/// Native `.glassEffect` can be reintroduced when CI builds with an iOS 26 SDK.
 struct LiquidGlassCard<Content: View>: View {
     var cornerRadius: CGFloat = 22
     @ViewBuilder var content: () -> Content
@@ -49,20 +51,13 @@ struct LiquidGlassCard<Content: View>: View {
             )
     }
 
-    @ViewBuilder
     private var glassBackground: some View {
-        if #available(iOS 26.0, *) {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .fill(.clear)
-                .glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
-        } else {
-            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .background(
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(Color.white.opacity(0.06))
-                )
-        }
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            .fill(.ultraThinMaterial)
+            .background(
+                RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                    .fill(Color.white.opacity(0.06))
+            )
     }
 }
 
@@ -102,13 +97,11 @@ struct LiquidGlassCapsuleButtonStyle: ButtonStyle {
             LinearGradient(
                 colors: [
                     Lum1naPalette.violet.opacity(isPressed ? 0.85 : 1),
-                    Lum1naPalette.ice.opacity(isPressed ? 0.55 : 0.75)
+                    Lum1naPalette.magenta.opacity(isPressed ? 0.55 : 0.75)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
-        } else if #available(iOS 26.0, *) {
-            Capsule().fill(.clear).glassEffect(.regular, in: .capsule)
         } else {
             Capsule().fill(.ultraThinMaterial)
         }

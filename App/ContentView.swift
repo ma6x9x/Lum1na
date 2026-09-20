@@ -180,13 +180,7 @@ struct ContentView: View {
                             .padding(.horizontal, 14)
                             .padding(.vertical, 10)
                             .foregroundStyle(.white)
-                            .background {
-                                if #available(iOS 26.0, *) {
-                                    Capsule().glassEffect(.regular.interactive(), in: .capsule)
-                                } else {
-                                    Capsule().fill(.ultraThinMaterial)
-                                }
-                            }
+                            .background(Capsule().fill(.ultraThinMaterial))
                             .overlay(
                                 Capsule()
                                     .stroke(

@@ -76,18 +76,10 @@ struct StarBeaconView: View {
         }
     }
 
-    @ViewBuilder
     private var ringGlass: some View {
-        if #available(iOS 26.0, *) {
-            Circle()
-                .fill(.clear)
-                .frame(width: 158, height: 158)
-                .glassEffect(.regular.interactive(), in: .circle)
-        } else {
-            Circle()
-                .fill(.ultraThinMaterial)
-                .frame(width: 158, height: 158)
-                .opacity(0.35)
-        }
+        Circle()
+            .fill(.ultraThinMaterial)
+            .frame(width: 158, height: 158)
+            .opacity(0.35)
     }
 }

@@ -65,7 +65,15 @@
 		E6A800E3305F1B8200473E8B /* Exceptions for "Sources" folder in "Lum1na" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
-				Exploit/Lum1naKRW.m,
+				".github",
+				".gitignore",
+				"docs",
+				"Exploit/Lum1naKRW.m",
+				"Lum1na.xcodeproj",
+				"Lum1naTests",
+				"README.md",
+				"Tests",
+				"UITests",
 			);
 			target = E6DAA27F305DD93E00B0914F /* Lum1na */;
 		};
