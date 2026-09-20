@@ -1,9 +1,5 @@
 import Foundation
 
-enum SessionPhase {
-    case idle
-    case validating
-    case preparing
-    case complete
-    case failed
+enum SessionPhase: Equatable {
+    case check, unsupported, hold, armed, running, done, failed
 }
