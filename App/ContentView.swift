@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 enum ExploitStage: String, CaseIterable, Identifiable {
     case kaslr = "KASLR"
@@ -20,8 +21,6 @@ enum ExploitStage: String, CaseIterable, Identifiable {
         case .fullChain: return "Full Chain"
         }
     }
-
-    var isFullChain: Bool { self == .fullChain }
 }
 
 struct ContentView: View {
@@ -37,25 +36,27 @@ struct ContentView: View {
 
             VStack(spacing: 0) {
                 header
-                    .padding(.top, 8)
+                    .padding(.top, 10)
 
-                Spacer(minLength: 8)
+                Spacer(minLength: 6)
 
                 StarBeaconView(isActive: manager.isRunning)
                     .padding(.vertical, 4)
 
-                Text("The guiding light.")
-                    .font(.system(size: 14, weight: .medium, design: .rounded))
-                    .foregroundStyle(Lum1naPalette.ice.opacity(0.9))
-                    .padding(.top, 4)
+                Text("The guiding light for Jailbreaks")
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundStyle(Lum1naPalette.ice.opacity(0.92))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+                    .padding(.top, 6)
 
-                Spacer(minLength: 12)
+                Spacer(minLength: 10)
 
                 MatrixConsoleView()
-                    .frame(maxHeight: 210)
+                    .frame(maxHeight: 200)
                     .padding(.horizontal, 16)
 
-                Spacer(minLength: 12)
+                Spacer(minLength: 10)
 
                 chrome
                     .padding(.horizontal, 16)
@@ -65,16 +66,39 @@ struct ContentView: View {
     }
 
     private var header: some View {
-        VStack(spacing: 6) {
-            Text("Lum1na")
-                .font(.system(size: 36, weight: .bold, design: .rounded))
-                .foregroundStyle(Lum1naPalette.wordmarkGradient)
-                .shadow(color: Lum1naPalette.magenta.opacity(0.35), radius: 10)
+        ZStack {
+            HStack(spacing: 28) {
+                cloudWisp.offset(x: -6, y: 10)
+                Spacer()
+                cloudWisp.offset(x: 6, y: 6)
+            }
+            .padding(.horizontal, 28)
+            .opacity(0.55)
 
-            Text("v0.1 · private beta")
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.45))
+            VStack(spacing: 6) {
+                Text("Lum1na")
+                    .font(.system(size: 36, weight: .bold, design: .rounded))
+                    .foregroundStyle(Lum1naPalette.wordmarkGradient)
+                    .shadow(color: Lum1naPalette.magenta.opacity(0.35), radius: 10)
+
+                Text("v0.1 · private beta")
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.45))
+            }
         }
+    }
+
+    private var cloudWisp: some View {
+        Capsule()
+            .fill(
+                LinearGradient(
+                    colors: [Color.white.opacity(0.14), Color.white.opacity(0.04)],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+            .frame(width: 72, height: 18)
+            .blur(radius: 6)
     }
 
     private var chrome: some View {
@@ -134,7 +158,10 @@ struct ContentView: View {
                 Circle()
                     .fill(manager.isRunning ? Color.green : Lum1naPalette.ice.opacity(0.7))
                     .frame(width: 8, height: 8)
-                    .shadow(color: (manager.isRunning ? Color.green : Lum1naPalette.ice).opacity(0.7), radius: 4)
+                    .shadow(
+                        color: (manager.isRunning ? Color.green : Lum1naPalette.ice).opacity(0.7),
+                        radius: 4
+                    )
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 12)
