@@ -29,6 +29,11 @@ struct ContentView: View {
 
     private let individualStages: [ExploitStage] = [.kaslr, .uaf, .ane, .ppl, .persist]
 
+    /// Wave power from public ExploitManager state only (no mic).
+    private var beaconPower: Double {
+        manager.isRunning ? 0.78 : 0.15
+    }
+
     var body: some View {
         ZStack {
             Lum1naPalette.field.ignoresSafeArea()
@@ -40,7 +45,7 @@ struct ContentView: View {
 
                 Spacer(minLength: 6)
 
-                StarBeaconView(isActive: manager.isRunning)
+                StarBeaconView(isActive: manager.isRunning, power: beaconPower)
                     .padding(.vertical, 4)
 
                 Text("The guiding light for Jailbreaks")
