@@ -1,6 +1,6 @@
 <div align="center">
 
-  <img src="https://raw.githubusercontent.com/ma6x9x/Lum1na/main/Assets.xcassets/README.md" alt="Lum1na logo placeholder" width="240" />
+  <img src="https://raw.githubusercontent.com/ma6x9x/Lum1na/main/docs/Lum1naLogo.JPG" alt="Lum1na logo placeholder" width="240" />
 
   # Lum1na
 
