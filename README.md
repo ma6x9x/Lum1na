@@ -1,6 +1,6 @@
 <div align="center">
 
-  <img src="https://raw.githubusercontent.com/ma6x9x/Lum1na/main/docs/Lum1naLogo.JPG" alt="Lum1na logo placeholder" width="240" />
+  <img src="docs/Lum1naLogo.JPG" alt="Lum1na logo" width="240" />
 
   # Lum1na
 
@@ -16,9 +16,9 @@
 
 Lum1na is an experimental research project focused on iOS and iPadOS jailbreak tooling, device capability checks, and low-level experimentation for A12/A12X-era devices.
 
-This repository is intentionally structured as a clean, modular foundation so your app, jailbreak logic, kernel research, and test scaffolding can evolve without turning into a messy single-codebase project.
+This repository is intentionally structured as a clean, modular foundation so the app, jailbreak logic, kernel research, and test scaffolding can evolve without becoming a messy single-codebase project.
 
-> Warning: This project is experimental and not production-ready. It is intended for authorized testing on devices you own and control. Do not run anything in this repo on a device that you cannot safely recover.
+> Warning: This project is experimental and not production-ready. It is intended for authorized testing on devices you own and control. Do not run anything in this repo on a device that you cannot legally access or modify.
 
 ## Current focus
 
@@ -58,3 +58,4 @@ Lum1na/
 ├── LICENSE
 ├── README.md
 └── Lum1na.xcodeproj/        # Placeholder for the Xcode project
+```
