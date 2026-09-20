@@ -1,0 +1,47 @@
+name: Restore project.pbxproj
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "fix/compile-ready" ]
+    paths:
+      - "tools/pbx.gz.b64"
+      - ".github/workflows/restore-pbxproj.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/compile-ready
+      - name: Decode project.pbxproj
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          import gzip, base64
+          from pathlib import Path
+          b64 = Path("tools/pbx.gz.b64").read_text().strip()
+          data = gzip.decompress(base64.b64decode(b64))
+          out = Path("Lum1na.xcodeproj/project.pbxproj")
+          out.write_bytes(data)
+          text = data.decode()
+          assert "Exploit/KASLRLeak.m" in text
+          assert "HEADER_SEARCH_PATHS" in text
+          print("wrote", out, "bytes", len(data))
+          PY
+      - name: Commit restored pbxproj
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Lum1na.xcodeproj/project.pbxproj
+          if git diff --cached --quiet; then
+            echo "No pbxproj changes to commit"
+            exit 0
+          fi
+          git commit -m "Restore project.pbxproj (exclude exploit .m; HEADER_SEARCH_PATHS; iOS 16)"
+          git push
