@@ -1,1 +1,1 @@
-@/workspace/lum1na-fix/pbx_content_only.txt
+file:///workspace/lum1na-fix/pbx_content_only.txt
