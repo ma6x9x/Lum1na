@@ -1,0 +1,24 @@
+# Xcode and local build output
+DerivedData/
+build/
+*.xcuserstate
+*.xcscmblueprint
+xcuserdata/
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Package.resolved
+
+# Signing material and secrets
+*.p12
+*.mobileprovision
+*.provisionprofile
+*.pem
+.env
+.env.*
+
+# Local artifacts
+artifacts/
+logs/
+.DS_Store
