@@ -1,0 +1,49 @@
+name: Build IPA
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show Xcode
+        run: xcodebuild -version && xcodebuild -list -project Lum1na.xcodeproj
+
+      - name: Build (unsigned, for TrollStore / SideStore resign)
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project Lum1na.xcodeproj \
+            -scheme Lum1na \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=- \
+            DEVELOPMENT_TEAM= \
+            build
+
+      - name: Package IPA
+        run: |
+          set -euo pipefail
+          APP=$(find "$RUNNER_TEMP/DerivedData/Build/Products" -name 'Lum1na.app' -print -quit)
+          echo "Using app: $APP"
+          rm -rf Payload Lum1na.ipa
+          mkdir Payload
+          cp -R "$APP" Payload/
+          zip -r Lum1na.ipa Payload
+          ls -lh Lum1na.ipa
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Lum1na-ipa
+          path: Lum1na.ipa
+          if-no-files-found: error
