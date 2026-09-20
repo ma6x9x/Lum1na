@@ -1,111 +1,148 @@
 import SwiftUI
 
-enum ExploitStage: String, CaseIterable {
+enum ExploitStage: String, CaseIterable, Identifiable {
     case kaslr = "KASLR Leak"
     case uaf = "Heap Corruption"
     case ane = "ANE OOB Write"
     case ppl = "PPL Bypass"
     case persist = "Persistence"
     case fullChain = "Full Chain"
+
+    var id: String { rawValue }
 }
 
 struct StageButton: View {
     let stage: ExploitStage
     let isSelected: Bool
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             Text(stage.rawValue)
-                .font(.system(size: 14, weight: .medium, design: .rounded))
-                .padding(.horizontal, 20)
-                .padding(.vertical, 12)
-                .background(self.backgroundColor)
-                .foregroundColor(.white)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
+                .padding(.horizontal, 18)
+                .padding(.vertical, 11)
+                .background(background)
+                .foregroundStyle(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(Color.white.opacity(isSelected ? 0.35 : 0.14), lineWidth: 1)
                 )
-                .shadow(color: self.shadowColor, radius: 8)
+                .shadow(color: isSelected ? Color.purple.opacity(0.45) : .clear, radius: 10, y: 2)
         }
+        .buttonStyle(.plain)
     }
-    
-    private var backgroundColor: AnyView {
+
+    @ViewBuilder
+    private var background: some View {
         if isSelected {
-            return AnyView(LinearGradient(colors: [Color.purple, Color.blue], startPoint: .leading, endPoint: .trailing))
+            LinearGradient(
+                colors: [Color.purple, Color.blue.opacity(0.95)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
         } else {
-            return AnyView(Color.white.opacity(0.1))
+            Color.white.opacity(0.1)
         }
-    }
-    
-    private var shadowColor: Color {
-        return isSelected ? Color.purple.opacity(0.5) : Color.clear
     }
 }
 
 struct ContentView: View {
     @StateObject private var manager = ExploitManager.shared
-    
+
     var body: some View {
         ZStack {
             LinearGradient(
-                colors: [Color.black, Color.purple.opacity(0.2), Color.black],
+                colors: [
+                    Color.black,
+                    Color(red: 0.12, green: 0.04, blue: 0.2),
+                    Color.black
+                ],
                 startPoint: .top,
                 endPoint: .bottom
             )
             .ignoresSafeArea()
-            
-            VStack(spacing: 24) {
-                Image(systemName: "star.fill")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 80, height: 80)
-                    .foregroundColor(.purple)
-                    .shadow(color: .purple.opacity(0.8), radius: 10)
-                    .rotationEffect(.degrees(manager.logoAnimation ? 360 : 0))
-                    .onAppear {
-                        withAnimation(.linear(duration: 8).repeatForever(autoreverses: false)) {
-                            manager.logoAnimation = true
-                        }
-                    }
-                
-                Text("Lum1na")
-                    .font(.system(size: 36, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
-                    .shadow(color: .purple.opacity(0.5), radius: 10)
-                
+
+            VStack(spacing: 22) {
+                header
+
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        ForEach(ExploitStage.allCases, id: \.self) { stage in
+                    HStack(spacing: 10) {
+                        ForEach(ExploitStage.allCases) { stage in
                             StageButton(
                                 stage: stage,
                                 isSelected: manager.selectedStage == stage,
-                                action: {
-                                    manager.runExploit(stage)
-                                }
+                                action: { manager.runExploit(stage) }
                             )
                             .disabled(manager.isRunning)
+                            .opacity(manager.isRunning && manager.selectedStage != stage ? 0.45 : 1)
                         }
                     }
-                    .padding(.horizontal)
+                    .padding(.horizontal, 4)
                 }
-                
+
                 MatrixConsoleView()
-                    .frame(height: 300)
-                
-                HStack(spacing: 8) {
-                    Circle()
-                        .fill(manager.isRunning ? Color.green : Color.gray)
-                        .frame(width: 8, height: 8)
-                        .shadow(color: manager.isRunning ? .green.opacity(0.8) : .clear, radius: 4)
-                    Text(manager.isRunning ? "Exploiting..." : "Ready")
-                        .font(.caption)
-                        .foregroundColor(manager.isRunning ? .green : .gray)
-                }
-                .padding(.top, 8)
+                    .frame(maxHeight: 320)
+                    .padding(.horizontal, 2)
+
+                statusRow
             }
-            .padding()
+            .padding(.vertical, 20)
+            .padding(.horizontal, 16)
         }
+    }
+
+    private var header: some View {
+        VStack(spacing: 10) {
+            Image(systemName: "sparkle")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 64, height: 64)
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [.purple, .cyan.opacity(0.9)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .shadow(color: .purple.opacity(0.7), radius: 14)
+                .rotationEffect(.degrees(manager.logoAnimation ? 360 : 0))
+                .onAppear {
+                    withAnimation(.linear(duration: 10).repeatForever(autoreverses: false)) {
+                        manager.logoAnimation = true
+                    }
+                }
+
+            Text("Lum1na")
+                .font(.system(size: 34, weight: .bold, design: .rounded))
+                .foregroundStyle(.white)
+                .shadow(color: .purple.opacity(0.45), radius: 8)
+
+            Text("Private developer build")
+                .font(.system(size: 12, weight: .medium, design: .rounded))
+                .foregroundStyle(.white.opacity(0.55))
+        }
+    }
+
+    private var statusRow: some View {
+        HStack(spacing: 8) {
+            Circle()
+                .fill(manager.isRunning ? Color.green : Color.gray.opacity(0.7))
+                .frame(width: 8, height: 8)
+                .shadow(color: manager.isRunning ? .green.opacity(0.8) : .clear, radius: 4)
+
+            Text(manager.isRunning ? "Running…" : "Ready")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(manager.isRunning ? Color.green : Color.gray)
+
+            Spacer(minLength: 0)
+
+            Text("\(manager.lines.count) lines")
+                .font(.caption2.monospaced())
+                .foregroundStyle(.white.opacity(0.35))
+        }
+        .padding(.horizontal, 4)
+        .padding(.top, 4)
     }
 }
