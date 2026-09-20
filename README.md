@@ -1,32 +1,60 @@
-# Lum1na
+<div align="center">
 
-Experimental iOS/iPadOS research project scaffold for Lum1na. The current layout is designed so the application files, research components, tests, and resources can be added incrementally.
+  <img src="https://raw.githubusercontent.com/ma6x9x/Lum1na/main/Assets.xcassets/README.md" alt="Lum1na logo placeholder" width="240" />
 
-## Development targets
+  # Lum1na
 
-- iPhone 12 — iOS 26.5, current test device
-- iPhone XR — A12, planned iOS 18.7.5 port
-- iPad Pro — A12X, planned iPadOS 26.6 port
+  Next Gen iOS research and jailbreak experimentation
 
-Verify exact build numbers locally before recording results. Do not assume these devices share identical behavior.
+  <p>
+    <img alt="Status" src="https://img.shields.io/badge/status-early%20development-orange">
+    <img alt="Platform" src="https://img.shields.io/badge/platform-iOS%20%7C%20iPadOS-lightgrey">
+    <img alt="Focus" src="https://img.shields.io/badge/focus-experimental%20research-purple">
+  </p>
 
-## Layout
+</div>
 
-- `App/` — application entry point and views
-- `Assets.xcassets/` — app assets
-- `Bootstrap/` — startup coordination
-- `Device/` — device and OS capability detection
-- `Exploit/` — research interfaces and experimental implementations
-- `KernelMap/` — version-specific kernel research data
-- `Primitive/` — low-level primitive abstractions
-- `Resources/` — compatibility and configuration resources
-- `Session/` — logging and session state
-- `UI/` — shared user-interface components
-- `Tests/` — unit tests
-- `UITests/` — UI tests
+Lum1na is an experimental research project focused on iOS and iPadOS jailbreak tooling, device capability checks, and low-level experimentation for A12/A12X-era devices.
 
-This repository contains an original scaffold only. Add your own app files and implementations under the appropriate directories. Do not commit private keys, signing certificates, provisioning profiles, proprietary SDK files, or data from devices you do not own.
+This repository is intentionally structured as a clean, modular foundation so your app, jailbreak logic, kernel research, and test scaffolding can evolve without turning into a messy single-codebase project.
 
-## Safety
+> Warning: This project is experimental and not production-ready. It is intended for authorized testing on devices you own and control. Do not run anything in this repo on a device that you cannot safely recover.
 
-Maintain a verified backup and a known-good restore path before testing system-modifying software. Lum1na is experimental and is not production-ready.
+## Current focus
+
+- iPhone 12 — iOS 26.5
+- iPhone XR — iOS 18.7.5
+- iPad Pro (A12X) — iPadOS 26.6
+
+These targets are for development and testing only. Exact build numbers should be verified locally before each test session.
+
+## Project goals
+
+- Create a clean, original jailbreak app ecosystem
+- Keep device-specific logic isolated and discoverable
+- Build a modular structure for future research
+- Maintain safe, testable code boundaries
+- Avoid mixing research, UI, and exploitation work in one unstructured layer
+
+## Repository layout
+
+```text
+Lum1na/
+├── App/                     # Application source and entry points
+├── Assets.xcassets/         # App icon, colors, and artwork
+├── Bootstrap/               # Startup and bootstrap coordination
+├── Device/                  # Device profile and capability checks
+├── Docs/                    # Project notes and design docs
+├── Exploit/                 # Research interfaces and exploit scaffolding
+├── KernelMap/               # Kernel/build mapping research
+├── Primitive/               # Primitive abstraction helpers
+├── Resources/               # Compatibility and configuration resources
+├── Session/                 # Session and log management
+├── Tests/                   # Unit tests
+├── UI/                      # Shared UI components and theme files
+├── UITests/                 # UI automation tests
+├── .gitignore
+├── CONTRIBUTING.md
+├── LICENSE
+├── README.md
+└── Lum1na.xcodeproj/        # Placeholder for the Xcode project
