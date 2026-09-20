@@ -1,24 +1,22 @@
 <div align="center">
 
-  <img src="docs/Lum1naLogo.JPG" alt="Lum1na logo" width="240" />
+  <img src="docs/Lum1naLogo.JPG" alt="Lum1na logo" width="220" />
 
   <h1>Lum1na</h1>
 
-  <p>Next Gen iOS research and jailbreak experimentation</p>
+  <p><strong>Private developer beta</strong> — invite-only. Not a public release.</p>
 
   <p>
-    <img alt="Status" src="https://img.shields.io/badge/status-early%20development-orange">
+    <img alt="Visibility" src="https://img.shields.io/badge/visibility-private-red">
     <img alt="Platform" src="https://img.shields.io/badge/platform-iOS%20%7C%20iPadOS-lightgrey">
-    <img alt="Focus" src="https://img.shields.io/badge/focus-experimental%20research-purple">
+    <img alt="Status" src="https://img.shields.io/badge/status-trusted%20testers%20only-orange">
   </p>
 
 </div>
 
-Lum1na is an experimental research project focused on iOS and iPadOS jailbreak tooling, device capability checks, and low-level experimentation for A12/A12X-era devices.
+Lum1na is a private research / jailbreak app project for devices you own and control. This repository stays **private**. Do not mirror, fork publicly, or redistribute builds without the owner’s explicit OK.
 
-This repository is intentionally structured as a clean, modular foundation so the app, jailbreak logic, kernel research, and test scaffolding can evolve without becoming a messy single-codebase project.
-
-> Warning: This project is experimental and not production-ready. It is intended for authorized testing on devices you own and control. Do not run anything in this repo on a device that you cannot legally access or modify.
+> Warning: Experimental. Only use on hardware you are legally allowed to modify. Trusted-developer testing only.
 
 ## Current focus
 
@@ -26,36 +24,43 @@ This repository is intentionally structured as a clean, modular foundation so th
 - iPhone XR — iOS 18.7.5
 - iPad Pro (A12X) — iPadOS 26.6
 
-These targets are for development and testing only. Exact build numbers should be verified locally before each test session.
-
-## Project goals
-
-- Create a clean, original jailbreak app ecosystem
-- Keep device-specific logic isolated and discoverable
-- Build a modular structure for future research
-- Maintain safe, testable code boundaries
-- Avoid mixing research, UI, and exploitation work in one unstructured layer
+Confirm the exact build number on-device before each session.
 
 ## Repository layout
 
 ```text
 Lum1na/
-├── App/                     # Application source and entry points
-├── Assets.xcassets/         # App icon, colors, and artwork
-├── Bootstrap/               # Startup and bootstrap coordination
-├── Device/                  # Device profile and capability checks
-├── Docs/                    # Project notes and design docs
-├── Exploit/                 # Research interfaces and exploit scaffolding
-├── KernelMap/               # Kernel/build mapping research
-├── Primitive/               # Primitive abstraction helpers
-├── Resources/               # Compatibility and configuration resources
-├── Session/                 # Session and log management
-├── Tests/                   # Unit tests
-├── UI/                      # Shared UI components and theme files
-├── UITests/                 # UI automation tests
+├── App/                 # SwiftUI entry + ContentView
+├── Assets.xcassets/     # App icon / colors
+├── Bootstrap/           # Bootstrap coordination protocols
+├── Device/              # Device capability helpers
+├── docs/                # Notes + logo asset
+├── Exploit/             # Low-level research (do not “drive-by” edit)
+├── KernelMap/           # Mapping / offset research
+├── Lum1na.xcodeproj/    # Xcode project
+├── Primitive/           # Primitive helpers
+├── Resources/           # Bundled resources
+├── Session/             # Session / logging helpers
+├── Tests/               # Unit tests
+├── UI/                  # Theme + console presentation
+├── UITests/             # UI tests
 ├── .gitignore
-├── CONTRIBUTING.md
-├── LICENSE
-├── README.md
-└── Lum1na.xcodeproj/        # Placeholder for the Xcode project
+└── README.md
 ```
+
+## Polish policy
+
+UI, docs, and project hygiene may change freely. **Do not change race triggers, KRW paths, leak implementations, or other exploit logic** under `Exploit/` unless the owner asks for that specifically.
+
+## Build (Mac / Xcode)
+
+1. Open `Lum1na.xcodeproj` in Xcode on a Mac.
+2. Select your team / signing for a development device you control.
+3. Product → Archive, then Distribute App → Ad Hoc or Development for trusted testers.
+4. Keep `.ipa` / `.xcarchive` artifacts out of git (see `.gitignore`).
+
+IPAs are produced on a Mac with your signing identity — not from this README’s host environment.
+
+## Docs
+
+See [`docs/development.md`](docs/development.md) for session logging expectations.

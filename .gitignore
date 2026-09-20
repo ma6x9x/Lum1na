@@ -1,9 +1,11 @@
-# Xcode and local build output
+# Xcode / local build output
 DerivedData/
 build/
+Build/
 *.xcuserstate
 *.xcscmblueprint
 xcuserdata/
+*.xcworkspace/xcuserdata/
 
 # Swift Package Manager
 .build/
@@ -15,10 +17,21 @@ Package.resolved
 *.mobileprovision
 *.provisionprofile
 *.pem
+*.cer
+*.cert
 .env
 .env.*
 
-# Local artifacts
+# Packaged / export artifacts (build these locally; do not commit)
+*.ipa
+*.dSYM/
+*.xcarchive/
 artifacts/
 logs/
+
+# OS / editor noise
 .DS_Store
+*.swp
+*~
+.idea/
+.vscode/
