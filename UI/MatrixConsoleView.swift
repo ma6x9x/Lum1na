@@ -1,93 +1,106 @@
 import SwiftUI
 
-/// Console that shows real manager lines, with optional symbol-rain that
-/// coalesces into a star / Lum1na mark while a run is active — presentation only.
+// PASTE SLOT: overwrite with your other agent's MatrixConsoleView.swift
+
 struct MatrixConsoleView: View {
     @ObservedObject private var manager = ExploitManager.shared
-    @State private var rainTick: Int = 0
-
-    private let starMark: [String] = [
-        "            .            ",
-        "           /\\           ",
-        "      .___/  \\___.      ",
-        "      \\  Lum1na  /      ",
-        "       \\  ★★  /       ",
-        "      __/      \\__      ",
-        "           \\  /           ",
-        "            \\/            "
-    ]
 
     var body: some View {
-        LiquidGlassCard(cornerRadius: 20) {
-            ZStack(alignment: .topLeading) {
-                Color.black.opacity(0.55)
+        ZStack {
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color.black.opacity(0.9))
 
-                if manager.isRunning {
-                    symbolWeave
-                        .opacity(0.35)
-                        .allowsHitTesting(false)
-                }
+            MatrixRainView()
+                .opacity(0.15)
+                .clipShape(RoundedRectangle(cornerRadius: 16))
 
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 3) {
-                            ForEach(Array(manager.lines.enumerated()), id: \.offset) { index, line in
-                                Text(line)
-                                    .font(.system(size: 11, design: .monospaced))
-                                    .foregroundStyle(Color.white.opacity(0.92))
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .id(index)
-                            }
-                        }
-                        .padding(12)
-                    }
-                    .onChange(of: manager.lines.count) { _ in
-                        guard !manager.lines.isEmpty else { return }
-                        withAnimation(.easeOut(duration: 0.12)) {
-                            proxy.scrollTo(manager.lines.count - 1, anchor: .bottom)
-                        }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 2) {
+                    ForEach(manager.lines) { line in
+                        Text(line.text)
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundColor(line.color)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
+                .padding()
             }
-            .frame(minHeight: 160)
         }
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(
+                    LinearGradient(
+                        colors: [Color.purple.opacity(0.6), Color.blue.opacity(0.6)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1.5
+                )
+        )
+        .shadow(color: Color.purple.opacity(0.4), radius: 10)
         .overlay(alignment: .topTrailing) {
-            if manager.isRunning {
-                Text("weaving")
-                    .font(.system(size: 10, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Lum1naPalette.ice)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
-                    .background(.ultraThinMaterial, in: Capsule())
-                    .padding(10)
+            Button {
+                UIPasteboard.general.string = manager.lines.map(\.text).joined(separator: "\n")
+            } label: {
+                Image(systemName: "doc.on.doc")
+                    .foregroundColor(.white)
+                    .padding(8)
+                    .background(Color.white.opacity(0.2))
+                    .clipShape(Circle())
             }
+            .padding(8)
         }
-        .onReceive(Timer.publish(every: 0.35, on: .main, in: .common).autoconnect()) { _ in
-            guard manager.isRunning else { return }
-            rainTick &+= 1
-        }
-        .accessibilityLabel("Session console")
+    }
+}
+
+struct MatrixRainView: View {
+    @State private var characters: [MatrixChar] = []
+
+    struct MatrixChar: Identifiable {
+        let id = UUID()
+        var x: CGFloat
+        var y: CGFloat
+        var char: String
+        var speed: Double
+        var opacity: Double
     }
 
-    private var symbolWeave: some View {
-        let glyphs = Array("★✦✧*+◇01#@")
-        return VStack(alignment: .leading, spacing: 2) {
-            ForEach(Array(starMark.enumerated()), id: \.offset) { row, template in
-                HStack(spacing: 0) {
-                    ForEach(Array(template.enumerated()), id: \.offset) { col, ch in
-                        let showMark = !ch.isWhitespace && (rainTick + row + col) % 3 != 0
-                        Text(showMark ? String(ch) : String(glyphs[(row * 11 + col + rainTick) % glyphs.count]))
-                            .font(.system(size: 9, design: .monospaced))
-                            .foregroundStyle(
-                                ch.isWhitespace
-                                    ? Lum1naPalette.rain.opacity(0.12)
-                                    : Color.white.opacity(0.55)
-                            )
-                    }
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                ForEach(characters) { char in
+                    Text(char.char)
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundColor(.green.opacity(char.opacity))
+                        .position(x: char.x, y: char.y)
                 }
             }
-            Spacer(minLength: 0)
+            .onAppear {
+                startRain(width: geometry.size.width, height: geometry.size.height)
+            }
         }
-        .padding(12)
+    }
+
+    private func startRain(width: CGFloat, height: CGFloat) {
+        let alphabet = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*")
+        characters = (0..<30).map { _ in
+            MatrixChar(
+                x: CGFloat.random(in: 0...max(width, 1)),
+                y: CGFloat.random(in: -100...max(height, 1)),
+                char: String(alphabet.randomElement()!),
+                speed: Double.random(in: 20...60),
+                opacity: Double.random(in: 0.2...0.8)
+            )
+        }
+        Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { _ in
+            for i in characters.indices {
+                characters[i].y += CGFloat(characters[i].speed * 0.05)
+                if characters[i].y > height + 50 {
+                    characters[i].y = -50
+                    characters[i].x = CGFloat.random(in: 0...max(width, 1))
+                    characters[i].char = String(alphabet.randomElement()!)
+                }
+            }
+        }
     }
 }
