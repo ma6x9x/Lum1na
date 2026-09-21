@@ -22,7 +22,6 @@ jobs:
           set -euo pipefail
           echo "=== Verifying source files ==="
           
-          # All .m files that must exist
           files=(
             "Exploit/ClearSword.m"
             "Exploit/ANE.m"
@@ -48,7 +47,16 @@ jobs:
             fi
           done
 
-      - name: Fix Xcode Project (Add all .m files to target)
+      - name: Fix Import Paths (cs_run.h)
+        run: |
+          # Verify cs_run.h uses correct relative imports
+          if grep -q '#import "Exploit/' Exploit/Bridges/cs_run.h; then
+            echo "⚠️ Fixing cs_run.h imports..."
+            sed -i '' 's|#import "Exploit/|#import "../|g' Exploit/Bridges/cs_run.h
+            echo "✅ Fixed cs_run.h imports"
+          fi
+
+      - name: Add Files to Xcode Target (Skip Duplicates)
         run: |
           set -euo pipefail
           gem install xcodeproj
@@ -57,61 +65,45 @@ jobs:
           
           project = Xcodeproj::Project.open('Lum1na.xcodeproj')
           target = project.targets.find { |t| t.name == 'Lum1na' }
-          if target.nil?
-            puts '❌ Lum1na target not found'
-            exit 1
-          end
           
-          # Find Exploit group
           exploit_group = project.main_group.groups.find { |g| g.path == 'Exploit' }
           if exploit_group.nil?
             puts '❌ Exploit group not found'
             exit 1
           end
           
-          # Files to ensure are in target's Compile Sources
-          files_to_check = [
+          files_to_add = [
             'ClearSword.m', 'ANE.m', 'KASLRLeak.m', 'CSKRW.m',
             'UPLLeak.m', 'AVERace.m', 'Lum1naKRW.m', 'FusionChain.m',
             'P009Controller.m', 'P052Controller.m', 'P039Controller.m',
             'Momentarius.m', 'Persistence.m'
           ]
           
-          files_to_check.each do |filename|
-            # Check before adding so rerunning the workflow is idempotent.
-            existing = target.source_build_phase.files.find do |build_file|
-              ref_path = build_file.file_ref&.path
-              ref_path == filename || ref_path == "Exploit/#{filename}"
-            end
+          files_to_add.each do |filename|
+            # Skip if already in target
+            existing = target.source_build_phase.files.find { |f| 
+              f.file_ref&.path == filename || f.file_ref&.path == "Exploit/#{filename}"
+            }
             
             if existing
-              puts "✓ #{filename} already in Compile Sources"
+              puts "✓ #{filename} already in target"
               next
             end
             
-            # Find the existing file reference in the Exploit group.
-            file_ref = exploit_group.files.find { |file| file.path == filename }
+            # Find file reference
+            file_ref = exploit_group.files.find { |f| f.path == filename }
+            next if file_ref.nil?
             
-            if file_ref.nil?
-              puts "⚠️ #{filename} not found in Exploit group"
-              next
-            end
-            
+            # Add to target
             target.source_build_phase.add_file_reference(file_ref)
-            puts "+ Added #{filename} to Compile Sources"
+            puts "+ Added #{filename}"
           end
           
           project.save
           puts '💾 Project saved'
           RUBY
 
-      - name: Show Xcode / schemes
-        run: |
-          set -euo pipefail
-          ls -la Lum1na.xcodeproj/xcshareddata/xcschemes/ || echo "No shared schemes"
-          xcodebuild -list -project Lum1na.xcodeproj
-
-      - name: Build (unsigned, for TrollStore / SideStore resign)
+      - name: Build (unsigned)
         run: |
           set -euo pipefail
           xcodebuild \
@@ -124,8 +116,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            CODE_SIGN_ENTITLEMENTS="" \
-            DEVELOPMENT_TEAM="" \
+            GCC_WARN_ABOUT_DUPLICATE_METHOD_NAME=NO \
             build
 
       - name: Package IPA
@@ -133,16 +124,14 @@ jobs:
           set -euo pipefail
           APP=$(find "$RUNNER_TEMP/DerivedData/Build/Products" -name 'Lum1na.app' -print -quit)
           if [ -z "$APP" ]; then
-            echo "❌ Lum1na.app not found under DerivedData"
-            find "$RUNNER_TEMP/DerivedData/Build/Products" -maxdepth 4 -type d -print || true
+            echo "❌ Lum1na.app not found"
             exit 1
           fi
-          echo "✅ Using app: $APP"
+          echo "✅ Found: $APP"
           rm -rf Payload Lum1na.ipa
           mkdir Payload
           cp -R "$APP" Payload/
           zip -qr Lum1na.ipa Payload
-          ls -lh Lum1na.ipa
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
