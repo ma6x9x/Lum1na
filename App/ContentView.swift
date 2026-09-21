@@ -37,7 +37,6 @@ struct ContentView: View {
     var body: some View {
         ZStack {
             Lum1naPalette.field.ignoresSafeArea()
-            // Quieter rain — star stays the hero
             GlyphRainView(intensity: manager.isRunning ? 0.55 : 0.22)
 
             VStack(spacing: 0) {
@@ -92,8 +91,7 @@ struct ContentView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
 
-            // Architecture preserved: buttons still call ExploitManager.runExploit(_:).
-            // Paste real stage / chain implementations into that switch — not here.
+            // Buttons → ExploitManager.runExploit(_:). Paste real stage/chain work there.
             HStack(spacing: 10) {
                 Button {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.86)) {
@@ -157,7 +155,6 @@ struct ContentView: View {
             HStack(spacing: 8) {
                 ForEach(individualStages) { stage in
                     Button {
-                        // Hook preserved — ExploitManager.runExploit(stage)
                         manager.runExploit(stage)
                     } label: {
                         Text(stage.rawValue)

@@ -49,7 +49,7 @@ struct MatrixConsoleView: View {
                     }
                 }
             }
-            .frame(minHeight: 200)
+            .frame(minHeight: 160)
         }
         .overlay(alignment: .topTrailing) {
             if manager.isRunning {
