@@ -4,8 +4,11 @@
 #import <Foundation/Foundation.h>
 #include <stdint.h>
 
-// Paste slot: other-agent KASLRLeak
+// Exploit primitives
 #import "KASLRLeak.h"
+#import "UPLLeak.h"
+#import "CSKRW.h"
+#import "ANE.h"
 
 // ANE C API (from ANE.m)
 int cs_init(void);
