@@ -49,14 +49,15 @@ jobs:
 
       - name: Fix Import Paths (cs_run.h)
         run: |
-          # Verify cs_run.h uses correct relative imports
-          if grep -q '#import "Exploit/' Exploit/Bridges/cs_run.h; then
-            echo "⚠️ Fixing cs_run.h imports..."
-            sed -i '' 's|#import "Exploit/|#import "../|g' Exploit/Bridges/cs_run.h
-            echo "✅ Fixed cs_run.h imports"
+          if [ -f "Exploit/Bridges/cs_run.h" ]; then
+            if grep -q '#import "Exploit/' Exploit/Bridges/cs_run.h; then
+              echo "Fixing cs_run.h imports..."
+              sed -i '' 's|#import "Exploit/|#import "../|g' Exploit/Bridges/cs_run.h
+              echo "✅ Fixed cs_run.h"
+            fi
           fi
 
-      - name: Add Files to Xcode Target (Skip Duplicates)
+      - name: Add Files to Xcode Target
         run: |
           set -euo pipefail
           gem install xcodeproj
@@ -66,41 +67,58 @@ jobs:
           project = Xcodeproj::Project.open('Lum1na.xcodeproj')
           target = project.targets.find { |t| t.name == 'Lum1na' }
           
-          exploit_group = project.main_group.groups.find { |g| g.path == 'Exploit' }
+          puts "🔍 Searching for Exploit group..."
+          
+          # Try multiple methods to find the group
+          exploit_group = project.main_group.groups.find { |g| g.path == 'Exploit' || g.name == 'Exploit' }
+          exploit_group ||= project.groups.find { |g| g.path == 'Exploit' || g.name == 'Exploit' }
+          
           if exploit_group.nil?
-            puts '❌ Exploit group not found'
+            puts "⚠️ Exploit group not found by name/path, using main_group"
+            exploit_group = project.main_group
+          else
+            puts "✅ Found Exploit group"
+          end
+          
+          # Find all .m files in Exploit directory
+          exploit_files = Dir.glob('Exploit/**/*.m')
+          
+          if exploit_files.empty?
+            puts "❌ No .m files found in Exploit directory"
             exit 1
           end
           
-          files_to_add = [
-            'ClearSword.m', 'ANE.m', 'KASLRLeak.m', 'CSKRW.m',
-            'UPLLeak.m', 'AVERace.m', 'Lum1naKRW.m', 'FusionChain.m',
-            'P009Controller.m', 'P052Controller.m', 'P039Controller.m',
-            'Momentarius.m', 'Persistence.m'
-          ]
+          puts "Found #{exploit_files.count} files to process"
           
-          files_to_add.each do |filename|
-            # Skip if already in target
-            existing = target.source_build_phase.files.find { |f| 
-              f.file_ref&.path == filename || f.file_ref&.path == "Exploit/#{filename}"
-            }
+          added = 0
+          skipped = 0
+          
+          exploit_files.each do |file_path|
+            next unless File.exist?(file_path)
             
-            if existing
-              puts "✓ #{filename} already in target"
-              next
+            # Check if already in project
+            existing = project.files.find { |f| f.path == file_path }
+            
+            if existing.nil?
+              puts "➕ Adding #{file_path}"
+              ref = exploit_group.new_file(file_path)
+              target.source_build_phase.add_file_reference(ref)
+              added += 1
+            else
+              puts "✅ #{file_path} already in project"
+              # Ensure in compile sources
+              unless target.source_build_phase.files_references.include?(existing)
+                target.source_build_phase.add_file_reference(existing)
+                puts "   └─ Added to compile sources"
+              end
+              skipped += 1
             end
-            
-            # Find file reference
-            file_ref = exploit_group.files.find { |f| f.path == filename }
-            next if file_ref.nil?
-            
-            # Add to target
-            target.source_build_phase.add_file_reference(file_ref)
-            puts "+ Added #{filename}"
           end
           
           project.save
-          puts '💾 Project saved'
+          puts ""
+          puts "✅ Project saved!"
+          puts "   Added: #{added}, Skipped: #{skipped}"
           RUBY
 
       - name: Build (unsigned)
