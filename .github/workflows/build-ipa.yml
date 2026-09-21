@@ -33,12 +33,6 @@ jobs:
             exploit_group = project.main_group.new_group('Exploit', 'Exploit')
           end
           
-          # Find Bridges subgroup
-          bridges_group = exploit_group.groups.find { |g| g.path == 'Bridges' }
-          if bridges_group.nil?
-            bridges_group = exploit_group.new_group('Bridges', 'Bridges')
-          end
-          
           # Add all .m files from Exploit directory
           files_to_add = [
             'Exploit/ClearSword.m',
@@ -54,7 +48,7 @@ jobs:
             next unless File.exist?(filepath)
             
             # Check if already in target
-            exists = target.sources_build_phase.files.any? { |f| f.file_ref&.path == filepath }
+            exists = target.source_build_phase.files.any? { |f| f.file_ref&.path == filepath }
             if exists
               puts "✓ #{filepath} already in target"
               next
@@ -68,7 +62,7 @@ jobs:
             
             # Add to target and build phase
             target.add_file_references([file_ref])
-            target.sources_build_phase.add_file_reference(file_ref)
+            target.source_build_phase.add_file_reference(file_ref)
             puts "+ Added #{filepath} to target"
           end
           
