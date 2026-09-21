@@ -4,11 +4,10 @@
 #import <Foundation/Foundation.h>
 #include <stdint.h>
 
-#import "KASLRLeak.h"
-#import "UPLLeak.h"
-#import "CSKRW.h"
-#import "ANE.h"
-
-#import "cs_run.h"
+#import "Exploit/KASLRLeak.h"
+#import "Exploit/UPLLeak.h"
+#import "Exploit/CSKRW.h"
+#import "Exploit/ANE.h"
+#import "Exploit/Bridges/cs_run.h"
 
 #endif
