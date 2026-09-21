@@ -1,5 +1,3 @@
-name: Build IPA
-
 on:
   workflow_dispatch:
 
@@ -22,7 +20,8 @@ jobs:
           set -euo pipefail
           echo "=== Verifying source files ==="
           
-          files=(
+          # Objective-C implementation files
+          objc_files=(
             "Exploit/ClearSword.m"
             "Exploit/ANE.m"
             "Exploit/KASLRLeak.m"
@@ -38,7 +37,23 @@ jobs:
             "Exploit/Persistence.m"
           )
           
-          for file in "${files[@]}"; do
+          # Objective-C header files (for bridging)
+          header_files=(
+            "Exploit/P009Controller.h"
+            "Exploit/P052Controller.h"
+            "Exploit/P039Controller.h"
+          )
+          
+          # Swift files
+          swift_files=(
+            "Exploit/Bridges/ExploitManager.swift"
+          )
+          
+          # Bridging header
+          bridging_header="Exploit/Bridges/Lum1na-Bridging-Header.h"
+          
+          echo "Checking Objective-C .m files..."
+          for file in "${objc_files[@]}"; do
             if [ -f "$file" ]; then
               echo "✓ $file exists"
             else
@@ -46,6 +61,38 @@ jobs:
               exit 1
             fi
           done
+          
+          echo "Checking Objective-C .h files..."
+          for file in "${header_files[@]}"; do
+            if [ -f "$file" ]; then
+              echo "✓ $file exists"
+            else
+              echo "✗ $file MISSING"
+              exit 1
+            fi
+          done
+          
+          echo "Checking Swift files..."
+          for file in "${swift_files[@]}"; do
+            if [ -f "$file" ]; then
+              echo "✓ $file exists"
+            else
+              echo "✗ $file MISSING"
+              exit 1
+            fi
+          done
+          
+          echo "Checking bridging header..."
+          if [ -f "$bridging_header" ]; then
+            echo "✓ $bridging_header exists"
+            echo "Bridging header contents:"
+            cat "$bridging_header"
+          else
+            echo "✗ $bridging_header MISSING"
+            exit 1
+          fi
+          
+          echo "✅ All source files verified!"
 
       - name: Fix Import Paths (cs_run.h)
         run: |
@@ -56,9 +103,6 @@ jobs:
               echo "✅ Fixed cs_run.h"
             fi
           fi
-
-
-
 
       - name: Build (unsigned)
         run: |
@@ -74,6 +118,7 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             GCC_WARN_ABOUT_DUPLICATE_METHOD_NAME=NO \
+            SWIFT_OBJC_BRIDGING_HEADER="Exploit/Bridges/Lum1na-Bridging-Header.h" \
             build
 
       - name: Package IPA
