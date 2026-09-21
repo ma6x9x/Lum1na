@@ -1,15 +1,13 @@
-#ifndef BRIDGING_HEADER_H
-#define BRIDGING_HEADER_H
+#ifndef Lum1na_Bridging_Header_h
+#define Lum1na_Bridging_Header_h
 
-#import <Foundation/Foundation.h>
-#import "KASLRLeak.h"
-#import "UPLLeak.h"
-#import "CSKRW.h"
-#import "Momentarius.h"
-#import "Persistence.h"
+// ANE C API (from ANE.m)
+int cs_init(void);
+int cs_run(uint64_t *kb, uint64_t *ks);
+void cs_cleanup(void);
 
-// Native Exploit/*.m (KASLRLeak, UPLLeak, ClearSword, Lum1naKRW) are excluded from
-// the Lum1na app target via membershipExceptions. UI builds use Swift stubs in
-// Exploit/Bridges/NativeLeakStubs.swift. Do not import IOKit-backed headers here.
+// Add other C APIs here as they become available
+// int kaslr_leak(uint64_t *slide);
+// int upl_trigger(void);
 
-#endif
+#endif /* Lum1na_Bridging_Header_h */
