@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 
+// MARK: - Single Source of Truth for Stages
 enum ExploitStage: String, CaseIterable, Identifiable {
     case kaslr = "KASLR"
     case uaf = "Heap"
@@ -29,7 +30,6 @@ struct ContentView: View {
 
     private let individualStages: [ExploitStage] = [.kaslr, .uaf, .ane, .ppl, .persist]
 
-    /// Wave power from public ExploitManager state only (no mic).
     private var beaconPower: Double {
         manager.isRunning ? 0.85 : 0.18
     }
@@ -91,7 +91,6 @@ struct ContentView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
 
-            // Buttons → ExploitManager.runExploit(_:). Paste real stage/chain work there.
             HStack(spacing: 10) {
                 Button {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.86)) {
