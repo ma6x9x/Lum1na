@@ -29,39 +29,52 @@ jobs:
             fi
           done
 
-      - name: Add ClearSword.m to Xcode project
+      - name: Fix Xcode Project (Add ClearSword.m to target)
         run: |
           set -euo pipefail
           gem install xcodeproj
-          ruby -e "
+          ruby << 'RUBY'
           require 'xcodeproj'
+          
           project = Xcodeproj::Project.open('Lum1na.xcodeproj')
           target = project.targets.find { |t| t.name == 'Lum1na' }
           
-          # Check if ClearSword.m is already in the target
-          exists = target.source_build_phase.files.any? { |f| f.file_ref&.path == 'Exploit/ClearSword.m' }
+          # Check if ClearSword.m is already in the target (check multiple possible paths)
+          existing = target.source_build_phase.files.find { |f| 
+            path = f.file_ref&.path
+            path == 'Exploit/ClearSword.m' || path == 'ClearSword.m'
+          }
           
-          if exists
+          if existing
             puts '✓ ClearSword.m already in target'
-          else
-            # Find Exploit group
-            exploit_group = project.main_group.groups.find { |g| g.path == 'Exploit' }
-            if exploit_group.nil?
-              exploit_group = project.main_group.new_group('Exploit', 'Exploit')
-            end
-            
-            # Check if file ref exists but not in target
-            file_ref = exploit_group.find_file_by_path('Exploit/ClearSword.m')
-            if file_ref.nil?
-              file_ref = exploit_group.new_file('Exploit/ClearSword.m')
-            end
-            
-            target.add_file_references([file_ref])
-            target.source_build_phase.add_file_reference(file_ref)
-            project.save
-            puts '+ Added ClearSword.m to target'
+            exit 0
           end
-          "
+          
+          # Find Exploit group
+          exploit_group = project.main_group.groups.find { |g| g.path == 'Exploit' }
+          if exploit_group.nil?
+            exploit_group = project.main_group.new_group('Exploit', 'Exploit')
+          end
+          
+          # Check if file ref already exists in the group
+          file_ref = exploit_group.files.find { |f| f.path == 'ClearSword.m' }
+          
+          if file_ref.nil?
+            # Create file reference with path relative to the group
+            file_ref = exploit_group.new_file('ClearSword.m')
+            puts '+ Created file reference for ClearSword.m'
+          else
+            puts '✓ File reference already exists'
+          end
+          
+          # Add to target
+          target.add_file_references([file_ref])
+          target.source_build_phase.add_file_reference(file_ref)
+          puts '+ Added ClearSword.m to target'
+          
+          project.save
+          puts 'Project saved'
+          RUBY
 
       - name: Show Xcode / schemes
         run: |
