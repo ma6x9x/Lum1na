@@ -13,5 +13,8 @@
 #import "Exploit/FusionChain.h"
 #import "Exploit/Bridges/FusionChainDelegate.h"
 #import "Exploit/Bridges/cs_run.h"
+#import "Exploit/P009Controller.h"
+#import "Exploit/P052Controller.h"
+#import "Exploit/P039Controller.h"
 
 #endif
