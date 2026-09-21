@@ -1,1 +1,1 @@
-// Retired — use UI/MatrixConsoleView.swift (paste slot).
+// Retired liquid-glass console. Active paste slot: UI/MatrixConsoleView.swift
