@@ -31,20 +31,20 @@ struct MatrixConsoleView: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 3) {
-                            ForEach(manager.lines) { line in
-                                Text(line.text)
+                            ForEach(Array(manager.lines.enumerated()), id: \.offset) { index, line in
+                                Text(line)
                                     .font(.system(size: 11, design: .monospaced))
-                                    .foregroundStyle(line.color)
+                                    .foregroundStyle(Color.white.opacity(0.92))
                                     .frame(maxWidth: .infinity, alignment: .leading)
-                                    .id(line.id)
+                                    .id(index)
                             }
                         }
                         .padding(12)
                     }
                     .onChange(of: manager.lines.count) { _ in
-                        guard let last = manager.lines.last else { return }
+                        guard !manager.lines.isEmpty else { return }
                         withAnimation(.easeOut(duration: 0.12)) {
-                            proxy.scrollTo(last.id, anchor: .bottom)
+                            proxy.scrollTo(manager.lines.count - 1, anchor: .bottom)
                         }
                     }
                 }
