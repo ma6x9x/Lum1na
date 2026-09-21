@@ -21,15 +21,34 @@ jobs:
         run: |
           set -euo pipefail
           echo "=== Verifying source files ==="
-          for file in Exploit/ClearSword.m Exploit/ANE.m Exploit/KASLRLeak.m Exploit/CSKRW.m Exploit/UPLLeak.m Exploit/AVERace.m Exploit/Lum1naKRW.m; do
+          
+          # All .m files that must exist
+          files=(
+            "Exploit/ClearSword.m"
+            "Exploit/ANE.m"
+            "Exploit/KASLRLeak.m"
+            "Exploit/CSKRW.m"
+            "Exploit/UPLLeak.m"
+            "Exploit/AVERace.m"
+            "Exploit/Lum1naKRW.m"
+            "Exploit/FusionChain.m"
+            "Exploit/P009Controller.m"
+            "Exploit/P052Controller.m"
+            "Exploit/P039Controller.m"
+            "Exploit/Momentarius.m"
+            "Exploit/Persistence.m"
+          )
+          
+          for file in "${files[@]}"; do
             if [ -f "$file" ]; then
               echo "✓ $file exists"
             else
               echo "✗ $file MISSING"
+              exit 1
             fi
           done
 
-      - name: Fix Xcode Project (Add ClearSword.m to target)
+      - name: Fix Xcode Project (Add all .m files to target)
         run: |
           set -euo pipefail
           gem install xcodeproj
@@ -39,47 +58,64 @@ jobs:
           project = Xcodeproj::Project.open('Lum1na.xcodeproj')
           target = project.targets.find { |t| t.name == 'Lum1na' }
           
-          # Check if ClearSword.m is already in the target (check multiple possible paths)
-          existing = target.source_build_phase.files.find { |f| 
-            path = f.file_ref&.path
-            path == 'Exploit/ClearSword.m' || path == 'ClearSword.m'
-          }
-          
-          if existing
-            puts '✓ ClearSword.m already in target'
-            exit 0
-          end
-          
-          # Find Exploit group
+          # Find or create Exploit group
           exploit_group = project.main_group.groups.find { |g| g.path == 'Exploit' }
           if exploit_group.nil?
             exploit_group = project.main_group.new_group('Exploit', 'Exploit')
+            puts '+ Created Exploit group'
           end
           
-          # Check if file ref already exists in the group
-          file_ref = exploit_group.files.find { |f| f.path == 'ClearSword.m' }
+          # All .m files that need to be in the target
+          files_to_add = [
+            'ClearSword.m',
+            'ANE.m',
+            'KASLRLeak.m',
+            'CSKRW.m',
+            'UPLLeak.m',
+            'AVERace.m',
+            'Lum1naKRW.m',
+            'FusionChain.m',
+            'P009Controller.m',
+            'P052Controller.m',
+            'P039Controller.m',
+            'Momentarius.m',
+            'Persistence.m'
+          ]
           
-          if file_ref.nil?
-            # Create file reference with path relative to the group
-            file_ref = exploit_group.new_file('ClearSword.m')
-            puts '+ Created file reference for ClearSword.m'
-          else
-            puts '✓ File reference already exists'
+          files_to_add.each do |filename|
+            # Check if already in target
+            existing = target.source_build_phase.files.find { |f| 
+              f.file_ref&.path == filename || f.file_ref&.path == "Exploit/#{filename}"
+            }
+            
+            if existing
+              puts "✓ #{filename} already in target"
+              next
+            end
+            
+            # Find or create file reference in Exploit group
+            file_ref = exploit_group.files.find { |f| f.path == filename }
+            
+            if file_ref.nil?
+              file_ref = exploit_group.new_file(filename)
+              puts "+ Created file reference for #{filename}"
+            else
+              puts "✓ File reference exists for #{filename}"
+            end
+            
+            # Add to target's compile sources
+            target.source_build_phase.add_file_reference(file_ref)
+            puts "+ Added #{filename} to Compile Sources"
           end
-          
-          # Add to target
-          target.add_file_references([file_ref])
-          target.source_build_phase.add_file_reference(file_ref)
-          puts '+ Added ClearSword.m to target'
           
           project.save
-          puts 'Project saved'
+          puts '💾 Project saved successfully'
           RUBY
 
       - name: Show Xcode / schemes
         run: |
           set -euo pipefail
-          ls -la Lum1na.xcodeproj/xcshareddata/xcschemes/
+          ls -la Lum1na.xcodeproj/xcshareddata/xcschemes/ || echo "No shared schemes"
           xcodebuild -list -project Lum1na.xcodeproj
 
       - name: Build (unsigned, for TrollStore / SideStore resign)
@@ -104,11 +140,11 @@ jobs:
           set -euo pipefail
           APP=$(find "$RUNNER_TEMP/DerivedData/Build/Products" -name 'Lum1na.app' -print -quit)
           if [ -z "$APP" ]; then
-            echo "Lum1na.app not found under DerivedData"
+            echo "❌ Lum1na.app not found under DerivedData"
             find "$RUNNER_TEMP/DerivedData/Build/Products" -maxdepth 4 -type d -print || true
             exit 1
           fi
-          echo "Using app: $APP"
+          echo "✅ Using app: $APP"
           rm -rf Payload Lum1na.ipa
           mkdir Payload
           cp -R "$APP" Payload/
