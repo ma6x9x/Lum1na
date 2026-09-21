@@ -31,83 +31,60 @@ struct ContentView: View {
 
     /// Wave power from public ExploitManager state only (no mic).
     private var beaconPower: Double {
-        manager.isRunning ? 0.78 : 0.15
+        manager.isRunning ? 0.85 : 0.18
     }
 
     var body: some View {
         ZStack {
             Lum1naPalette.field.ignoresSafeArea()
-            GlyphRainView(intensity: manager.isRunning ? 1.25 : 0.7)
+            // Quieter rain — star stays the hero
+            GlyphRainView(intensity: manager.isRunning ? 0.55 : 0.22)
 
             VStack(spacing: 0) {
                 header
-                    .padding(.top, 10)
+                    .padding(.top, 8)
 
-                Spacer(minLength: 6)
+                Spacer(minLength: 4)
 
                 StarBeaconView(isActive: manager.isRunning, power: beaconPower)
-                    .padding(.vertical, 4)
 
                 Text("The guiding light for Jailbreaks")
                     .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundStyle(Lum1naPalette.ice.opacity(0.92))
+                    .foregroundStyle(Lum1naPalette.ice.opacity(0.9))
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
-                    .padding(.top, 6)
+                    .padding(.horizontal, 28)
+                    .padding(.top, 2)
 
-                Spacer(minLength: 10)
+                Spacer(minLength: 8)
 
                 MatrixConsoleView()
-                    .frame(maxHeight: 200)
+                    .frame(maxHeight: 168)
                     .padding(.horizontal, 16)
 
-                Spacer(minLength: 10)
+                Spacer(minLength: 8)
 
                 chrome
                     .padding(.horizontal, 16)
-                    .padding(.bottom, 18)
+                    .padding(.bottom, 16)
             }
         }
     }
 
     private var header: some View {
-        ZStack {
-            HStack(spacing: 28) {
-                cloudWisp.offset(x: -6, y: 10)
-                Spacer()
-                cloudWisp.offset(x: 6, y: 6)
-            }
-            .padding(.horizontal, 28)
-            .opacity(0.55)
+        VStack(spacing: 4) {
+            Text("LUM1NA")
+                .font(.system(size: 34, weight: .bold, design: .rounded))
+                .foregroundStyle(Lum1naPalette.wordmarkGradient)
+                .shadow(color: Lum1naPalette.magenta.opacity(0.35), radius: 10)
 
-            VStack(spacing: 6) {
-                Text("Lum1na")
-                    .font(.system(size: 36, weight: .bold, design: .rounded))
-                    .foregroundStyle(Lum1naPalette.wordmarkGradient)
-                    .shadow(color: Lum1naPalette.magenta.opacity(0.35), radius: 10)
-
-                Text("v0.1 · private beta")
-                    .font(.system(size: 11, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.45))
-            }
+            Text("v0.1 · private beta")
+                .font(.system(size: 11, weight: .medium, design: .monospaced))
+                .foregroundStyle(.white.opacity(0.4))
         }
     }
 
-    private var cloudWisp: some View {
-        Capsule()
-            .fill(
-                LinearGradient(
-                    colors: [Color.white.opacity(0.14), Color.white.opacity(0.04)],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            )
-            .frame(width: 72, height: 18)
-            .blur(radius: 6)
-    }
-
     private var chrome: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 10) {
             deviceCard
 
             if showStages {
@@ -115,6 +92,8 @@ struct ContentView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
 
+            // Architecture preserved: buttons still call ExploitManager.runExploit(_:).
+            // Paste real stage / chain implementations into that switch — not here.
             HStack(spacing: 10) {
                 Button {
                     withAnimation(.spring(response: 0.35, dampingFraction: 0.86)) {
@@ -143,9 +122,9 @@ struct ContentView: View {
         LiquidGlassCard(cornerRadius: 18) {
             HStack(spacing: 12) {
                 Image(systemName: "iphone")
-                    .font(.system(size: 22, weight: .semibold))
+                    .font(.system(size: 20, weight: .semibold))
                     .foregroundStyle(Lum1naPalette.violet)
-                    .frame(width: 40, height: 40)
+                    .frame(width: 36, height: 36)
                     .background(
                         RoundedRectangle(cornerRadius: 10, style: .continuous)
                             .fill(Lum1naPalette.violet.opacity(0.18))
@@ -169,7 +148,7 @@ struct ContentView: View {
                     )
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 12)
+            .padding(.vertical, 11)
         }
     }
 
@@ -178,6 +157,7 @@ struct ContentView: View {
             HStack(spacing: 8) {
                 ForEach(individualStages) { stage in
                     Button {
+                        // Hook preserved — ExploitManager.runExploit(stage)
                         manager.runExploit(stage)
                     } label: {
                         Text(stage.rawValue)
