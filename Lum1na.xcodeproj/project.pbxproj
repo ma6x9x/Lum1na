@@ -276,7 +276,7 @@
 			mainGroup = E6DAA277305DD93E00B0914F;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
-			productRefGroup = E6DAA281305DD93E00B0914F /* Products */;
+			productRefGroup = E6DAA281305DD94500B0914F /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -481,6 +481,10 @@
 				DEVELOPMENT_TEAM = GLVKP6RZ39;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/Support/IOSurfaceShim",
+				);
 				INFOPLIST_KEY_CFBundleDisplayName = Lum1na;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -511,6 +515,10 @@
 				DEVELOPMENT_TEAM = GLVKP6RZ39;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/Support/IOSurfaceShim",
+				);
 				INFOPLIST_KEY_CFBundleDisplayName = Lum1na;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
