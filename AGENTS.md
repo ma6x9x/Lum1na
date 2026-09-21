@@ -117,6 +117,37 @@ The project uses a filesystem-synchronized source group. Do not casually add dup
 - `docs/PASTE_MAP.md` — historical paste map; use it as a migration note, not as proof that a file is current.
 - `README.md` — project scope, supported-device notes, layout, and safety/polish policy.
 
+## UI and structure guardrails
+
+Before any change to app structure, SwiftUI view composition, or project layout, inspect these files in order and confirm they still match the intended architecture:
+
+1. `App/Lum1naApp.swift`
+2. `App/ContentView.swift`
+3. `Exploit/Bridges/ExploitManager.swift`
+4. `UI/StarBeaconView.swift`
+5. `UI/MatrixConsoleView.swift`
+6. `UI/Lum1naTheme.swift`
+7. `Lum1na-Bridging-Header.h`
+8. `Lum1na.xcodeproj/project.pbxproj`
+
+This is the minimum read set for any UI or structure-related task. If a change touches the app entry point, project files, SwiftUI layout, or bridging imports, these are required reads; do not skip them.
+
+Never do any of the following without checking the project file and target membership:
+
+- Add a new Swift file to the app target.
+- Rename or move a SwiftUI view or model file.
+- Add a new Objective-C header or implementation that should be visible to Swift.
+- Change the bridging header or import paths.
+- Edit `PBXFileSystemSynchronizedRootGroup`, `PBXFileSystemSynchronizedBuildFileExceptionSet`, or target membership in `project.pbxproj`.
+
+If a UI change compiles locally but fails in CI, the most common causes are:
+
+- the file was not actually included in the target
+- the bridging header imports the wrong path
+- the file is present but not in `project.pbxproj`
+- Swift/Objective-C interop types do not match the actual signatures
+- a generated `xcuserdata` or stale state is being mistaken for repository truth
+
 ## Build and CI facts
 
 The Build IPA workflow currently:
@@ -150,3 +181,5 @@ Agents must verify the actual current declarations before proposing a fix. Do no
 8. Do not treat historical notes in `docs/PASTE_MAP.md` or this file as newer than the pinned repository tree.
 9. Never fabricate file contents, implementation status, commit SHAs, or test results.
 10. Keep generated artifacts, `.ipa` files, archives, and Xcode user data out of commits.
+11. For any UI or structure change, verify the file is included in the target and the SwiftUI types resolve in the app target before claiming the structure is valid.
+12. Do not confuse generated local Xcode data under `Lum1na.xcodeproj/xcuserdata` with repository source code.
