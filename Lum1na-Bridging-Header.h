@@ -6,9 +6,9 @@
 
 #import "Exploit/KASLRLeak.h"
 #import "Exploit/UPLLeak.h"
-#import "Exploit/CSKRW.h"      // Keep for compatibility
+#import "Exploit/CSKRW.h"
 #import "Exploit/ANE.h"
-#import "Exploit/Lum1naKRW.h"  // ADD THIS
+#import "Exploit/Lum1naKRW.h"
 #import "Exploit/Bridges/cs_run.h"
 
 #endif
