@@ -57,59 +57,52 @@ jobs:
           
           project = Xcodeproj::Project.open('Lum1na.xcodeproj')
           target = project.targets.find { |t| t.name == 'Lum1na' }
-          
-          # Find or create Exploit group
-          exploit_group = project.main_group.groups.find { |g| g.path == 'Exploit' }
-          if exploit_group.nil?
-            exploit_group = project.main_group.new_group('Exploit', 'Exploit')
-            puts '+ Created Exploit group'
+          if target.nil?
+            puts '❌ Lum1na target not found'
+            exit 1
           end
           
-          # All .m files that need to be in the target
-          files_to_add = [
-            'ClearSword.m',
-            'ANE.m',
-            'KASLRLeak.m',
-            'CSKRW.m',
-            'UPLLeak.m',
-            'AVERace.m',
-            'Lum1naKRW.m',
-            'FusionChain.m',
-            'P009Controller.m',
-            'P052Controller.m',
-            'P039Controller.m',
-            'Momentarius.m',
-            'Persistence.m'
+          # Find Exploit group
+          exploit_group = project.main_group.groups.find { |g| g.path == 'Exploit' }
+          if exploit_group.nil?
+            puts '❌ Exploit group not found'
+            exit 1
+          end
+          
+          # Files to ensure are in target's Compile Sources
+          files_to_check = [
+            'ClearSword.m', 'ANE.m', 'KASLRLeak.m', 'CSKRW.m',
+            'UPLLeak.m', 'AVERace.m', 'Lum1naKRW.m', 'FusionChain.m',
+            'P009Controller.m', 'P052Controller.m', 'P039Controller.m',
+            'Momentarius.m', 'Persistence.m'
           ]
           
-          files_to_add.each do |filename|
-            # Check if already in target
-            existing = target.source_build_phase.files.find { |f| 
-              f.file_ref&.path == filename || f.file_ref&.path == "Exploit/#{filename}"
-            }
+          files_to_check.each do |filename|
+            # Check before adding so rerunning the workflow is idempotent.
+            existing = target.source_build_phase.files.find do |build_file|
+              ref_path = build_file.file_ref&.path
+              ref_path == filename || ref_path == "Exploit/#{filename}"
+            end
             
             if existing
-              puts "✓ #{filename} already in target"
+              puts "✓ #{filename} already in Compile Sources"
               next
             end
             
-            # Find or create file reference in Exploit group
-            file_ref = exploit_group.files.find { |f| f.path == filename }
+            # Find the existing file reference in the Exploit group.
+            file_ref = exploit_group.files.find { |file| file.path == filename }
             
             if file_ref.nil?
-              file_ref = exploit_group.new_file(filename)
-              puts "+ Created file reference for #{filename}"
-            else
-              puts "✓ File reference exists for #{filename}"
+              puts "⚠️ #{filename} not found in Exploit group"
+              next
             end
             
-            # Add to target's compile sources
             target.source_build_phase.add_file_reference(file_ref)
             puts "+ Added #{filename} to Compile Sources"
           end
           
           project.save
-          puts '💾 Project saved successfully'
+          puts '💾 Project saved'
           RUBY
 
       - name: Show Xcode / schemes
