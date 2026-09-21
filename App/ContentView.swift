@@ -1,7 +1,6 @@
 import SwiftUI
 
-// PASTE SLOT: overwrite this file with your other agent's ContentView.swift
-// (stubs below match that API so the project compiles before you paste)
+// PASTE SLOT: overwrite with your other agent's ContentView.swift
 
 struct ContentView: View {
     @StateObject private var manager = ExploitManager.shared
