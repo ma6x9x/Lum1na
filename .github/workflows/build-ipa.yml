@@ -50,7 +50,7 @@ jobs:
           )
           
           # Bridging header
-          bridging_header="Exploit/Bridges/Lum1na-Bridging-Header.h"
+          bridging_header="Lum1na-Bridging-Header.h"
           
           echo "Checking Objective-C .m files..."
           for file in "${objc_files[@]}"; do
@@ -118,7 +118,7 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             GCC_WARN_ABOUT_DUPLICATE_METHOD_NAME=NO \
-            SWIFT_OBJC_BRIDGING_HEADER="Exploit/Bridges/Lum1na-Bridging-Header.h" \
+            SWIFT_OBJC_BRIDGING_HEADER="Lum1na-Bridging-Header.h" \
             build
 
       - name: Package IPA
