@@ -29,6 +29,40 @@ jobs:
             fi
           done
 
+      - name: Add ClearSword.m to Xcode project
+        run: |
+          set -euo pipefail
+          gem install xcodeproj
+          ruby -e "
+          require 'xcodeproj'
+          project = Xcodeproj::Project.open('Lum1na.xcodeproj')
+          target = project.targets.find { |t| t.name == 'Lum1na' }
+          
+          # Check if ClearSword.m is already in the target
+          exists = target.source_build_phase.files.any? { |f| f.file_ref&.path == 'Exploit/ClearSword.m' }
+          
+          if exists
+            puts '✓ ClearSword.m already in target'
+          else
+            # Find Exploit group
+            exploit_group = project.main_group.groups.find { |g| g.path == 'Exploit' }
+            if exploit_group.nil?
+              exploit_group = project.main_group.new_group('Exploit', 'Exploit')
+            end
+            
+            # Check if file ref exists but not in target
+            file_ref = exploit_group.find_file_by_path('Exploit/ClearSword.m')
+            if file_ref.nil?
+              file_ref = exploit_group.new_file('Exploit/ClearSword.m')
+            end
+            
+            target.add_file_references([file_ref])
+            target.source_build_phase.add_file_reference(file_ref)
+            project.save
+            puts '+ Added ClearSword.m to target'
+          end
+          "
+
       - name: Show Xcode / schemes
         run: |
           set -euo pipefail
