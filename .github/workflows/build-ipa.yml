@@ -17,58 +17,17 @@ jobs:
           sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
           xcodebuild -version
 
-      - name: Fix Xcode Project (Add missing source files)
+      - name: Verify source files exist
         run: |
           set -euo pipefail
-          gem install xcodeproj
-          ruby << 'RUBY'
-          require 'xcodeproj'
-          
-          project = Xcodeproj::Project.open('Lum1na.xcodeproj')
-          target = project.targets.find { |t| t.name == 'Lum1na' }
-          
-          # Find Exploit group
-          exploit_group = project.main_group.groups.find { |g| g.path == 'Exploit' }
-          if exploit_group.nil?
-            exploit_group = project.main_group.new_group('Exploit', 'Exploit')
-          end
-          
-          # Add all .m files from Exploit directory
-          files_to_add = [
-            'Exploit/ClearSword.m',
-            'Exploit/ANE.m',
-            'Exploit/KASLRLeak.m',
-            'Exploit/CSKRW.m',
-            'Exploit/UPLLeak.m',
-            'Exploit/AVERace.m',
-            'Exploit/Lum1naKRW.m'
-          ]
-          
-          files_to_add.each do |filepath|
-            next unless File.exist?(filepath)
-            
-            # Check if already in target
-            exists = target.source_build_phase.files.any? { |f| f.file_ref&.path == filepath }
-            if exists
-              puts "✓ #{filepath} already in target"
-              next
-            end
-            
-            # Find or create file reference
-            file_ref = exploit_group.find_file_by_path(filepath)
-            if file_ref.nil?
-              file_ref = exploit_group.new_file(filepath)
-            end
-            
-            # Add to target and build phase
-            target.add_file_references([file_ref])
-            target.source_build_phase.add_file_reference(file_ref)
-            puts "+ Added #{filepath} to target"
-          end
-          
-          project.save
-          puts "Project updated successfully"
-          RUBY
+          echo "=== Verifying source files ==="
+          for file in Exploit/ClearSword.m Exploit/ANE.m Exploit/KASLRLeak.m Exploit/CSKRW.m Exploit/UPLLeak.m Exploit/AVERace.m Exploit/Lum1naKRW.m; do
+            if [ -f "$file" ]; then
+              echo "✓ $file exists"
+            else
+              echo "✗ $file MISSING"
+            fi
+          done
 
       - name: Show Xcode / schemes
         run: |
