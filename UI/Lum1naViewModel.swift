@@ -38,10 +38,11 @@ class Lum1naViewModel: ObservableObject {
         appendToConsole("║ Device: \(device.modelName.padding(toLength: 26, withPad: " ", startingAt: 0)) ║")
         appendToConsole("║ Chip:   \(device.chipName.padding(toLength: 26, withPad: " ", startingAt: 0)) ║")
         appendToConsole("║ iOS:    \(device.osVersion.padding(toLength: 26, withPad: " ", startingAt: 0)) ║")
-let supportStatus = device.isSupported ? "SUPPORTED ✓" : "UNSUPPORTED ✗"
-appendToConsole(
-    "║ Status: \(supportStatus.padding(toLength: 26, withPad: " ", startingAt: 0)) ║"
-)
+        
+        // Fixed: Properly formatted support status
+        let supportStatus = device.isSupported ? "SUPPORTED ✓" : "UNSUPPORTED ✗"
+        appendToConsole("║ Status: \(supportStatus.padding(toLength: 26, withPad: " ", startingAt: 0)) ║")
+        
         appendToConsole("╚══════════════════════════════════════╝")
         appendToConsole("")
         appendToConsole("[*] Exploit chain loaded")
@@ -81,7 +82,6 @@ appendToConsole(
         appendToConsole("[*] Stage 1/5: KASLR Bypass")
         appendToConsole("[*] ├─ Detecting kernel slide...")
         
-        // Simulate work
         try? await Task.sleep(nanoseconds: 800_000_000)
         appendToConsole("[*] ├─ Scanning memory regions...")
         try? await Task.sleep(nanoseconds: 600_000_000)
