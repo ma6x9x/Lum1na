@@ -125,7 +125,7 @@ class Lum1naViewModel: ObservableObject {
         let offsets = getDeviceOffsets()
         let tag = String(cString: offsets.tag)
         log("Device profile: \(offsets.tag)", level: .info)
-        log("Static base: 0x\(String(offsets.static_base, radix: 16))", level: .info)
+        log("Static base: 0x\(String(offsets.staticBase, radix: 16))", level: .info)
     }
     
     func detectDevice() {
