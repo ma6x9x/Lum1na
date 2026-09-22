@@ -65,12 +65,12 @@ struct CentralHeapView: View {
     }
     
     private func calculateRotation(at date: Date, speed: Double) -> Double {
-        let time = date.timeIntervalSinceReferenceTime
+        let time = date.timeIntervalSince1970
         return (time * 10 * speed).truncatingRemainder(dividingBy: 360)
     }
 }
 
-// HexagonRing and HexagonShape stay the same...
+// HexagonRing uses the shared HexagonShape from HexagonBadgeView.swift.
 struct HexagonRing: View {
     let isInner: Bool
     let color: Color
@@ -79,7 +79,7 @@ struct HexagonRing: View {
     var body: some View {
         Canvas { context, size in
             let center = CGPoint(x: size.width / 2, y: size.height / 2)
-            let timeVal = time.timeIntervalSinceReferenceDate
+            let timeVal = time.timeIntervalSince1970
             
             let baseRadius = isInner ? 45.0 : 55.0
             let radius = baseRadius + sin(timeVal * 2) * 3
@@ -96,21 +96,5 @@ struct HexagonRing: View {
             context.stroke(path, with: .color(color.opacity(0.4)), lineWidth: isInner ? 1 : 1.5)
         }
         .frame(width: 120, height: 120)
-    }
-}
-
-struct HexagonShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let center = CGPoint(x: rect.midX, y: rect.midY)
-        let radius = min(rect.width, rect.height) / 2
-        for i in 0..<6 {
-            let angle = Double(i) * .pi / 3 - .pi / 2
-            let x = center.x + cos(angle) * radius
-            let y = center.y + sin(angle) * radius
-            if i == 0 { path.move(to: CGPoint(x: x, y: y)) } else { path.addLine(to: CGPoint(x: x, y: y)) }
-        }
-        path.closeSubpath()
-        return path
     }
 }
