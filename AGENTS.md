@@ -1,81 +1,79 @@
-# AGENTS.md — Lum1na repository guide
+# AGENTS.md — Lum1na contributor and coding-agent guide
 
-This file is the source-of-truth navigation guide for coding agents working in `ma6x9x/Lum1na`. Read it before inspecting or editing anything.
+This is the operational guide for working in `ma6x9x/Lum1na`. Treat the repository at the pinned commit as the source of truth; do not rely on remembered file lists, old agent messages, or historical notes.
 
-## Repository identity and freshness
+## 1. Start every task this way
+
+1. Resolve the current `main` tip:
+   `https://api.github.com/repos/ma6x9x/Lum1na/commits?sha=main&per_page=1`
+2. Record the returned commit SHA.
+3. Read the complete pinned tree:
+   `https://api.github.com/repos/ma6x9x/Lum1na/git/trees/<SHA>?recursive=1`
+4. Read relevant files from that same SHA only.
+5. Before editing, confirm each exact path exists in the pinned tree.
+6. After editing, re-check the diff and run the narrowest relevant validation available.
+
+Current repository facts:
 
 - Repository: `ma6x9x/Lum1na`
 - Default branch: `main`
-- Repository URL: https://github.com/ma6x9x/Lum1na
-- Build workflow: [`.github/workflows/build-ipa.yml`](.github/workflows/build-ipa.yml)
-- Xcode project: [`Lum1na.xcodeproj`](Lum1na.xcodeproj)
+- Project: `Lum1na.xcodeproj`
+- Shared scheme: `Lum1na`
+- Primary CI workflow: `.github/workflows/build-ipa.yml`
+- Current pinned tip used for this guide: `052d10ebedfc3ab3d16a2e18ab37a6493f373b5d`
 
-Never rely on a remembered file list or an earlier agent response. At the start of every task:
+The last item is only the revision used to write this document. Re-resolve `main` at the start of the next task.
 
-1. Resolve the current tip of `main` from `https://api.github.com/repos/ma6x9x/Lum1na/commits?sha=main&per_page=1`.
-2. Record that commit SHA.
-3. Read the complete tree from `https://api.github.com/repos/ma6x9x/Lum1na/git/trees/<SHA>?recursive=1`.
-4. Read all relevant files at that same SHA. Do not mix files from different revisions.
-5. Before changing a file, confirm that its exact path exists in the pinned tree.
+## 2. Repository map
 
-The latest inspected CI snapshot associated with the Build IPA failure was commit `98a3f2952bb4cd34c131220086f15fd78b3fb360`. That SHA is historical context only; agents must resolve the current `main` tip before working.
+### App and UI
 
-## Current source layout
-
-### Application and UI
-
-- `App/Lum1naApp.swift` — SwiftUI application entry point.
-- `App/ContentView.swift` — primary application view.
-- `UI/ConsoleLine.swift` — console line model.
+- `App/Lum1naApp.swift` — SwiftUI `@main` entry point.
+- `App/ContentView.swift` — primary screen and stage controls.
+- `UI/Lum1naViewModel.swift` — UI-facing state support.
+- `UI/Lum1naTheme.swift` — palette and reusable visual styles.
 - `UI/MatrixConsoleView.swift` — console presentation.
-- `UI/GlyphRainView.swift` — glyph-rain animation.
-- `UI/LiquidBubbleMotion.swift` — liquid bubble motion.
-- `UI/Lum1naTheme.swift` — theme definitions.
-- `UI/RainbowWaveRibbon.swift` — ribbon animation.
-- `UI/StarBeaconView.swift` — star beacon view.
+- `UI/ConsoleLine.swift` — console-line model.
+- `UI/StarBeaconView.swift`, `UI/GlyphRainView.swift`, `UI/LiquidBubbleMotion.swift`, `UI/RainbowWaveRibbon.swift`, `UI/CentralHeapView.swift`, `UI/CircuitBackgroundView.swift`, `UI/HexagonBadgeView.swift`, `UI/ExploitStageSelector.swift` — visual components and effects.
 
-### Runtime coordination and support
+### Runtime and support
 
-- `Bootstrap/BootstrapCoordinator.swift` — bootstrap coordination.
-- `Device/DeviceCapabilities.swift` — device capability logic.
-- `Device/DeviceUtils.h` and `Device/DeviceUtils.m` — Objective-C device helpers.
+- `Bootstrap/BootstrapCoordinator.swift` — bootstrap prerequisites and preparation.
+- `Device/DeviceCapabilities.swift` — device profile protocol and model.
+- `Device/DeviceUtils.swift` — device utility implementation currently present in the tree.
 - `Resources/Compatibility.swift` — compatibility helpers.
-- `Session/Logger.swift` — session logging.
-- `Session/SessionPhase.swift` — session state/phase definitions.
-- `Support/IOSurfaceShim/IOSurface/IOSurface.h` — IOSurface shim declarations.
+- `Session/Logger.swift` and `Session/SessionPhase.swift` — session logging and phases.
+- `Support/IOSurfaceShim/IOSurface/IOSurface.h` — SDK compatibility shim.
 
-### Exploit and bridge sources
+### Exploit and bridge code
 
-Treat this directory as low-level research code. Do not invent APIs, controller names, method signatures, exploit behavior, offsets, or missing files. Read the corresponding header and implementation together before making claims.
+Treat `Exploit/` as low-level, hardware/build-specific research code. Do not invent APIs, offsets, controller names, signatures, exploit behavior, or implementation status. Read a header and its implementation together before describing or changing behavior.
 
-- `Exploit/ANE.h`, `Exploit/ANE.m`
-- `Exploit/AVERace.h`, `Exploit/AVERace.m`
-- `Exploit/CSKRW.h`, `Exploit/CSKRW.m`
-- `Exploit/ClearSword.m`
-- `Exploit/DeviceUtils.h`, `Exploit/DeviceUtils.m`
-- `Exploit/FusionChain.h`, `Exploit/FusionChain.m`
-- `Exploit/KASLRLeak.h`, `Exploit/KASLRLeak.m`
-- `Exploit/Lum1naKRW.h`, `Exploit/Lum1naKRW.m`
-- `Exploit/Momentarius.h`, `Exploit/Momentarius.m`
-- `Exploit/P009Controller.h`, `Exploit/P009Controller.m`
-- `Exploit/P039Controller.h`, `Exploit/P039Controller.m`
-- `Exploit/P052Controller.h`, `Exploit/P052Controller.m`
-- `Exploit/Persistence.h`, `Exploit/Persistence.m`
-- `Exploit/UPLLeak.h`, `Exploit/UPLLeak.m`
-- `Exploit/Bridges/ExploitManager.swift` — Swift orchestration and UI-facing bridge.
-- `Exploit/Bridges/FusionChainDelegate.h` — FusionChain delegate declarations.
-- `Exploit/Bridges/NativeLeakStubs.swift` — Swift native-leak stubs.
+Important bridge files:
+
+- `Exploit/Bridges/ExploitManager.swift` — `@MainActor` UI-facing coordinator.
+- `Exploit/Bridges/ExploitControllerAdapters.swift` — Swift adapters for Objective-C controller methods.
+- `Exploit/Bridges/FusionChainDelegate.h` — delegate declarations.
+- `Exploit/Bridges/NativeLeakStubs.swift` — native-leak stubs.
 - `Exploit/Bridges/cs_run.h` — C/Objective-C bridge declarations.
 
-The three controller pairs are real repository files:
+Important Objective-C pairs include:
 
 - `Exploit/P009Controller.h` + `Exploit/P009Controller.m`
 - `Exploit/P052Controller.h` + `Exploit/P052Controller.m`
 - `Exploit/P039Controller.h` + `Exploit/P039Controller.m`
+- `Exploit/ANE.h` + `Exploit/ANE.m`
+- `Exploit/AVERace.h` + `Exploit/AVERace.m`
+- `Exploit/CSKRW.h` + `Exploit/CSKRW.m`
+- `Exploit/FusionChain.h` + `Exploit/FusionChain.m`
+- `Exploit/KASLRLeak.h` + `Exploit/KASLRLeak.m`
+- `Exploit/Lum1naKRW.h` + `Exploit/Lum1naKRW.m`
+- `Exploit/Momentarius.h` + `Exploit/Momentarius.m`
+- `Exploit/UPLLeak.h` + `Exploit/UPLLeak.m`
 
-Do not report these controllers as absent without first checking the pinned tree and both files. Do not assume their Objective-C interfaces match a Swift tuple-returning protocol.
+Additional probe, profile, APFS, JPEG UAF, Lockdownd, and persistence sources are present under `Exploit/`; verify their exact paths in the pinned tree before referencing them.
 
-### Kernel map and primitive layers
+### Primitive and kernel-map layers
 
 - `KernelMap/KernelMapDescriptor.swift`
 - `KernelMap/KernelRW.swift`
@@ -83,14 +81,20 @@ Do not report these controllers as absent without first checking the pinned tree
 - `Primitive/PrimitiveProvider.swift`
 - `Exploit/ExploitProvider.swift`
 
-### Project integration and interop
+Do not describe placeholder methods as functional. In particular, inspect `KernelMap/KernelRW.swift` before making claims about kernel read/write capability.
 
-- `Lum1na.xcodeproj/project.pbxproj` — authoritative target membership and build settings.
-- `Lum1na.xcodeproj/xcshareddata/xcschemes/Lum1na.xcscheme` — shared build scheme.
-- `Lum1na-Bridging-Header.h` — current Swift/Objective-C bridge header.
-- `Lum1na.entitlements` — app entitlements.
+### Tests and resources
 
-The current bridging header imports these paths:
+- `Lum1naTests/Lum1naTests.swift` — unit tests.
+- `UITests/Lum1naUITests.swift` — UI tests.
+- `Assets.xcassets/` — app assets.
+- `model/` — bundled Core ML resources, including compiled/generated model data.
+- `docs/development.md` — experiment-record requirements.
+- `docs/PASTE_MAP.md` — historical migration note, not proof of current files.
+
+## 3. Swift/Objective-C interop checklist
+
+The bridge is intentionally explicit. Current `Lum1na-Bridging-Header.h` imports:
 
 ```objc
 #import "Exploit/KASLRLeak.h"
@@ -101,85 +105,88 @@ The current bridging header imports these paths:
 #import "Exploit/FusionChain.h"
 #import "Exploit/Bridges/FusionChainDelegate.h"
 #import "Exploit/Bridges/cs_run.h"
+#import "Exploit/P009Controller.h"
+#import "Exploit/P052Controller.h"
+#import "Exploit/P039Controller.h"
 ```
 
-Before diagnosing a Swift `cannot find ... in scope` error, inspect both `Lum1na-Bridging-Header.h` and the `SWIFT_OBJC_BRIDGING_HEADER` setting in `Lum1na.xcodeproj/project.pbxproj`. Also inspect the controller headers and target membership. The CI file's existence check does not prove that a file is compiled or imported.
+Before diagnosing `cannot find ... in scope`, inspect all of the following at the same revision:
 
-The project uses a filesystem-synchronized source group. Do not casually add duplicate PBX file references. Confirm target membership and the synchronized-group exception list in `project.pbxproj` first.
+1. The relevant `.h` and `.m` files.
+2. `Lum1na-Bridging-Header.h`.
+3. `SWIFT_OBJC_BRIDGING_HEADER` in `Lum1na.xcodeproj/project.pbxproj`.
+4. `Exploit/Bridges/ExploitControllerAdapters.swift`.
+5. Target membership and filesystem-synchronized-group exceptions in `project.pbxproj`.
 
-### Tests, resources, and documentation
+The Objective-C controller APIs are authoritative. Do not assume an Objective-C method can be represented as a Swift tuple-returning `@objc` protocol, and do not add duplicate declarations to make an error disappear.
 
-- `Lum1naTests/Lum1naTests.swift` — unit tests.
-- `UITests/Lum1naUITests.swift` — UI tests.
-- `Assets.xcassets/` — app assets.
-- `model/` — bundled Core ML model resources; treat compiled model files as binary/generated resources.
-- `docs/development.md` — development and session notes.
-- `docs/PASTE_MAP.md` — historical paste map; use it as a migration note, not as proof that a file is current.
-- `README.md` — project scope, supported-device notes, layout, and safety/polish policy.
+The project uses `PBXFileSystemSynchronizedRootGroup`. Do not casually add PBX file references or manually duplicate source entries. Confirm the synchronized root and exception list before changing project structure.
 
-## UI and structure guardrails
+## 4. Build and CI
 
-Before any change to app structure, SwiftUI view composition, or project layout, inspect these files in order and confirm they still match the intended architecture:
+The manually dispatched IPA workflow `.github/workflows/build-ipa.yml` currently:
+
+1. Runs on `macos-15`.
+2. Selects `/Applications/Xcode_16.4.app/Contents/Developer`.
+3. Verifies selected source, header, bridge, and icon files.
+4. May rewrite imports in `Exploit/Bridges/cs_run.h` in the CI checkout.
+5. Applies a small SwiftUI compatibility replacement step in the CI checkout.
+6. Builds the `Lum1na` scheme in `Release` for `iphoneos` with signing disabled.
+7. Packages `Lum1na.app` as `Lum1na.ipa` and uploads it as `Lum1na-ipa`.
+
+Equivalent core command:
+
+```bash
+xcodebuild \
+  -project Lum1na.xcodeproj \
+  -scheme Lum1na \
+  -configuration Release \
+  -sdk iphoneos \
+  -destination 'generic/platform=iOS' \
+  CODE_SIGNING_ALLOWED=NO \
+  CODE_SIGNING_REQUIRED=NO \
+  CODE_SIGN_IDENTITY="" \
+  build
+```
+
+Local device installation or archiving requires an authorized signing team/device. Do not claim a build or test passed unless it actually ran and passed. The Node 20 deprecation warning in Actions is not, by itself, a Swift compilation failure.
+
+## 5. Change rules
+
+- Read `README.md` and this file before editing.
+- Prefer the smallest change that addresses the observed problem.
+- Preserve public APIs unless the task explicitly requests an API change.
+- For UI or project-layout changes, inspect the app entry point, `ContentView`, `ExploitManager`, affected UI components, bridging header, and `project.pbxproj` first.
+- For interop changes, inspect headers, implementations, adapters, bridge imports, and target settings together.
+- Keep generated Xcode user data, DerivedData, archives, dSYMs, IPAs, signing material, and secrets out of commits.
+- Do not modify low-level exploit triggers, kernel read/write paths, offsets, or entitlements as a documentation/build-hygiene shortcut.
+- Record experiments in `docs/development.md` with device model, OS version/build, Xcode version, component, result, and recovery steps.
+- If a file is missing, report the exact pinned-tree lookup performed; never infer absence from an old README.
+- If CI mutates files temporarily, do not copy those generated changes back into the repository without explicit justification.
+
+## 6. Suggested investigation order
+
+For a build failure:
+
+1. Pin the revision and inspect the failing workflow.
+2. Read the exact compiler error and identify the first real error.
+3. Confirm the file exists and is in the intended target.
+4. For Swift/Objective-C errors, follow the interop checklist above.
+5. Reproduce with the narrowest `xcodebuild` command available.
+6. Make one focused change, then rerun validation.
+
+For a UI change:
 
 1. `App/Lum1naApp.swift`
 2. `App/ContentView.swift`
 3. `Exploit/Bridges/ExploitManager.swift`
-4. `UI/StarBeaconView.swift`
-5. `UI/MatrixConsoleView.swift`
-6. `UI/Lum1naTheme.swift`
-7. `Lum1na-Bridging-Header.h`
-8. `Lum1na.xcodeproj/project.pbxproj`
+4. The affected UI component(s)
+5. `UI/Lum1naTheme.swift`
+6. `Lum1na-Bridging-Header.h` if bridge symbols are involved
+7. `Lum1na.xcodeproj/project.pbxproj`
 
-This is the minimum read set for any UI or structure-related task. If a change touches the app entry point, project files, SwiftUI layout, or bridging imports, these are required reads; do not skip them.
+For low-level research code, stop and request clarification rather than guessing at missing primitives, offsets, devices, or exploit semantics.
 
-Never do any of the following without checking the project file and target membership:
+## 7. Safety and scope
 
-- Add a new Swift file to the app target.
-- Rename or move a SwiftUI view or model file.
-- Add a new Objective-C header or implementation that should be visible to Swift.
-- Change the bridging header or import paths.
-- Edit `PBXFileSystemSynchronizedRootGroup`, `PBXFileSystemSynchronizedBuildFileExceptionSet`, or target membership in `project.pbxproj`.
-
-If a UI change compiles locally but fails in CI, the most common causes are:
-
-- the file was not actually included in the target
-- the bridging header imports the wrong path
-- the file is present but not in `project.pbxproj`
-- Swift/Objective-C interop types do not match the actual signatures
-- a generated `xcuserdata` or stale state is being mistaken for repository truth
-
-## Build and CI facts
-
-The Build IPA workflow currently:
-
-1. Runs on `macos-15`.
-2. Selects `/Applications/Xcode_16.4.app/Contents/Developer`.
-3. Verifies selected Objective-C source files exist.
-4. Optionally rewrites imports in `Exploit/Bridges/cs_run.h`.
-5. Builds `Lum1na.xcodeproj` using scheme `Lum1na`, configuration `Release`, and SDK `iphoneos`.
-6. Disables code signing for the build.
-7. Packages the resulting `Lum1na.app` into `Lum1na.ipa`.
-
-The Node 20 deprecation message is a warning and is not the cause of Swift compilation failures.
-
-For the CI failure that motivated this guide, the relevant errors were:
-
-- A tuple return type in an `@objc` protocol cannot be represented in Objective-C.
-- `P009Controller`, `P052Controller`, and `P039Controller` could not be found in Swift.
-
-Agents must verify the actual current declarations before proposing a fix. Do not solve the first error by inventing a new controller API, and do not solve the second by adding duplicate headers without checking the existing bridging header and Xcode project settings.
-
-## Editing and verification rules
-
-1. Read this file and `README.md` before editing.
-2. Pin all investigation to one resolved commit SHA.
-3. Prefer the smallest change that addresses the observed error.
-4. Preserve existing public APIs unless the task explicitly requests an API change.
-5. For Objective-C/Swift interop, inspect `.h`, `.m`, the bridging header, and `project.pbxproj` together.
-6. After source changes, run the narrowest relevant test or `xcodebuild` command available.
-7. Do not claim a build passes unless the build actually ran and passed.
-8. Do not treat historical notes in `docs/PASTE_MAP.md` or this file as newer than the pinned repository tree.
-9. Never fabricate file contents, implementation status, commit SHAs, or test results.
-10. Keep generated artifacts, `.ipa` files, archives, and Xcode user data out of commits.
-11. For any UI or structure change, verify the file is included in the target and the SwiftUI types resolve in the app target before claiming the structure is valid.
-12. Do not confuse generated local Xcode data under `Lum1na.xcodeproj/xcuserdata` with repository source code.
+Lum1na is private experimental research software for hardware owned or controlled by the developer. Work only within authorized environments. Documentation, UI, tests, and project hygiene are ordinary maintenance areas; low-level exploit behavior and privileged entitlements require explicit scope and careful verification.
