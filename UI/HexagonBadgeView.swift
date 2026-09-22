@@ -41,7 +41,7 @@ struct HexagonBadgeView: View {
                 Image(systemName: type.icon).font(.system(size: 16, weight: .semibold)).foregroundStyle(type.color.opacity(isActive ? 1.0 : 0.5))
             }
             .scaleEffect(pulseScale)
-            // Use old onChange syntax for iOS < 17 compatibility
+            // FIX: Use old onChange syntax for iOS < 17 compatibility
             .onChange(of: isActive) { newValue in
                 if newValue {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
@@ -88,7 +88,6 @@ struct BadgeContainerView: View {
     }
 }
 
-// Color extension for hex support
 extension Color {
     init(hex: String) {
         let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
