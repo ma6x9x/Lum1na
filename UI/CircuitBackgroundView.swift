@@ -161,34 +161,38 @@ struct DataFlowPaths: View {
     
     var body: some View {
         Canvas { context, _ in
-            let timeVal = time.timeIntervalSinceReferenceDate
-            
-            for i in 0..<8 {
-                let angle = Double(i) * .pi / 4 + timeVal * 0.1
-                let startRadius = max(size.width, size.height) / 2
-                let startX = size.width/2 + cos(angle) * CGFloat(startRadius)
-                let startY = size.height/2 + sin(angle) * CGFloat(startRadius) * 0.8
-                
-                let flowProgress = fmod(timeVal * 0.3 + Double(i) * 0.125, 1.0)
-                let currentRadius = startRadius * (1.0 - flowProgress)
-                
-                let currentX = size.width/2 + cos(angle) * CGFloat(currentRadius)
-                let currentY = size.height/2 + sin(angle) * CGFloat(currentRadius) * 0.8
-                
-                let packetSize = 6.0 * (1.0 - flowProgress * 0.5)
-                let opacity = 1.0 - flowProgress * 0.7
-                
-                let rect = CGRect(x: currentX - CGFloat(packetSize)/2, y: currentY - CGFloat(packetSize)/2, width: CGFloat(packetSize), height: CGFloat(packetSize))
-                
-                context.fill(Path(ellipseIn: rect), with: .color(stage.color.opacity(opacity)))
-                
+            let timeValue: Double = time.timeIntervalSinceReferenceDate
+            let centerX: CGFloat = size.width * 0.5
+            let centerY: CGFloat = size.height * 0.5
+            let startRadius: CGFloat = max(size.width, size.height) * 0.5
+
+            for index in 0..<8 {
+                let indexValue: Double = Double(index)
+                let angle: Double = indexValue * Double.pi / 4.0 + timeValue * 0.1
+                let flowProgress: Double = (timeValue * 0.3 + indexValue * 0.125)
+                    .truncatingRemainder(dividingBy: 1.0)
+                let currentRadius: CGFloat = startRadius * CGFloat(1.0 - flowProgress)
+                let angleCosine: CGFloat = CGFloat(cos(angle))
+                let angleSine: CGFloat = CGFloat(sin(angle))
+                let currentX: CGFloat = centerX + angleCosine * currentRadius
+                let currentY: CGFloat = centerY + angleSine * currentRadius * 0.8
+                let packetSize: CGFloat = CGFloat(6.0 * (1.0 - flowProgress * 0.5))
+                let opacity: Double = 1.0 - flowProgress * 0.7
+
+                let packetRect = CGRect(
+                    x: currentX - packetSize * 0.5,
+                    y: currentY - packetSize * 0.5,
+                    width: packetSize,
+                    height: packetSize
+                )
+                context.fill(Path(ellipseIn: packetRect), with: .color(stage.color.opacity(opacity)))
+
                 for trail in 1...3 {
-                    let trailRadius = currentRadius + CGFloat(trail * 15)
-                    let trailX = size.width/2 + cos(angle) * trailRadius
-                    let trailY = size.height/2 + sin(angle) * trailRadius * 0.8
-                    let trailOpacity = opacity * (0.5 - Double(trail) * 0.15)
-                    
-                    let trailRect = CGRect(x: trailX - 2, y: trailY - 2, width: 4, height: 4)
+                    let trailRadius: CGFloat = currentRadius + CGFloat(trail * 15)
+                    let trailX: CGFloat = centerX + angleCosine * trailRadius
+                    let trailY: CGFloat = centerY + angleSine * trailRadius * 0.8
+                    let trailOpacity: Double = opacity * (0.5 - Double(trail) * 0.15)
+                    let trailRect = CGRect(x: trailX - 2.0, y: trailY - 2.0, width: 4.0, height: 4.0)
                     context.fill(Path(ellipseIn: trailRect), with: .color(stage.color.opacity(trailOpacity)))
                 }
             }
