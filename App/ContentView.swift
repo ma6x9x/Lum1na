@@ -1,3 +1,8 @@
+//
+//  ContentView.swift
+//  Lum1na
+//
+
 import SwiftUI
 
 struct ContentView: View {
@@ -6,72 +11,72 @@ struct ContentView: View {
     
     var body: some View {
         ZStack {
+            // Background
             Color(hex: "07060F").ignoresSafeArea()
             
-            ScrollView(.vertical, showsIndicators: false) {
-                VStack(spacing: 0) {
-                    // Device info - top left corner, smaller
-                    DeviceInfoCompact(viewModel: viewModel)
-                        .padding(.horizontal, 20)
-                        .padding(.top, 12)
+            // Main content - NO ScrollView, fits without scrolling
+            VStack(spacing: 0) {
+                // MARK: - Header: Lum1na Logo (NOW AT TOP)
+                HeaderView()
+                    .padding(.top, 12)
+                
+                // MARK: - Device Info (NOW BELOW LOGO, COMPACT)
+                DeviceInfoCompact(viewModel: viewModel)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                
+                // MARK: - 4-Pointed Star (FIXED: Using StarBeaconView)
+                StarBeaconSection(viewModel: viewModel)
+                    .padding(.top, 10)
+                
+                // Tagline
+                Text("The guiding light for Jailbreaks")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 8)
+                
+                // MARK: - Console (REDUCED HEIGHT)
+                ConsoleCard(viewModel: viewModel)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+                
+                // MARK: - Stage Buttons (COMPACT)
+                StageButtonsRow(viewModel: viewModel)
+                    .padding(.horizontal, 12)
+                    .padding(.top, 8)
+                
+                // MARK: - Action Buttons
+                HStack(spacing: 12) {
+                    Button(action: { showingStageTester = true }) {
+                        Label("Test Stages", systemImage: "slider.horizontal.3")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.primary)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                            .background(Capsule().fill(.ultraThinMaterial))
+                    }
                     
-                    // LUM1NA logo - brought up
-                    HeaderView()
-                        .padding(.top, 20)
-                    
-                    // Star beacon
-                    StarBeaconSection(viewModel: viewModel)
-                        .padding(.top, 16)
-                    
-                    // Tagline
-                    Text("The guiding light for Jailbreaks")
-                        .font(.system(size: 14))
-                        .foregroundStyle(.secondary)
-                        .padding(.top, 12)
-                    
-                    // Console card - LARGER
-                    ConsoleCard(viewModel: viewModel)
-                        .padding(.horizontal, 16)
-                        .padding(.top, 20)
-                    
-                    // Stage buttons
-                    StageButtonsRow(viewModel: viewModel)
-                        .padding(.horizontal, 12)
-                        .padding(.top, 16)
-                    
-                    // Action buttons - REPLACED "Hide stages" with "Test Stages"
-                    HStack(spacing: 12) {
-                        Button(action: { showingStageTester = true }) {
-                            Label("Test Stages", systemImage: "slider.horizontal.3")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(.primary)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 50)
-                                .background(Capsule().fill(.ultraThinMaterial))
-                        }
-                        
-                        Button(action: { viewModel.startJailbreak() }) {
-                            Text("Jailbreak")
-                                .font(.system(size: 15, weight: .bold))
-                                .foregroundStyle(.white)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 50)
-                                .background(
-                                    Capsule().fill(
-                                        LinearGradient(
-                                            colors: [Color(hex: "FF6B9D"), Color(hex: "9B59B6")],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
+                    Button(action: { viewModel.startJailbreak() }) {
+                        Text("Jailbreak")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                            .background(
+                                Capsule().fill(
+                                    LinearGradient(
+                                        colors: [Color(hex: "FF6B9D"), Color(hex: "9B59B6")],
+                                        startPoint: .leading,
+                                        endPoint: .trailing
                                     )
                                 )
-                        }
-                        .disabled(viewModel.isRunning)
+                            )
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
-                    .padding(.bottom, 30)
+                    .disabled(viewModel.isRunning)
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
+                .padding(.bottom, 16)
             }
         }
         .sheet(isPresented: $showingStageTester) {
@@ -80,13 +85,12 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Supporting Views
-
+// MARK: - Header View (Lum1na Logo at Top)
 struct HeaderView: View {
     var body: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 2) {
             Text("Lum1na")
-                .font(.system(size: 42, weight: .bold, design: .rounded))
+                .font(.system(size: 32, weight: .bold, design: .rounded))
                 .foregroundStyle(
                     LinearGradient(
                         colors: [Color(hex: "FF6B9D"), Color(hex: "4ECDC4")],
@@ -96,26 +100,27 @@ struct HeaderView: View {
                 )
             
             Text("v0.1 • private beta")
-                .font(.system(size: 13, weight: .medium))
+                .font(.system(size: 11, weight: .medium))
                 .foregroundStyle(.gray)
         }
     }
 }
 
+// MARK: - Device Info (Compact, Below Logo)
 struct DeviceInfoCompact: View {
     @ObservedObject var viewModel: Lum1naViewModel
     
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "iphone")
-                .font(.system(size: 12))
+                .font(.system(size: 14))
                 .foregroundStyle(Color(hex: "4ECDC4"))
             
             VStack(alignment: .leading, spacing: 1) {
-                Text(viewModel.deviceInfo?.machine ?? "Unknown")
-                    .font(.system(size: 12, weight: .semibold))
+                Text(viewModel.deviceInfo?.machine ?? "Detecting...")
+                    .font(.system(size: 13, weight: .semibold))
                 Text("iOS \(viewModel.deviceInfo?.version ?? "?")")
-                    .font(.system(size: 10))
+                    .font(.system(size: 11))
                     .foregroundStyle(.secondary)
             }
             
@@ -125,7 +130,7 @@ struct DeviceInfoCompact: View {
                 Circle()
                     .fill(viewModel.statusColor)
                     .frame(width: 6, height: 6)
-                Text(viewModel.exploitState == .idle ? "Ready" : viewModel.exploitState.description)
+                Text(viewModel.statusText)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(viewModel.statusColor)
             }
@@ -137,100 +142,96 @@ struct DeviceInfoCompact: View {
                 .fill(.ultraThinMaterial)
                 .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 1))
         )
-        .frame(maxWidth: 200, alignment: .leading)
+        .frame(maxWidth: 260, alignment: .center)
     }
 }
 
+// MARK: - Star Beacon Section (FIXED: Using 4-Pointed Star)
 struct StarBeaconSection: View {
     @ObservedObject var viewModel: Lum1naViewModel
-    @State private var isPulsing = false
     
     var body: some View {
         ZStack {
+            // Outer ring
+            Circle()
+                .stroke(
+                    LinearGradient(
+                        colors: [Color(hex: "FF6B9D"), Color(hex: "4ECDC4")],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 2
+                )
+                .frame(width: 130, height: 130)
+            
+            // Background
             Circle()
                 .fill(.ultraThinMaterial)
-                .frame(width: 180, height: 180)
-                .overlay(
-                    Circle()
-                        .stroke(
-                            LinearGradient(
-                                colors: [Color(hex: "FF6B9D"), Color(hex: "4ECDC4")],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 2
-                        )
-                )
+                .frame(width: 120, height: 120)
             
-            Image(systemName: "star.circle.fill")
-                .font(.system(size: 60))
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [Color(hex: "FF6B9D"), Color(hex: "9B59B6"), Color(hex: "4ECDC4")],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
-                .shadow(color: Color(hex: "9B59B6").opacity(0.6), radius: 15)
-                .scaleEffect(isPulsing ? 1.05 : 1.0)
-                .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: isPulsing)
+            // FIXED: Using StarBeaconView with 4-pointed star
+            StarBeaconView(stage: viewModel.currentStage)
+                .frame(width: 80, height: 80)
         }
-        .frame(height: 200)
-        .onAppear { isPulsing = true }
+        .frame(height: 140)
     }
 }
 
+// MARK: - Console Card (REDUCED HEIGHT)
 struct ConsoleCard: View {
     @ObservedObject var viewModel: Lum1naViewModel
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // Header
             HStack {
                 Label("console", systemImage: "terminal")
-                    .font(.system(size: 13, weight: .medium, design: .monospaced))
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
                     .foregroundStyle(.secondary)
                 
                 Spacer()
                 
                 Button(action: { UIPasteboard.general.string = viewModel.consoleText }) {
                     Image(systemName: "doc.on.doc")
-                        .font(.system(size: 13))
+                        .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                 }
                 
                 Button(action: { viewModel.clearConsole() }) {
                     Image(systemName: "trash")
-                        .font(.system(size: 13))
+                        .font(.system(size: 12))
                         .foregroundStyle(.secondary)
                         .padding(.leading, 8)
                 }
             }
             .padding(.horizontal, 12)
-            .padding(.vertical, 10)
+            .padding(.vertical, 8)
             
             Divider().background(Color.white.opacity(0.1))
             
+            // Console output
             ScrollView(.vertical, showsIndicators: true) {
                 Text(viewModel.consoleText)
-                    .font(.system(size: 13, design: .monospaced))
+                    .font(.system(size: 11, design: .monospaced))
                     .foregroundStyle(.cyan)
-                    .lineSpacing(3)
+                    .lineSpacing(2)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(12)
+                    .padding(10)
             }
-            .frame(height: 250) // LARGER console
+            .frame(height: 140) // REDUCED from 250
         }
         .background(
-            RoundedRectangle(cornerRadius: 16)
+            RoundedRectangle(cornerRadius: 14)
                 .fill(.ultraThinMaterial)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 16)
+                    RoundedRectangle(cornerRadius: 14)
                         .stroke(Color(hex: "FF6B9D").opacity(0.3), lineWidth: 1)
                 )
         )
     }
 }
 
+// MARK: - Stage Buttons Row (COMPACT)
 struct StageButtonsRow: View {
     @ObservedObject var viewModel: Lum1naViewModel
     
@@ -243,29 +244,27 @@ struct StageButtonsRow: View {
     ]
     
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(stages, id: \.0) { stage in
-                    VStack(spacing: 4) {
-                        Image(systemName: stage.1)
-                            .font(.system(size: 16))
-                        Text(stage.0)
-                            .font(.system(size: 11, weight: .medium))
-                    }
-                    .foregroundStyle(.secondary)
-                    .frame(width: 60, height: 50)
-                    .background(
-                        Capsule()
-                            .fill(.ultraThinMaterial)
-                            .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 1))
-                    )
+        HStack(spacing: 8) {
+            ForEach(stages, id: \.0) { stage in
+                VStack(spacing: 4) {
+                    Image(systemName: stage.1)
+                        .font(.system(size: 14))
+                    Text(stage.0)
+                        .font(.system(size: 10, weight: .medium))
                 }
+                .foregroundStyle(viewModel.stageColor(for: stage.0))
+                .frame(width: 55, height: 42)
+                .background(
+                    Capsule()
+                        .fill(.ultraThinMaterial)
+                        .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 1))
+                )
             }
-            .padding(.horizontal, 4)
         }
     }
 }
 
+// MARK: - Stage Tester View
 struct StageTesterView: View {
     @ObservedObject var viewModel: Lum1naViewModel
     @Environment(\.dismiss) var dismiss
@@ -327,5 +326,32 @@ struct StageTesterView: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Color Extension
+extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphabetics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 3:
+            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6:
+            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8:
+            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (a, r, g, b) = (1, 1, 1, 0)
+        }
+        self.init(
+            .sRGB,
+            red: Double(r) / 255,
+            green: Double(g) / 255,
+            blue: Double(b) / 255,
+            opacity: Double(a) / 255
+        )
     }
 }
