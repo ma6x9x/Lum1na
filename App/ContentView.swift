@@ -173,12 +173,12 @@ struct ContentView: View {
     private func startJailbreak() {
         isJailbreaking = true
         let stages: [(JailbreakStage, ExploitChainStage?, BadgeType?, String)] = [
-            (.kaslr, .kernel, .kernel, "KASLR bypass initiated"),
-            (.heap, .sandbox, .sandbox, "Sandbox escape: 0x00006085427A"),
-            (.ane, .daemon, .daemon, "ANE daemon compromised"),
-            (.ppl, .patchset, .patchset, "PPL bypass complete"),
-            (.persist, nil, nil, "Persistence installed")
-        ]
+    (.kaslr, .kernel,   .kernel,   "KASLR bypass initiated"),
+    (.heap,  .sandbox,  .sandbox,  "Sandbox escape: 0x00006085427A"),
+    (.ane,   .daemon,   .daemon,   "ANE daemon compromised"),
+    (.ppl,   .patchset, .patchset, "PPL bypass complete"),
+    (.persist, nil,      nil,       "Persistence installed")
+]
         
         var delay: TimeInterval = 0
         for (jbStage, exploitStage, badge, logMessage) in stages {
@@ -224,11 +224,11 @@ struct ContentView: View {
     }
     
     private func mapStageToLogLevel(_ stage: ExploitChainStage) -> CategorizedLogLevel {
-        switch stage {
-        case .kernel: return .kernel
-        case .sandbox: return .sandbox
-        case .daemon: return .daemon
-        case .patchset: return .patchset
-        }
+    switch stage {
+    case .kernel:   return .kernel
+    case .sandbox:  return .sandbox
+    case .daemon:   return .daemon
+    case .patchset: return .patchset
     }
+}
 }
