@@ -2,9 +2,9 @@
 //  ContentView.swift
 //  Lum1na
 //
-
+import Foundation
 import SwiftUI
-
+import UIKit
 struct ContentView: View {
     @StateObject private var viewModel = Lum1naViewModel()
     @State private var showMoreProbes = false
