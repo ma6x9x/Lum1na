@@ -1,212 +1,80 @@
 import SwiftUI
 
-enum Lum1naPalette {
-    static let field = Color(red: 0.027, green: 0.024, blue: 0.059) // #07060F
-    static let magenta = Color(red: 0.92, green: 0.28, blue: 0.72)
-    static let violet = Color(red: 0.56, green: 0.35, blue: 0.98)
-    static let ice = Color(red: 0.45, green: 0.85, blue: 0.98)
-    static let rain = Color(red: 0.55, green: 0.62, blue: 0.78)
-
-    static var wordmarkGradient: LinearGradient {
-        LinearGradient(
-            colors: [magenta, .white, ice],
-            startPoint: .leading,
-            endPoint: .trailing
-        )
-    }
-
-    static var ringGradient: AngularGradient {
-        AngularGradient(
-            colors: [magenta, violet, ice, magenta],
-            center: .center
-        )
-    }
-}
-
-// MARK: - Fake liquid glass (inspired by liquid (gl)ass stock look)
-//
-// Public-API approximation of the liquidass recipe:
-//   1. ultra-thin material blur (stand-in for CABackdropLayer)
-//   2. continuous corner curve
-//   3. soft separator edge (~0.16 alpha)
-//   4. angled specular rim (white → clear → soft bottom catch)
-//   5. light frost wash so it reads like real glass, not a flat card
-
-private enum LiquidAssGlass {
-    /// Matches liquidass specular stops: peak, soft, clear, clear, shadow, catch.
-    static func specularColors(maxAlpha: Double = 0.35) -> [Color] {
-        [
-            Color.white.opacity(maxAlpha * 0.28),
-            Color.white.opacity(maxAlpha * 0.10),
-            Color.clear,
-            Color.clear,
-            Color.black.opacity(maxAlpha * 0.04),
-            Color.white.opacity(maxAlpha * 0.12)
-        ]
-    }
-
-    static let specularStops: [CGFloat] = [0.0, 0.12, 0.34, 0.66, 0.88, 1.0]
-
-    /// ~ -45° like liquidass default specular angle.
-    static var specularGradient: LinearGradient {
-        LinearGradient(
-            stops: zip(specularStops, specularColors()).map { Gradient.Stop(color: $0.1, location: $0.0) },
-            startPoint: UnitPoint(x: 0.15, y: 0.05),
-            endPoint: UnitPoint(x: 0.85, y: 0.95)
-        )
-    }
-
-    static var edgeStroke: Color {
-        Color.white.opacity(0.16)
-    }
-
-    static var frostWash: Color {
-        Color.white.opacity(0.07)
-    }
-}
-
-struct LiquidGlassCard<Content: View>: View {
-    var cornerRadius: CGFloat = 22
-    @ViewBuilder var content: () -> Content
-
-    var body: some View {
-        content()
-            .background { glassFill }
-            .clipShape(shape)
-            .overlay { specularRim }
-            .overlay { edgeRim }
-            .shadow(color: Color.black.opacity(0.22), radius: 18, y: 8)
-    }
-
-    private var shape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-    }
-
-    private var glassFill: some View {
-        shape
-            .fill(.ultraThinMaterial)
-            .background(shape.fill(LiquidAssGlass.frostWash))
-            .overlay {
-                // Top-weighted specular wash (liquidass edge highlight).
-                shape.fill(
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.18),
-                            Color.white.opacity(0.04),
-                            Color.clear
-                        ],
-                        startPoint: .top,
-                        endPoint: UnitPoint(x: 0.5, y: 0.55)
-                    )
-                )
-                .allowsHitTesting(false)
-            }
-    }
-
-    private var specularRim: some View {
-        shape
-            .strokeBorder(LiquidAssGlass.specularGradient, lineWidth: 1.1)
-            .allowsHitTesting(false)
-    }
-
-    private var edgeRim: some View {
-        shape
-            .strokeBorder(LiquidAssGlass.edgeStroke, lineWidth: 0.5)
-            .allowsHitTesting(false)
-    }
-}
-
-struct LiquidGlassCapsuleButtonStyle: ButtonStyle {
-    var prominent: Bool = false
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .font(.system(size: 16, weight: .semibold, design: .rounded))
-            .foregroundStyle(.white)
-            .padding(.horizontal, 22)
-            .padding(.vertical, 14)
-            .frame(maxWidth: .infinity)
-            .background { capsuleFill(isPressed: configuration.isPressed) }
-            .clipShape(Capsule(style: .continuous))
-            .overlay {
-                Capsule(style: .continuous)
-                    .strokeBorder(LiquidAssGlass.specularGradient, lineWidth: prominent ? 1.25 : 1.0)
-            }
-            .overlay {
-                Capsule(style: .continuous)
-                    .strokeBorder(LiquidAssGlass.edgeStroke, lineWidth: 0.5)
-            }
-            .shadow(color: Color.black.opacity(prominent ? 0.28 : 0.16), radius: 12, y: 5)
-            .scaleEffect(configuration.isPressed ? 0.98 : 1)
-            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
-    }
-
-    @ViewBuilder
-    private func capsuleFill(isPressed: Bool) -> some View {
-        if prominent {
-            Capsule(style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [
-                            Lum1naPalette.violet.opacity(isPressed ? 0.85 : 1),
-                            Lum1naPalette.magenta.opacity(isPressed ? 0.55 : 0.78)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-                .overlay {
-                    Capsule(style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.white.opacity(0.22), Color.clear],
-                                startPoint: .top,
-                                endPoint: .center
-                            )
-                        )
-                }
-        } else {
-            Capsule(style: .continuous)
-                .fill(.ultraThinMaterial)
-                .background(Capsule(style: .continuous).fill(LiquidAssGlass.frostWash))
-                .overlay {
-                    Capsule(style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [Color.white.opacity(0.16), Color.clear],
-                                startPoint: .top,
-                                endPoint: UnitPoint(x: 0.5, y: 0.6)
-                            )
-                        )
-                }
+enum JailbreakStage: String, CaseIterable {
+    case idle = "IDLE"
+    case kaslr = "KASLR"
+    case heap = "HEAP"
+    case ane = "ANE"
+    case ppl = "PPL"
+    case persist = "PERSIST"
+    
+    var color: Color {
+        switch self {
+        case .idle:     return .lum1naViolet
+        case .kaslr:    return .lum1naCyan
+        case .heap:     return .lum1naVioletPurple
+        case .ane:      return .lum1naBlue
+        case .ppl:      return .lum1naMagenta
+        case .persist:  return .lum1naPink
         }
     }
+    
+    var glowColor: Color {
+        color.opacity(0.6)
+    }
 }
 
-/// Circular glass disc — same liquidass specular recipe for the star ring.
-struct LiquidGlassDisc: View {
-    var diameter: CGFloat = 158
-
-    var body: some View {
-        Circle()
-            .fill(.ultraThinMaterial)
-            .background(Circle().fill(LiquidAssGlass.frostWash))
-            .overlay {
-                Circle().fill(
-                    LinearGradient(
-                        colors: [Color.white.opacity(0.20), Color.clear],
-                        startPoint: .top,
-                        endPoint: .center
-                    )
-                )
-            }
-            .overlay {
-                Circle().strokeBorder(LiquidAssGlass.specularGradient, lineWidth: 1.1)
-            }
-            .overlay {
-                Circle().strokeBorder(LiquidAssGlass.edgeStroke, lineWidth: 0.5)
-            }
-            .frame(width: diameter, height: diameter)
-            .opacity(0.92)
+extension Color {
+    static let lum1naField = Color(hex: "#07060F")
+    static let lum1naViolet = Color(hex: "#8B5CF6")
+    static let lum1naVioletPurple = Color(hex: "#A855F7")
+    static let lum1naCyan = Color(hex: "#06B6D4")
+    static let lum1naBlue = Color(hex: "#3B82F6")
+    static let lum1naMagenta = Color(hex: "#D946EF")
+    static let lum1naPink = Color(hex: "#EC4899")
+    static let consoleBackground = Color(hex: "#0A0A0F")
+    static let consoleText = Color(hex: "#E2E8F0")
+    static let consoleTimestamp = Color(hex: "#64748B")
+    static let consoleInfo = Color(hex: "#22D3EE")
+    static let consoleSuccess = Color(hex: "#4ADE80")
+    static let consoleWarning = Color(hex: "#FBBF24")
+    static let consoleError = Color(hex: "#F87171")
+    static let circuitLine = Color(hex: "#1E293B")
+    static let circuitNode = Color(hex: "#334155")
+    static let badgeKernel = Color(hex: "#EF4444")
+    static let badgeSandbox = Color(hex: "#F59E0B")
+    static let badgeDaemon = Color(hex: "#10B981")
+    static let badgePatchset = Color(hex: "#3B82F6")
+    
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 3: (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6: (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8: (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default: (a, r, g, b) = (1, 1, 1, 0)
+        }
+        self.init(.sRGB, red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255, opacity: Double(a) / 255)
     }
+}
+
+extension Font {
+    static let console = Font.system(.caption, design: .monospaced)
+    static let consoleSmall = Font.system(.caption2, design: .monospaced)
+    static let beaconTitle = Font.system(.title2, weight: .semibold)
+    static let badgeLabel = Font.system(.caption, weight: .medium)
+    static let heapAddress = Font.system(.callout, design: .monospaced)
+    static let buttonLabel = Font.system(.subheadline, weight: .medium)
+}
+
+enum LayoutConstants {
+    static let starSize: CGFloat = 80
+    static let hexagonSize: CGFloat = 60
+    static let badgeSize: CGFloat = 44
+    static let consoleHeight: CGFloat = 180
+    static let circuitLineWidth: CGFloat = 1.5
+    static let cornerRadius: CGFloat = 16
 }
