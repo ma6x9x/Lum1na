@@ -124,7 +124,7 @@ class Lum1naViewModel: ObservableObject {
         // FIXED: Use getDeviceOffsets() and .tag
         let offsets = getDeviceOffsets()
         let tag = String(cString: offsets.tag)
-        log("Device profile: \(tag)", level: .info)
+        log("Device profile: \(offsets.tag)", level: .info)
         log("Static base: 0x\(String(offsets.static_base, radix: 16))", level: .info)
     }
     
@@ -381,7 +381,7 @@ class Lum1naViewModel: ObservableObject {
         
         // FIXED: Use getDeviceOffsets().static_base instead of .slidePage
         let offsets = getDeviceOffsets()
-        let kernelBase = offsets.static_base  // CORRECT field name
+        let kernelBase = offsets.staticBase  // CORRECT field name
         let slide = leakedPtr - kernelBase
         
         guard slide < 0x100000000 && (slide & 0x3FFF) == 0 else {
