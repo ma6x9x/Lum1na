@@ -9,11 +9,11 @@ enum LogLevel: String {
     
     var color: Color {
         switch self {
-        case .info:     return .consoleInfo
-        case .success:  return .consoleSuccess
-        case .warning:  return .consoleWarning
-        case .error:    return .consoleError
-        case .debug:    return .consoleTimestamp
+        case .info:     return Color(hex: "#22D3EE")
+        case .success:  return Color(hex: "#4ADE80")
+        case .warning:  return Color(hex: "#FBBF24")
+        case .error:    return Color(hex: "#F87171")
+        case .debug:    return Color(hex: "#64748B")
         }
     }
 }
@@ -38,13 +38,13 @@ struct MatrixConsoleView: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack {
-                Text("console").font(.system(.caption, design: .monospaced)).foregroundStyle(.consoleTimestamp)
+                Text("console").font(.system(.caption, design: .monospaced)).foregroundStyle(Color(hex: "#64748B"))
                 Spacer()
                 HStack(spacing: 8) {
-                    Circle().fill(Color.consoleSuccess).frame(width: 6, height: 6)
-                    Text("online").font(.system(.caption2, design: .monospaced)).foregroundStyle(.consoleSuccess.opacity(0.8))
+                    Circle().fill(Color(hex: "#4ADE80")).frame(width: 6, height: 6)
+                    Text("online").font(.system(.caption2, design: .monospaced)).foregroundStyle(Color(hex: "#4ADE80").opacity(0.8))
                 }
-            }.padding(.horizontal, 12).padding(.vertical, 8).background(Color.consoleBackground.opacity(0.5))
+            }.padding(.horizontal, 12).padding(.vertical, 8).background(Color(hex: "#0A0A0F").opacity(0.5))
             
             ScrollViewReader { proxy in
                 ScrollView(.vertical, showsIndicators: true) {
@@ -53,16 +53,16 @@ struct MatrixConsoleView: View {
                             LogRow(entry: entry).id(entry.id)
                         }
                     }.padding(.horizontal, 12).padding(.vertical, 8)
-                }.background(Color.consoleBackground)
-                .onChange(of: logs.count) { _, _ in
+                }.background(Color(hex: "#0A0A0F"))
+                .onChange(of: logs.count) { newValue in
                     if autoScroll, let last = logs.last {
                         withAnimation(.easeOut(duration: 0.1)) { proxy.scrollTo(last.id, anchor: .bottom) }
                     }
                 }
             }
         }
-        .frame(height: LayoutConstants.consoleHeight)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color.consoleBackground).overlay(RoundedRectangle(cornerRadius: 12).stroke(Color.circuitLine, lineWidth: 1)))
+        .frame(height: 180)
+        .background(RoundedRectangle(cornerRadius: 12).fill(Color(hex: "#0A0A0F")).overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(hex: "#1E293B"), lineWidth: 1)))
         .onAppear {
             addLog(level: .info, message: "Lum1na Beta 1 initialized")
             addLog(level: .info, message: "Device: iPhone15,2 (iOS 26.0)")
@@ -83,27 +83,27 @@ struct LogRow: View {
     
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
-            Text(entry.formattedTimestamp).font(.consoleSmall).foregroundStyle(.consoleTimestamp).frame(width: 70, alignment: .leading)
-            Text(entry.level.rawValue).font(.consoleSmall).foregroundStyle(entry.level.color).frame(width: 24, alignment: .leading)
-            Text(entry.message).font(.consoleSmall).foregroundStyle(.consoleText).lineLimit(nil).fixedSize(horizontal: false, vertical: true)
+            Text(entry.formattedTimestamp).font(.system(.caption2, design: .monospaced)).foregroundStyle(Color(hex: "#64748B")).frame(width: 70, alignment: .leading)
+            Text(entry.level.rawValue).font(.system(.caption2, design: .monospaced)).foregroundStyle(entry.level.color).frame(width: 24, alignment: .leading)
+            Text(entry.message).font(.system(.caption2, design: .monospaced)).foregroundStyle(Color(hex: "#E2E8F0")).lineLimit(nil).fixedSize(horizontal: false, vertical: true)
             Spacer()
         }
     }
 }
 
-class ConsoleViewModel: ObservableObject {
-    @Published var logs: [LogEntry] = []
-    
-    func log(_ level: LogLevel, _ message: String) {
-        let entry = LogEntry(timestamp: Date(), level: level, message: message)
-        logs.append(entry)
-        if logs.count > 500 { logs.removeFirst(logs.count - 500) }
+// Color extension
+extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 3: (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6: (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8: (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default: (a, r, g, b) = (1, 1, 1, 0)
+        }
+        self.init(.sRGB, red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255, opacity: Double(a) / 255)
     }
-    
-    func info(_ message: String) { log(.info, message) }
-    func success(_ message: String) { log(.success, message) }
-    func warning(_ message: String) { log(.warning, message) }
-    func error(_ message: String) { log(.error, message) }
-    func debug(_ message: String) { log(.debug, message) }
-    func clear() { logs.removeAll() }
 }
