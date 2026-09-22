@@ -1,68 +1,85 @@
 import SwiftUI
 
-enum LogLevel: String {
-    case info = "[*]"
-    case success = "[+]"
-    case warning = "[!]"
-    case error = "[-]"
-    case debug = "[#]"
+enum CategorizedLogLevel: String, CaseIterable {
+    case kernel = "[KERN]"
+    case sandbox = "[SND]"
+    case daemon = "[DAEM]"
+    case patchset = "[PTCH]"
+    case init_ = "[INIT]"
+    case error = "[ERR]"
+    case success = "[OK]"
+    
+    var displayPrefix: String { rawValue }
     
     var color: Color {
         switch self {
-        case .info:     return Color(hex: "#22D3EE")
-        case .success:  return Color(hex: "#4ADE80")
-        case .warning:  return Color(hex: "#FBBF24")
+        case .kernel:   return Color(hex: "#EF4444")
+        case .sandbox:  return Color(hex: "#F59E0B")
+        case .daemon:   return Color(hex: "#10B981")
+        case .patchset: return Color(hex: "#3B82F6")
+        case .init_:    return Color(hex: "#22D3EE")
         case .error:    return Color(hex: "#F87171")
-        case .debug:    return Color(hex: "#64748B")
+        case .success:  return Color(hex: "#4ADE80")
         }
     }
 }
 
-struct LogEntry: Identifiable {
+struct CategorizedLogEntry: Identifiable {
     let id = UUID()
     let timestamp: Date
-    let level: LogLevel
+    let level: CategorizedLogLevel
     let message: String
     
     var formattedTimestamp: String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm:ss.SSS"
+        formatter.dateFormat = "HH:mm:ss"
+        return formatter.string(from: timestamp)
+    }
+    
+    var formattedMilliseconds: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = ".SSS"
         return formatter.string(from: timestamp)
     }
 }
 
+@MainActor
+class MatrixConsoleViewModel: ObservableObject {
+    @Published var logs: [CategorizedLogEntry] = []
+    @Published var autoScroll = true
+    @Published var filterLevel: CategorizedLogLevel?
+    
+    var filteredLogs: [CategorizedLogEntry] {
+        if let filter = filterLevel {
+            return logs.filter { $0.level == filter }
+        }
+        return logs
+    }
+    
+    func addLog(level: CategorizedLogLevel, message: String) {
+        let entry = CategorizedLogEntry(timestamp: Date(), level: level, message: message)
+        logs.append(entry)
+        if logs.count > 200 {
+            logs.removeFirst(logs.count - 200)
+        }
+    }
+    
+    func clear() {
+        logs.removeAll()
+    }
+}
+
 struct MatrixConsoleView: View {
-    @State private var logs: [LogEntry] = []
-    @State private var autoScroll = true
+    @StateObject private var viewModel = MatrixConsoleViewModel()
+    @State private var showFilters = false
     
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
-                Text("console").font(.system(.caption, design: .monospaced)).foregroundStyle(Color(hex: "#64748B"))
-                Spacer()
-                HStack(spacing: 8) {
-                    Circle().fill(Color(hex: "#4ADE80")).frame(width: 6, height: 6)
-                    Text("online").font(.system(.caption2, design: .monospaced)).foregroundStyle(Color(hex: "#4ADE80").opacity(0.8))
-                }
-            }.padding(.horizontal, 12).padding(.vertical, 8).background(Color(hex: "#0A0A0F").opacity(0.5))
-            
-            ScrollViewReader { proxy in
-                ScrollView(.vertical, showsIndicators: true) {
-                    LazyVStack(alignment: .leading, spacing: 2) {
-                        ForEach(logs) { entry in
-                            LogRow(entry: entry).id(entry.id)
-                        }
-                    }.padding(.horizontal, 12).padding(.vertical, 8)
-                }.background(Color(hex: "#0A0A0F"))
-                .onChange(of: logs.count) { newValue in
-                    if autoScroll, let last = logs.last {
-                        withAnimation(.easeOut(duration: 0.1)) { proxy.scrollTo(last.id, anchor: .bottom) }
-                    }
-                }
-            }
+            consoleHeader
+            if showFilters { filterBar }
+            logContent
         }
-        .frame(height: 180)
-        // FIXED: Properly balanced parentheses
+        .frame(height: 200)
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(Color(hex: "#0A0A0F"))
@@ -72,29 +89,168 @@ struct MatrixConsoleView: View {
                 )
         )
         .onAppear {
-            addLog(level: .info, message: "Lum1na Beta 1 initialized")
-            addLog(level: .info, message: "Device: iPhone15,2 (iOS 26.0)")
-            addLog(level: .success, message: "Exploit chain loaded successfully")
-            addLog(level: .debug, message: "Waiting for user action...")
+            viewModel.addLog(level: .init_, message: "Lum1na Beta 1 initialized")
+            viewModel.addLog(level: .init_, message: "Device: iPhone15,2 (iOS 26.0)")
+            viewModel.addLog(level: .init_, message: "Target: A14-A17 devices")
+            viewModel.addLog(level: .success, message: "Exploit chain loaded")
+            viewModel.addLog(level: .kernel, message: "Waiting for KASLR leak...")
         }
     }
     
-    func addLog(level: LogLevel, message: String) {
-        let entry = LogEntry(timestamp: Date(), level: level, message: message)
-        logs.append(entry)
-        if logs.count > 100 { logs.removeFirst(logs.count - 100) }
+    private var consoleHeader: some View {
+        HStack(spacing: 12) {
+            HStack(spacing: 6) {
+                Image(systemName: "terminal.fill")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Color(hex: "#64748B"))
+                Text("console")
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(Color(hex: "#64748B"))
+            }
+            
+            Spacer()
+            
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) { showFilters.toggle() }
+            } label: {
+                Image(systemName: "line.3.horizontal.decrease.circle")
+                    .font(.system(size: 12))
+                    .foregroundStyle(showFilters ? Color(hex: "#22D3EE") : Color(hex: "#64748B"))
+            }
+            
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(Color(hex: "#10B981"))
+                    .frame(width: 6, height: 6)
+                Text("online")
+                    .font(.system(.caption2, design: .monospaced))
+                    .foregroundStyle(Color(hex: "#10B981").opacity(0.8))
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color(hex: "#0F0F14"))
+    }
+    
+    private var filterBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                ForEach(CategorizedLogLevel.allCases, id: \.self) { level in
+                    FilterChip(
+                        level: level,
+                        isSelected: viewModel.filterLevel == level,
+                        count: viewModel.logs.filter { $0.level == level }.count
+                    ) {
+                        if viewModel.filterLevel == level {
+                            viewModel.filterLevel = nil
+                        } else {
+                            viewModel.filterLevel = level
+                        }
+                    }
+                }
+                
+                Button { viewModel.clear() } label: {
+                    Text("CLEAR")
+                        .font(.system(.caption2, weight: .bold))
+                        .foregroundStyle(Color(hex: "#64748B"))
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+        }
+        .background(Color(hex: "#0A0A0F"))
+    }
+    
+    private var logContent: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.vertical, showsIndicators: true) {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(viewModel.filteredLogs) { entry in
+                        CategorizedLogRow(entry: entry)
+                            .id(entry.id)
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+            }
+            .background(Color(hex: "#0A0A0F"))
+            .onChange(of: viewModel.filteredLogs.count) { _ in
+                if viewModel.autoScroll, let last = viewModel.filteredLogs.last {
+                    withAnimation(.easeOut(duration: 0.1)) {
+                        proxy.scrollTo(last.id, anchor: .bottom)
+                    }
+                }
+            }
+        }
+    }
+    
+    func addLog(level: CategorizedLogLevel, message: String) {
+        viewModel.addLog(level: level, message: message)
     }
 }
 
-struct LogRow: View {
-    let entry: LogEntry
+struct FilterChip: View {
+    let level: CategorizedLogLevel
+    let isSelected: Bool
+    let count: Int
+    let action: () -> Void
     
     var body: some View {
-        HStack(alignment: .top, spacing: 8) {
-            Text(entry.formattedTimestamp).font(.system(.caption2, design: .monospaced)).foregroundStyle(Color(hex: "#64748B")).frame(width: 70, alignment: .leading)
-            Text(entry.level.rawValue).font(.system(.caption2, design: .monospaced)).foregroundStyle(entry.level.color).frame(width: 24, alignment: .leading)
-            Text(entry.message).font(.system(.caption2, design: .monospaced)).foregroundStyle(Color(hex: "#E2E8F0")).lineLimit(nil).fixedSize(horizontal: false, vertical: true)
+        Button(action: action) {
+            HStack(spacing: 4) {
+                Circle()
+                    .fill(level.color)
+                    .frame(width: 6, height: 6)
+                Text(level.displayPrefix.replacingOccurrences(of: "[", with: "").replacingOccurrences(of: "]", with: ""))
+                    .font(.system(.caption2, design: .monospaced, weight: isSelected ? .bold : .regular))
+                if count > 0 {
+                    Text("\(count)")
+                        .font(.system(.caption2, design: .monospaced))
+                }
+            }
+            .foregroundStyle(isSelected ? level.color : Color(hex: "#64748B"))
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(
+                Capsule()
+                    .fill(isSelected ? level.color.opacity(0.15) : Color(hex: "#1E293B").opacity(0.5))
+            )
+            .overlay(
+                Capsule()
+                    .stroke(isSelected ? level.color.opacity(0.5) : Color.clear, lineWidth: 1)
+            )
+        }
+        .buttonStyle(PlainButtonStyle())
+    }
+}
+
+struct CategorizedLogRow: View {
+    let entry: CategorizedLogEntry
+    
+    var body: some View {
+        HStack(alignment: .top, spacing: 6) {
+            HStack(spacing: 0) {
+                Text(entry.formattedTimestamp)
+                    .foregroundStyle(Color(hex: "#64748B"))
+                Text(entry.formattedMilliseconds)
+                    .foregroundStyle(Color(hex: "#475569"))
+            }
+            .font(.system(.caption2, design: .monospaced))
+            .frame(width: 75, alignment: .leading)
+            
+            Text(entry.level.displayPrefix)
+                .font(.system(.caption2, design: .monospaced, weight: .bold))
+                .foregroundStyle(entry.level.color)
+                .frame(width: 45, alignment: .leading)
+            
+            Text(entry.message)
+                .font(.system(.caption2, design: .monospaced))
+                .foregroundStyle(Color(hex: "#E2E8F0"))
+                .lineLimit(nil)
+                .fixedSize(horizontal: false, vertical: true)
+            
             Spacer()
         }
+        .padding(.vertical, 2)
     }
 }
