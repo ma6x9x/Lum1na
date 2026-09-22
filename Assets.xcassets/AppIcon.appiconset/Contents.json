@@ -1,7 +1,7 @@
 {
   "images" : [
     {
-      "filename" : "Lum1naIcon-Default.jpg",
+      "filename" : "AppIcon-Default.jpg",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -13,7 +13,7 @@
           "value" : "dark"
         }
       ],
-      "filename" : "Lum1naIcon-Dark.jpg",
+      "filename" : "AppIcon-Dark.jpg",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -25,7 +25,7 @@
           "value" : "tinted"
         }
       ],
-      "filename" : "Lum1naIcon-Tinted.jpg",
+      "filename" : "AppIcon-Tinted.jpg",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
