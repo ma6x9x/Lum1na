@@ -91,7 +91,6 @@ jobs:
       - name: Ensure KASLRLeak.m is in Compile Sources
         run: |
           python3 << 'PYEOF'
-          import re
           import uuid
           
           pbxproj_path = "Lum1na.xcodeproj/project.pbxproj"
@@ -106,44 +105,58 @@ jobs:
           
           print("⚠️ Adding KASLRLeak.m to Compile Sources...")
           
-          # Generate UUIDs
+          # Generate UUIDs (24 chars, uppercase)
           build_file_uuid = str(uuid.uuid4()).upper().replace('-', '')[:24]
           file_ref_uuid = str(uuid.uuid4()).upper().replace('-', '')[:24]
           
-          # Add PBXBuildFile entry
+          # 1. Add PBXBuildFile entry
           build_file_entry = f'{build_file_uuid} /* KASLRLeak.m in Sources */ = {{isa = PBXBuildFile; fileRef = {file_ref_uuid} /* KASLRLeak.m */; }};'
           
-          # Insert before End PBXBuildFile section
           content = content.replace(
               '/* End PBXBuildFile section */',
-              f'{build_file_entry}\\n/* End PBXBuildFile section */'
+              build_file_entry + '\n/* End PBXBuildFile section */'
           )
           
-          # Add PBXFileReference entry
+          # 2. Add PBXFileReference entry
           file_ref_entry = f'{file_ref_uuid} /* KASLRLeak.m */ = {{isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = KASLRLeak.m; path = Exploit/KASLRLeak.m; sourceTree = "<group>"; }};'
           
           content = content.replace(
               '/* End PBXFileReference section */',
-              f'{file_ref_entry}\\n/* End PBXFileReference section */'
+              file_ref_entry + '\n/* End PBXFileReference section */'
           )
           
-          # Add to PBXSourcesBuildPhase - find the Sources build phase and add to files
-          # This regex finds the first files array in PBXSourcesBuildPhase
-          pattern = r'(PBXSourcesBuildPhase.*?\{[^}]*files = \(\s*)([^)]*\))'
+          # 3. Add to PBXSourcesBuildPhase - find files = ( section and add entry
+          # Look for the pattern in PBXSourcesBuildPhase
+          lines = content.split('\n')
+          new_lines = []
+          in_sources_phase = False
+          found_files_section = False
           
-          def add_file_to_sources(match):
-              files_start = match.group(1)
-              files_list = match.group(2)
-              new_file = f'{build_file_uuid} /* KASLRLeak.m in Sources */,\\n'
-              return files_start + new_file + files_list
+          for i, line in enumerate(lines):
+              new_lines.append(line)
+              
+              if 'PBXSourcesBuildPhase' in line:
+                  in_sources_phase = True
+              
+              if in_sources_phase and 'files = (' in line:
+                  found_files_section = True
+              
+              if found_files_section and ');' in line and '/* KASLRLeak.m in Sources */' not in content:
+                  # Insert before the closing );
+                  new_lines.insert(-1, f'\t\t\t{build_file_uuid} /* KASLRLeak.m in Sources */,')
+                  found_files_section = False
+                  in_sources_phase = False
           
-          content = re.sub(pattern, add_file_to_sources, content, count=1, flags=re.DOTALL)
+          content = '\n'.join(new_lines)
           
           with open(pbxproj_path, 'w') as f:
               f.write(content)
           
-          print(f"✅ Added KASLRLeak.m (BuildFile: {build_file_uuid}, FileRef: {file_ref_uuid})")
+          print(f"✅ Added KASLRLeak.m to Compile Sources")
+          print(f"   BuildFile UUID: {build_file_uuid}")
+          print(f"   FileRef UUID: {file_ref_uuid}")
           PYEOF
+
       - name: Build (unsigned)
         run: |
           set -euo pipefail
