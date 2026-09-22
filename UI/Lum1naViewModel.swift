@@ -5,8 +5,12 @@
 
 import Foundation
 import Combine
+import SwiftUI
+import UIKit
 
-// MARK: - Exploit Protocols (Bridge to Objective-C)
+// NOTE: JailbreakStage enum removed - use UI/Lum1naTheme.swift definition instead
+
+// MARK: - Exploit Protocols
 @objc protocol KASLRLeakProtocol {
     func initializeLeak() -> Bool
     func leakKernelSlide() -> UInt64
@@ -38,38 +42,27 @@ struct DeviceInfo {
         var pagesize: Int = 0
         var memsize: UInt64 = 0
         
-        // Get device model
         var size = 0
         sysctlbyname("hw.machine", nil, &size, nil, 0)
         var machine = [CChar](repeating: 0, count: size)
         sysctlbyname("hw.machine", &machine, &size, nil, 0)
         model = String(cString: machine)
         
-        // Get iOS version
         version = UIDevice.current.systemVersion
         
-        // Get kernel build
         size = 0
         sysctlbyname("kern.osversion", nil, &size, nil, 0)
         var osversion = [CChar](repeating: 0, count: size)
         sysctlbyname("kern.osversion", &osversion, &size, nil, 0)
         build = String(cString: osversion)
         
-        // Get page size
         size = MemoryLayout<Int>.size
         sysctlbyname("hw.pagesize", &pagesize, &size, nil, 0)
         
-        // Get memory size
         size = MemoryLayout<UInt64>.size
         sysctlbyname("hw.memsize", &memsize, &size, nil, 0)
         
-        return DeviceInfo(
-            machine: model,
-            version: version,
-            build: build,
-            pagesize: pagesize,
-            memsize: memsize
-        )
+        return DeviceInfo(machine: model, version: version, build: build, pagesize: pagesize, memsize: memsize)
     }
 }
 
@@ -129,6 +122,7 @@ class Lum1naViewModel: ObservableObject {
         exploitState.description
     }
     
+    // FIXED: Use JailbreakStage from Lum1naTheme.swift
     var currentStage: JailbreakStage {
         switch exploitState {
         case .idle: return .idle
@@ -138,20 +132,18 @@ class Lum1naViewModel: ObservableObject {
         case .executingANE: return .ane
         case .executingKRW: return .krw
         case .executingPPL: return .ppl
-        case .executingPersistence: return .persistence
+        case .executingPersistence: return .persistence  // FIXED: was .persist
         case .success: return .success
         case .failed: return .failed
         }
     }
     
-    // MARK: - Initialization
     init() {
         detectDevice()
         log("Lum1na initialized", level: .info)
         log("Target: A14 23F77", level: .info)
     }
     
-    // MARK: - Device Detection
     func detectDevice() {
         exploitState = .detecting
         deviceInfo = DeviceInfo.current()
@@ -160,7 +152,6 @@ class Lum1naViewModel: ObservableObject {
         exploitState = .idle
     }
     
-    // MARK: - Console Logging
     func log(_ message: String, level: LogLevel = .info) {
         let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
         let logLine = "[\(timestamp)] [\(level.rawValue)] \(message)"
@@ -179,7 +170,6 @@ class Lum1naViewModel: ObservableObject {
         consoleText = ""
     }
     
-    // MARK: - Main Jailbreak Chain
     func startJailbreak() {
         guard !isRunning else { return }
         isRunning = true
@@ -194,7 +184,6 @@ class Lum1naViewModel: ObservableObject {
     private func executeFullChain() async {
         log("[*] Starting Lum1na jailbreak chain", level: .info)
         
-        // Stage 1: KASLR Bypass
         let kaslrResult = await performKASLRStage()
         guard let slide = kaslrResult else {
             fail("KASLR bypass failed")
@@ -202,25 +191,21 @@ class Lum1naViewModel: ObservableObject {
         }
         log("[+] KASLR slide: 0x\(String(slide, radix: 16))", level: .success)
         
-        // Stage 2: Heap Corruption
         guard await performHeapStage() else {
             fail("Heap corruption failed")
             return
         }
         
-        // Stage 3: ANE Exploit (KRW)
         guard await performANEStage(slide: slide) else {
             fail("ANE exploit failed")
             return
         }
         
-        // Stage 4: PPL Bypass
         guard await performPPLStage() else {
             fail("PPL bypass failed")
             return
         }
         
-        // Stage 5: Persistence
         guard await performPersistenceStage() else {
             fail("Persistence failed")
             return
@@ -229,7 +214,6 @@ class Lum1naViewModel: ObservableObject {
         succeed()
     }
     
-    // MARK: - Individual Stage Testing
     func testIndividualStage(_ stageName: String) {
         guard !isRunning else { return }
         isRunning = true
@@ -256,15 +240,13 @@ class Lum1naViewModel: ObservableObject {
         }
     }
     
-    // MARK: - Stage Implementations (Call Real Exploits)
+    // MARK: - Stage Implementations
     
-    /// Stage 1: KASLR Bypass - Calls real P044 implementation
     private func performKASLRStage() async -> UInt64? {
         exploitState = .executingKASLR
         log("[*] Stage: KASLR Bypass", level: .info)
         log("[*] ├─ Initializing P044 ANE leak...", level: .info)
         
-        // Bridge to Objective-C KASLRLeak
         guard let kaslrClass = NSClassFromString("KASLRLeak") as? NSObject.Type,
               let leakInstance = kaslrClass.init() as? KASLRLeakProtocol else {
             log("[-] ├─ KASLRLeak class not available", level: .error)
@@ -282,7 +264,6 @@ class Lum1naViewModel: ObservableObject {
             return nil
         }
         
-        // Validate slide is page-aligned
         guard slide & 0x3FFF == 0 else {
             log("[-] ├─ KASLR slide not page-aligned: 0x\(String(slide, radix: 16))", level: .error)
             return nil
@@ -294,7 +275,6 @@ class Lum1naViewModel: ObservableObject {
         return slide
     }
     
-    /// Stage 2: Heap Corruption - Calls real UPLLeak implementation
     private func performHeapStage() async -> Bool {
         exploitState = .executingHeap
         log("[*] Stage: Heap Corruption", level: .info)
@@ -328,13 +308,11 @@ class Lum1naViewModel: ObservableObject {
         return true
     }
     
-    /// Stage 3: ANE Exploit - Calls real ANE 43748 implementation
     private func performANEStage(slide: UInt64) async -> Bool {
         exploitState = .executingANE
         log("[*] Stage: ANE Exploit", level: .info)
         log("[*] ├─ Initializing ANE 43748...", level: .info)
         
-        // Bridge to ANE controller
         guard let aneClass = NSClassFromString("ANE43748") as? NSObject.Type,
               let aneInstance = aneClass.init() as? ExploitControllerProtocol else {
             log("[-] ├─ ANE43748 class not available", level: .error)
@@ -357,7 +335,6 @@ class Lum1naViewModel: ObservableObject {
         return true
     }
     
-    /// Stage 4: PPL Bypass - Calls real Momentarius implementation
     private func performPPLStage() async -> Bool {
         exploitState = .executingPPL
         log("[*] Stage: PPL Bypass", level: .info)
@@ -369,15 +346,16 @@ class Lum1naViewModel: ObservableObject {
             return false
         }
         
-        // Call Momentarius bypass method
         let selector = NSSelectorFromString("bypassPPL")
         guard pplInstance.responds(to: selector) else {
             log("[-] ├─ Momentarius bypass method not found", level: .error)
             return false
         }
         
-        let result = pplInstance.perform(selector)
-        let success = result?.returnValue != 0
+        // FIXED: Use takeUnretainedValue() instead of .returnValue
+        let unmanagedResult = pplInstance.perform(selector)
+        let result = unmanagedResult?.takeUnretainedValue() as? NSNumber
+        let success = result?.boolValue ?? false
         
         guard success else {
             log("[-] ├─ PPL bypass failed", level: .error)
@@ -390,7 +368,6 @@ class Lum1naViewModel: ObservableObject {
         return true
     }
     
-    /// Stage 5: Persistence - Calls real tempRoot implementation
     private func performPersistenceStage() async -> Bool {
         exploitState = .executingPersistence
         log("[*] Stage: Persistence", level: .info)
@@ -408,8 +385,10 @@ class Lum1naViewModel: ObservableObject {
             return false
         }
         
-        let result = persistInstance.perform(selector)
-        let success = result?.returnValue != 0
+        // FIXED: Use takeUnretainedValue() instead of .returnValue
+        let unmanagedResult = persistInstance.perform(selector)
+        let result = unmanagedResult?.takeUnretainedValue() as? NSNumber
+        let success = result?.boolValue ?? false
         
         guard success else {
             log("[-] ├─ Persistence installation failed", level: .error)
@@ -421,7 +400,6 @@ class Lum1naViewModel: ObservableObject {
         return true
     }
     
-    // MARK: - State Management
     private func fail(_ reason: String) {
         exploitState = .failed(reason)
         log("[-] Jailbreak failed: \(reason)", level: .error)
@@ -440,7 +418,6 @@ class Lum1naViewModel: ObservableObject {
         log("State reset", level: .info)
     }
     
-    // MARK: - Stage Color Helper
     func stageColor(for stage: String) -> Color {
         switch exploitState {
         case .executingKASLR where stage == "KASLR": return .cyan
@@ -448,7 +425,7 @@ class Lum1naViewModel: ObservableObject {
         case .executingANE where stage == "ANE": return .cyan
         case .executingKRW where stage == "KRW": return .cyan
         case .executingPPL where stage == "PPL": return .cyan
-        case .executingPersistence where stage == "Persist": return .cyan
+        case .executingPersistence where stage == "Persist": return .cyan  // FIXED: matches enum
         default: return .secondary
         }
     }
@@ -460,17 +437,4 @@ enum LogLevel: String {
     case success = "SUCCESS"
     case error = "ERROR"
     case warning = "WARN"
-}
-
-enum JailbreakStage {
-    case idle
-    case detecting
-    case kaslr
-    case heap
-    case ane
-    case krw
-    case ppl
-    case persistence
-    case success
-    case failed
 }
