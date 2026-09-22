@@ -5,20 +5,22 @@ struct CentralHeapView: View {
     let stage: JailbreakStage
     
     var body: some View {
-        TimelineView(.animation(minimumInterval: 1/60, paused: false)) { context in
-            ZStack {
-                HexagonRing(isInner: false, color: stage.color, time: context.date)
-                    .rotationEffect(.degrees(calculateRotation(at: context.date, speed: 1)))
-                HexagonRing(isInner: true, color: stage.color, time: context.date)
-                    .rotationEffect(.degrees(-calculateRotation(at: context.date, speed: 0.7)))
-                HexagonShape()
-                    .fill(LinearGradient(colors: [stage.color.opacity(0.2), stage.color.opacity(0.1), .lum1naField.opacity(0.8)], startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .overlay(HexagonShape().stroke(stage.color.opacity(0.6), lineWidth: 2))
-                    .frame(width: LayoutConstants.hexagonSize, height: LayoutConstants.hexagonSize)
-                VStack(spacing: 2) {
-                    Text("HEAP").font(.system(.caption2, weight: .bold)).foregroundStyle(stage.color.opacity(0.7))
-                    Text(heapAddress ?? "0x000000000").font(.heapAddress).foregroundStyle(.consoleText).lineLimit(1).minimumScaleFactor(0.8)
-                }.padding(.horizontal, 8)
+        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: false)) { context in
+            Group {
+                ZStack {
+                    HexagonRing(isInner: false, color: stage.color, time: context.date)
+                        .rotationEffect(.degrees(calculateRotation(at: context.date, speed: 1)))
+                    HexagonRing(isInner: true, color: stage.color, time: context.date)
+                        .rotationEffect(.degrees(-calculateRotation(at: context.date, speed: 0.7)))
+                    HexagonShape()
+                        .fill(LinearGradient(colors: [stage.color.opacity(0.2), stage.color.opacity(0.1), .lum1naField.opacity(0.8)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                        .overlay(HexagonShape().stroke(stage.color.opacity(0.6), lineWidth: 2))
+                        .frame(width: LayoutConstants.hexagonSize, height: LayoutConstants.hexagonSize)
+                    VStack(spacing: 2) {
+                        Text("HEAP").font(.system(.caption2, weight: .bold)).foregroundStyle(stage.color.opacity(0.7))
+                        Text(heapAddress ?? "0x000000000").font(.heapAddress).foregroundStyle(.consoleText).lineLimit(1).minimumScaleFactor(0.8)
+                    }.padding(.horizontal, 8)
+                }
             }
         }
     }
