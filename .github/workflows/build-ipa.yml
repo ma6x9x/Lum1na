@@ -42,6 +42,7 @@ jobs:
             "Exploit/P009Controller.h"
             "Exploit/P052Controller.h"
             "Exploit/P039Controller.h"
+            "Exploit/P044AksKaslrReach.h"
           )
           
           # Swift files
