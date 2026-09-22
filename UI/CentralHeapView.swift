@@ -9,7 +9,7 @@ struct CentralHeapView: View {
             StatusIndicator(stage: stage)
             
             Text("HEAP")
-                .font(.system(.caption2, weight: .bold, design: .rounded))
+                .font(.system(size: 11, weight: .bold, design: .rounded))
                 .foregroundStyle(stage.color.opacity(0.7))
                 .tracking(2)
             
