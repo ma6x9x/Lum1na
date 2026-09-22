@@ -14,7 +14,7 @@
 
 </div>
 
-Lum1na is a private SwiftUI/Objective-C iOS and iPadOS research application for hardware owned and controlled by the developer. It includes a visual SwiftUI interface, device/profile abstractions, low-level Objective-C research sources, exploit-to-Swift bridge code, kernel-map placeholders, and bundled Core ML resources.
+Lum1na is an open-source SwiftUI/Objective-C iOS and iPadOS research application for hardware owned and controlled by the developer. It includes a visual SwiftUI interface, device/profile abstractions, low-level Objective-C research sources, exploit-to-Swift bridge code, kernel-map placeholders, and bundled Core ML resources.
 
 > **Safety and scope:** This is experimental research software for authorized testing only. Use it only on hardware you are legally allowed to modify. Do not redistribute builds, publish the private repository, or invent/alter low-level exploit behavior without explicit authorization.
 
