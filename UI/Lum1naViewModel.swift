@@ -1,19 +1,90 @@
-import SwiftUI
-import Darwin
-import MachO
+//
+//  Lum1naViewModel.swift
+//  Lum1na
+//
+
+import Foundation
+import Combine
+
+// MARK: - Exploit Protocols (Bridge to Objective-C)
+@objc protocol KASLRLeakProtocol {
+    func initializeLeak() -> Bool
+    func leakKernelSlide() -> UInt64
+    func cleanup()
+}
+
+@objc protocol UPLLeakProtocol {
+    func initializeUPL() -> Bool
+    func triggerLeak() -> Int32
+    func establishPrimitives() -> Bool
+}
+
+@objc protocol ExploitControllerProtocol {
+    func executeWithKbase(_ kbase: UnsafeMutablePointer<UInt64>, error: AutoreleasingUnsafeMutablePointer<NSString?>) -> Bool
+}
+
+// MARK: - Device Info
+struct DeviceInfo {
+    let machine: String
+    let version: String
+    let build: String
+    let pagesize: Int
+    let memsize: UInt64
+    
+    static func current() -> DeviceInfo {
+        var model = "Unknown"
+        var version = "?"
+        var build = "?"
+        var pagesize: Int = 0
+        var memsize: UInt64 = 0
+        
+        // Get device model
+        var size = 0
+        sysctlbyname("hw.machine", nil, &size, nil, 0)
+        var machine = [CChar](repeating: 0, count: size)
+        sysctlbyname("hw.machine", &machine, &size, nil, 0)
+        model = String(cString: machine)
+        
+        // Get iOS version
+        version = UIDevice.current.systemVersion
+        
+        // Get kernel build
+        size = 0
+        sysctlbyname("kern.osversion", nil, &size, nil, 0)
+        var osversion = [CChar](repeating: 0, count: size)
+        sysctlbyname("kern.osversion", &osversion, &size, nil, 0)
+        build = String(cString: osversion)
+        
+        // Get page size
+        size = MemoryLayout<Int>.size
+        sysctlbyname("hw.pagesize", &pagesize, &size, nil, 0)
+        
+        // Get memory size
+        size = MemoryLayout<UInt64>.size
+        sysctlbyname("hw.memsize", &memsize, &size, nil, 0)
+        
+        return DeviceInfo(
+            machine: model,
+            version: version,
+            build: build,
+            pagesize: pagesize,
+            memsize: memsize
+        )
+    }
+}
 
 // MARK: - Exploit State
 enum ExploitState: Equatable {
     case idle
     case detecting
     case preparing
-    case executingANE43748
-    case executingAPFS84523
-    case executingP052
-    case executingP039
-    case executingP009
-    case executingP005
-    case success(String)
+    case executingKASLR
+    case executingHeap
+    case executingANE
+    case executingKRW
+    case executingPPL
+    case executingPersistence
+    case success
     case failed(String)
     
     var description: String {
@@ -21,573 +92,385 @@ enum ExploitState: Equatable {
         case .idle: return "Ready"
         case .detecting: return "Detecting..."
         case .preparing: return "Preparing..."
-        case .executingANE43748: return "ANE43748..."
-        case .executingAPFS84523: return "APFS84523..."
-        case .executingP052: return "P052..."
-        case .executingP039: return "P039..."
-        case .executingP009: return "P009..."
-        case .executingP005: return "P005..."
-        case .success(let msg): return "Success: \(msg)"
-        case .failed(let err): return "Failed: \(err)"
+        case .executingKASLR: return "KASLR Bypass..."
+        case .executingHeap: return "Heap Corruption..."
+        case .executingANE: return "ANE Exploit..."
+        case .executingKRW: return "Kernel R/W..."
+        case .executingPPL: return "PPL Bypass..."
+        case .executingPersistence: return "Persistence..."
+        case .success: return "Jailbroken"
+        case .failed(let reason): return "Failed: \(reason)"
         }
     }
 }
 
-// MARK: - Device Info (ObjC-compatible)
-@objc(DeviceInfo)
-final class DeviceInfo: NSObject {
-    @objc let machine: String
-    @objc let version: String
-    @objc let buildVersion: String
-    @objc let isA12Plus: Bool
-    @objc let isArm64e: Bool
-    @objc let pageSize: Int
-    @objc let physicalMemory: UInt64
-    
-    init(machine: String, version: String, buildVersion: String,
-         isA12Plus: Bool, isArm64e: Bool, pageSize: Int, physicalMemory: UInt64) {
-        self.machine = machine
-        self.version = version
-        self.buildVersion = buildVersion
-        self.isA12Plus = isA12Plus
-        self.isArm64e = isArm64e
-        self.pageSize = pageSize
-        self.physicalMemory = physicalMemory
-        super.init()
-    }
-    
-    var exploitCompatibility: [String] {
-        var compatible: [String] = []
-        
-        // Fixed availability checks
-        if #available(iOS 15.0, *) {
-            if #unavailable(iOS 17.0) {
-                compatible.append("ANE43748")
-            }
-        }
-        
-        if #available(iOS 14.0, *) {
-            if #unavailable(iOS 16.5) {
-                compatible.append("APFS84523")
-            }
-        }
-        
-        if isA12Plus {
-            compatible.append("P052APFSNstream")
-            compatible.append("P039Controller")
-        }
-        compatible.append("P009Controller")
-        compatible.append("P005") // P005 JIT disclose
-        return compatible
-    }
-}
-
-// MARK: - Console Logger
-final class ConsoleLogger: ObservableObject {
-    @Published var logs: [LogEntry] = []
-    private let maxLogs = 1000
-    
-    struct LogEntry: Identifiable {
-        let id = UUID()
-        let timestamp: Date
-        let level: LogLevel
-        let message: String
-        
-        var formattedTime: String {
-            let f = DateFormatter()
-            f.dateFormat = "HH:mm:ss.SSS"
-            return f.string(from: timestamp)
-        }
-    }
-    
-    enum LogLevel: String {
-        case debug = "DEBUG", info = "INFO", warning = "WARN", error = "ERROR", critical = "CRIT"
-        var color: Color {
-            switch self {
-            case .debug: return .gray; case .info: return .green
-            case .warning: return .yellow; case .error: return .orange; case .critical: return .red
-            }
-        }
-    }
-    
-    func log(_ message: String, level: LogLevel = .info) {
-        DispatchQueue.main.async {
-            self.logs.append(LogEntry(timestamp: Date(), level: level, message: message))
-            if self.logs.count > self.maxLogs { self.logs.removeFirst() }
-        }
-        print("[\(level.rawValue)] \(message)")
-    }
-    func debug(_ m: String) { log(m, level: .debug) }
-    func info(_ m: String) { log(m, level: .info) }
-    func warning(_ m: String) { log(m, level: .warning) }
-    func error(_ m: String) { log(m, level: .error) }
-    func critical(_ m: String) { log(m, level: .critical) }
-    func clear() { logs.removeAll() }
-}
-
-// MARK: - @objc Protocols
-@objc(P052APFSNstreamProtocol) protocol P052APFSNstreamProtocol {
-    @objc func initializeExploit() -> Bool
-    @objc func setupPrimitives() -> Bool
-    @objc func triggerRaceCondition() -> Int32
-    @objc func obtainKernelRW() -> Bool
-    @objc func cleanup() -> Void
-    @objc var isReady: Bool { get }
-    @objc var lastError: String? { get }
-}
-
-@objc(P039ControllerProtocol) protocol P039ControllerProtocol {
-    @objc func initWithDeviceInfo(_ info: DeviceInfo) -> Bool
-    @objc func prepareExploit() -> Bool
-    @objc func executeExploit() -> Int32
-    @objc func getKernelBase() -> UInt64
-    @objc func getTaskPort() -> UInt32
-    @objc var exploitStatus: Int32 { get }
-}
-
-@objc(P009ControllerProtocol) protocol P009ControllerProtocol {
-    @objc func initialize() -> Bool
-    @objc func runExploit() -> Bool
-    @objc func patchKernel() -> Bool
-    @objc func installBootstrap() -> Bool
-    @objc func getLastErrorCode() -> Int32
-    @objc func getLastErrorMessage() -> String?
-}
-
-@objc(ANE43748Protocol) protocol ANE43748Protocol {
-    @objc func initExploit() -> Bool
-    @objc func setupANEContext() -> Bool
-    @objc func triggerVulnerability() -> Int32
-    @objc func buildPrimitives() -> Bool
-    @objc func escalatePrivileges() -> Bool
-}
-
-@objc(APFS84523Protocol) protocol APFS84523Protocol {
-    @objc func prepareAPFSContext() -> Bool
-    @objc func triggerAPFSRace() -> Int32
-    @objc func obtainKernelAccess() -> Bool
-    @objc func stabilizeExploit() -> Bool
-}
-
-@objc(P005JITProtocol) protocol P005JITProtocol {
-    @objc func initP005() -> Bool
-    @objc func setupJITContext() -> Bool
-    @objc func triggerJITDowngrade() -> Int32
-    @objc func obtainKernelLeak() -> Bool
-}
-
-// MARK: - Exploit Bridge
-final class ExploitBridge: NSObject {
-    static let shared = ExploitBridge()
-    private(set) var p052Controller: P052APFSNstreamProtocol?
-    private(set) var p039Controller: P039ControllerProtocol?
-    private(set) var p009Controller: P009ControllerProtocol?
-    private(set) var ane43748Controller: ANE43748Protocol?
-    private(set) var apfs84523Controller: APFS84523Protocol?
-    private(set) var p005Controller: P005JITProtocol?
-    private let logger = ConsoleLogger()
-    
-    override init() {
-        super.init()
-        initializeControllers()
-    }
-    
-    private func initializeControllers() {
-        if let c = NSClassFromString("P052APFSNstream") as? NSObject.Type {
-            p052Controller = c.init() as? P052APFSNstreamProtocol
-            logger.info("P052APFSNstream loaded")
-        }
-        if let c = NSClassFromString("P039Controller") as? NSObject.Type {
-            p039Controller = c.init() as? P039ControllerProtocol
-            logger.info("P039Controller loaded")
-        }
-        if let c = NSClassFromString("P009Controller") as? NSObject.Type {
-            p009Controller = c.init() as? P009ControllerProtocol
-            logger.info("P009Controller loaded")
-        }
-        if let c = NSClassFromString("ANE43748") as? NSObject.Type {
-            ane43748Controller = c.init() as? ANE43748Protocol
-            logger.info("ANE43748 loaded")
-        }
-        if let c = NSClassFromString("APFS84523") as? NSObject.Type {
-            apfs84523Controller = c.init() as? APFS84523Protocol
-            logger.info("APFS84523 loaded")
-        }
-        if let c = NSClassFromString("P005JIT") as? NSObject.Type {
-            p005Controller = c.init() as? P005JITProtocol
-            logger.info("P005JIT loaded")
-        }
-    }
-    
-    var availableExploits: [String] {
-        var e: [String] = []
-        if ane43748Controller != nil { e.append("ANE43748") }
-        if apfs84523Controller != nil { e.append("APFS84523") }
-        if p052Controller != nil { e.append("P052") }
-        if p039Controller != nil { e.append("P039") }
-        if p009Controller != nil { e.append("P009") }
-        if p005Controller != nil { e.append("P005") }
-        return e
-    }
-}
-
-// MARK: - Main ViewModel
-@MainActor
-final class Lum1naViewModel: ObservableObject {
+// MARK: - View Model
+class Lum1naViewModel: ObservableObject {
     @Published var exploitState: ExploitState = .idle
+    @Published var consoleText: String = ""
     @Published var deviceInfo: DeviceInfo?
-    @Published var progress: Double = 0.0
     @Published var isRunning: Bool = false
-    @Published var kernelBase: UInt64 = 0
-    @Published var taskPort: UInt32 = 0
     
-    let console = ConsoleLogger()
-    private let bridge = ExploitBridge.shared
+    private var consoleBuffer: [String] = []
+    private let maxConsoleLines = 1000
     
-    // MARK: - Console Text Export
-    var consoleText: String {
-        console.logs.map { entry in
-            "[\(entry.formattedTime)] [\(entry.level.rawValue)] \(entry.message)"
-        }.joined(separator: "\n")
-    }
-    
-    // MARK: - Clear Console
-    func clearConsole() {
-        console.clear()
-    }
-    
-    // MARK: - Test Individual Stage
-    func testIndividualStage(_ stage: String) {
-        guard !isRunning else {
-            console.warning("Already running")
-            return
-        }
-        
-        console.info("Testing stage: \(stage)")
-        exploitState = .preparing
-        
-        switch stage {
-        case "KASLR Bypass":
-            Task { await runKASLRStage() }
-        case "Heap Corruption":
-            Task { await runHeapStage() }
-        case "ANE Exploit":
-            exploitState = .executingANE43748
-            Task {
-                _ = await attemptANE43748()
-            }
-        case "PPL Bypass":
-            Task { await runPPLStage() }
-        case "Persistence":
-            Task { await runPersistStage() }
-        case "P005 JIT":
-            exploitState = .executingP005
-            Task {
-                _ = await attemptP005()
-            }
-        default:
-            console.warning("Unknown stage: \(stage)")
-            exploitState = .idle
-        }
-    }
-    
-    init() {
-        console.info("Lum1na initialized")
-        console.info("Available: \(bridge.availableExploits.joined(separator: ", "))")
-    }
-    
-    // MARK: - Device Detection
-    func detectDevice() {
-        guard !isRunning else { return }
-        isRunning = true
-        exploitState = .detecting
-        progress = 0.1
-        
-        Task { await performDetection() }
-    }
-    
-    private func performDetection() async {
-        var machine = "unknown"
-        var size = size_t(MemoryLayout.size(ofValue: machine))
-        sysctlbyname("hw.machine", &machine, &size, nil, 0)
-        
-        let version = UIDevice.current.systemVersion
-        
-        var build = "unknown"
-        var bs = size_t(MemoryLayout.size(ofValue: build))
-        sysctlbyname("kern.osversion", &build, &bs, nil, 0)
-        
-        var pageSize: Int = 0
-        var ps = size_t(MemoryLayout.size(ofValue: pageSize))
-        sysctlbyname("hw.pagesize", &pageSize, &ps, nil, 0)
-        
-        var pm: UInt64 = 0
-        var pms = size_t(MemoryLayout.size(ofValue: pm))
-        sysctlbyname("hw.memsize", &pm, &pms, nil, 0)
-        
-        let a12Plus = [
-            "iPhone11,2", "iPhone11,4", "iPhone11,6", "iPhone11,8",
-            "iPhone12,1", "iPhone12,3", "iPhone12,5", "iPhone12,8",
-            "iPhone13,1", "iPhone13,2", "iPhone13,3", "iPhone13,4",
-            "iPhone14,2", "iPhone14,3", "iPhone14,4", "iPhone14,5",
-            "iPhone14,6", "iPhone14,7", "iPhone14,8", "iPhone15,2", "iPhone15,3"
-        ].contains(machine)
-        
-        let info = DeviceInfo(
-            machine: machine, version: version, buildVersion: build,
-            isA12Plus: a12Plus, isArm64e: false, pageSize: pageSize, physicalMemory: pm
-        )
-        
-        await MainActor.run {
-            self.deviceInfo = info
-            self.exploitState = .idle
-            self.isRunning = false
-            self.console.info("Device: \(machine) iOS \(version)")
-            self.console.info("Compatible: \(info.exploitCompatibility.joined(separator: ", "))")
-        }
-    }
-    
-    // MARK: - Exploit Chain
-    func startJailbreak() {
-        guard let device = deviceInfo else {
-            console.error("Run detection first")
-            exploitState = .failed("Detection required")
-            return
-        }
-        guard !isRunning else { return }
-        
-        isRunning = true
-        progress = 0.0
-        Task { await executeChain(device: device) }
-    }
-    
-    private func executeChain(device: DeviceInfo) async {
-        console.info("Starting exploit chain...")
-        
-        // Try P005 first (JIT-based, if entitled)
-        if device.exploitCompatibility.contains("P005") {
-            console.info("Attempting P005 JIT disclose...")
-            exploitState = .executingP005
-            progress = 0.1
-            if await attemptP005() {
-                console.info("P005 SUCCESS!")
-                // Continue to get KRW
-            }
-        }
-        
-        // Phase 1: ANE43748
-        if device.exploitCompatibility.contains("ANE43748") {
-            console.info("Attempting ANE43748...")
-            exploitState = .executingANE43748
-            progress = 0.2
-            if await attemptANE43748() {
-                console.info("ANE43748 SUCCESS!")
-                exploitState = .success("ANE43748")
-                isRunning = false; progress = 1.0; return
-            }
-            console.warning("ANE43748 failed...")
-        }
-        
-        // Phase 2: APFS84523
-        if device.exploitCompatibility.contains("APFS84523") {
-            console.info("Attempting APFS84523...")
-            exploitState = .executingAPFS84523
-            progress = 0.4
-            if await attemptAPFS84523() {
-                console.info("APFS84523 SUCCESS!")
-                exploitState = .success("APFS84523")
-                isRunning = false; progress = 1.0; return
-            }
-            console.warning("APFS84523 failed...")
-        }
-        
-        // Phase 3: P052
-        if device.exploitCompatibility.contains("P052APFSNstream") {
-            console.info("Attempting P052...")
-            exploitState = .executingP052
-            progress = 0.6
-            if await attemptP052() {
-                console.info("P052 SUCCESS!")
-                exploitState = .success("P052APFSNstream")
-                isRunning = false; progress = 1.0; return
-            }
-        }
-        
-        // Phase 4: P039
-        if device.exploitCompatibility.contains("P039Controller") {
-            console.info("Attempting P039...")
-            exploitState = .executingP039
-            progress = 0.75
-            if await attemptP039(device: device) {
-                console.info("P039 SUCCESS!")
-                exploitState = .success("P039Controller")
-                isRunning = false; progress = 1.0; return
-            }
-        }
-        
-        // Phase 5: P009
-        console.info("Attempting P009...")
-        exploitState = .executingP009
-        progress = 0.9
-        if await attemptP009() {
-            console.info("P009 SUCCESS!")
-            exploitState = .success("P009Controller")
-            isRunning = false; progress = 1.0
-        } else {
-            console.critical("ALL EXPLOITS FAILED!")
-            exploitState = .failed("Exhausted all exploits")
-            isRunning = false; progress = 0.0
-        }
-    }
-    
-    // MARK: - Individual Exploits
-    private func attemptANE43748() async -> Bool {
-        guard let c = bridge.ane43748Controller else {
-            console.error("ANE43748 not available"); return false
-        }
-        guard c.initExploit() else { console.error("ANE init failed"); return false }
-        guard c.setupANEContext() else { console.error("ANE context failed"); return false }
-        let r = c.triggerVulnerability()
-        guard r == 0 else { console.error("ANE trigger failed: \(r)"); return false }
-        guard c.buildPrimitives() else { console.error("ANE primitives failed"); return false }
-        guard c.escalatePrivileges() else { console.error("ANE escalation failed"); return false }
-        console.info("ANE43748 complete!"); return true
-    }
-    
-    private func attemptAPFS84523() async -> Bool {
-        guard let c = bridge.apfs84523Controller else {
-            console.error("APFS84523 not available"); return false
-        }
-        guard c.prepareAPFSContext() else { console.error("APFS prep failed"); return false }
-        let r = c.triggerAPFSRace()
-        guard r == 0 else { console.error("APFS race failed: \(r)"); return false }
-        guard c.obtainKernelAccess() else { console.error("APFS kernel access failed"); return false }
-        guard c.stabilizeExploit() else { console.error("APFS stabilize failed"); return false }
-        console.info("APFS84523 complete!"); return true
-    }
-    
-    private func attemptP052() async -> Bool {
-        guard let c = bridge.p052Controller else {
-            console.error("P052 not available"); return false
-        }
-        guard c.initializeExploit() else {
-            console.error("P052 init failed")
-            if let e = c.lastError { console.error("Error: \(e)") }
-            return false
-        }
-        guard c.setupPrimitives() else { console.error("P052 primitives failed"); return false }
-        let r = c.triggerRaceCondition()
-        guard r == 0 else { console.error("P052 race failed: \(r)"); return false }
-        guard c.obtainKernelRW() else { console.error("P052 KRW failed"); return false }
-        c.cleanup()
-        console.info("P052 complete!"); return true
-    }
-    
-    private func attemptP039(device: DeviceInfo) async -> Bool {
-        guard let c = bridge.p039Controller else {
-            console.error("P039 not available"); return false
-        }
-        guard c.initWithDeviceInfo(device) else { console.error("P039 init failed"); return false }
-        guard c.prepareExploit() else { console.error("P039 prep failed"); return false }
-        let r = c.executeExploit()
-        guard r == 0 else { console.error("P039 exec failed: \(r)"); return false }
-        await MainActor.run {
-            self.kernelBase = c.getKernelBase()
-            self.taskPort = c.getTaskPort()
-        }
-        console.info("P039 complete! Kernel: 0x\(String(kernelBase, radix: 16))")
-        return true
-    }
-    
-    private func attemptP009() async -> Bool {
-        guard let c = bridge.p009Controller else {
-            console.error("P009 not available"); return false
-        }
-        guard c.initialize() else { console.error("P009 init failed"); return false }
-        guard c.runExploit() else {
-            console.error("P009 exploit failed: [\(c.getLastErrorCode())] \(c.getLastErrorMessage() ?? "?")")
-            return false
-        }
-        guard c.patchKernel() else { console.error("P009 patch failed"); return false }
-        guard c.installBootstrap() else { console.error("P009 bootstrap failed"); return false }
-        console.info("P009 complete!"); return true
-    }
-    
-    // MARK: - P005 JIT Disclose
-    private func attemptP005() async -> Bool {
-        guard let c = bridge.p005Controller else {
-            console.error("P005 not available"); return false
-        }
-        console.info("Initializing P005 JIT disclose...")
-        guard c.initP005() else {
-            console.error("P005 init failed")
-            return false
-        }
-        guard c.setupJITContext() else {
-            console.error("P005 JIT context failed")
-            return false
-        }
-        let r = c.triggerJITDowngrade()
-        guard r == 0 else {
-            console.error("P005 trigger failed: \(r)")
-            return false
-        }
-        guard c.obtainKernelLeak() else {
-            console.error("P005 leak failed")
-            return false
-        }
-        console.info("P005 JIT disclose complete!")
-        return true
-    }
-    
-    // MARK: - Stage Methods for Individual Testing
-    private func runKASLRStage() async {
-        console.info("[*] Stage: KASLR Bypass")
-        console.info("[*] ├─ Detecting kernel slide...")
-        try? await Task.sleep(nanoseconds: 800_000_000)
-        let slide = String(format: "0x%llx", UInt64.random(in: 0x10000000...0x20000000))
-        console.info("[+] ├─ Kernel slide found: \(slide)")
-        console.info("[+] └─ KASLR bypass complete")
-    }
-    
-    private func runHeapStage() async {
-        console.info("[*] Stage: Heap Corruption")
-        console.info("[*] ├─ Allocating primitive buffers...")
-        try? await Task.sleep(nanoseconds: 500_000_000)
-        console.info("[+] └─ Heap primitive established")
-    }
-    
-    private func runPPLStage() async {
-        console.info("[*] Stage: PPL Bypass")
-        console.info("[*] ├─ Mapping GPU textures...")
-        try? await Task.sleep(nanoseconds: 700_000_000)
-        console.info("[+] └─ PPL bypass complete")
-    }
-    
-    private func runPersistStage() async {
-        console.info("[*] Stage: Persistence")
-        console.info("[*] ├─ Installing tempRoot...")
-        try? await Task.sleep(nanoseconds: 500_000_000)
-        console.info("[+] └─ Persistence installed")
-    }
-    
-    func reset() {
-        guard !isRunning else { return }
-        exploitState = .idle; progress = 0.0; kernelBase = 0; taskPort = 0
-        console.clear(); console.info("State reset")
-    }
-    
-    var canStartExploit: Bool {
-        deviceInfo != nil && !isRunning
-    }
-    
+    // MARK: - Computed Properties
     var statusColor: Color {
         switch exploitState {
         case .idle: return .gray
-        case .detecting, .preparing: return .blue
-        case .executingANE43748, .executingAPFS84523, .executingP052, .executingP039, .executingP009, .executingP005: return .orange
+        case .detecting, .preparing: return .orange
+        case .executingKASLR, .executingHeap, .executingANE, .executingKRW, .executingPPL, .executingPersistence: return .cyan
         case .success: return .green
         case .failed: return .red
         }
     }
+    
+    var statusText: String {
+        exploitState.description
+    }
+    
+    var currentStage: JailbreakStage {
+        switch exploitState {
+        case .idle: return .idle
+        case .detecting, .preparing: return .detecting
+        case .executingKASLR: return .kaslr
+        case .executingHeap: return .heap
+        case .executingANE: return .ane
+        case .executingKRW: return .krw
+        case .executingPPL: return .ppl
+        case .executingPersistence: return .persistence
+        case .success: return .success
+        case .failed: return .failed
+        }
+    }
+    
+    // MARK: - Initialization
+    init() {
+        detectDevice()
+        log("Lum1na initialized", level: .info)
+        log("Target: A14 23F77", level: .info)
+    }
+    
+    // MARK: - Device Detection
+    func detectDevice() {
+        exploitState = .detecting
+        deviceInfo = DeviceInfo.current()
+        log("Device: \(deviceInfo?.machine ?? "Unknown")", level: .info)
+        log("iOS: \(deviceInfo?.version ?? "?") (\(deviceInfo?.build ?? "?"))", level: .info)
+        exploitState = .idle
+    }
+    
+    // MARK: - Console Logging
+    func log(_ message: String, level: LogLevel = .info) {
+        let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
+        let logLine = "[\(timestamp)] [\(level.rawValue)] \(message)"
+        
+        DispatchQueue.main.async {
+            self.consoleBuffer.append(logLine)
+            if self.consoleBuffer.count > self.maxConsoleLines {
+                self.consoleBuffer.removeFirst()
+            }
+            self.consoleText = self.consoleBuffer.joined(separator: "\n")
+        }
+    }
+    
+    func clearConsole() {
+        consoleBuffer.removeAll()
+        consoleText = ""
+    }
+    
+    // MARK: - Main Jailbreak Chain
+    func startJailbreak() {
+        guard !isRunning else { return }
+        isRunning = true
+        exploitState = .preparing
+        clearConsole()
+        
+        Task {
+            await executeFullChain()
+        }
+    }
+    
+    private func executeFullChain() async {
+        log("[*] Starting Lum1na jailbreak chain", level: .info)
+        
+        // Stage 1: KASLR Bypass
+        let kaslrResult = await performKASLRStage()
+        guard let slide = kaslrResult else {
+            fail("KASLR bypass failed")
+            return
+        }
+        log("[+] KASLR slide: 0x\(String(slide, radix: 16))", level: .success)
+        
+        // Stage 2: Heap Corruption
+        guard await performHeapStage() else {
+            fail("Heap corruption failed")
+            return
+        }
+        
+        // Stage 3: ANE Exploit (KRW)
+        guard await performANEStage(slide: slide) else {
+            fail("ANE exploit failed")
+            return
+        }
+        
+        // Stage 4: PPL Bypass
+        guard await performPPLStage() else {
+            fail("PPL bypass failed")
+            return
+        }
+        
+        // Stage 5: Persistence
+        guard await performPersistenceStage() else {
+            fail("Persistence failed")
+            return
+        }
+        
+        succeed()
+    }
+    
+    // MARK: - Individual Stage Testing
+    func testIndividualStage(_ stageName: String) {
+        guard !isRunning else { return }
+        isRunning = true
+        clearConsole()
+        
+        Task {
+            switch stageName {
+            case "KASLR Bypass":
+                _ = await performKASLRStage()
+            case "Heap Corruption":
+                _ = await performHeapStage()
+            case "ANE Exploit":
+                if let slide = await performKASLRStage() {
+                    _ = await performANEStage(slide: slide)
+                }
+            case "PPL Bypass":
+                _ = await performPPLStage()
+            case "Persistence":
+                _ = await performPersistenceStage()
+            default:
+                log("Unknown stage: \(stageName)", level: .error)
+            }
+            isRunning = false
+        }
+    }
+    
+    // MARK: - Stage Implementations (Call Real Exploits)
+    
+    /// Stage 1: KASLR Bypass - Calls real P044 implementation
+    private func performKASLRStage() async -> UInt64? {
+        exploitState = .executingKASLR
+        log("[*] Stage: KASLR Bypass", level: .info)
+        log("[*] ├─ Initializing P044 ANE leak...", level: .info)
+        
+        // Bridge to Objective-C KASLRLeak
+        guard let kaslrClass = NSClassFromString("KASLRLeak") as? NSObject.Type,
+              let leakInstance = kaslrClass.init() as? KASLRLeakProtocol else {
+            log("[-] ├─ KASLRLeak class not available", level: .error)
+            return nil
+        }
+        
+        guard leakInstance.initializeLeak() else {
+            log("[-] ├─ KASLRLeak initialization failed", level: .error)
+            return nil
+        }
+        
+        let slide = leakInstance.leakKernelSlide()
+        guard slide != 0 else {
+            log("[-] ├─ KASLRLeak returned invalid slide", level: .error)
+            return nil
+        }
+        
+        // Validate slide is page-aligned
+        guard slide & 0x3FFF == 0 else {
+            log("[-] ├─ KASLR slide not page-aligned: 0x\(String(slide, radix: 16))", level: .error)
+            return nil
+        }
+        
+        log("[+] ├─ Kernel slide found: 0x\(String(slide, radix: 16))", level: .success)
+        log("[+] └─ KASLR bypass complete", level: .success)
+        
+        return slide
+    }
+    
+    /// Stage 2: Heap Corruption - Calls real UPLLeak implementation
+    private func performHeapStage() async -> Bool {
+        exploitState = .executingHeap
+        log("[*] Stage: Heap Corruption", level: .info)
+        log("[*] ├─ Initializing UPL leak primitive...", level: .info)
+        
+        guard let uplClass = NSClassFromString("UPLLeak") as? NSObject.Type,
+              let uplInstance = uplClass.init() as? UPLLeakProtocol else {
+            log("[-] ├─ UPLLeak class not available", level: .error)
+            return false
+        }
+        
+        guard uplInstance.initializeUPL() else {
+            log("[-] ├─ UPLLeak initialization failed", level: .error)
+            return false
+        }
+        
+        let result = uplInstance.triggerLeak()
+        guard result == 0 else {
+            log("[-] ├─ UPLLeak trigger failed: \(result)", level: .error)
+            return false
+        }
+        
+        guard uplInstance.establishPrimitives() else {
+            log("[-] ├─ UPLLeak primitive establishment failed", level: .error)
+            return false
+        }
+        
+        log("[+] ├─ UPL primitive established", level: .success)
+        log("[+] └─ Heap corruption stage complete", level: .success)
+        
+        return true
+    }
+    
+    /// Stage 3: ANE Exploit - Calls real ANE 43748 implementation
+    private func performANEStage(slide: UInt64) async -> Bool {
+        exploitState = .executingANE
+        log("[*] Stage: ANE Exploit", level: .info)
+        log("[*] ├─ Initializing ANE 43748...", level: .info)
+        
+        // Bridge to ANE controller
+        guard let aneClass = NSClassFromString("ANE43748") as? NSObject.Type,
+              let aneInstance = aneClass.init() as? ExploitControllerProtocol else {
+            log("[-] ├─ ANE43748 class not available", level: .error)
+            return false
+        }
+        
+        var kbase: UInt64 = slide
+        var error: NSString?
+        
+        let success = aneInstance.executeWithKbase(&kbase, error: &error)
+        
+        guard success else {
+            log("[-] ├─ ANE 43748 failed: \(error ?? "unknown")", level: .error)
+            return false
+        }
+        
+        log("[+] ├─ ANE 43748 complete, KRW established", level: .success)
+        log("[+] └─ Kernel R/W primitive active", level: .success)
+        
+        return true
+    }
+    
+    /// Stage 4: PPL Bypass - Calls real Momentarius implementation
+    private func performPPLStage() async -> Bool {
+        exploitState = .executingPPL
+        log("[*] Stage: PPL Bypass", level: .info)
+        log("[*] ├─ Initializing Momentarius...", level: .info)
+        
+        guard let pplClass = NSClassFromString("Momentarius") as? NSObject.Type,
+              let pplInstance = pplClass.init() as? NSObject else {
+            log("[-] ├─ Momentarius class not available", level: .error)
+            return false
+        }
+        
+        // Call Momentarius bypass method
+        let selector = NSSelectorFromString("bypassPPL")
+        guard pplInstance.responds(to: selector) else {
+            log("[-] ├─ Momentarius bypass method not found", level: .error)
+            return false
+        }
+        
+        let result = pplInstance.perform(selector)
+        let success = result?.returnValue != 0
+        
+        guard success else {
+            log("[-] ├─ PPL bypass failed", level: .error)
+            return false
+        }
+        
+        log("[+] ├─ PPL defeated", level: .success)
+        log("[+] └─ PPL bypass complete", level: .success)
+        
+        return true
+    }
+    
+    /// Stage 5: Persistence - Calls real tempRoot implementation
+    private func performPersistenceStage() async -> Bool {
+        exploitState = .executingPersistence
+        log("[*] Stage: Persistence", level: .info)
+        log("[*] ├─ Installing tempRoot...", level: .info)
+        
+        guard let persistClass = NSClassFromString("Persistence") as? NSObject.Type,
+              let persistInstance = persistClass.init() as? NSObject else {
+            log("[-] ├─ Persistence class not available", level: .error)
+            return false
+        }
+        
+        let selector = NSSelectorFromString("installTempRoot")
+        guard persistInstance.responds(to: selector) else {
+            log("[-] ├─ Persistence install method not found", level: .error)
+            return false
+        }
+        
+        let result = persistInstance.perform(selector)
+        let success = result?.returnValue != 0
+        
+        guard success else {
+            log("[-] ├─ Persistence installation failed", level: .error)
+            return false
+        }
+        
+        log("[+] └─ Persistence installed", level: .success)
+        
+        return true
+    }
+    
+    // MARK: - State Management
+    private func fail(_ reason: String) {
+        exploitState = .failed(reason)
+        log("[-] Jailbreak failed: \(reason)", level: .error)
+        isRunning = false
+    }
+    
+    private func succeed() {
+        exploitState = .success
+        log("[+] Jailbreak successful!", level: .success)
+        isRunning = false
+    }
+    
+    func reset() {
+        exploitState = .idle
+        clearConsole()
+        log("State reset", level: .info)
+    }
+    
+    // MARK: - Stage Color Helper
+    func stageColor(for stage: String) -> Color {
+        switch exploitState {
+        case .executingKASLR where stage == "KASLR": return .cyan
+        case .executingHeap where stage == "Heap": return .cyan
+        case .executingANE where stage == "ANE": return .cyan
+        case .executingKRW where stage == "KRW": return .cyan
+        case .executingPPL where stage == "PPL": return .cyan
+        case .executingPersistence where stage == "Persist": return .cyan
+        default: return .secondary
+        }
+    }
+}
+
+// MARK: - Supporting Types
+enum LogLevel: String {
+    case info = "INFO"
+    case success = "SUCCESS"
+    case error = "ERROR"
+    case warning = "WARN"
+}
+
+enum JailbreakStage {
+    case idle
+    case detecting
+    case kaslr
+    case heap
+    case ane
+    case krw
+    case ppl
+    case persistence
+    case success
+    case failed
 }
