@@ -109,20 +109,21 @@ class Lum1naViewModel: ObservableObject {
         exploitState.description
     }
     
+    // MARK: - Initialization
     init() {
         detectDevice()
         log("Lum1na initialized", level: .info)
         
-     
-   if let offsets = getDeviceOffsets() {
-    log("Device: \(offsets.tag)", level: .info)
-    log("Kernel base: \(LabOffsetsBridge.formatAddress(offsets.staticBase))", level: .info)
-} else {
-    log("Warning: Could not load device offsets", level: .warning)
-}
+        // Log device profile
+        if let offsets = getDeviceOffsets() {
+            log("Device: \(offsets.tag)", level: .info)
+            log("Kernel base: \(LabOffsetsBridge.formatAddress(offsets.staticBase))", level: .info)
+        } else {
+            log("Warning: Could not load device offsets", level: .warning)
+        }
+    }
     
     // MARK: - Device Detection
-    
     func detectDevice() {
         exploitState = .detecting
         deviceInfo = DeviceInfo.current()
@@ -132,7 +133,6 @@ class Lum1naViewModel: ObservableObject {
     }
     
     // MARK: - Logging
-    
     func log(_ message: String, level: LogLevel = .info) {
         let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
         let logLine = "[\(timestamp)] [\(level.rawValue)] \(message)"
@@ -158,7 +158,6 @@ class Lum1naViewModel: ObservableObject {
     }
     
     // MARK: - Timeout & Recovery
-    
     func setupTimeout(seconds: TimeInterval, action: @escaping () -> Void) {
         timeoutWorkItem?.cancel()
         
@@ -180,7 +179,6 @@ class Lum1naViewModel: ObservableObject {
     }
     
     // MARK: - Recovered Log
-    
     func showRecoveredLog() {
         let docsDir = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let logURL = docsDir.appendingPathComponent("lum1na_console_log.txt")
@@ -194,8 +192,13 @@ class Lum1naViewModel: ObservableObject {
         showRecoveredLogSheet = true
     }
     
-    // MARK: - Test Methods
+    // MARK: - APFS Cleanup
+    private func cleanupAPFS() {
+        log("♻️ Cleaning up APFS state...", level: .recovery)
+        NotificationCenter.default.post(name: .init("Lum1naCancelAPFS"), object: nil)
+    }
     
+    // MARK: - Test Methods
     func testAKS() {
         guard !isRunning else { return }
         isRunning = true
@@ -309,7 +312,7 @@ class Lum1naViewModel: ObservableObject {
             // Trigger OOB
             let triggerSel = NSSelectorFromString("triggerOOBWriteToBuffer:size:")
             var buffer = [UInt8](repeating: 0, count: 0x198)
-            let result = buffer.withUnsafeMutableBytes { ptr in
+            _ = buffer.withUnsafeMutableBytes { ptr in
                 oobInstance.perform(triggerSel, with: ptr.baseAddress, with: 0x198)
             }
             
@@ -381,11 +384,6 @@ class Lum1naViewModel: ObservableObject {
             isRunning = false
             exploitState = .idle
         }
-    }
-    
-    private func cleanupAPFS() {
-        log("♻️ Cleaning up APFS state...", level: .recovery)
-        NotificationCenter.default.post(name: .init("Lum1naCancelAPFS"), object: nil)
     }
     
     func startFullChain() {
