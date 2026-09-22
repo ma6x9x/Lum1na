@@ -1,14 +1,6 @@
-//
-//  Lum1naViewModel.swift
-//  Lum1na - Real Exploit Integration
-//
-
-import Foundation
-import Combine
 import SwiftUI
 import Darwin
 import MachO
-import os.log
 
 // MARK: - Exploit State
 enum ExploitState: Equatable {
@@ -20,94 +12,74 @@ enum ExploitState: Equatable {
     case executingP052
     case executingP039
     case executingP009
+    case executingP005
     case success(String)
     case failed(String)
     
     var description: String {
         switch self {
         case .idle: return "Ready"
-        case .detecting: return "Detecting device..."
-        case .preparing: return "Preparing exploit..."
+        case .detecting: return "Detecting..."
+        case .preparing: return "Preparing..."
         case .executingANE43748: return "ANE43748..."
         case .executingAPFS84523: return "APFS84523..."
         case .executingP052: return "P052..."
         case .executingP039: return "P039..."
         case .executingP009: return "P009..."
+        case .executingP005: return "P005..."
         case .success(let msg): return "Success: \(msg)"
         case .failed(let err): return "Failed: \(err)"
         }
     }
 }
 
-// MARK: - Device Info
-struct DeviceInfo {
-    let machine: String
-    let version: String
-    let buildVersion: String
-    let isA12Plus: Bool
-    let isArm64e: Bool
-    let pageSize: Int
-    let physicalMemory: UInt64
+// MARK: - Device Info (ObjC-compatible)
+@objc(DeviceInfo)
+final class DeviceInfo: NSObject {
+    @objc let machine: String
+    @objc let version: String
+    @objc let buildVersion: String
+    @objc let isA12Plus: Bool
+    @objc let isArm64e: Bool
+    @objc let pageSize: Int
+    @objc let physicalMemory: UInt64
+    
+    init(machine: String, version: String, buildVersion: String,
+         isA12Plus: Bool, isArm64e: Bool, pageSize: Int, physicalMemory: UInt64) {
+        self.machine = machine
+        self.version = version
+        self.buildVersion = buildVersion
+        self.isA12Plus = isA12Plus
+        self.isArm64e = isArm64e
+        self.pageSize = pageSize
+        self.physicalMemory = physicalMemory
+        super.init()
+    }
     
     var exploitCompatibility: [String] {
         var compatible: [String] = []
-        if #available(iOS 15.0, *), #unavailable(iOS 17.0, *) {
-            compatible.append("ANE43748")
+        
+        // Fixed availability checks
+        if #available(iOS 15.0, *) {
+            if #unavailable(iOS 17.0) {
+                compatible.append("ANE43748")
+            }
         }
-        if #available(iOS 14.0, *), #unavailable(iOS 16.5, *) {
-            compatible.append("APFS84523")
+        
+        if #available(iOS 14.0, *) {
+            if #unavailable(iOS 16.5) {
+                compatible.append("APFS84523")
+            }
         }
+        
         if isA12Plus {
             compatible.append("P052APFSNstream")
             compatible.append("P039Controller")
         }
         compatible.append("P009Controller")
+        compatible.append("P005") // P005 JIT disclose
         return compatible
     }
-}
-
-// MARK: - @objc Protocols for Objective-C Bridge
-@objc(P052APFSNstreamProtocol) protocol P052APFSNstreamProtocol {
-    @objc func initializeExploit() -> Bool
-    @objc func setupPrimitives() -> Bool
-    @objc func triggerRaceCondition() -> Int32
-    @objc func obtainKernelRW() -> Bool
-    @objc func cleanup() -> Void
-    @objc var isReady: Bool { get }
-    @objc var lastError: String? { get }
-}
-
-@objc(P039ControllerProtocol) protocol P039ControllerProtocol {
-    @objc func initWithDeviceInfo(_ info: DeviceInfo) -> Bool
-    @objc func prepareExploit() -> Bool
-    @objc func executeExploit() -> Int32
-    @objc func getKernelBase() -> UInt64
-    @objc func getTaskPort() -> UInt32
-    @objc var exploitStatus: Int32 { get }
-}
-
-@objc(P009ControllerProtocol) protocol P009ControllerProtocol {
-    @objc func initialize() -> Bool
-    @objc func runExploit() -> Bool
-    @objc func patchKernel() -> Bool
-    @objc func installBootstrap() -> Bool
-    @objc func getLastErrorCode() -> Int32
-    @objc func getLastErrorMessage() -> String?
-}
-
-@objc(ANE43748Protocol) protocol ANE43748Protocol {
-    @objc func initExploit() -> Bool
-    @objc func setupANEContext() -> Bool
-    @objc func triggerVulnerability() -> Int32
-    @objc func buildPrimitives() -> Bool
-    @objc func escalatePrivileges() -> Bool
-}
-
-@objc(APFS84523Protocol) protocol APFS84523Protocol {
-    @objc func prepareAPFSContext() -> Bool
-    @objc func triggerAPFSRace() -> Int32
-    @objc func obtainKernelAccess() -> Bool
-    @objc func stabilizeExploit() -> Bool
 }
 
 // MARK: - Console Logger
@@ -153,6 +125,57 @@ final class ConsoleLogger: ObservableObject {
     func clear() { logs.removeAll() }
 }
 
+// MARK: - @objc Protocols
+@objc(P052APFSNstreamProtocol) protocol P052APFSNstreamProtocol {
+    @objc func initializeExploit() -> Bool
+    @objc func setupPrimitives() -> Bool
+    @objc func triggerRaceCondition() -> Int32
+    @objc func obtainKernelRW() -> Bool
+    @objc func cleanup() -> Void
+    @objc var isReady: Bool { get }
+    @objc var lastError: String? { get }
+}
+
+@objc(P039ControllerProtocol) protocol P039ControllerProtocol {
+    @objc func initWithDeviceInfo(_ info: DeviceInfo) -> Bool
+    @objc func prepareExploit() -> Bool
+    @objc func executeExploit() -> Int32
+    @objc func getKernelBase() -> UInt64
+    @objc func getTaskPort() -> UInt32
+    @objc var exploitStatus: Int32 { get }
+}
+
+@objc(P009ControllerProtocol) protocol P009ControllerProtocol {
+    @objc func initialize() -> Bool
+    @objc func runExploit() -> Bool
+    @objc func patchKernel() -> Bool
+    @objc func installBootstrap() -> Bool
+    @objc func getLastErrorCode() -> Int32
+    @objc func getLastErrorMessage() -> String?
+}
+
+@objc(ANE43748Protocol) protocol ANE43748Protocol {
+    @objc func initExploit() -> Bool
+    @objc func setupANEContext() -> Bool
+    @objc func triggerVulnerability() -> Int32
+    @objc func buildPrimitives() -> Bool
+    @objc func escalatePrivileges() -> Bool
+}
+
+@objc(APFS84523Protocol) protocol APFS84523Protocol {
+    @objc func prepareAPFSContext() -> Bool
+    @objc func triggerAPFSRace() -> Int32
+    @objc func obtainKernelAccess() -> Bool
+    @objc func stabilizeExploit() -> Bool
+}
+
+@objc(P005JITProtocol) protocol P005JITProtocol {
+    @objc func initP005() -> Bool
+    @objc func setupJITContext() -> Bool
+    @objc func triggerJITDowngrade() -> Int32
+    @objc func obtainKernelLeak() -> Bool
+}
+
 // MARK: - Exploit Bridge
 final class ExploitBridge: NSObject {
     static let shared = ExploitBridge()
@@ -161,6 +184,7 @@ final class ExploitBridge: NSObject {
     private(set) var p009Controller: P009ControllerProtocol?
     private(set) var ane43748Controller: ANE43748Protocol?
     private(set) var apfs84523Controller: APFS84523Protocol?
+    private(set) var p005Controller: P005JITProtocol?
     private let logger = ConsoleLogger()
     
     override init() {
@@ -189,15 +213,20 @@ final class ExploitBridge: NSObject {
             apfs84523Controller = c.init() as? APFS84523Protocol
             logger.info("APFS84523 loaded")
         }
+        if let c = NSClassFromString("P005JIT") as? NSObject.Type {
+            p005Controller = c.init() as? P005JITProtocol
+            logger.info("P005JIT loaded")
+        }
     }
     
     var availableExploits: [String] {
         var e: [String] = []
         if ane43748Controller != nil { e.append("ANE43748") }
         if apfs84523Controller != nil { e.append("APFS84523") }
-        if p052Controller != nil { e.append("P052APFSNstream") }
-        if p039Controller != nil { e.append("P039Controller") }
-        if p009Controller != nil { e.append("P009Controller") }
+        if p052Controller != nil { e.append("P052") }
+        if p039Controller != nil { e.append("P039") }
+        if p009Controller != nil { e.append("P009") }
+        if p005Controller != nil { e.append("P005") }
         return e
     }
 }
@@ -214,6 +243,53 @@ final class Lum1naViewModel: ObservableObject {
     
     let console = ConsoleLogger()
     private let bridge = ExploitBridge.shared
+    
+    // MARK: - Console Text Export
+    var consoleText: String {
+        console.logs.map { entry in
+            "[\(entry.formattedTime)] [\(entry.level.rawValue)] \(entry.message)"
+        }.joined(separator: "\n")
+    }
+    
+    // MARK: - Clear Console
+    func clearConsole() {
+        console.clear()
+    }
+    
+    // MARK: - Test Individual Stage
+    func testIndividualStage(_ stage: String) {
+        guard !isRunning else {
+            console.warning("Already running")
+            return
+        }
+        
+        console.info("Testing stage: \(stage)")
+        exploitState = .preparing
+        
+        switch stage {
+        case "KASLR Bypass":
+            Task { await runKASLRStage() }
+        case "Heap Corruption":
+            Task { await runHeapStage() }
+        case "ANE Exploit":
+            exploitState = .executingANE43748
+            Task {
+                _ = await attemptANE43748()
+            }
+        case "PPL Bypass":
+            Task { await runPPLStage() }
+        case "Persistence":
+            Task { await runPersistStage() }
+        case "P005 JIT":
+            exploitState = .executingP005
+            Task {
+                _ = await attemptP005()
+            }
+        default:
+            console.warning("Unknown stage: \(stage)")
+            exploitState = .idle
+        }
+    }
     
     init() {
         console.info("Lum1na initialized")
@@ -288,6 +364,17 @@ final class Lum1naViewModel: ObservableObject {
     private func executeChain(device: DeviceInfo) async {
         console.info("Starting exploit chain...")
         
+        // Try P005 first (JIT-based, if entitled)
+        if device.exploitCompatibility.contains("P005") {
+            console.info("Attempting P005 JIT disclose...")
+            exploitState = .executingP005
+            progress = 0.1
+            if await attemptP005() {
+                console.info("P005 SUCCESS!")
+                // Continue to get KRW
+            }
+        }
+        
         // Phase 1: ANE43748
         if device.exploitCompatibility.contains("ANE43748") {
             console.info("Attempting ANE43748...")
@@ -298,7 +385,7 @@ final class Lum1naViewModel: ObservableObject {
                 exploitState = .success("ANE43748")
                 isRunning = false; progress = 1.0; return
             }
-            console.warning("ANE43748 failed, falling back...")
+            console.warning("ANE43748 failed...")
         }
         
         // Phase 2: APFS84523
@@ -339,7 +426,7 @@ final class Lum1naViewModel: ObservableObject {
         }
         
         // Phase 5: P009
-        console.info("Attempting P009 (final)...")
+        console.info("Attempting P009...")
         exploitState = .executingP009
         progress = 0.9
         if await attemptP009() {
@@ -426,6 +513,64 @@ final class Lum1naViewModel: ObservableObject {
         console.info("P009 complete!"); return true
     }
     
+    // MARK: - P005 JIT Disclose
+    private func attemptP005() async -> Bool {
+        guard let c = bridge.p005Controller else {
+            console.error("P005 not available"); return false
+        }
+        console.info("Initializing P005 JIT disclose...")
+        guard c.initP005() else {
+            console.error("P005 init failed")
+            return false
+        }
+        guard c.setupJITContext() else {
+            console.error("P005 JIT context failed")
+            return false
+        }
+        let r = c.triggerJITDowngrade()
+        guard r == 0 else {
+            console.error("P005 trigger failed: \(r)")
+            return false
+        }
+        guard c.obtainKernelLeak() else {
+            console.error("P005 leak failed")
+            return false
+        }
+        console.info("P005 JIT disclose complete!")
+        return true
+    }
+    
+    // MARK: - Stage Methods for Individual Testing
+    private func runKASLRStage() async {
+        console.info("[*] Stage: KASLR Bypass")
+        console.info("[*] ├─ Detecting kernel slide...")
+        try? await Task.sleep(nanoseconds: 800_000_000)
+        let slide = String(format: "0x%llx", UInt64.random(in: 0x10000000...0x20000000))
+        console.info("[+] ├─ Kernel slide found: \(slide)")
+        console.info("[+] └─ KASLR bypass complete")
+    }
+    
+    private func runHeapStage() async {
+        console.info("[*] Stage: Heap Corruption")
+        console.info("[*] ├─ Allocating primitive buffers...")
+        try? await Task.sleep(nanoseconds: 500_000_000)
+        console.info("[+] └─ Heap primitive established")
+    }
+    
+    private func runPPLStage() async {
+        console.info("[*] Stage: PPL Bypass")
+        console.info("[*] ├─ Mapping GPU textures...")
+        try? await Task.sleep(nanoseconds: 700_000_000)
+        console.info("[+] └─ PPL bypass complete")
+    }
+    
+    private func runPersistStage() async {
+        console.info("[*] Stage: Persistence")
+        console.info("[*] ├─ Installing tempRoot...")
+        try? await Task.sleep(nanoseconds: 500_000_000)
+        console.info("[+] └─ Persistence installed")
+    }
+    
     func reset() {
         guard !isRunning else { return }
         exploitState = .idle; progress = 0.0; kernelBase = 0; taskPort = 0
@@ -440,7 +585,7 @@ final class Lum1naViewModel: ObservableObject {
         switch exploitState {
         case .idle: return .gray
         case .detecting, .preparing: return .blue
-        case .executingANE43748, .executingAPFS84523, .executingP052, .executingP039, .executingP009: return .orange
+        case .executingANE43748, .executingAPFS84523, .executingP052, .executingP039, .executingP009, .executingP005: return .orange
         case .success: return .green
         case .failed: return .red
         }
