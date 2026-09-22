@@ -8,10 +8,10 @@ enum BadgeType: String, CaseIterable {
     
     var color: Color {
         switch self {
-        case .kernel:   return .badgeKernel
-        case .sandbox:  return .badgeSandbox
-        case .daemon:   return .badgeDaemon
-        case .patchset: return .badgePatchset
+        case .kernel:   return Color(hex: "#EF4444")
+        case .sandbox:  return Color(hex: "#F59E0B")
+        case .daemon:   return Color(hex: "#10B981")
+        case .patchset: return Color(hex: "#3B82F6")
         }
     }
     
@@ -36,20 +36,25 @@ struct HexagonBadgeView: View {
                 HexagonShape()
                     .fill(LinearGradient(colors: [type.color.opacity(isActive ? 0.3 : 0.1), type.color.opacity(isActive ? 0.15 : 0.05)], startPoint: .top, endPoint: .bottom))
                     .overlay(HexagonShape().stroke(type.color.opacity(isActive ? 0.8 : 0.3), lineWidth: 1.5))
-                    .frame(width: LayoutConstants.badgeSize, height: LayoutConstants.badgeSize)
+                    .frame(width: 44, height: 44)
                     .shadow(color: isActive ? type.color.opacity(0.4) : .clear, radius: 8)
                 Image(systemName: type.icon).font(.system(size: 16, weight: .semibold)).foregroundStyle(type.color.opacity(isActive ? 1.0 : 0.5))
             }
             .scaleEffect(pulseScale)
-            .onChange(of: isActive) { _, newValue in
+            // Use old onChange syntax for iOS < 17 compatibility
+            .onChange(of: isActive) { newValue in
                 if newValue {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { pulseScale = 1.1 }
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                        pulseScale = 1.1
+                    }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { pulseScale = 1.0 }
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+                            pulseScale = 1.0
+                        }
                     }
                 }
             }
-            Text(type.rawValue).font(.badgeLabel).foregroundStyle(type.color.opacity(isActive ? 0.9 : 0.4))
+            Text(type.rawValue).font(.system(size: 10, weight: .medium)).foregroundStyle(type.color.opacity(isActive ? 0.9 : 0.4))
         }
     }
 }
@@ -80,5 +85,22 @@ struct BadgeContainerView: View {
                 HexagonBadgeView(type: type, isActive: activeBadges.contains(type))
             }
         }
+    }
+}
+
+// Color extension for hex support
+extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 3: (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6: (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8: (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default: (a, r, g, b) = (1, 1, 1, 0)
+        }
+        self.init(.sRGB, red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255, opacity: Double(a) / 255)
     }
 }
