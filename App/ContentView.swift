@@ -11,7 +11,7 @@ struct ContentView: View {
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(spacing: 0) {
                     // Device info - top left corner, smaller
-                    DeviceInfoCompact()
+                    DeviceInfoCompact(viewModel: viewModel)
                         .padding(.horizontal, 20)
                         .padding(.top, 12)
                     
@@ -29,7 +29,7 @@ struct ContentView: View {
                         .foregroundStyle(.secondary)
                         .padding(.top, 12)
                     
-                    // Console - LARGER (250pt height)
+                    // Console card - LARGER
                     ConsoleCard(viewModel: viewModel)
                         .padding(.horizontal, 16)
                         .padding(.top, 20)
@@ -78,8 +78,31 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Compact Device Info (Top Left)
+// MARK: - Supporting Views
+
+struct HeaderView: View {
+    var body: some View {
+        VStack(spacing: 4) {
+            Text("Lum1na")
+                .font(.system(size: 42, weight: .bold, design: .rounded))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [Color(hex: "FF6B9D"), Color(hex: "4ECDC4")],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+            
+            Text("v0.1 • private beta")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.gray)
+        }
+    }
+}
+
 struct DeviceInfoCompact: View {
+    @ObservedObject var viewModel: Lum1naViewModel
+    
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "iphone")
@@ -87,9 +110,9 @@ struct DeviceInfoCompact: View {
                 .foregroundStyle(Color(hex: "4ECDC4"))
             
             VStack(alignment: .leading, spacing: 1) {
-                Text("iPhone 12")
+                Text(viewModel.deviceInfo?.machine ?? "Unknown")
                     .font(.system(size: 12, weight: .semibold))
-                Text("iOS 26.5")
+                Text("iOS \(viewModel.deviceInfo?.version ?? "?")")
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
             }
@@ -98,11 +121,11 @@ struct DeviceInfoCompact: View {
             
             HStack(spacing: 4) {
                 Circle()
-                    .fill(Color(hex: "4ECDC4"))
+                    .fill(viewModel.statusColor)
                     .frame(width: 6, height: 6)
-                Text("A14")
+                Text(viewModel.exploitState == .idle ? "Ready" : viewModel.exploitState.description)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Color(hex: "4ECDC4"))
+                    .foregroundStyle(viewModel.statusColor)
             }
         }
         .padding(.horizontal, 12)
@@ -112,11 +135,49 @@ struct DeviceInfoCompact: View {
                 .fill(.ultraThinMaterial)
                 .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 1))
         )
-        .frame(maxWidth: 180, alignment: .leading)
+        .frame(maxWidth: 200, alignment: .leading)
     }
 }
 
-// MARK: - Larger Console (250pt height)
+struct StarBeaconSection: View {
+    @ObservedObject var viewModel: Lum1naViewModel
+    @State private var isPulsing = false
+    
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(.ultraThinMaterial)
+                .frame(width: 180, height: 180)
+                .overlay(
+                    Circle()
+                        .stroke(
+                            LinearGradient(
+                                colors: [Color(hex: "FF6B9D"), Color(hex: "4ECDC4")],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 2
+                        )
+                )
+            
+            Image(systemName: "star.circle.fill")
+                .font(.system(size: 60))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [Color(hex: "FF6B9D"), Color(hex: "9B59B6"), Color(hex: "4ECDC4")],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .shadow(color: Color(hex: "9B59B6").opacity(0.6), radius: 15)
+                .scaleEffect(isPulsing ? 1.05 : 1.0)
+                .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: isPulsing)
+        }
+        .frame(height: 200)
+        .onAppear { isPulsing = true }
+    }
+}
+
 struct ConsoleCard: View {
     @ObservedObject var viewModel: Lum1naViewModel
     
@@ -129,9 +190,7 @@ struct ConsoleCard: View {
                 
                 Spacer()
                 
-                Button(action: {
-                    UIPasteboard.general.string = viewModel.consoleText
-                }) {
+                Button(action: { UIPasteboard.general.string = viewModel.consoleText }) {
                     Image(systemName: "doc.on.doc")
                         .font(.system(size: 13))
                         .foregroundStyle(.secondary)
@@ -151,13 +210,13 @@ struct ConsoleCard: View {
             
             ScrollView(.vertical, showsIndicators: true) {
                 Text(viewModel.consoleText)
-                    .font(.system(size: 13, design: .monospaced)) // Slightly larger
+                    .font(.system(size: 13, design: .monospaced))
                     .foregroundStyle(.cyan)
                     .lineSpacing(3)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(12)
             }
-            .frame(height: 250) // INCREASED from 180
+            .frame(height: 250) // LARGER console
         }
         .background(
             RoundedRectangle(cornerRadius: 16)
@@ -170,17 +229,52 @@ struct ConsoleCard: View {
     }
 }
 
-// MARK: - Stage Tester Sheet (Replaces "Hide stages")
+struct StageButtonsRow: View {
+    @ObservedObject var viewModel: Lum1naViewModel
+    
+    let stages = [
+        ("KASLR", "memorychip"),
+        ("Heap", "cpu"),
+        ("ANE", "brain"),
+        ("PPL", "lock.shield"),
+        ("Persist", "arrow.clockwise")
+    ]
+    
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(stages, id: \.0) { stage in
+                    VStack(spacing: 4) {
+                        Image(systemName: stage.1)
+                            .font(.system(size: 16))
+                        Text(stage.0)
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .foregroundStyle(.secondary)
+                    .frame(width: 60, height: 50)
+                    .background(
+                        Capsule()
+                            .fill(.ultraThinMaterial)
+                            .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 1))
+                    )
+                }
+            }
+            .padding(.horizontal, 4)
+        }
+    }
+}
+
 struct StageTesterView: View {
     @ObservedObject var viewModel: Lum1naViewModel
     @Environment(\.dismiss) var dismiss
     
     let stages = [
-        ("KASLR Bypass", "memorychip", "Test KASLR leak primitive"),
-        ("Heap Corruption", "cpu", "Test heap grooming/UAF"),
-        ("ANE Exploit", "brain", "Test ANE 43748 write class"),
+        ("KASLR Bypass", "memorychip", "Test KASLR leak"),
+        ("Heap Corruption", "cpu", "Test heap grooming"),
+        ("ANE Exploit", "brain", "Test ANE 43748"),
+        ("P005 JIT", "bolt", "Test P005 disclose"),
         ("PPL Bypass", "lock.shield", "Test PPL defeat"),
-        ("Persistence", "arrow.clockwise", "Test tempRoot installation")
+        ("Persistence", "arrow.clockwise", "Test tempRoot")
     ]
     
     var body: some View {
@@ -188,27 +282,39 @@ struct StageTesterView: View {
             List {
                 Section(header: Text("Individual Stage Testing")) {
                     ForEach(stages, id: \.0) { stage in
-                        StageTestRow(
-                            title: stage.0,
-                            icon: stage.1,
-                            description: stage.2,
-                            action: {
-                                viewModel.testIndividualStage(stage.0)
-                                dismiss()
+                        Button(action: {
+                            viewModel.testIndividualStage(stage.0)
+                            dismiss()
+                        }) {
+                            HStack(spacing: 12) {
+                                Image(systemName: stage.1)
+                                    .font(.system(size: 20))
+                                    .foregroundStyle(Color(hex: "FF6B9D"))
+                                    .frame(width: 40, height: 40)
+                                    .background(Color(hex: "FF6B9D").opacity(0.1))
+                                    .cornerRadius(10)
+                                
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(stage.0)
+                                        .font(.system(size: 16, weight: .semibold))
+                                    Text(stage.2)
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(.secondary)
+                                }
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(.secondary)
                             }
-                        )
+                        }
                     }
                 }
                 
-                Section(header: Text("Diagnostics")) {
-                    Button("Clear Console") {
-                        viewModel.clearConsole()
-                    }
-                    .foregroundStyle(.red)
-                    
-                    Button("Reset State") {
-                        viewModel.reset()
-                    }
+                Section {
+                    Button("Reset State") { viewModel.reset() }
+                        .foregroundStyle(.red)
                 }
             }
             .navigationTitle("Stage Tester")
@@ -222,37 +328,18 @@ struct StageTesterView: View {
     }
 }
 
-struct StageTestRow: View {
-    let title: String
-    let icon: String
-    let description: String
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .font(.system(size: 20))
-                    .foregroundStyle(Color(hex: "FF6B9D"))
-                    .frame(width: 40, height: 40)
-                    .background(Color(hex: "FF6B9D").opacity(0.1))
-                    .cornerRadius(10)
-                
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .font(.system(size: 16, weight: .semibold))
-                    Text(description)
-                        .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
-                
-                Spacer()
-                
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14))
-                    .foregroundStyle(.secondary)
-            }
+extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 3: (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6: (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8: (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default: (a, r, g, b) = (1, 1, 1, 0)
         }
+        self.init(.sRGB, red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255, opacity: Double(a) / 255)
     }
 }
