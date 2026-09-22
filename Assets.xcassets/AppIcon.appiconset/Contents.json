@@ -1,7 +1,7 @@
 {
   "images" : [
     {
-      "filename" : "Lum1naLogo.JPG",
+      "filename" : "Lum1naIcon-Default.jpg",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -13,7 +13,7 @@
           "value" : "dark"
         }
       ],
-      "filename" : "AppIcon 2.JPG",
+      "filename" : "Lum1naIcon-Dark.jpg",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -25,7 +25,7 @@
           "value" : "tinted"
         }
       ],
-      "filename" : "AppIcon 3.JPG",
+      "filename" : "Lum1naIcon-Tinted.jpg",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
