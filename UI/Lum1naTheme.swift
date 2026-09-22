@@ -1,29 +1,46 @@
+//
+//  Lum1naTheme.swift
+//  Lum1na
+//
+
 import SwiftUI
 
-enum JailbreakStage: String, CaseIterable {
+// FIXED: Added missing cases to match Lum1naViewModel usage
+enum JailbreakStage: String, CaseIterable, Identifiable {
     case idle = "IDLE"
+    case detecting = "DETECTING"
     case kaslr = "KASLR"
     case heap = "HEAP"
     case ane = "ANE"
+    case krw = "KRW"
     case ppl = "PPL"
-    case persist = "PERSIST"
-    
+    case persistence = "PERSISTENCE"  // FIXED: was .persist
+    case success = "SUCCESS"
+    case failed = "FAILED"
+
+    var id: String { rawValue }
+
     var color: Color {
         switch self {
-        case .idle:     return .lum1naViolet
-        case .kaslr:    return .lum1naCyan
-        case .heap:     return .lum1naVioletPurple
-        case .ane:      return .lum1naBlue
-        case .ppl:      return .lum1naMagenta
-        case .persist:  return .lum1naPink
+        case .idle:         return .lum1naViolet
+        case .detecting:    return .lum1naCyan
+        case .kaslr:        return .lum1naCyan
+        case .heap:         return .lum1naVioletPurple
+        case .ane:          return .lum1naBlue
+        case .krw:          return .lum1naBlue
+        case .ppl:          return .lum1naMagenta
+        case .persistence:  return .lum1naPink
+        case .success:      return .consoleSuccess
+        case .failed:       return .consoleError
         }
     }
-    
+
     var glowColor: Color {
         color.opacity(0.6)
     }
 }
 
+// MARK: - Color Extensions
 extension Color {
     static let lum1naField = Color(hex: "#07060F")
     static let lum1naViolet = Color(hex: "#8B5CF6")
@@ -47,6 +64,7 @@ extension Color {
     static let badgePatchset = Color(hex: "#3B82F6")
 }
 
+// MARK: - Font Extensions
 extension Font {
     static let console = Font.system(.caption, design: .monospaced)
     static let consoleSmall = Font.system(.caption2, design: .monospaced)
@@ -56,6 +74,7 @@ extension Font {
     static let buttonLabel = Font.system(.subheadline, weight: .medium)
 }
 
+// MARK: - Layout Constants
 enum LayoutConstants {
     static let starSize: CGFloat = 80
     static let hexagonSize: CGFloat = 60
