@@ -110,7 +110,20 @@ jobs:
           fi
           
           echo "✅ All source files verified!"
-
+      - name: Verify iOS 18 Universal App Icon Structure
+        run: |
+          set -euo pipefail
+          ICON_DIR="Assets.xcassets/AppIcon.appiconset"
+          
+          test -d "$ICON_DIR" || { echo "❌ AppIcon.appiconset missing"; exit 1; }
+          test -f "$ICON_DIR/Contents.json" || { echo "❌ Contents.json missing"; exit 1; }
+          
+          for file in AppIcon.jpg AppIcon-Dark.jpg AppIcon-Tinted.jpg; do
+            test -f "$ICON_DIR/$file" || { echo "❌ $file missing"; exit 1; }
+            echo "✓ $file exists"
+          done
+          
+          echo "✅ iOS 18 Universal App Icon structure validated!"
       - name: Fix Import Paths (cs_run.h)
         run: |
           if [ -f "Exploit/Bridges/cs_run.h" ]; then
