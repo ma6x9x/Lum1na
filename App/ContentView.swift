@@ -45,7 +45,8 @@ struct ContentView: View {
                             Label("Test Stages", systemImage: "slider.horizontal.3")
                                 .font(.system(size: 15, weight: .semibold))
                                 .foregroundStyle(.primary)
-                                .frame(maxWidth: .infinity, height: 50)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 50)
                                 .background(Capsule().fill(.ultraThinMaterial))
                         }
                         
@@ -53,7 +54,8 @@ struct ContentView: View {
                             Text("Jailbreak")
                                 .font(.system(size: 15, weight: .bold))
                                 .foregroundStyle(.white)
-                                .frame(maxWidth: .infinity, height: 50)
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 50)
                                 .background(
                                     Capsule().fill(
                                         LinearGradient(
