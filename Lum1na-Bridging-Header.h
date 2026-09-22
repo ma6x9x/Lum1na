@@ -16,5 +16,5 @@
 #import "Exploit/P009Controller.h"
 #import "Exploit/P052Controller.h"
 #import "Exploit/P039Controller.h"
-
+#import "Exploit/primitives/kaslr/CVE_2026_65343_AKS.h"
 #endif
