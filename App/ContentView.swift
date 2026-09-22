@@ -11,21 +11,19 @@ struct ContentView: View {
     
     var body: some View {
         ZStack {
-            // Background
             Color(hex: "07060F").ignoresSafeArea()
             
-            // Main content - NO ScrollView, fits without scrolling
             VStack(spacing: 0) {
-                // MARK: - Header: Lum1na Logo (NOW AT TOP)
+                // MARK: - Header: Lum1na Logo
                 HeaderView()
                     .padding(.top, 12)
                 
-                // MARK: - Device Info (NOW BELOW LOGO, COMPACT)
+                // MARK: - Device Info
                 DeviceInfoCompact(viewModel: viewModel)
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
                 
-                // MARK: - 4-Pointed Star (FIXED: Using StarBeaconView)
+                // MARK: - 4-Pointed Star
                 StarBeaconSection(viewModel: viewModel)
                     .padding(.top, 10)
                 
@@ -35,12 +33,12 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
                     .padding(.top, 8)
                 
-                // MARK: - Console (REDUCED HEIGHT)
+                // MARK: - Console
                 ConsoleCard(viewModel: viewModel)
                     .padding(.horizontal, 16)
                     .padding(.top, 10)
                 
-                // MARK: - Stage Buttons (COMPACT)
+                // MARK: - Stage Buttons
                 StageButtonsRow(viewModel: viewModel)
                     .padding(.horizontal, 12)
                     .padding(.top, 8)
@@ -85,7 +83,7 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Header View (Lum1na Logo at Top)
+// MARK: - Header View
 struct HeaderView: View {
     var body: some View {
         VStack(spacing: 2) {
@@ -106,7 +104,7 @@ struct HeaderView: View {
     }
 }
 
-// MARK: - Device Info (Compact, Below Logo)
+// MARK: - Device Info
 struct DeviceInfoCompact: View {
     @ObservedObject var viewModel: Lum1naViewModel
     
@@ -146,13 +144,12 @@ struct DeviceInfoCompact: View {
     }
 }
 
-// MARK: - Star Beacon Section (FIXED: Using 4-Pointed Star)
+// MARK: - Star Beacon Section
 struct StarBeaconSection: View {
     @ObservedObject var viewModel: Lum1naViewModel
     
     var body: some View {
         ZStack {
-            // Outer ring
             Circle()
                 .stroke(
                     LinearGradient(
@@ -164,12 +161,10 @@ struct StarBeaconSection: View {
                 )
                 .frame(width: 130, height: 130)
             
-            // Background
             Circle()
                 .fill(.ultraThinMaterial)
                 .frame(width: 120, height: 120)
             
-            // FIXED: Using StarBeaconView with 4-pointed star
             StarBeaconView(stage: viewModel.currentStage)
                 .frame(width: 80, height: 80)
         }
@@ -177,13 +172,12 @@ struct StarBeaconSection: View {
     }
 }
 
-// MARK: - Console Card (REDUCED HEIGHT)
+// MARK: - Console Card
 struct ConsoleCard: View {
     @ObservedObject var viewModel: Lum1naViewModel
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header
             HStack {
                 Label("console", systemImage: "terminal")
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
@@ -209,7 +203,6 @@ struct ConsoleCard: View {
             
             Divider().background(Color.white.opacity(0.1))
             
-            // Console output
             ScrollView(.vertical, showsIndicators: true) {
                 Text(viewModel.consoleText)
                     .font(.system(size: 11, design: .monospaced))
@@ -218,7 +211,7 @@ struct ConsoleCard: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(10)
             }
-            .frame(height: 140) // REDUCED from 250
+            .frame(height: 140)
         }
         .background(
             RoundedRectangle(cornerRadius: 14)
@@ -231,7 +224,7 @@ struct ConsoleCard: View {
     }
 }
 
-// MARK: - Stage Buttons Row (COMPACT)
+// MARK: - Stage Buttons Row
 struct StageButtonsRow: View {
     @ObservedObject var viewModel: Lum1naViewModel
     
@@ -329,29 +322,4 @@ struct StageTesterView: View {
     }
 }
 
-// MARK: - Color Extension
-extension Color {
-    init(hex: String) {
-        let hex = hex.trimmingCharacters(in: CharacterSet.alphabetics.inverted)
-        var int: UInt64 = 0
-        Scanner(string: hex).scanHexInt64(&int)
-        let a, r, g, b: UInt64
-        switch hex.count {
-        case 3:
-            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
-        case 6:
-            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
-        case 8:
-            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
-        default:
-            (a, r, g, b) = (1, 1, 1, 0)
-        }
-        self.init(
-            .sRGB,
-            red: Double(r) / 255,
-            green: Double(g) / 255,
-            blue: Double(b) / 255,
-            opacity: Double(a) / 255
-        )
-    }
-}
+// NOTE: Color(hex:) extension removed - use UI/Color+Hex.swift instead
