@@ -35,6 +35,14 @@ jobs:
             "Exploit/P039Controller.m"
             "Exploit/Momentarius.m"
             "Exploit/Persistence.m"
+            "Exploit/P044AksKaslrReach.h"
+            "Exploit/P035AVEWrapProbe.m"
+            "Exploit/P036AVEPaintProbe.m"
+            "Exploit/P037AVEPaintProbe.m"
+            "Exploit/P038WHuntSmoke.m"
+            "Exploit/P043WriteClassMap.m"
+            "Exploit/P045HybridMap.m"
+            "Exploit/P046F77PatchOracle.m"
           )
           
           # Objective-C header files (for bridging)
@@ -43,6 +51,14 @@ jobs:
             "Exploit/P052Controller.h"
             "Exploit/P039Controller.h"
             "Exploit/P044AksKaslrReach.h"
+            "Exploit/P035AVEWrapProbe.h"
+            "Exploit/P036AVEPaintProbe.h"
+            "Exploit/P037AVEPaintProbe.h"
+            "Exploit/P038WHuntSmoke.h"
+            "Exploit/A12X_23G71_LabOffsets.h"
+            "Exploit/A14_23F77_LabOffsets.h"
+            "Exploit/LabDeviceProfile.h"
+            "Exploit/LabLocalTime.h"
           )
           
           # Swift files
