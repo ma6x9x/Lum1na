@@ -87,7 +87,63 @@ jobs:
                   text = text.replace(old, new)
               path.write_text(text)
           PY
-
+  
+      - name: Ensure KASLRLeak.m is in Compile Sources
+        run: |
+          python3 << 'PYEOF'
+          import re
+          import uuid
+          
+          pbxproj_path = "Lum1na.xcodeproj/project.pbxproj"
+          
+          with open(pbxproj_path, 'r') as f:
+              content = f.read()
+          
+          # Check if already present
+          if "KASLRLeak.m in Sources" in content:
+              print("✅ KASLRLeak.m already in Compile Sources")
+              exit(0)
+          
+          print("⚠️ Adding KASLRLeak.m to Compile Sources...")
+          
+          # Generate UUIDs
+          build_file_uuid = str(uuid.uuid4()).upper().replace('-', '')[:24]
+          file_ref_uuid = str(uuid.uuid4()).upper().replace('-', '')[:24]
+          
+          # Add PBXBuildFile entry
+          build_file_entry = f'{build_file_uuid} /* KASLRLeak.m in Sources */ = {{isa = PBXBuildFile; fileRef = {file_ref_uuid} /* KASLRLeak.m */; }};'
+          
+          # Insert before End PBXBuildFile section
+          content = content.replace(
+              '/* End PBXBuildFile section */',
+              f'{build_file_entry}\\n/* End PBXBuildFile section */'
+          )
+          
+          # Add PBXFileReference entry
+          file_ref_entry = f'{file_ref_uuid} /* KASLRLeak.m */ = {{isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = KASLRLeak.m; path = Exploit/KASLRLeak.m; sourceTree = "<group>"; }};'
+          
+          content = content.replace(
+              '/* End PBXFileReference section */',
+              f'{file_ref_entry}\\n/* End PBXFileReference section */'
+          )
+          
+          # Add to PBXSourcesBuildPhase - find the Sources build phase and add to files
+          # This regex finds the first files array in PBXSourcesBuildPhase
+          pattern = r'(PBXSourcesBuildPhase.*?\{[^}]*files = \(\s*)([^)]*\))'
+          
+          def add_file_to_sources(match):
+              files_start = match.group(1)
+              files_list = match.group(2)
+              new_file = f'{build_file_uuid} /* KASLRLeak.m in Sources */,\\n'
+              return files_start + new_file + files_list
+          
+          content = re.sub(pattern, add_file_to_sources, content, count=1, flags=re.DOTALL)
+          
+          with open(pbxproj_path, 'w') as f:
+              f.write(content)
+          
+          print(f"✅ Added KASLRLeak.m (BuildFile: {build_file_uuid}, FileRef: {file_ref_uuid})")
+          PYEOF
       - name: Build (unsigned)
         run: |
           set -euo pipefail
