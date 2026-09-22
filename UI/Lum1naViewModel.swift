@@ -38,7 +38,10 @@ class Lum1naViewModel: ObservableObject {
         appendToConsole("║ Device: \(device.modelName.padding(toLength: 26, withPad: " ", startingAt: 0)) ║")
         appendToConsole("║ Chip:   \(device.chipName.padding(toLength: 26, withPad: " ", startingAt: 0)) ║")
         appendToConsole("║ iOS:    \(device.osVersion.padding(toLength: 26, withPad: " ", startingAt: 0)) ║")
-        appendToConsole("║ Status: \(device.isSupported ? "SUPPORTED ✓" : "UNSUPPORTED ✗").padding(toLength: 26, withPad: " ", startingAt: 0)) ║")
+let supportStatus = device.isSupported ? "SUPPORTED ✓" : "UNSUPPORTED ✗"
+appendToConsole(
+    "║ Status: \(supportStatus.padding(toLength: 26, withPad: " ", startingAt: 0)) ║"
+)
         appendToConsole("╚══════════════════════════════════════╝")
         appendToConsole("")
         appendToConsole("[*] Exploit chain loaded")
