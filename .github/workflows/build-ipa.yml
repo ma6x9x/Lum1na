@@ -19,26 +19,22 @@ jobs:
         run: |
           set -euo pipefail
           echo "=== Verifying source files ==="
+          
+          # Minimal exploit files only
           objc_files=(
-            "Exploit/ClearSword.m" "Exploit/ANE.m" "Exploit/KASLRLeak.m" "Exploit/CSKRW.m"
-            "Exploit/UPLLeak.m" "Exploit/AVERace.m" "Exploit/Lum1naKRW.m" "Exploit/FusionChain.m"
-            "Exploit/P009Controller.m" "Exploit/P052Controller.m" "Exploit/P039Controller.m"
-            "Exploit/Momentarius.m" "Exploit/Persistence.m" "Exploit/P044AksKaslrReach.h"
-            "Exploit/P035AVEWrapProbe.m" "Exploit/P036AVEPaintProbe.m" "Exploit/P037AVEPaintProbe.m"
-            "Exploit/P038WHuntSmoke.m" "Exploit/P043WriteClassMap.m" "Exploit/P045HybridMap.m"
-            "Exploit/P046F77PatchOracle.m" 
+            "Exploit/CVE_2026_65343_AKS.m"
+            "Exploit/APFS84523.m"
           )
           header_files=(
-            "Exploit/P009Controller.h" "Exploit/P052Controller.h" "Exploit/P039Controller.h"
-            "Exploit/P044AksKaslrReach.h" "Exploit/P035AVEWrapProbe.h" "Exploit/P036AVEPaintProbe.h"
-            "Exploit/P037AVEPaintProbe.h" "Exploit/P038WHuntSmoke.h" "Exploit/A12X_23G71_LabOffsets.h"
-            "Exploit/A14_23F77_LabOffsets.h" "Exploit/LabDeviceProfile.h" "Exploit/LabLocalTime.h"
-            "Exploit/KASLRLeak.h"
+            "Exploit/CVE_2026_65343_AKS.h"
+            "Exploit/APFS84523.h"
           )
-          swift_files=("Exploit/Bridges/ExploitManager.swift")
-          for file in "${objc_files[@]}" "${header_files[@]}" "${swift_files[@]}"; do
+          
+          for file in "${objc_files[@]}" "${header_files[@]}"; do
             test -f "$file" || { echo "✗ $file MISSING"; exit 1; }
+            echo "✓ $file"
           done
+          
           test -f Lum1na-Bridging-Header.h || { echo "✗ Lum1na-Bridging-Header.h MISSING"; exit 1; }
           echo "✅ All source files verified!"
 
@@ -51,19 +47,13 @@ jobs:
           for file in AppIcon.jpg AppIcon-Dark.jpg AppIcon-Tinted.jpg; do
             test -f "$ICON_DIR/$file" || { echo "❌ $file missing"; exit 1; }
           done
-
-      - name: Fix Import Paths (cs_run.h)
-        run: |
-          if [ -f "Exploit/Bridges/cs_run.h" ] && grep -q '#import "Exploit/' Exploit/Bridges/cs_run.h; then
-            sed -i '' 's|#import "Exploit/|#import "../|g' Exploit/Bridges/cs_run.h
-          fi
+          echo "✅ Icons verified"
 
       - name: Fix SwiftUI compatibility issues
         run: |
           set -euo pipefail
           python3 <<'PY'
           from pathlib import Path
-
           replacements = {
               "UI/ExploitStageSelector.swift": {
                   ".font(.system(.caption, weight: .bold, design: .rounded))": ".font(.system(size: 12, weight: .bold, design: .rounded))",
@@ -75,87 +65,15 @@ jobs:
                   ".font(.system(.caption))": ".font(.system(size: 12))",
                   ".font(.system(.caption, weight: .medium, design: .monospaced))": ".font(.system(size: 12, weight: .medium, design: .monospaced))",
               },
-              "UI/CentralHeapView.swift": {
-                  ".font(.system(.caption2, weight: .bold, design: .rounded))": ".font(.system(size: 11, weight: .bold, design: .rounded))",
-                  ".font(.system(.caption2, weight: .medium))": ".font(.system(size: 11, weight: .medium))",
-              },
           }
           for name, mapping in replacements.items():
               path = Path(name)
-              text = path.read_text()
-              for old, new in mapping.items():
-                  text = text.replace(old, new)
-              path.write_text(text)
+              if path.exists():
+                  text = path.read_text()
+                  for old, new in mapping.items():
+                      text = text.replace(old, new)
+                  path.write_text(text)
           PY
-  
-      - name: Ensure KASLRLeak.m is in Compile Sources
-        run: |
-          python3 << 'PYEOF'
-          import uuid
-          
-          pbxproj_path = "Lum1na.xcodeproj/project.pbxproj"
-          
-          with open(pbxproj_path, 'r') as f:
-              content = f.read()
-          
-          # Check if already present
-          if "KASLRLeak.m in Sources" in content:
-              print("✅ KASLRLeak.m already in Compile Sources")
-              exit(0)
-          
-          print("⚠️ Adding KASLRLeak.m to Compile Sources...")
-          
-          # Generate UUIDs (24 chars, uppercase)
-          build_file_uuid = str(uuid.uuid4()).upper().replace('-', '')[:24]
-          file_ref_uuid = str(uuid.uuid4()).upper().replace('-', '')[:24]
-          
-          # 1. Add PBXBuildFile entry
-          build_file_entry = f'{build_file_uuid} /* KASLRLeak.m in Sources */ = {{isa = PBXBuildFile; fileRef = {file_ref_uuid} /* KASLRLeak.m */; }};'
-          
-          content = content.replace(
-              '/* End PBXBuildFile section */',
-              build_file_entry + '\n/* End PBXBuildFile section */'
-          )
-          
-          # 2. Add PBXFileReference entry
-          file_ref_entry = f'{file_ref_uuid} /* KASLRLeak.m */ = {{isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = KASLRLeak.m; path = Exploit/KASLRLeak.m; sourceTree = "<group>"; }};'
-          
-          content = content.replace(
-              '/* End PBXFileReference section */',
-              file_ref_entry + '\n/* End PBXFileReference section */'
-          )
-          
-          # 3. Add to PBXSourcesBuildPhase - find files = ( section and add entry
-          # Look for the pattern in PBXSourcesBuildPhase
-          lines = content.split('\n')
-          new_lines = []
-          in_sources_phase = False
-          found_files_section = False
-          
-          for i, line in enumerate(lines):
-              new_lines.append(line)
-              
-              if 'PBXSourcesBuildPhase' in line:
-                  in_sources_phase = True
-              
-              if in_sources_phase and 'files = (' in line:
-                  found_files_section = True
-              
-              if found_files_section and ');' in line and '/* KASLRLeak.m in Sources */' not in content:
-                  # Insert before the closing );
-                  new_lines.insert(-1, f'\t\t\t{build_file_uuid} /* KASLRLeak.m in Sources */,')
-                  found_files_section = False
-                  in_sources_phase = False
-          
-          content = '\n'.join(new_lines)
-          
-          with open(pbxproj_path, 'w') as f:
-              f.write(content)
-          
-          print(f"✅ Added KASLRLeak.m to Compile Sources")
-          print(f"   BuildFile UUID: {build_file_uuid}")
-          print(f"   FileRef UUID: {file_ref_uuid}")
-          PYEOF
 
       - name: Build (unsigned)
         run: |
@@ -170,9 +88,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            GCC_WARN_ABOUT_DUPLICATE_METHOD_NAME=NO \
             SWIFT_OBJC_BRIDGING_HEADER="Lum1na-Bridging-Header.h" \
-            SWIFT_OPTIMIZATION_LEVEL=-Onone \
             build
 
       - name: Package IPA
