@@ -20,9 +20,11 @@ jobs:
           set -euo pipefail
           echo "=== Verifying source files ==="
           
-          # Core exploit files
+          # Core exploit files (UPDATED with new PAC/OOB files)
           objc_files=(
             "Exploit/CVE_2026_65343_AKS.m"
+            "Exploit/CVE_2026_65330_PAC.m"      # NEW
+            "Exploit/CVE_2026_65349_OOB.m"      # NEW
             "Exploit/APFS84523.m"
             "Exploit/P005JIT.m"
             "Exploit/LabRuntimeOffsets.m"
@@ -31,6 +33,8 @@ jobs:
           
           header_files=(
             "Exploit/CVE_2026_65343_AKS.h"
+            "Exploit/CVE_2026_65330_PAC.h"      # NEW
+            "Exploit/CVE_2026_65349_OOB.h"      # NEW
             "Exploit/APFS84523.h"
             "Exploit/P005JIT.h"
             "Exploit/LabRuntimeOffsets.h"
@@ -39,7 +43,11 @@ jobs:
             "Exploit/A12X_23G71_LabOffsets.h"
           )
           
-          for file in "${objc_files[@]}" "${header_files[@]}"; do
+          swift_files=(
+            "Exploit/LabOffsetsBridge.swift"     # NEW
+          )
+          
+          for file in "${objc_files[@]}" "${header_files[@]}" "${swift_files[@]}"; do
             test -f "$file" || { echo "✗ $file MISSING"; exit 1; }
             echo "✓ $file"
           done
