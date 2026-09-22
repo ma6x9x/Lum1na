@@ -62,7 +62,15 @@ struct MatrixConsoleView: View {
             }
         }
         .frame(height: 180)
-        .background(RoundedRectangle(cornerRadius: 12).fill(Color(hex: "#0A0A0F").overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(hex: "#1E293B"), lineWidth: 1)))
+        // FIXED: Properly balanced parentheses
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(hex: "#0A0A0F"))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12)
+                        .stroke(Color(hex: "#1E293B"), lineWidth: 1)
+                )
+        )
         .onAppear {
             addLog(level: .info, message: "Lum1na Beta 1 initialized")
             addLog(level: .info, message: "Device: iPhone15,2 (iOS 26.0)")
