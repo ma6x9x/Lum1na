@@ -19,120 +19,73 @@ jobs:
         run: |
           set -euo pipefail
           echo "=== Verifying source files ==="
-          
-          # Objective-C implementation files
           objc_files=(
-            "Exploit/ClearSword.m"
-            "Exploit/ANE.m"
-            "Exploit/KASLRLeak.m"
-            "Exploit/CSKRW.m"
-            "Exploit/UPLLeak.m"
-            "Exploit/AVERace.m"
-            "Exploit/Lum1naKRW.m"
-            "Exploit/FusionChain.m"
-            "Exploit/P009Controller.m"
-            "Exploit/P052Controller.m"
-            "Exploit/P039Controller.m"
-            "Exploit/Momentarius.m"
-            "Exploit/Persistence.m"
-            "Exploit/P044AksKaslrReach.h"
-            "Exploit/P035AVEWrapProbe.m"
-            "Exploit/P036AVEPaintProbe.m"
-            "Exploit/P037AVEPaintProbe.m"
-            "Exploit/P038WHuntSmoke.m"
-            "Exploit/P043WriteClassMap.m"
-            "Exploit/P045HybridMap.m"
+            "Exploit/ClearSword.m" "Exploit/ANE.m" "Exploit/KASLRLeak.m" "Exploit/CSKRW.m"
+            "Exploit/UPLLeak.m" "Exploit/AVERace.m" "Exploit/Lum1naKRW.m" "Exploit/FusionChain.m"
+            "Exploit/P009Controller.m" "Exploit/P052Controller.m" "Exploit/P039Controller.m"
+            "Exploit/Momentarius.m" "Exploit/Persistence.m" "Exploit/P044AksKaslrReach.h"
+            "Exploit/P035AVEWrapProbe.m" "Exploit/P036AVEPaintProbe.m" "Exploit/P037AVEPaintProbe.m"
+            "Exploit/P038WHuntSmoke.m" "Exploit/P043WriteClassMap.m" "Exploit/P045HybridMap.m"
             "Exploit/P046F77PatchOracle.m"
           )
-          
-          # Objective-C header files (for bridging)
           header_files=(
-            "Exploit/P009Controller.h"
-            "Exploit/P052Controller.h"
-            "Exploit/P039Controller.h"
-            "Exploit/P044AksKaslrReach.h"
-            "Exploit/P035AVEWrapProbe.h"
-            "Exploit/P036AVEPaintProbe.h"
-            "Exploit/P037AVEPaintProbe.h"
-            "Exploit/P038WHuntSmoke.h"
-            "Exploit/A12X_23G71_LabOffsets.h"
-            "Exploit/A14_23F77_LabOffsets.h"
-            "Exploit/LabDeviceProfile.h"
-            "Exploit/LabLocalTime.h"
+            "Exploit/P009Controller.h" "Exploit/P052Controller.h" "Exploit/P039Controller.h"
+            "Exploit/P044AksKaslrReach.h" "Exploit/P035AVEWrapProbe.h" "Exploit/P036AVEPaintProbe.h"
+            "Exploit/P037AVEPaintProbe.h" "Exploit/P038WHuntSmoke.h" "Exploit/A12X_23G71_LabOffsets.h"
+            "Exploit/A14_23F77_LabOffsets.h" "Exploit/LabDeviceProfile.h" "Exploit/LabLocalTime.h"
           )
-          
-          # Swift files
-          swift_files=(
-            "Exploit/Bridges/ExploitManager.swift"
-          )
-          
-          # Bridging header
-          bridging_header="Lum1na-Bridging-Header.h"
-          
-          echo "Checking Objective-C .m files..."
-          for file in "${objc_files[@]}"; do
-            if [ -f "$file" ]; then
-              echo "✓ $file exists"
-            else
-              echo "✗ $file MISSING"
-              exit 1
-            fi
+          swift_files=("Exploit/Bridges/ExploitManager.swift")
+          for file in "${objc_files[@]}" "${header_files[@]}" "${swift_files[@]}"; do
+            test -f "$file" || { echo "✗ $file MISSING"; exit 1; }
           done
-          
-          echo "Checking Objective-C .h files..."
-          for file in "${header_files[@]}"; do
-            if [ -f "$file" ]; then
-              echo "✓ $file exists"
-            else
-              echo "✗ $file MISSING"
-              exit 1
-            fi
-          done
-          
-          echo "Checking Swift files..."
-          for file in "${swift_files[@]}"; do
-            if [ -f "$file" ]; then
-              echo "✓ $file exists"
-            else
-              echo "✗ $file MISSING"
-              exit 1
-            fi
-          done
-          
-          echo "Checking bridging header..."
-          if [ -f "$bridging_header" ]; then
-            echo "✓ $bridging_header exists"
-            echo "Bridging header contents:"
-            cat "$bridging_header"
-          else
-            echo "✗ $bridging_header MISSING"
-            exit 1
-          fi
-          
+          test -f Lum1na-Bridging-Header.h || { echo "✗ Lum1na-Bridging-Header.h MISSING"; exit 1; }
           echo "✅ All source files verified!"
+
       - name: Verify iOS 18 Universal App Icon Structure
         run: |
           set -euo pipefail
           ICON_DIR="Assets.xcassets/AppIcon.appiconset"
-          
           test -d "$ICON_DIR" || { echo "❌ AppIcon.appiconset missing"; exit 1; }
           test -f "$ICON_DIR/Contents.json" || { echo "❌ Contents.json missing"; exit 1; }
-          
           for file in AppIcon.jpg AppIcon-Dark.jpg AppIcon-Tinted.jpg; do
             test -f "$ICON_DIR/$file" || { echo "❌ $file missing"; exit 1; }
-            echo "✓ $file exists"
           done
-          
-          echo "✅ iOS 18 Universal App Icon structure validated!"
+
       - name: Fix Import Paths (cs_run.h)
         run: |
-          if [ -f "Exploit/Bridges/cs_run.h" ]; then
-            if grep -q '#import "Exploit/' Exploit/Bridges/cs_run.h; then
-              echo "Fixing cs_run.h imports..."
-              sed -i '' 's|#import "Exploit/|#import "../|g' Exploit/Bridges/cs_run.h
-              echo "✅ Fixed cs_run.h"
-            fi
+          if [ -f "Exploit/Bridges/cs_run.h" ] && grep -q '#import "Exploit/' Exploit/Bridges/cs_run.h; then
+            sed -i '' 's|#import "Exploit/|#import "../|g' Exploit/Bridges/cs_run.h
           fi
+
+      - name: Fix SwiftUI compatibility issues
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          from pathlib import Path
+
+          replacements = {
+              "UI/ExploitStageSelector.swift": {
+                  ".font(.system(.caption, weight: .bold, design: .rounded))": ".font(.system(size: 12, weight: .bold, design: .rounded))",
+                  ".font(.system(.caption, weight: .semibold))": ".font(.system(size: 12, weight: .semibold, design: .rounded))",
+                  ".font(.system(.caption2))": ".font(.system(size: 11))",
+              },
+              "App/ContentView.swift": {
+                  ".font(.system(.caption, weight: .medium))": ".font(.system(size: 12, weight: .medium))",
+                  ".font(.system(.caption))": ".font(.system(size: 12))",
+                  ".font(.system(.caption, weight: .medium, design: .monospaced))": ".font(.system(size: 12, weight: .medium, design: .monospaced))",
+              },
+              "UI/CentralHeapView.swift": {
+                  ".font(.system(.caption2, weight: .bold, design: .rounded))": ".font(.system(size: 11, weight: .bold, design: .rounded))",
+                  ".font(.system(.caption2, weight: .medium))": ".font(.system(size: 11, weight: .medium))",
+              },
+          }
+          for name, mapping in replacements.items():
+              path = Path(name)
+              text = path.read_text()
+              for old, new in mapping.items():
+                  text = text.replace(old, new)
+              path.write_text(text)
+          PY
 
       - name: Build (unsigned)
         run: |
@@ -149,17 +102,14 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             GCC_WARN_ABOUT_DUPLICATE_METHOD_NAME=NO \
             SWIFT_OBJC_BRIDGING_HEADER="Lum1na-Bridging-Header.h" \
+            SWIFT_OPTIMIZATION_LEVEL=-Onone \
             build
 
       - name: Package IPA
         run: |
           set -euo pipefail
           APP=$(find "$RUNNER_TEMP/DerivedData/Build/Products" -name 'Lum1na.app' -print -quit)
-          if [ -z "$APP" ]; then
-            echo "❌ Lum1na.app not found"
-            exit 1
-          fi
-          echo "✅ Found: $APP"
+          test -n "$APP" || { echo "❌ Lum1na.app not found"; exit 1; }
           rm -rf Payload Lum1na.ipa
           mkdir Payload
           cp -R "$APP" Payload/
