@@ -14,7 +14,7 @@ struct ContentView: View {
             Color(hex: "07060F").ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // MARK: - Header: Lum1na Logo
+                // MARK: - Header
                 HeaderView()
                     .padding(.top, 12)
                 
@@ -23,11 +23,10 @@ struct ContentView: View {
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
                 
-                // MARK: - 4-Pointed Star
+                // MARK: - Star Beacon
                 StarBeaconSection(viewModel: viewModel)
                     .padding(.top, 10)
                 
-                // Tagline
                 Text("The guiding light for Jailbreaks")
                     .font(.system(size: 13))
                     .foregroundStyle(.secondary)
@@ -38,10 +37,30 @@ struct ContentView: View {
                     .padding(.horizontal, 16)
                     .padding(.top, 10)
                 
-                // MARK: - Stage Buttons
-                StageButtonsRow(viewModel: viewModel)
-                    .padding(.horizontal, 12)
-                    .padding(.top, 8)
+                // MARK: - Primitive Test Buttons
+                HStack(spacing: 12) {
+                    Button(action: { viewModel.testAKS() }) {
+                        Label("Test AKS", systemImage: "memorychip")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                            .background(Capsule().fill(Color.blue))
+                    }
+                    .disabled(viewModel.isRunning)
+                    
+                    Button(action: { viewModel.testAPFS() }) {
+                        Label("Test APFS", systemImage: "externaldrive")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                            .background(Capsule().fill(Color.green))
+                    }
+                    .disabled(viewModel.isRunning)
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
                 
                 // MARK: - Action Buttons
                 HStack(spacing: 12) {
@@ -224,60 +243,27 @@ struct ConsoleCard: View {
     }
 }
 
-// MARK: - Stage Buttons Row
-struct StageButtonsRow: View {
-    @ObservedObject var viewModel: Lum1naViewModel
-    
-    let stages = [
-        ("KASLR", "memorychip"),
-        ("Heap", "cpu"),
-        ("ANE", "brain"),
-        ("PPL", "lock.shield"),
-        ("Persist", "arrow.clockwise")
-    ]
-    
-    var body: some View {
-        HStack(spacing: 8) {
-            ForEach(stages, id: \.0) { stage in
-                VStack(spacing: 4) {
-                    Image(systemName: stage.1)
-                        .font(.system(size: 14))
-                    Text(stage.0)
-                        .font(.system(size: 10, weight: .medium))
-                }
-                .foregroundStyle(viewModel.stageColor(for: stage.0))
-                .frame(width: 55, height: 42)
-                .background(
-                    Capsule()
-                        .fill(.ultraThinMaterial)
-                        .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 1))
-                )
-            }
-        }
-    }
-}
-
 // MARK: - Stage Tester View
 struct StageTesterView: View {
     @ObservedObject var viewModel: Lum1naViewModel
     @Environment(\.dismiss) var dismiss
     
     let stages = [
-        ("KASLR Bypass", "memorychip", "Test KASLR leak"),
-        ("Heap Corruption", "cpu", "Test heap grooming"),
-        ("ANE Exploit", "brain", "Test ANE 43748"),
-        ("P005 JIT", "bolt", "Test P005 disclose"),
-        ("PPL Bypass", "lock.shield", "Test PPL defeat"),
-        ("Persistence", "arrow.clockwise", "Test tempRoot")
+        ("KASLR Bypass", "memorychip", "Test AKS KASLR leak"),
+        ("Heap Corruption", "cpu", "Test APFS nstream"),
     ]
     
     var body: some View {
         NavigationView {
             List {
-                Section(header: Text("Individual Stage Testing")) {
+                Section(header: Text("Primitive Testing")) {
                     ForEach(stages, id: \.0) { stage in
                         Button(action: {
-                            viewModel.testIndividualStage(stage.0)
+                            if stage.0 == "KASLR Bypass" {
+                                viewModel.testAKS()
+                            } else if stage.0 == "Heap Corruption" {
+                                viewModel.testAPFS()
+                            }
                             dismiss()
                         }) {
                             HStack(spacing: 12) {
@@ -321,5 +307,3 @@ struct StageTesterView: View {
         }
     }
 }
-
-// NOTE: Color(hex:) extension removed - use UI/Color+Hex.swift instead
