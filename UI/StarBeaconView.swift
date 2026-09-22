@@ -24,7 +24,8 @@ struct StarBeaconView: View {
                     .scaleEffect(calculateGlowScale(at: context.date))
                     .blur(radius: 25)
                 
-                FourPointedStar()
+                // Renamed to avoid conflict with ContentView's FourPointedStar
+                BeaconFourPointedStar()
                     .fill(
                         LinearGradient(
                             colors: [
@@ -37,7 +38,7 @@ struct StarBeaconView: View {
                         )
                     )
                     .overlay(
-                        FourPointedStar()
+                        BeaconFourPointedStar()
                             .stroke(stage.color.opacity(0.9), lineWidth: 1.5)
                     )
                     .frame(width: LayoutConstants.starSize, height: LayoutConstants.starSize)
@@ -45,7 +46,7 @@ struct StarBeaconView: View {
                     .scaleEffect(calculateCalmScale(at: context.date))
                     .shadow(color: stage.glowColor.opacity(0.6), radius: 12)
                 
-                FourPointedStar()
+                BeaconFourPointedStar()
                     .fill(Color.white.opacity(0.25))
                     .frame(width: LayoutConstants.starSize * 0.35, height: LayoutConstants.starSize * 0.35)
                     .rotationEffect(.degrees(calculateCalmRotation(at: context.date)))
@@ -87,7 +88,8 @@ struct StarBeaconView: View {
     }
 }
 
-struct FourPointedStar: Shape {
+// MARK: - Renamed Shape
+struct BeaconFourPointedStar: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
         let center = CGPoint(x: rect.midX, y: rect.midY)
@@ -107,11 +109,13 @@ struct FourPointedStar: Shape {
             } else {
                 path.addLine(to: CGPoint(x: outerX, y: outerY))
             }
+            
             path.addQuadCurve(
                 to: CGPoint(x: innerX, y: innerY),
                 control: CGPoint(x: (outerX + innerX) / 2, y: (outerY + innerY) / 2)
             )
         }
+        
         path.closeSubpath()
         return path
     }
