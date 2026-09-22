@@ -57,9 +57,7 @@ struct FourPointedStar: Shape {
             let nextAngle = angle + .pi / 4
             let innerX = center.x + cos(nextAngle) * innerRadius
             let innerY = center.y + sin(nextAngle) * innerRadius
-            let prevAngle = angle - .pi / 4
-            let prevInnerX = center.x + cos(prevAngle) * innerRadius
-            let prevInnerY = center.y + sin(prevAngle) * innerRadius
+    
             
             if i == 0 {
                 path.move(to: CGPoint(x: outerX, y: outerY))
