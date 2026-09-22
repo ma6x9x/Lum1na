@@ -113,11 +113,13 @@ class Lum1naViewModel: ObservableObject {
         detectDevice()
         log("Lum1na initialized", level: .info)
         
-        // Log device profile
-        let offsets = getDeviceOffsets()
-        log("Device: \(offsets.tag)", level: .info)
-        log("Kernel base: \(LabOffsetsBridge.formatAddress(offsets.staticBase))", level: .info)
-    }
+     
+   if let offsets = getDeviceOffsets() {
+    log("Device: \(offsets.tag)", level: .info)
+    log("Kernel base: \(LabOffsetsBridge.formatAddress(offsets.staticBase))", level: .info)
+} else {
+    log("Warning: Could not load device offsets", level: .warning)
+}
     
     // MARK: - Device Detection
     
