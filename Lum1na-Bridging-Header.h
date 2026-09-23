@@ -29,11 +29,16 @@
 // CoreML
 #import <CoreML/CoreML.h>
 
-// Your exploit headers
-#import "Exploit/P044AksKaslrReach.h"
-#import "Exploit/CVE_2026_65343_AKS.h"
-#import "Exploit/P051APFSXattr.h"
-#import "Exploit/P054APFSReapList.h"
+// VideoToolbox for P035
+#import <VideoToolbox/VideoToolbox.h>
+#import <CoreMedia/CoreMedia.h>
+
+// Your exploit headers - UPDATED
+#import "Exploit/P044ExploitController.h"        // NEW: P044 ANE 254-input
+#import "Exploit/AKSExploitController.h"          // AKS CVE-2026-65343
+#import "Exploit/P035AVEWrapProbe.h"              // P035 AVE
+#import "Exploit/P051APFSXattr.h"                 // P051 APFS
+#import "Exploit/P054APFSReapList.h"              // P054 APFS
 #import "Exploit/LabRuntimeOffsets.h"
 #import "Exploit/LabDeviceProfile.h"
 #import "Exploit/A14_23F77_LabOffsets.h"
