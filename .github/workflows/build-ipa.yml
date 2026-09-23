@@ -189,7 +189,19 @@ jobs:
           else
             echo "✅ Model files verified"
           fi
+# ============================================
+      # Remove problematic files temporarily
+      # ============================================
+      - name: Remove Unused Exploit Files
+        run: |
+          echo "Removing problematic AVE files..."
+          rm -f Exploit/P035AVEWrapProbe.m Exploit/P035AVEWrapProbe.h 2>/dev/null || true
+          rm -f Exploit/P036AVEPaintProbe.m Exploit/P036AVEPaintProbe.h 2>/dev/null || true  
+          rm -f Exploit/P037AVEPaintProb.m Exploit/P037AVEPaintProb.h 2>/dev/null || true
+          rm -f Exploit/AVERace.m Exploit/AVERace.h 2>/dev/null || true
+          echo "✅ Removed problematic files"
 
+     
   # ============================================
   # Job 2: Build (only if validate passes)
   # ============================================
