@@ -1,31 +1,34 @@
 #ifndef Lum1na_Bridging_Header_h
 #define Lum1na_Bridging_Header_h
 
-// System headers
 #import <Foundation/Foundation.h>
-#import <IOKit/IOKitLib.h>
-#import <mach/mach.h>
-#import <sys/sysctl.h>
-#import <sys/types.h>
+#include <stdint.h>
+#include <sys/sysctl.h>
 
-// Runtime offset system
-#import "LabRuntimeOffsets.h"
-#import "LabDeviceProfile.h"
+// MARK: - Device & Offsets
+#import "Exploit/LabRuntimeOffsets.h"
+#import "Exploit/A14_23F77_LabOffsets.h"
+#import "Exploit/A12X_23G71_LabOffsets.h"
 
-// Device-specific offsets
-#import "A14_23F77_LabOffsets.h"
-#import "A12X_23G71_LabOffsets.h"
+// MARK: - Exploit Controllers
+#import "Exploit/KASLRLeak.h"
+#import "Exploit/UPLLeak.h"
+#import "Exploit/ANE254InputController.h"
+#import "Exploit/CSKRW.h"
+#import "Exploit/Lum1naKRW.h"
 
-// Exploit primitives
-#import "CVE_2026_65343_AKS.h"      // KASLR bypass
-#import "CVE_2026_65330_PAC.h"      // PAC bypass #0x307a
-#import "CVE_2026_65349_OOB.h"      // getattrlist OOB
-#import "APFS84523.h"              // APFS persistence
-#import "P005JIT.h"                // JIT fallback
+// MARK: - Chain Management
+#import "Exploit/FusionChain.h"
+#import "Exploit/Bridges/FusionChainDelegate.h"
+#import "Exploit/Bridges/cs_run.h"
 
-// C function exports for Swift
-extern const LabOffTab* LabOff(void);
-extern uint64_t LabKernSlide(void);
-extern void LabSetKernSlide(uint64_t slide);
+// MARK: - CVE Controllers
+#import "Exploit/P009Controller.h"
+#import "Exploit/P052Controller.h"
+#import "Exploit/P039Controller.h"
+#import "Exploit/P005JIT.h"
 
-#endif
+// MARK: - Primitives
+#import "Exploit/primitives/kaslr/CVE_2026_65343_AKS.h"
+
+#endif /* Lum1na_Bridging_Header_h */
