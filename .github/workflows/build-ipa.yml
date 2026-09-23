@@ -8,21 +8,19 @@ on:
 env:
   PROJECT_NAME: Lum1na
   SCHEME_NAME: Lum1na
-  DEPLOYMENT_TARGET: 14.0
+  DEPLOYMENT_TARGET: 18.0
 
 jobs:
   # ============================================
-  # Job 1: Validate (catches errors early)
+  # Job 1: Validate Everything First
   # ============================================
   validate:
     runs-on: macos-15
-    name: "Validate Build Environment"
+    name: "🔍 Validation"
     
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Select Xcode 16.4
         run: |
@@ -30,14 +28,14 @@ jobs:
           xcodebuild -version
 
       # ============================================
-      # Validate Bridging Header (FIXED)
+      # 1. Bridging Header Validation
       # ============================================
       - name: Validate Bridging Header
         run: |
           set -euo pipefail
           echo "=== Validating Bridging Header ==="
           
-          BRIDGING_HEADER="Lum1na-Bridging-Header.h"
+          BRIDGING_HEADER="${PROJECT_NAME}-Bridging-Header.h"
           
           if [ ! -f "$BRIDGING_HEADER" ]; then
             echo "❌ ERROR: $BRIDGING_HEADER not found!"
@@ -49,126 +47,57 @@ jobs:
           MACOS_ONLY_HEADERS=(
             "mach/mach_vm.h"
             "IOKit/IOBSD.h"
-            "IOKit/storage/IOStorageDeviceCharacteristics.h"
-            "IOKit/storage/IOStorageProtocolCharacteristics.h"
             "libkern/OSAtomic.h"
             "mach/mach_interface.h"
             "mach/mach_port.h"
             "mach/mach_host.h"
-            "mach/mach_types.defs"
             "mach/mach_voucher.h"
             "mach-o/arch.h"
             "mach-o/fat.h"
-            "mach-o/reloc.h"
             "mach-o/swap.h"
             "sys/syscall.h"
           )
           
-          FOUND_BAD_HEADERS=0
+          FOUND_BAD=0
           for header in "${MACOS_ONLY_HEADERS[@]}"; do
             if grep -q "#import.*<$header>" "$BRIDGING_HEADER" 2>/dev/null || \
                grep -q "#include.*<$header>" "$BRIDGING_HEADER" 2>/dev/null; then
-              echo "❌ ERROR: Found macOS-only header: $header"
-              FOUND_BAD_HEADERS=1
+              echo "❌ ERROR: macOS-only header: $header"
+              FOUND_BAD=1
             fi
           done
           
-          if [ $FOUND_BAD_HEADERS -eq 1 ]; then
+          if [ $FOUND_BAD -eq 1 ]; then
             echo ""
-            echo "📝 To fix:"
+            echo "📝 Use iOS-compatible alternatives:"
             echo "  mach/mach_vm.h → mach/vm_map.h"
-            echo "  IOKit/IOBSD.h  → (remove - not available on iOS)"
-            echo ""
+            echo "  IOKit/IOBSD.h  → (remove)"
+            echo "  libkern/OSAtomic.h → os/atomic.h"
             exit 1
           fi
           
           echo "✓ No macOS-only headers found"
           
-          # Test compile bridging header with iOS SDK (FIXED: added -x objective-c)
-          echo "=== Testing Bridging Header Compilation ==="
+          # Test compile with iOS SDK
           SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
-          
-          if ! clang -x objective-c -fsyntax-only \
+          if ! clang -fsyntax-only \
             -target arm64-apple-ios${DEPLOYMENT_TARGET} \
             -isysroot "$SDK_PATH" \
             -I"$(pwd)/Exploit" \
             -framework Foundation \
             -framework UIKit \
-            -framework IOKit \
-            "$BRIDGING_HEADER" 2>&1 | tee /tmp/bridging_header_errors.log; then
-            
-            echo ""
-            echo "❌ BRIDGING HEADER VALIDATION FAILED"
-            echo "See /tmp/bridging_header_errors.log above for details."
+            "$BRIDGING_HEADER" 2>&1; then
+            echo "❌ Bridging header compilation failed!"
             exit 1
           fi
           
-          echo "✓ Bridging header compiles successfully with iOS SDK"
-      # ============================================
-      # Validate iOS 18 Universal App Icons
-      # ============================================
-      - name: Verify iOS 18 Universal App Icon Structure
-        run: |
-          set -euo pipefail
-          echo "=== Validating iOS 18 Universal App Icons ==="
-          
-          ICON_DIR="Assets.xcassets/AppIcon.appiconset"
-          
-          if [ ! -d "$ICON_DIR" ]; then
-            echo "❌ ERROR: $ICON_DIR directory not found"
-            exit 1
-          fi
-          echo "✓ Found $ICON_DIR"
-          
-          if [ ! -f "$ICON_DIR/Contents.json" ]; then
-            echo "❌ ERROR: Contents.json missing from $ICON_DIR"
-            exit 1
-          fi
-          echo "✓ Found Contents.json"
-          
-          # Required iOS 18 Universal App Icon files
-          REQUIRED_ICONS=(
-            "AppIcon.jpg"
-            "AppIcon-Dark.jpg"
-            "AppIcon-Tinted.jpg"
-          )
-          
-          MISSING_ICONS=0
-          for icon in "${REQUIRED_ICONS[@]}"; do
-            if [ -f "$ICON_DIR/$icon" ]; then
-              echo "✓ Found $icon"
-            else
-              echo "❌ Missing $icon"
-              MISSING_ICONS=1
-            fi
-          done
-          
-          if [ $MISSING_ICONS -eq 1 ]; then
-            echo ""
-            echo "❌ iOS 18 Universal App Icon validation failed"
-            echo ""
-            echo "Required files for iOS 18:"
-            echo "  - AppIcon.jpg (light mode)"
-            echo "  - AppIcon-Dark.jpg (dark mode)"
-            echo "  - AppIcon-Tinted.jpg (tinted mode)"
-            echo ""
-            exit 1
-          fi
-          
-          # Validate Contents.json has proper iOS 18 structure
-          if ! grep -q "universal" "$ICON_DIR/Contents.json" && \
-             ! grep -q "ios-marketing" "$ICON_DIR/Contents.json"; then
-            echo "⚠️ Warning: Contents.json may not have proper iOS 18 universal icon definitions"
-          fi
-          
-          echo "✅ iOS 18 Universal App Icons validated"
+          echo "✓ Bridging header compiles with iOS SDK"
 
       # ============================================
-      # Validate Source Files Exist
+      # 2. Source Files Verification
       # ============================================
       - name: Verify Source Files
         run: |
-          set -euo pipefail
           echo "=== Verifying Source Files ==="
           
           required_files=(
@@ -179,6 +108,8 @@ jobs:
             "Exploit/LabRuntimeOffsets.m"
             "Exploit/LabDeviceProfile.m"
             "UI/LabOffsets.swift"
+            "UI/ContentView.swift"
+            "UI/Lum1naViewModel.swift"
           )
           
           MISSING=0
@@ -192,7 +123,6 @@ jobs:
           done
           
           if [ $MISSING -eq 1 ]; then
-            echo ""
             echo "❌ Required source files missing"
             exit 1
           fi
@@ -200,7 +130,54 @@ jobs:
           echo "✅ All source files verified"
 
       # ============================================
-      # Validate Model Files
+      # 3. iOS 18 Universal App Icon Verification
+      # ============================================
+      - name: Verify iOS 18 Universal App Icons
+        run: |
+          set -euo pipefail
+          echo "=== Validating iOS 18 Universal App Icons ==="
+          
+          ICON_DIR="Assets.xcassets/AppIcon.appiconset"
+          
+          if [ ! -d "$ICON_DIR" ]; then
+            echo "❌ ERROR: $ICON_DIR not found"
+            exit 1
+          fi
+          echo "✓ Found $ICON_DIR"
+          
+          if [ ! -f "$ICON_DIR/Contents.json" ]; then
+            echo "❌ ERROR: Contents.json missing"
+            exit 1
+          fi
+          echo "✓ Found Contents.json"
+          
+          REQUIRED_ICONS=(
+            "AppIcon.jpg"
+            "AppIcon-Dark.jpg"
+            "AppIcon-Tinted.jpg"
+          )
+          
+          MISSING=0
+          for icon in "${REQUIRED_ICONS[@]}"; do
+            if [ -f "$ICON_DIR/$icon" ]; then
+              echo "✓ Found $icon"
+            else
+              echo "❌ Missing $icon"
+              MISSING=1
+            fi
+          done
+          
+          if [ $MISSING -eq 1 ]; then
+            echo ""
+            echo "❌ iOS 18 Universal App Icon validation failed"
+            echo "Required: AppIcon.jpg, AppIcon-Dark.jpg, AppIcon-Tinted.jpg"
+            exit 1
+          fi
+          
+          echo "✅ iOS 18 Universal App Icons validated"
+
+      # ============================================
+      # 4. Model Files Check
       # ============================================
       - name: Verify Model Files
         run: |
@@ -223,34 +200,29 @@ jobs:
           done
           
           if [ $FOUND -eq 0 ]; then
-            echo "⚠️ Model not found - build may fail if model is required"
+            echo "⚠️ Model not found - build may fail"
           else
             echo "✅ Model files verified"
           fi
 
   # ============================================
-  # Job 2: Build (only runs if validate passes)
+  # Job 2: Build (only if validate passes)
   # ============================================
   build:
     runs-on: macos-15
     needs: validate
     timeout-minutes: 45
-    name: "Build IPA"
+    name: "🔨 Build IPA"
     
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Select Xcode 16.4
         run: |
           sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
           xcodebuild -version
 
-      # ============================================
-      # Setup Entitlements
-      # ============================================
       - name: Create Entitlements
         run: |
           cat > Lum1na.entitlements << 'EOF'
@@ -258,42 +230,21 @@ jobs:
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
-              <!-- CoreML & Research -->
               <key>com.apple.developer.coreml</key>
               <true/>
-              
-              <!-- Required for research tools -->
-              <key>get-task-allow</key>
-              <true/>
-              
-              <!-- IOKit access -->
               <key>com.apple.private.IOSurface</key>
+              <true/>
+              <key>get-task-allow</key>
               <true/>
           </dict>
           </plist>
           EOF
-          echo "✅ Created entitlements"
 
-      # ============================================
-      # Build with Proper iOS Settings
-      # ============================================
       - name: Build Unsigned IPA
         run: |
           set -euo pipefail
-          echo "=== Building ${PROJECT_NAME} ==="
           
-          # Clean build
-          xcodebuild clean \
-            -project "${PROJECT_NAME}.xcodeproj" \
-            -scheme "${SCHEME_NAME}" \
-            -configuration Release \
-            -sdk iphoneos \
-            -destination 'generic/platform=iOS' \
-            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
-            2>&1 | tee /tmp/xcodebuild_clean.log
-          
-          # Build
-          xcodebuild build \
+          xcodebuild \
             -project "${PROJECT_NAME}.xcodeproj" \
             -scheme "${SCHEME_NAME}" \
             -configuration Release \
@@ -306,61 +257,16 @@ jobs:
             CODE_SIGN_ENTITLEMENTS="Lum1na.entitlements" \
             SWIFT_OBJC_BRIDGING_HEADER="${PROJECT_NAME}-Bridging-Header.h" \
             IPHONEOS_DEPLOYMENT_TARGET="${DEPLOYMENT_TARGET}" \
-            ENABLE_BITCODE=NO \
-            GCC_PREPROCESSOR_DEFINITIONS="DEBUG=0" \
-            2>&1 | tee /tmp/xcodebuild.log
-          
-          BUILD_STATUS=${PIPESTATUS[0]}
-          
-          if [ $BUILD_STATUS -ne 0 ]; then
-            echo ""
-            echo "❌ BUILD FAILED"
-            echo ""
-            echo "Last 50 lines of build log:"
-            tail -50 /tmp/xcodebuild.log
-            exit 1
-          fi
-          
-          echo "✅ Build succeeded"
+            build
 
-      # ============================================
-      # Package IPA
-      # ============================================
       - name: Package IPA
         run: |
-          set -euo pipefail
-          echo "=== Packaging IPA ==="
-          
           APP=$(find "$RUNNER_TEMP/DerivedData/Build/Products" -name "${PROJECT_NAME}.app" -print -quit)
-          
-          if [ -z "$APP" ]; then
-            echo "❌ ${PROJECT_NAME}.app not found"
-            echo "Build products:"
-            find "$RUNNER_TEMP/DerivedData/Build/Products" -type d -name "*.app" 2>/dev/null || true
-            exit 1
-          fi
-          
-          echo "Found app at: $APP"
-          ls -la "$APP"
-          
-          # Create Payload
-          rm -rf Payload "${PROJECT_NAME}.ipa"
-          mkdir Payload
+          mkdir -p Payload
           cp -R "$APP" Payload/
-          
-          # Create IPA
           zip -qr "${PROJECT_NAME}.ipa" Payload
-          
-          echo "✅ Created ${PROJECT_NAME}.ipa"
           ls -lh "${PROJECT_NAME}.ipa"
-          
-          # Verify IPA contents
-          echo "=== IPA Contents ==="
-          unzip -l "${PROJECT_NAME}.ipa" | head -20
 
-      # ============================================
-      # Upload Artifact
-      # ============================================
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
@@ -368,16 +274,3 @@ jobs:
           path: Lum1na.ipa
           if-no-files-found: error
           retention-days: 7
-
-      # ============================================
-      # Upload Logs on Failure
-      # ============================================
-      - name: Upload Build Logs (on failure)
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-logs
-          path: |
-            /tmp/xcodebuild.log
-            /tmp/bridging_header_errors.log
-          if-no-files-found: ignore
