@@ -29,6 +29,6 @@
 #import "Exploit/P005JIT.h"
 
 // MARK: - Primitives
-#import "Exploit/primitives/kaslr/CVE_2026_65343_AKS.h"
+#import "Exploit/CVE_2026_65343_AKS.h"
 
 #endif /* Lum1na_Bridging_Header_h */
