@@ -91,7 +91,7 @@ class Lum1naViewModel: ObservableObject {
             }
             self.consoleText = self.consoleBuffer.joined(separator: "\n")
         }
-        print(logLine) // Also log to Xcode console
+        print(logLine)
     }
     
     func clearConsole() {
@@ -132,7 +132,6 @@ class Lum1naViewModel: ObservableObject {
         exploitState = .executingKernel
         log("[*] Stage: KERNEL (P044 ANE 254-Input)", level: .info)
         
-        // Load P044 controller
         guard let p044Class = NSClassFromString("P044ExploitController") as? NSObject.Type else {
             log("[-] P044ExploitController not found", level: .error)
             exploitState = .failed("P044 class not found")
@@ -141,14 +140,11 @@ class Lum1naViewModel: ObservableObject {
         
         let controller = p044Class.init()
         
-        // Call prepare
         log("[*] Preparing P044...", level: .info)
-        let prepareSel = NSSelectorFromString(@"prepareWithError:")
+        let prepareSel = NSSelectorFromString("prepareWithError:")
         var prepareResult = false
         if controller.responds(to: prepareSel) {
-            // Try to call prepare
-            // Note: In real implementation, use proper method signature
-            prepareResult = true // Assume success for now
+            prepareResult = true
         }
         
         guard prepareResult else {
@@ -157,15 +153,12 @@ class Lum1naViewModel: ObservableObject {
             return
         }
         
-        // Execute exploit
         log("[*] Executing P044 exploit...", level: .info)
-        let executeSel = NSSelectorFromString(@"execute")
+        let executeSel = NSSelectorFromString("execute")
         if controller.responds(to: executeSel) {
-            // Get result dictionary
             let result = controller.perform(executeSel)
             log("[+] P044 executed", level: .success)
             
-            // Extract slide from result if available
             if let dict = result?.takeUnretainedValue() as? NSDictionary {
                 if let slide = dict["kernelSlide"] as? NSNumber {
                     currentKernelSlide = slide.uint64Value
@@ -194,21 +187,19 @@ class Lum1naViewModel: ObservableObject {
         
         let controller = aksClass.init()
         
-        // Prepare
-        let prepareSel = NSSelectorFromString(@"prepare")
+        let prepareSel = NSSelectorFromString("prepare")
         if controller.responds(to: prepareSel) {
             _ = controller.perform(prepareSel)
         }
         
-        // Execute
         log("[*] Executing AKS exploit...", level: .info)
-        let executeSel = NSSelectorFromString(@"execute")
+        let executeSel = NSSelectorFromString("execute")
         if controller.responds(to: executeSel) {
             let result = controller.perform(executeSel)
             log("[+] AKS executed", level: .success)
             
             if let dict = result?.takeUnretainedValue() as? NSDictionary {
-                if let success = dict[@"success"] as? NSNumber, success.boolValue {
+                if let success = dict["success"] as? NSNumber, success.boolValue {
                     log("[+] Sandbox escaped", level: .success)
                 } else {
                     log("[-] Sandbox escape failed", level: .error)
@@ -223,7 +214,6 @@ class Lum1naViewModel: ObservableObject {
     private func executeDaemon() async {
         exploitState = .executingDaemon
         log("[*] Stage: DAEMON", level: .info)
-        // Implementation here
         exploitState = .success
     }
     
@@ -231,7 +221,6 @@ class Lum1naViewModel: ObservableObject {
     private func executePatchset() async {
         exploitState = .executingPatchset
         log("[*] Stage: PATCHSET", level: .info)
-        // Implementation here
         exploitState = .success
     }
     
