@@ -1,6 +1,6 @@
 //
 //  Lum1na-Bridging-Header.h
-//  iOS-compatible headers (no mach_vm.h)
+//  iOS-only headers (no macOS-specific headers)
 //
 
 #ifndef Lum1na_Bridging_Header_h
@@ -11,6 +11,7 @@
 
 // MARK: - Mach Headers (iOS-compatible)
 #import <mach/mach.h>
+#import <mach/mach_types.h>
 #import <mach/vm_map.h>
 #import <mach/vm_region.h>
 #import <mach/mach_traps.h>
@@ -19,16 +20,14 @@
 #import <mach/task.h>
 #import <mach/port.h>
 #import <mach/message.h>
-
-// mach_vm.h is NOT available on iOS - use these instead:
-// - vm_map.h for vm_map_64
-// - mach.h for mach_port_t, kern_return_t, etc.
+#import <mach/exception.h>
+#import <mach/processor_info.h>
+#import <mach/host_info.h>
 
 // MARK: - Mach-O Headers
 #import <mach-o/dyld.h>
 #import <mach-o/loader.h>
 #import <mach-o/nlist.h>
-#import <mach-o/getsect.h>
 
 // MARK: - System Headers
 #import <sys/mman.h>
@@ -39,14 +38,16 @@
 #import <pthread.h>
 #import <os/log.h>
 
-// MARK: - IOKit
+// MARK: - IOKit (iOS subset)
+// NOTE: IOKit is limited on iOS - only user-space APIs available
 #import <IOKit/IOKitLib.h>
-#import <IOKit/IOBSD.h>
+// IOBSD.h does NOT exist on iOS - removed
 
 // MARK: - CoreML (if needed)
 #import <CoreML/CoreML.h>
 
 // MARK: - Your Exploit Headers
+// Only include headers that actually exist in your project
 #import "Exploit/KASLRLeak.h"
 #import "Exploit/P044AksKaslrReach.h"
 #import "Exploit/CVE_2026_65343_AKS.h"
