@@ -1,9 +1,15 @@
 //
 //  ContentView.swift
-//  Lum1na
+//  Lum1na - iOS 14.0 Compatible
 //
 
 import SwiftUI
+
+// MARK: - iOS 14 Compatible Colors
+extension Color {
+    static let luminaCyan = Color(red: 0.0, green: 0.8, blue: 1.0)  // Replaces .cyan
+    static let luminaMint = Color(red: 0.0, green: 1.0, blue: 0.6)  // Replaces .mint
+}
 
 struct ContentView: View {
     @StateObject private var viewModel = Lum1naViewModel()
@@ -11,38 +17,39 @@ struct ContentView: View {
     
     var body: some View {
         ZStack {
-            Color(hex: "07060F").ignoresSafeArea()
+            // Background
+            Color.black.opacity(0.9).ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // MARK: - Header
+                // Header
                 HeaderView()
                     .padding(.top, 12)
                 
-                // MARK: - Device Info
-                DeviceInfoCompact(viewModel: viewModel)
+                // Device Info - Fixed for iOS 14
+                DeviceInfoSection(viewModel: viewModel)
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
                 
-                // MARK: - Star Beacon
+                // Star Beacon
                 StarBeaconSection(viewModel: viewModel)
                     .padding(.top, 10)
                 
                 Text("The guiding light for Jailbreaks")
                     .font(.system(size: 13))
-                    .foregroundStyle(.secondary)
+                    .foregroundColor(.gray)
                     .padding(.top, 8)
                 
-                // MARK: - Console
+                // Console
                 ConsoleCard(viewModel: viewModel)
                     .padding(.horizontal, 16)
                     .padding(.top, 10)
                 
-                // MARK: - Stage Buttons (6 stages)
+                // Stage Buttons (4 stages matching your selector)
                 StageButtonsRow(viewModel: viewModel)
                     .padding(.horizontal, 12)
                     .padding(.top, 8)
                 
-                // MARK: - Action Buttons
+                // Action Buttons
                 ActionButtons(viewModel: viewModel, showingStageTester: $showingStageTester)
                     .padding(.horizontal, 16)
                     .padding(.top, 10)
@@ -55,64 +62,75 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Header View
+// MARK: - Header
 struct HeaderView: View {
     var body: some View {
         VStack(spacing: 2) {
             Text("Lum1na")
                 .font(.system(size: 32, weight: .bold, design: .rounded))
-                .foregroundStyle(
-                    LinearGradient(
-                        colors: [Color(hex: "FF6B9D"), Color(hex: "4ECDC4")],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
+                .foregroundColor(.white)
             
-            Text("v0.1 • ANE 254-Input")
+            Text("v0.1 • Multi-Path")
                 .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(.gray)
+                .foregroundColor(.gray)
         }
     }
 }
 
-// MARK: - Device Info
-struct DeviceInfoCompact: View {
+// MARK: - Device Info Section (Fixed for iOS 14)
+struct DeviceInfoSection: View {
     @ObservedObject var viewModel: Lum1naViewModel
     
     var body: some View {
         HStack(spacing: 8) {
             Image(systemName: "iphone")
                 .font(.system(size: 14))
-                .foregroundStyle(Color(hex: "4ECDC4"))
+                .foregroundColor(.blue)
             
             VStack(alignment: .leading, spacing: 1) {
-                Text(viewModel.deviceInfo?.machine ?? "Detecting...")
+                // Fixed: deviceInfo is not optional, check if empty
+                Text(deviceInfoText)
                     .font(.system(size: 13, weight: .semibold))
                 Text("iOS \(viewModel.deviceInfo?.version ?? "?")")
                     .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
+                    .foregroundColor(.gray)
             }
             
             Spacer()
             
             HStack(spacing: 4) {
                 Circle()
-                    .fill(viewModel.statusColor)
+                    .fill(statusColor)
                     .frame(width: 6, height: 6)
-                Text(viewModel.statusText)
+                Text(viewModel.exploitState.description)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(viewModel.statusColor)
+                    .foregroundColor(statusColor)
             }
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(
-            Capsule()
-                .fill(.ultraThinMaterial)
-                .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 1))
+            // iOS 14 compatible - no .ultraThinMaterial
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.white.opacity(0.1))
         )
         .frame(maxWidth: 260, alignment: .center)
+    }
+    
+    // Fixed: Handle non-optional deviceInfo
+    private var deviceInfoText: String {
+        let machine = viewModel.deviceInfo?.machine ?? ""
+        return machine.isEmpty ? "Detecting..." : machine
+    }
+    
+    private var statusColor: Color {
+        switch viewModel.exploitState {
+        case .idle: return .gray
+        case .preparing: return .orange
+        case .executingKernel, .executingSandbox, .executingDaemon, .executingPatchset: return .blue
+        case .success: return .green
+        case .failed: return .red
+        }
     }
 }
 
@@ -125,7 +143,7 @@ struct StarBeaconSection: View {
             Circle()
                 .stroke(
                     LinearGradient(
-                        colors: [Color(hex: "FF6B9D"), Color(hex: "4ECDC4")],
+                        colors: [.pink, .blue],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     ),
@@ -133,40 +151,21 @@ struct StarBeaconSection: View {
                 )
                 .frame(width: 130, height: 130)
             
+            // iOS 14 compatible fill
             Circle()
-                .fill(.ultraThinMaterial)
+                .fill(Color.white.opacity(0.05))
                 .frame(width: 120, height: 120)
             
-            StarBeaconView(stage: currentStage)
+            StarBeaconView(state: viewModel.exploitState)
                 .frame(width: 80, height: 80)
         }
         .frame(height: 140)
     }
-    
-    private var currentStage: StarBeaconStage {
-        switch viewModel.exploitState {
-        case .idle: return .idle
-        case .detecting, .preparing: return .detecting
-        case .executingKASLR: return .kaslr
-        case .executingHeap: return .heap
-        case .executingANE: return .ane
-        case .executingKRW: return .krw
-        case .executingPPL: return .ppl
-        case .executingPersistence: return .persistence
-        case .success: return .success
-        case .failed: return .failed
-        }
-    }
-}
-
-// MARK: - Star Beacon Stage Enum
-enum StarBeaconStage {
-    case idle, detecting, kaslr, heap, ane, krw, ppl, persistence, success, failed
 }
 
 // MARK: - Star Beacon View
 struct StarBeaconView: View {
-    let stage: StarBeaconStage
+    let state: ExploitState
     
     var body: some View {
         GeometryReader { geometry in
@@ -178,7 +177,7 @@ struct StarBeaconView: View {
                 StarShape()
                     .fill(
                         LinearGradient(
-                            colors: stageColors,
+                            colors: stateColors,
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
                         )
@@ -189,22 +188,21 @@ struct StarBeaconView: View {
                 Circle()
                     .fill(Color.white.opacity(0.8))
                     .frame(width: radius * 0.3, height: radius * 0.3)
-                    .shadow(color: stageColors[0].opacity(0.8), radius: 10)
+                    .shadow(color: stateColors[0].opacity(0.8), radius: 10)
             }
             .position(center)
         }
     }
     
-    private var stageColors: [Color] {
-        switch stage {
+    // iOS 14 compatible colors (no .cyan, .mint)
+    private var stateColors: [Color] {
+        switch state {
         case .idle: return [.gray, .gray]
-        case .detecting: return [.orange, .yellow]
-        case .kaslr: return [.cyan, .blue]
-        case .heap: return [.purple, .pink]
-        case .ane: return [.green, .cyan]
-        case .krw: return [.orange, .red]
-        case .ppl: return [.red, .orange]
-        case .persistence: return [.green, .mint]
+        case .preparing: return [.orange, .yellow]
+        case .executingKernel: return [.luminaCyan, .blue]  // Custom cyan
+        case .executingSandbox: return [.purple, .pink]
+        case .executingDaemon: return [.green, .luminaCyan]   // Custom cyan
+        case .executingPatchset: return [.green, .luminaMint] // Custom mint
         case .success: return [.green, .green]
         case .failed: return [.red, .red]
         }
@@ -218,15 +216,14 @@ struct StarShape: Shape {
         let center = CGPoint(x: rect.midX, y: rect.midY)
         let radius = min(rect.width, rect.height) / 2
         
-        // Four-pointed star
         let points = [
-            CGPoint(x: center.x, y: center.y - radius),      // Top
+            CGPoint(x: center.x, y: center.y - radius),
             CGPoint(x: center.x + radius * 0.3, y: center.y - radius * 0.3),
-            CGPoint(x: center.x + radius, y: center.y),      // Right
+            CGPoint(x: center.x + radius, y: center.y),
             CGPoint(x: center.x + radius * 0.3, y: center.y + radius * 0.3),
-            CGPoint(x: center.x, y: center.y + radius),      // Bottom
+            CGPoint(x: center.x, y: center.y + radius),
             CGPoint(x: center.x - radius * 0.3, y: center.y + radius * 0.3),
-            CGPoint(x: center.x - radius, y: center.y),      // Left
+            CGPoint(x: center.x - radius, y: center.y),
             CGPoint(x: center.x - radius * 0.3, y: center.y - radius * 0.3),
         ]
         
@@ -240,7 +237,7 @@ struct StarShape: Shape {
     }
 }
 
-// MARK: - Console Card
+// MARK: - Console Card (iOS 14 Compatible)
 struct ConsoleCard: View {
     @ObservedObject var viewModel: Lum1naViewModel
     
@@ -249,20 +246,20 @@ struct ConsoleCard: View {
             HStack {
                 Label("console", systemImage: "terminal")
                     .font(.system(size: 12, weight: .medium, design: .monospaced))
-                    .foregroundStyle(.secondary)
+                    .foregroundColor(.gray)
                 
                 Spacer()
                 
                 Button(action: { UIPasteboard.general.string = viewModel.consoleText }) {
                     Image(systemName: "doc.on.doc")
                         .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+                        .foregroundColor(.gray)
                 }
                 
                 Button(action: { viewModel.clearConsole() }) {
                     Image(systemName: "trash")
                         .font(.system(size: 12))
-                        .foregroundStyle(.secondary)
+                        .foregroundColor(.gray)
                         .padding(.leading, 8)
                 }
             }
@@ -274,7 +271,7 @@ struct ConsoleCard: View {
             ScrollView(.vertical, showsIndicators: true) {
                 Text(viewModel.consoleText)
                     .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(.cyan)
+                    .foregroundColor(.luminaCyan) // Custom cyan
                     .lineSpacing(2)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(10)
@@ -283,26 +280,24 @@ struct ConsoleCard: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 14)
-                .fill(.ultraThinMaterial)
+                .fill(Color.white.opacity(0.05)) // iOS 14 compatible
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
-                        .stroke(Color(hex: "FF6B9D").opacity(0.3), lineWidth: 1)
+                        .stroke(Color.pink.opacity(0.3), lineWidth: 1)
                 )
         )
     }
 }
 
-// MARK: - Stage Buttons Row (6 stages)
+// MARK: - Stage Buttons Row (4 stages)
 struct StageButtonsRow: View {
     @ObservedObject var viewModel: Lum1naViewModel
     
     let stages = [
-        ("KASLR", "memorychip"),
-        ("Heap", "cpu"),
-        ("ANE", "brain"),
-        ("KRW", "arrow.left.arrow.right"),
-        ("PPL", "lock.shield"),
-        ("Persist", "arrow.clockwise")
+        ("KERNEL", "cpu", ExploitState.executingKernel),
+        ("SANDBOX", "lock.open", ExploitState.executingSandbox),
+        ("DAEMON", "gear", ExploitState.executingDaemon),
+        ("PATCHSET", "checkmark.shield", ExploitState.executingPatchset)
     ]
     
     var body: some View {
@@ -314,15 +309,26 @@ struct StageButtonsRow: View {
                     Text(stage.0)
                         .font(.system(size: 9, weight: .medium))
                 }
-                .foregroundStyle(viewModel.stageColor(for: stage.0))
-                .frame(width: 48, height: 40)
+                .foregroundColor(stageColor(for: stage.2))
+                .frame(width: 70, height: 44)
                 .background(
-                    Capsule()
-                        .fill(.ultraThinMaterial)
-                        .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 1))
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.white.opacity(0.05))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(isActive(stage.2) ? Color.blue : Color.clear, lineWidth: 1)
                 )
             }
         }
+    }
+    
+    private func isActive(_ state: ExploitState) -> Bool {
+        return viewModel.exploitState == state
+    }
+    
+    private func stageColor(for state: ExploitState) -> Color {
+        return isActive(state) ? .luminaCyan : .gray
     }
 }
 
@@ -336,26 +342,32 @@ struct ActionButtons: View {
             Button(action: { showingStageTester = true }) {
                 Label("Test Stages", systemImage: "slider.horizontal.3")
                     .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(.primary)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 44)
-                    .background(Capsule().fill(.ultraThinMaterial))
-            }
-            
-            Button(action: { viewModel.startJailbreak() }) {
-                Text("Jailbreak")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundColor(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 44)
                     .background(
-                        Capsule().fill(
-                            LinearGradient(
-                                colors: [Color(hex: "FF6B9D"), Color(hex: "9B59B6")],
-                                startPoint: .leading,
-                                endPoint: .trailing
+                        RoundedRectangle(cornerRadius: 22)
+                            .fill(Color.white.opacity(0.1))
+                    )
+            }
+            
+            Button(action: { 
+                Task { await viewModel.executeStage("Full Chain") }
+            }) {
+                Text("Jailbreak")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .background(
+                        RoundedRectangle(cornerRadius: 22)
+                            .fill(
+                                LinearGradient(
+                                    colors: [.pink, .purple],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
                             )
-                        )
                     )
             }
             .disabled(viewModel.isRunning)
@@ -366,15 +378,13 @@ struct ActionButtons: View {
 // MARK: - Stage Tester View
 struct StageTesterView: View {
     @ObservedObject var viewModel: Lum1naViewModel
-    @Environment(\.dismiss) var dismiss
+    @Environment(\.presentationMode) var presentationMode
     
     let stages = [
-        ("KASLR Bypass", "memorychip", "Test KASLR leak via ANE"),
-        ("Heap Corruption", "cpu", "Test UPL leak primitive"),
-        ("ANE Exploit", "brain", "Test ANE 254-input OOB"),
-        ("KRW Verify", "arrow.left.arrow.right", "Test kernel R/W"),
-        ("PPL Bypass", "lock.shield", "Test PPL defeat"),
-        ("Persistence", "arrow.clockwise", "Test tempRoot install")
+        ("KERNEL", "KASLR + P044", "cpu"),
+        ("SANDBOX", "CVE-2026-65343", "lock.open"),
+        ("DAEMON", "Service Injection", "gear"),
+        ("PATCHSET", "Final Rooting", "checkmark.shield")
     ]
     
     var body: some View {
@@ -383,30 +393,32 @@ struct StageTesterView: View {
                 Section(header: Text("Individual Stage Testing")) {
                     ForEach(stages, id: \.0) { stage in
                         Button(action: {
-                            viewModel.testIndividualStage(stage.0)
-                            dismiss()
+                            Task {
+                                await viewModel.executeStage(stage.0)
+                            }
+                            presentationMode.wrappedValue.dismiss()
                         }) {
                             HStack(spacing: 12) {
-                                Image(systemName: stage.1)
+                                Image(systemName: stage.2)
                                     .font(.system(size: 20))
-                                    .foregroundStyle(Color(hex: "FF6B9D"))
+                                    .foregroundColor(.blue)
                                     .frame(width: 40, height: 40)
-                                    .background(Color(hex: "FF6B9D").opacity(0.1))
+                                    .background(Color.blue.opacity(0.1))
                                     .cornerRadius(10)
                                 
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(stage.0)
                                         .font(.system(size: 16, weight: .semibold))
-                                    Text(stage.2)
+                                    Text(stage.1)
                                         .font(.system(size: 12))
-                                        .foregroundStyle(.secondary)
+                                        .foregroundColor(.gray)
                                 }
                                 
                                 Spacer()
                                 
                                 Image(systemName: "chevron.right")
                                     .font(.system(size: 14))
-                                    .foregroundStyle(.secondary)
+                                    .foregroundColor(.gray)
                             }
                         }
                     }
@@ -414,45 +426,38 @@ struct StageTesterView: View {
                 
                 Section {
                     Button("Reset State") { viewModel.reset() }
-                        .foregroundStyle(.red)
+                        .foregroundColor(.red)
                 }
                 
-                Section(header: Text("Device Info")) {
-                    LabeledContent("Machine", value: viewModel.deviceInfo?.machine ?? "Unknown")
-                    LabeledContent("iOS Version", value: viewModel.deviceInfo?.version ?? "?")
-                    LabeledContent("Build", value: viewModel.deviceInfo?.build ?? "?")
-                    LabeledContent("Kernel Slide", value: viewModel.currentKernelSlide != 0 ? 
-                        "0x\(String(viewModel.currentKernelSlide, radix: 16))" : "Not set")
+                Section(header: Text("Recovery")) {
+                    if viewModel.recoveryAvailable {
+                        Button("Attempt Recovery") {
+                            viewModel.attemptRecovery()
+                            presentationMode.wrappedValue.dismiss()
+                        }
+                        .foregroundColor(.orange)
+                    }
+                    
+                    Button("Export Recovery Logs") {
+                        let logs = viewModel.exportRecoveryLogs()
+                        UIPasteboard.general.string = logs
+                    }
                 }
             }
             .navigationTitle("Stage Tester")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") { dismiss() }
+                    Button("Done") { presentationMode.wrappedValue.dismiss() }
                 }
             }
         }
     }
 }
 
-// MARK: - Color Extension
-extension Color {
-    init(hex: String) {
-        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
-        var int: UInt64 = 0
-        Scanner(string: hex).scanHexInt64(&int)
-        let a, r, g, b: UInt64
-        switch hex.count {
-        case 3: // RGB (12-bit)
-            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
-        case 6: // RGB (24-bit)
-            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
-        case 8: // ARGB (32-bit)
-            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
-        default:
-            (a, r, g, b) = (1, 1, 1, 0)
-        }
-        self.init(.sRGB, red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255, opacity: Double(a) / 255)
+// MARK: - Preview
+struct ContentView_Previews: PreviewProvider {
+    static var previews: some View {
+        ContentView()
     }
 }
