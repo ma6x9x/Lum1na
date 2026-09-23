@@ -62,6 +62,7 @@ class Lum1naViewModel: ObservableObject {
     @Published var deviceInfo: DeviceInfo?
     @Published var isRunning: Bool = false
     @Published var currentKernelSlide: UInt64 = 0
+    @Published var currentKernelBase: UInt64 = 0
     
     private var consoleBuffer: [String] = []
     private let maxConsoleLines = 1000
@@ -249,5 +250,32 @@ class Lum1naViewModel: ObservableObject {
         currentKernelSlide = 0
         clearConsole()
         log("[*] State reset", level: .info)
+    }
+    
+    // MARK: - Debug Export
+    
+    func exportFullDebugLog() -> String {
+        let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .medium, timeStyle: .medium)
+        let device = deviceInfo ?? DeviceInfo.current()
+        
+        var logOutput = ""
+        logOutput.append("=== Lum1na Debug Log ===\n")
+        logOutput.append("Timestamp: \(timestamp)\n")
+        logOutput.append("----------------------------\n")
+        logOutput.append("DEVICE INFORMATION\n")
+        logOutput.append("  Machine:     \(device.machine)\n")
+        logOutput.append("  iOS Version: \(device.version)\n")
+        logOutput.append("  Build:       \(device.build)\n")
+        logOutput.append("----------------------------\n")
+        logOutput.append("EXPLOIT STATE\n")
+        logOutput.append("  Current:     \(exploitState.description)\n")
+        logOutput.append("  Kernel Slide: 0x\(String(currentKernelSlide, radix: 16, uppercase: true))\n")
+        logOutput.append("  Kernel Base:  0x\(String(currentKernelBase, radix: 16, uppercase: true))\n")
+        logOutput.append("  Is Running:  \(isRunning)\n")
+        logOutput.append("----------------------------\n")
+        logOutput.append("CONSOLE LOG:\n")
+        logOutput.append(consoleText)
+        
+        return logOutput
     }
 }
