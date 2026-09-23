@@ -1,60 +1,92 @@
+name: Lum1na Build
+
 on:
   workflow_dispatch:
+  push:
+    branches: [ main, develop ]
+
+env:
+  PROJECT_NAME: Lum1na
+  SCHEME_NAME: Lum1na
+  DEPLOYMENT_TARGET: 14.0
 
 jobs:
   build:
     runs-on: macos-15
     timeout-minutes: 45
+    
     steps:
-      - name: Checkout
+      # ============================================
+      # 1. Checkout & Setup
+      # ============================================
+      - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Select Xcode 16.4
         run: |
-          set -euo pipefail
           sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
           xcodebuild -version
 
-      - name: Verify source files exist
+      # ============================================
+      # 2. Verify Source Files
+      # ============================================
+      - name: Verify Source Files Exist
         run: |
           set -euo pipefail
           echo "=== Verifying source files ==="
           
-          # Core exploit files (UPDATED with new PAC/OOB files)
-          objc_files=(
+          # Core files
+          required_files=(
+            "Exploit/P044AksKaslrReach.m"
             "Exploit/CVE_2026_65343_AKS.m"
-            "Exploit/CVE_2026_65330_PAC.m"      # NEW
-            "Exploit/CVE_2026_65349_OOB.m"      # NEW
-            "Exploit/APFS84523.m"
-            "Exploit/P005JIT.m"
+            "Exploit/P051APFSXattr.m"
+            "Exploit/P054APFSReapList.m"
             "Exploit/LabRuntimeOffsets.m"
             "Exploit/LabDeviceProfile.m"
+            "UI/LabOffsets.swift"
+            "Lum1na-Bridging-Header.h"
           )
           
-          header_files=(
-            "Exploit/CVE_2026_65343_AKS.h"
-            "Exploit/CVE_2026_65330_PAC.h"      # NEW
-            "Exploit/CVE_2026_65349_OOB.h"      # NEW
-            "Exploit/APFS84523.h"
-            "Exploit/P005JIT.h"
-            "Exploit/LabRuntimeOffsets.h"
-            "Exploit/LabDeviceProfile.h"
-            "Exploit/A14_23F77_LabOffsets.h"
-            "Exploit/A12X_23G71_LabOffsets.h"
-          )
-          
-          swift_files=(
-            "UI/LabOffsets.swift"     # NEW
-          )
-          
-          for file in "${objc_files[@]}" "${header_files[@]}" "${swift_files[@]}"; do
-            test -f "$file" || { echo "✗ $file MISSING"; exit 1; }
-            echo "✓ $file"
+          for file in "${required_files[@]}"; do
+            if [ -f "$file" ]; then
+              echo "✓ $file"
+            else
+              echo "✗ $file MISSING"
+              exit 1
+            fi
           done
           
-          test -f Lum1na-Bridging-Header.h || { echo "✗ Lum1na-Bridging-Header.h MISSING"; exit 1; }
           echo "✅ All source files verified!"
 
+      # ============================================
+      # 3. Verify Model Files
+      # ============================================
+      - name: Verify Model Files
+        run: |
+          echo "=== Checking Model Files ==="
+          
+          MODEL_NAME="XVRC27_254in_1out_addchain"
+          MODEL_PATHS=(
+            "model/${MODEL_NAME}.mlmodelc"
+            "Resources/${MODEL_NAME}.mlmodelc"
+            "${MODEL_NAME}.mlmodelc"
+          )
+          
+          FOUND=0
+          for path in "${MODEL_PATHS[@]}"; do
+            if [ -d "$path" ]; then
+              echo "✓ Found model at: $path"
+              FOUND=1
+              break
+            fi
+          done
+          
+          if [ $FOUND -eq 0 ]; then
+            echo "⚠️ Model not found - will need to compile from source"
+          fi
+          
       - name: Verify iOS 18 Universal App Icon Structure
         run: |
           set -euo pipefail
@@ -65,36 +97,85 @@ jobs:
             test -f "$ICON_DIR/$file" || { echo "❌ $file missing"; exit 1; }
           done
           echo "✅ Icons verified"
+      # ============================================
+      # 4. Setup Entitlements
+      # ============================================
+      - name: Create Entitlements
+        run: |
+          cat > Lum1na.entitlements << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <!-- Research Tool Entitlements -->
+              <key>com.apple.developer.coreml</key>
+              <true/>
+              <key>com.apple.private.security.no-sandbox</key>
+              <true/>
+              <key>com.apple.private.security.container-required</key>
+              <false/>
+              <key>com.apple.private.IOSurface</key>
+              <true/>
+              <key>get-task-allow</key>
+              <true/>
+          </dict>
+          </plist>
+          EOF
+          
+          echo "✅ Created entitlements"
 
-      - name: Build (unsigned)
+      # ============================================
+      # 5. Build (Unsigned)
+      # ============================================
+      - name: Build Unsigned IPA
         run: |
           set -euo pipefail
+          
           xcodebuild \
-            -project Lum1na.xcodeproj \
-            -scheme Lum1na \
+            -project "${PROJECT_NAME}.xcodeproj" \
+            -scheme "${SCHEME_NAME}" \
             -configuration Release \
             -sdk iphoneos \
-            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
             -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            SWIFT_OBJC_BRIDGING_HEADER="Lum1na-Bridging-Header.h" \
+            CODE_SIGN_ENTITLEMENTS="Lum1na.entitlements" \
+            SWIFT_OBJC_BRIDGING_HEADER="${PROJECT_NAME}-Bridging-Header.h" \
+            IPHONEOS_DEPLOYMENT_TARGET="${DEPLOYMENT_TARGET}" \
             build
 
+      # ============================================
+      # 6. Package IPA
+      # ============================================
       - name: Package IPA
         run: |
           set -euo pipefail
-          APP=$(find "$RUNNER_TEMP/DerivedData/Build/Products" -name 'Lum1na.app' -print -quit)
-          test -n "$APP" || { echo "❌ Lum1na.app not found"; exit 1; }
-          rm -rf Payload Lum1na.ipa
+          
+          APP=$(find "$RUNNER_TEMP/DerivedData/Build/Products" -name "${PROJECT_NAME}.app" -print -quit)
+          test -n "$APP" || { echo "❌ ${PROJECT_NAME}.app not found"; exit 1; }
+          
+          echo "Found app at: $APP"
+          
+          # Create Payload
+          rm -rf Payload "${PROJECT_NAME}.ipa"
           mkdir Payload
           cp -R "$APP" Payload/
-          zip -qr Lum1na.ipa Payload
+          
+          # Zip IPA
+          zip -qr "${PROJECT_NAME}.ipa" Payload
+          
+          echo "✅ Created ${PROJECT_NAME}.ipa"
+          ls -lh "${PROJECT_NAME}.ipa"
 
+      # ============================================
+      # 7. Upload Artifact
+      # ============================================
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: Lum1na-ipa
+          name: Lum1na-IPA
           path: Lum1na.ipa
           if-no-files-found: error
+          retention-days: 7
