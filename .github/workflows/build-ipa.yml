@@ -1,3 +1,32 @@
+name: Lum1na Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, develop ]
+
+env:
+  PROJECT_NAME: Lum1na
+  SCHEME_NAME: Lum1na
+  DEPLOYMENT_TARGET: 18.0
+
+jobs:
+  # ============================================
+  # Job 1: Validate Everything First
+  # ============================================
+  validate:
+    runs-on: macos-15
+    name: "🔍 Validation"
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode 16.4
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+          xcodebuild -version
+
 # ============================================
       # Simplified Bridging Header Validation
       # ============================================
@@ -48,3 +77,185 @@
           
           echo "✓ No macOS-only headers found"
           echo "⚠️  Full compilation check skipped (Xcode will validate during build)"
+
+      # ============================================
+      # 2. Source Files Verification
+      # ============================================
+      - name: Verify Source Files
+        run: |
+          echo "=== Verifying Source Files ==="
+          
+          required_files=(
+            "Exploit/P044AksKaslrReach.m"
+            "Exploit/CVE_2026_65343_AKS.m"
+            "Exploit/P051APFSXattr.m"
+            "Exploit/P054APFSReapList.m"
+            "Exploit/LabRuntimeOffsets.m"
+            "Exploit/LabDeviceProfile.m"
+            "UI/LabOffsets.swift"
+            "UI/ContentView.swift"
+            "UI/Lum1naViewModel.swift"
+          )
+          
+          MISSING=0
+          for file in "${required_files[@]}"; do
+            if [ -f "$file" ]; then
+              echo "✓ $file"
+            else
+              echo "❌ $file MISSING"
+              MISSING=1
+            fi
+          done
+          
+          if [ $MISSING -eq 1 ]; then
+            echo "❌ Required source files missing"
+            exit 1
+          fi
+          
+          echo "✅ All source files verified"
+
+      # ============================================
+      # 3. iOS 18 Universal App Icon Verification
+      # ============================================
+      - name: Verify iOS 18 Universal App Icons
+        run: |
+          set -euo pipefail
+          echo "=== Validating iOS 18 Universal App Icons ==="
+          
+          ICON_DIR="Assets.xcassets/AppIcon.appiconset"
+          
+          if [ ! -d "$ICON_DIR" ]; then
+            echo "❌ ERROR: $ICON_DIR not found"
+            exit 1
+          fi
+          echo "✓ Found $ICON_DIR"
+          
+          if [ ! -f "$ICON_DIR/Contents.json" ]; then
+            echo "❌ ERROR: Contents.json missing"
+            exit 1
+          fi
+          echo "✓ Found Contents.json"
+          
+          REQUIRED_ICONS=(
+            "AppIcon.jpg"
+            "AppIcon-Dark.jpg"
+            "AppIcon-Tinted.jpg"
+          )
+          
+          MISSING=0
+          for icon in "${REQUIRED_ICONS[@]}"; do
+            if [ -f "$ICON_DIR/$icon" ]; then
+              echo "✓ Found $icon"
+            else
+              echo "❌ Missing $icon"
+              MISSING=1
+            fi
+          done
+          
+          if [ $MISSING -eq 1 ]; then
+            echo ""
+            echo "❌ iOS 18 Universal App Icon validation failed"
+            echo "Required: AppIcon.jpg, AppIcon-Dark.jpg, AppIcon-Tinted.jpg"
+            exit 1
+          fi
+          
+          echo "✅ iOS 18 Universal App Icons validated"
+
+      # ============================================
+      # 4. Model Files Check
+      # ============================================
+      - name: Verify Model Files
+        run: |
+          echo "=== Checking Model Files ==="
+          
+          MODEL_NAME="XVRC27_254in_1out_addchain"
+          MODEL_PATHS=(
+            "model/${MODEL_NAME}.mlmodelc"
+            "Resources/${MODEL_NAME}.mlmodelc"
+            "${MODEL_NAME}.mlmodelc"
+          )
+          
+          FOUND=0
+          for path in "${MODEL_PATHS[@]}"; do
+            if [ -d "$path" ]; then
+              echo "✓ Found model at: $path"
+              FOUND=1
+              break
+            fi
+          done
+          
+          if [ $FOUND -eq 0 ]; then
+            echo "⚠️ Model not found - build may fail"
+          else
+            echo "✅ Model files verified"
+          fi
+
+  # ============================================
+  # Job 2: Build (only if validate passes)
+  # ============================================
+  build:
+    runs-on: macos-15
+    needs: validate
+    timeout-minutes: 45
+    name: "🔨 Build IPA"
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode 16.4
+        run: |
+          sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Create Entitlements
+        run: |
+          cat > Lum1na.entitlements << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>com.apple.developer.coreml</key>
+              <true/>
+              <key>com.apple.private.IOSurface</key>
+              <true/>
+              <key>get-task-allow</key>
+              <true/>
+          </dict>
+          </plist>
+          EOF
+
+      - name: Build Unsigned IPA
+        run: |
+          set -euo pipefail
+          
+          xcodebuild \
+            -project "${PROJECT_NAME}.xcodeproj" \
+            -scheme "${SCHEME_NAME}" \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="Lum1na.entitlements" \
+            SWIFT_OBJC_BRIDGING_HEADER="${PROJECT_NAME}-Bridging-Header.h" \
+            IPHONEOS_DEPLOYMENT_TARGET="${DEPLOYMENT_TARGET}" \
+            build
+
+      - name: Package IPA
+        run: |
+          APP=$(find "$RUNNER_TEMP/DerivedData/Build/Products" -name "${PROJECT_NAME}.app" -print -quit)
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -qr "${PROJECT_NAME}.ipa" Payload
+          ls -lh "${PROJECT_NAME}.ipa"
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Lum1na-IPA
+          path: Lum1na.ipa
+          if-no-files-found: error
+          retention-days: 7
