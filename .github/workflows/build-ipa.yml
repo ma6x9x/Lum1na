@@ -86,8 +86,9 @@ jobs:
           echo "=== Verifying Source Files ==="
           
           required_files=(
-            "Exploit/P044AksKaslrReach.m"
-            "Exploit/CVE_2026_65343_AKS.m"
+            "Exploit/P044ExploitController.m"
+            "Exploit/AKSExploitController.m"
+            "Exploit/P035AVEWrapProbe.m"
             "Exploit/P051APFSXattr.m"
             "Exploit/P054APFSReapList.m"
             "Exploit/LabRuntimeOffsets.m"
