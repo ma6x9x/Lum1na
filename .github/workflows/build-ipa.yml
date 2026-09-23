@@ -30,7 +30,7 @@ jobs:
           xcodebuild -version
 
       # ============================================
-      # Validate Bridging Header (catches iOS/macOS issues)
+      # Validate Bridging Header (FIXED)
       # ============================================
       - name: Validate Bridging Header
         run: |
@@ -45,7 +45,7 @@ jobs:
           fi
           echo "✓ Found $BRIDGING_HEADER"
           
-          # Check for macOS-only headers that will fail on iOS
+          # Check for macOS-only headers
           MACOS_ONLY_HEADERS=(
             "mach/mach_vm.h"
             "IOKit/IOBSD.h"
@@ -69,35 +69,26 @@ jobs:
             if grep -q "#import.*<$header>" "$BRIDGING_HEADER" 2>/dev/null || \
                grep -q "#include.*<$header>" "$BRIDGING_HEADER" 2>/dev/null; then
               echo "❌ ERROR: Found macOS-only header: $header"
-              echo "   This header is not available on iOS and will cause build failures."
-              echo ""
               FOUND_BAD_HEADERS=1
             fi
           done
           
           if [ $FOUND_BAD_HEADERS -eq 1 ]; then
             echo ""
-            echo "📝 To fix, use these iOS-compatible alternatives:"
-            echo ""
-            echo "  mach/mach_vm.h     → mach/vm_map.h"
-            echo "  IOKit/IOBSD.h      → (remove - not available)"
-            echo "  libkern/OSAtomic.h → os/atomic.h or <stdatomic.h>"
-            echo ""
-            echo "  Or wrap macOS-only code with:"
-            echo "    #if TARGET_OS_MAC && !TARGET_OS_IPHONE"
-            echo "      // macOS-only code here"
-            echo "    #endif"
+            echo "📝 To fix:"
+            echo "  mach/mach_vm.h → mach/vm_map.h"
+            echo "  IOKit/IOBSD.h  → (remove - not available on iOS)"
             echo ""
             exit 1
           fi
           
           echo "✓ No macOS-only headers found"
           
-          # Test compile bridging header with iOS SDK
+          # Test compile bridging header with iOS SDK (FIXED: added -x objective-c)
           echo "=== Testing Bridging Header Compilation ==="
           SDK_PATH=$(xcrun --sdk iphoneos --show-sdk-path)
           
-          if ! clang -fsyntax-only \
+          if ! clang -x objective-c -fsyntax-only \
             -target arm64-apple-ios${DEPLOYMENT_TARGET} \
             -isysroot "$SDK_PATH" \
             -I"$(pwd)/Exploit" \
@@ -108,19 +99,11 @@ jobs:
             
             echo ""
             echo "❌ BRIDGING HEADER VALIDATION FAILED"
-            echo "The bridging header contains incompatible headers for iOS."
-            echo ""
-            echo "Common issues:"
-            echo "• IOKit headers that don't exist on iOS"
-            echo "• mach/vm headers that are macOS-only"
-            echo "• Missing framework imports"
-            echo ""
             echo "See /tmp/bridging_header_errors.log above for details."
             exit 1
           fi
           
           echo "✓ Bridging header compiles successfully with iOS SDK"
-
       # ============================================
       # Validate iOS 18 Universal App Icons
       # ============================================
