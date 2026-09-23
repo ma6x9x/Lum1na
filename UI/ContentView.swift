@@ -1,15 +1,9 @@
 //
 //  ContentView.swift
-//  Lum1na - iOS 14.0 Compatible
+//  Lum1na - Fixed for compilation
 //
 
 import SwiftUI
-
-// MARK: - iOS 14 Compatible Colors
-extension Color {
-    static let luminaCyan = Color(red: 0.0, green: 0.8, blue: 1.0)  // Replaces .cyan
-    static let luminaMint = Color(red: 0.0, green: 1.0, blue: 0.6)  // Replaces .mint
-}
 
 struct ContentView: View {
     @StateObject private var viewModel = Lum1naViewModel()
@@ -17,20 +11,18 @@ struct ContentView: View {
     
     var body: some View {
         ZStack {
-            // Background
             Color.black.opacity(0.9).ignoresSafeArea()
             
             VStack(spacing: 0) {
-                // Header
                 HeaderView()
                     .padding(.top, 12)
                 
-                // Device Info - Fixed for iOS 14
+                // Fixed: Proper device info access
                 DeviceInfoSection(viewModel: viewModel)
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
                 
-                // Star Beacon
+                // Use the separate StarBeaconView file, not inline
                 StarBeaconSection(viewModel: viewModel)
                     .padding(.top, 10)
                 
@@ -39,17 +31,14 @@ struct ContentView: View {
                     .foregroundColor(.gray)
                     .padding(.top, 8)
                 
-                // Console
                 ConsoleCard(viewModel: viewModel)
                     .padding(.horizontal, 16)
                     .padding(.top, 10)
                 
-                // Stage Buttons (4 stages matching your selector)
                 StageButtonsRow(viewModel: viewModel)
                     .padding(.horizontal, 12)
                     .padding(.top, 8)
                 
-                // Action Buttons
                 ActionButtons(viewModel: viewModel, showingStageTester: $showingStageTester)
                     .padding(.horizontal, 16)
                     .padding(.top, 10)
@@ -77,7 +66,7 @@ struct HeaderView: View {
     }
 }
 
-// MARK: - Device Info Section (Fixed for iOS 14)
+// MARK: - Device Info Section (Fixed)
 struct DeviceInfoSection: View {
     @ObservedObject var viewModel: Lum1naViewModel
     
@@ -88,12 +77,20 @@ struct DeviceInfoSection: View {
                 .foregroundColor(.blue)
             
             VStack(alignment: .leading, spacing: 1) {
-                // Fixed: deviceInfo is not optional, check if empty
-                Text(deviceInfoText)
-                    .font(.system(size: 13, weight: .semibold))
-                Text("iOS \(viewModel.deviceInfo?.version ?? "?")")
-                    .font(.system(size: 11))
-                    .foregroundColor(.gray)
+                // Fixed: deviceInfo is optional, use proper optional binding
+                if let info = viewModel.deviceInfo {
+                    Text(info.machine.isEmpty ? "Unknown" : info.machine)
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("iOS \(info.version)")
+                        .font(.system(size: 11))
+                        .foregroundColor(.gray)
+                } else {
+                    Text("Detecting...")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("iOS ?")
+                        .font(.system(size: 11))
+                        .foregroundColor(.gray)
+                }
             }
             
             Spacer()
@@ -110,17 +107,10 @@ struct DeviceInfoSection: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .background(
-            // iOS 14 compatible - no .ultraThinMaterial
             RoundedRectangle(cornerRadius: 8)
                 .fill(Color.white.opacity(0.1))
         )
         .frame(maxWidth: 260, alignment: .center)
-    }
-    
-    // Fixed: Handle non-optional deviceInfo
-    private var deviceInfoText: String {
-        let machine = viewModel.deviceInfo?.machine ?? ""
-        return machine.isEmpty ? "Detecting..." : machine
     }
     
     private var statusColor: Color {
@@ -134,7 +124,7 @@ struct DeviceInfoSection: View {
     }
 }
 
-// MARK: - Star Beacon Section
+// MARK: - Star Beacon Section (uses external StarBeaconView)
 struct StarBeaconSection: View {
     @ObservedObject var viewModel: Lum1naViewModel
     
@@ -151,11 +141,11 @@ struct StarBeaconSection: View {
                 )
                 .frame(width: 130, height: 130)
             
-            // iOS 14 compatible fill
             Circle()
                 .fill(Color.white.opacity(0.05))
                 .frame(width: 120, height: 120)
             
+            // Use the existing StarBeaconView from separate file
             StarBeaconView(state: viewModel.exploitState)
                 .frame(width: 80, height: 80)
         }
@@ -163,81 +153,7 @@ struct StarBeaconSection: View {
     }
 }
 
-// MARK: - Star Beacon View
-struct StarBeaconView: View {
-    let state: ExploitState
-    
-    var body: some View {
-        GeometryReader { geometry in
-            let center = CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2)
-            let radius = min(geometry.size.width, geometry.size.height) / 2
-            
-            ZStack {
-                // Four-pointed star
-                StarShape()
-                    .fill(
-                        LinearGradient(
-                            colors: stateColors,
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: radius * 1.5, height: radius * 1.5)
-                
-                // Center glow
-                Circle()
-                    .fill(Color.white.opacity(0.8))
-                    .frame(width: radius * 0.3, height: radius * 0.3)
-                    .shadow(color: stateColors[0].opacity(0.8), radius: 10)
-            }
-            .position(center)
-        }
-    }
-    
-    // iOS 14 compatible colors (no .cyan, .mint)
-    private var stateColors: [Color] {
-        switch state {
-        case .idle: return [.gray, .gray]
-        case .preparing: return [.orange, .yellow]
-        case .executingKernel: return [.luminaCyan, .blue]  // Custom cyan
-        case .executingSandbox: return [.purple, .pink]
-        case .executingDaemon: return [.green, .luminaCyan]   // Custom cyan
-        case .executingPatchset: return [.green, .luminaMint] // Custom mint
-        case .success: return [.green, .green]
-        case .failed: return [.red, .red]
-        }
-    }
-}
-
-// MARK: - Star Shape
-struct StarShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let center = CGPoint(x: rect.midX, y: rect.midY)
-        let radius = min(rect.width, rect.height) / 2
-        
-        let points = [
-            CGPoint(x: center.x, y: center.y - radius),
-            CGPoint(x: center.x + radius * 0.3, y: center.y - radius * 0.3),
-            CGPoint(x: center.x + radius, y: center.y),
-            CGPoint(x: center.x + radius * 0.3, y: center.y + radius * 0.3),
-            CGPoint(x: center.x, y: center.y + radius),
-            CGPoint(x: center.x - radius * 0.3, y: center.y + radius * 0.3),
-            CGPoint(x: center.x - radius, y: center.y),
-            CGPoint(x: center.x - radius * 0.3, y: center.y - radius * 0.3),
-        ]
-        
-        path.move(to: points[0])
-        for i in 1..<points.count {
-            path.addLine(to: points[i])
-        }
-        path.closeSubpath()
-        
-        return path
-    }
-}
-
-// MARK: - Console Card (iOS 14 Compatible)
+// MARK: - Console Card
 struct ConsoleCard: View {
     @ObservedObject var viewModel: Lum1naViewModel
     
@@ -271,7 +187,7 @@ struct ConsoleCard: View {
             ScrollView(.vertical, showsIndicators: true) {
                 Text(viewModel.consoleText)
                     .font(.system(size: 11, design: .monospaced))
-                    .foregroundColor(.luminaCyan) // Custom cyan
+                    .foregroundColor(Color(red: 0, green: 0.8, blue: 1)) // Custom cyan
                     .lineSpacing(2)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(10)
@@ -280,7 +196,7 @@ struct ConsoleCard: View {
         }
         .background(
             RoundedRectangle(cornerRadius: 14)
-                .fill(Color.white.opacity(0.05)) // iOS 14 compatible
+                .fill(Color.white.opacity(0.05))
                 .overlay(
                     RoundedRectangle(cornerRadius: 14)
                         .stroke(Color.pink.opacity(0.3), lineWidth: 1)
@@ -289,7 +205,7 @@ struct ConsoleCard: View {
     }
 }
 
-// MARK: - Stage Buttons Row (4 stages)
+// MARK: - Stage Buttons
 struct StageButtonsRow: View {
     @ObservedObject var viewModel: Lum1naViewModel
     
@@ -309,7 +225,7 @@ struct StageButtonsRow: View {
                     Text(stage.0)
                         .font(.system(size: 9, weight: .medium))
                 }
-                .foregroundColor(stageColor(for: stage.2))
+                .foregroundColor(isActive(stage.2) ? Color(red: 0, green: 0.8, blue: 1) : .gray)
                 .frame(width: 70, height: 44)
                 .background(
                     RoundedRectangle(cornerRadius: 8)
@@ -325,10 +241,6 @@ struct StageButtonsRow: View {
     
     private func isActive(_ state: ExploitState) -> Bool {
         return viewModel.exploitState == state
-    }
-    
-    private func stageColor(for state: ExploitState) -> Color {
-        return isActive(state) ? .luminaCyan : .gray
     }
 }
 
@@ -351,7 +263,7 @@ struct ActionButtons: View {
                     )
             }
             
-            Button(action: { 
+            Button(action: {
                 Task { await viewModel.executeStage("Full Chain") }
             }) {
                 Text("Jailbreak")
@@ -455,7 +367,6 @@ struct StageTesterView: View {
     }
 }
 
-// MARK: - Preview
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
         ContentView()
