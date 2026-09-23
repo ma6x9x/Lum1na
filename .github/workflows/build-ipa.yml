@@ -44,7 +44,7 @@ jobs:
           )
           
           swift_files=(
-            "Exploit/LabOffsetsBridge.swift"     # NEW
+            "UI/LabOffsets.swift"     # NEW
           )
           
           for file in "${objc_files[@]}" "${header_files[@]}" "${swift_files[@]}"; do
