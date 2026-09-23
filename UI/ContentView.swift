@@ -124,7 +124,8 @@ struct DeviceInfoSection: View {
     }
 }
 
-// MARK: - Star Beacon Section (uses external StarBeaconView)
+
+// MARK: - Star Beacon Section (matches existing StarBeaconView)
 struct StarBeaconSection: View {
     @ObservedObject var viewModel: Lum1naViewModel
     
@@ -145,11 +146,27 @@ struct StarBeaconSection: View {
                 .fill(Color.white.opacity(0.05))
                 .frame(width: 120, height: 120)
             
-            // Use the existing StarBeaconView from separate file
-            StarBeaconView(state: viewModel.exploitState)
+            // Use existing StarBeaconView with correct parameter
+            StarBeaconView(stage: viewModel.exploitState.toJailbreakStage())
                 .frame(width: 80, height: 80)
         }
         .frame(height: 140)
+    }
+}
+
+// Add extension to convert ExploitState to JailbreakStage
+extension ExploitState {
+    func toJailbreakStage() -> JailbreakStage {
+        switch self {
+        case .idle: return .idle
+        case .preparing: return .preparing
+        case .executingKernel: return .kernel
+        case .executingSandbox: return .sandbox
+        case .executingDaemon: return .daemon
+        case .executingPatchset: return .patchset
+        case .success: return .success
+        case .failed: return .failed
+        }
     }
 }
 
