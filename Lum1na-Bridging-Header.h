@@ -22,13 +22,11 @@
 #import "Exploit/Bridges/FusionChainDelegate.h"
 #import "Exploit/Bridges/cs_run.h"
 
-// MARK: - CVE Controllers
-#import "Exploit/P009Controller.h"
-#import "Exploit/P052Controller.h"
-#import "Exploit/P039Controller.h"
-#import "Exploit/P005JIT.h"
 
-// MARK: - Primitives
-#import "Exploit/CVE_2026_65343_AKS.h"
+// MARK: - Exploit Controllers
+#import "Exploit/P044ExploitController.h"
+#import "Exploit/P051ExploitController.h"
+#import "Exploit/P054ExploitController.h"
+#import "Exploit/AKSExploitController.h"
 
 #endif /* Lum1na_Bridging_Header_h */
