@@ -2,113 +2,96 @@
 //  ContentView.swift
 //  Lum1na
 //
-import Foundation
+
 import SwiftUI
-import UIKit
+
 struct ContentView: View {
     @StateObject private var viewModel = Lum1naViewModel()
-    @State private var showMoreProbes = false
+    @State private var showingStageTester = false
     
     var body: some View {
-        NavigationStack {
+        ZStack {
+            Color(hex: "07060F").ignoresSafeArea()
+            
             VStack(spacing: 0) {
-                // Console Output
-                consoleView
+                // MARK: - Header
+                HeaderView()
+                    .padding(.top, 12)
                 
-                Divider()
+                // MARK: - Device Info
+                DeviceInfoCompact(viewModel: viewModel)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
                 
-                // Control Panel
-                controlPanel
-            }
-            .navigationTitle("Lum1na")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Button(action: { viewModel.clearConsole() }) {
-                            Label("Clear Log", systemImage: "trash")
-                        }
-                        Button(action: { viewModel.showRecoveredLog() }) {
-                            Label("Recovered Log", systemImage: "doc.text.magnifyingglass")
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis.circle")
-                    }
-                }
-            }
-            .sheet(isPresented: $viewModel.showRecoveredLogSheet) {
-                RecoveredLogView(content: viewModel.recoveredLogContent)
-            }
-            .sheet(isPresented: $showMoreProbes) {
-                ProbesListView(viewModel: viewModel)
-            }
-        }
-    }
-    
-    // MARK: - Console View
-    
-    private var consoleView: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 2) {
-                    ForEach(viewModel.consoleBuffer.indices, id: \.self) { index in
-                        let line = viewModel.consoleBuffer[index]
-                        ConsoleLineView(line: line)
-                            .id(index)
-                    }
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(.secondarySystemBackground))
-            .onChange(of: viewModel.consoleBuffer.count) { _ in
-                if let last = viewModel.consoleBuffer.indices.last {
-                    withAnimation {
-                        proxy.scrollTo(last, anchor: .bottom)
-                    }
-                }
+                // MARK: - Star Beacon
+                StarBeaconSection(viewModel: viewModel)
+                    .padding(.top, 10)
+                
+                Text("The guiding light for Jailbreaks")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .padding(.top, 8)
+                
+                // MARK: - Console
+                ConsoleCard(viewModel: viewModel)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+                
+                // MARK: - Stage Buttons (6 stages)
+                StageButtonsRow(viewModel: viewModel)
+                    .padding(.horizontal, 12)
+                    .padding(.top, 8)
+                
+                // MARK: - Action Buttons
+                ActionButtons(viewModel: viewModel, showingStageTester: $showingStageTester)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 10)
+                    .padding(.bottom, 16)
             }
         }
-    }
-    
-    // MARK: - Control Panel
-    
-    private var controlPanel: some View {
-        VStack(spacing: 12) {
-            // Device Info
-            deviceInfoRow
-            
-            Divider()
-            
-            // Hot Buttons
-            hotButtonsRow
-            
-            Divider()
-            
-            // Status & Actions
-            statusAndActionsRow
-            
-            // Running Indicator
-            if viewModel.isRunning {
-                runningIndicator
-            }
+        .sheet(isPresented: $showingStageTester) {
+            StageTesterView(viewModel: viewModel)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color(.systemBackground))
     }
+}
+
+// MARK: - Header View
+struct HeaderView: View {
+    var body: some View {
+        VStack(spacing: 2) {
+            Text("Lum1na")
+                .font(.system(size: 32, weight: .bold, design: .rounded))
+                .foregroundStyle(
+                    LinearGradient(
+                        colors: [Color(hex: "FF6B9D"), Color(hex: "4ECDC4")],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                )
+            
+            Text("v0.1 • ANE 254-Input")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(.gray)
+        }
+    }
+}
+
+// MARK: - Device Info
+struct DeviceInfoCompact: View {
+    @ObservedObject var viewModel: Lum1naViewModel
     
-    // MARK: - Device Info
-    
-    private var deviceInfoRow: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(viewModel.deviceInfo?.machine ?? "Unknown")
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "iphone")
+                .font(.system(size: 14))
+                .foregroundStyle(Color(hex: "4ECDC4"))
+            
+            VStack(alignment: .leading, spacing: 1) {
+                Text(viewModel.deviceInfo?.machine ?? "Detecting...")
                     .font(.system(size: 13, weight: .semibold))
                 Text("iOS \(viewModel.deviceInfo?.version ?? "?")")
                     .font(.system(size: 11))
-                    .foregroundColor(.secondary)
+                    .foregroundStyle(.secondary)
             }
             
             Spacer()
@@ -119,300 +102,357 @@ struct ContentView: View {
                     .frame(width: 6, height: 6)
                 Text(viewModel.statusText)
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(viewModel.statusColor)
+                    .foregroundStyle(viewModel.statusColor)
             }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            Capsule()
+                .fill(.ultraThinMaterial)
+                .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 1))
+        )
+        .frame(maxWidth: 260, alignment: .center)
+    }
+}
+
+// MARK: - Star Beacon Section
+struct StarBeaconSection: View {
+    @ObservedObject var viewModel: Lum1naViewModel
+    
+    var body: some View {
+        ZStack {
+            Circle()
+                .stroke(
+                    LinearGradient(
+                        colors: [Color(hex: "FF6B9D"), Color(hex: "4ECDC4")],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 2
+                )
+                .frame(width: 130, height: 130)
+            
+            Circle()
+                .fill(.ultraThinMaterial)
+                .frame(width: 120, height: 120)
+            
+            StarBeaconView(stage: currentStage)
+                .frame(width: 80, height: 80)
+        }
+        .frame(height: 140)
+    }
+    
+    private var currentStage: StarBeaconStage {
+        switch viewModel.exploitState {
+        case .idle: return .idle
+        case .detecting, .preparing: return .detecting
+        case .executingKASLR: return .kaslr
+        case .executingHeap: return .heap
+        case .executingANE: return .ane
+        case .executingKRW: return .krw
+        case .executingPPL: return .ppl
+        case .executingPersistence: return .persistence
+        case .success: return .success
+        case .failed: return .failed
+        }
+    }
+}
+
+// MARK: - Star Beacon Stage Enum
+enum StarBeaconStage {
+    case idle, detecting, kaslr, heap, ane, krw, ppl, persistence, success, failed
+}
+
+// MARK: - Star Beacon View
+struct StarBeaconView: View {
+    let stage: StarBeaconStage
+    
+    var body: some View {
+        GeometryReader { geometry in
+            let center = CGPoint(x: geometry.size.width / 2, y: geometry.size.height / 2)
+            let radius = min(geometry.size.width, geometry.size.height) / 2
+            
+            ZStack {
+                // Four-pointed star
+                StarShape()
+                    .fill(
+                        LinearGradient(
+                            colors: stageColors,
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+                    .frame(width: radius * 1.5, height: radius * 1.5)
+                
+                // Center glow
+                Circle()
+                    .fill(Color.white.opacity(0.8))
+                    .frame(width: radius * 0.3, height: radius * 0.3)
+                    .shadow(color: stageColors[0].opacity(0.8), radius: 10)
+            }
+            .position(center)
         }
     }
     
-    // MARK: - Hot Buttons
+    private var stageColors: [Color] {
+        switch stage {
+        case .idle: return [.gray, .gray]
+        case .detecting: return [.orange, .yellow]
+        case .kaslr: return [.cyan, .blue]
+        case .heap: return [.purple, .pink]
+        case .ane: return [.green, .cyan]
+        case .krw: return [.orange, .red]
+        case .ppl: return [.red, .orange]
+        case .persistence: return [.green, .mint]
+        case .success: return [.green, .green]
+        case .failed: return [.red, .red]
+        }
+    }
+}
+
+// MARK: - Star Shape
+struct StarShape: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let radius = min(rect.width, rect.height) / 2
+        
+        // Four-pointed star
+        let points = [
+            CGPoint(x: center.x, y: center.y - radius),      // Top
+            CGPoint(x: center.x + radius * 0.3, y: center.y - radius * 0.3),
+            CGPoint(x: center.x + radius, y: center.y),      // Right
+            CGPoint(x: center.x + radius * 0.3, y: center.y + radius * 0.3),
+            CGPoint(x: center.x, y: center.y + radius),      // Bottom
+            CGPoint(x: center.x - radius * 0.3, y: center.y + radius * 0.3),
+            CGPoint(x: center.x - radius, y: center.y),      // Left
+            CGPoint(x: center.x - radius * 0.3, y: center.y - radius * 0.3),
+        ]
+        
+        path.move(to: points[0])
+        for i in 1..<points.count {
+            path.addLine(to: points[i])
+        }
+        path.closeSubpath()
+        
+        return path
+    }
+}
+
+// MARK: - Console Card
+struct ConsoleCard: View {
+    @ObservedObject var viewModel: Lum1naViewModel
     
-    private var hotButtonsRow: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 8) {
-                HotButton(
-                    title: "AKS KASLR",
-                    icon: "location.circle",
-                    color: .blue,
-                    action: { viewModel.testAKS() },
-                    disabled: viewModel.isRunning
-                )
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Label("console", systemImage: "terminal")
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .foregroundStyle(.secondary)
                 
-                HotButton(
-                    title: "PAC Bypass",
-                    icon: "key.fill",
-                    color: .purple,
-                    action: { viewModel.testPACBypass() },
-                    disabled: viewModel.isRunning
+                Spacer()
+                
+                Button(action: { UIPasteboard.general.string = viewModel.consoleText }) {
+                    Image(systemName: "doc.on.doc")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                }
+                
+                Button(action: { viewModel.clearConsole() }) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .padding(.leading, 8)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            
+            Divider().background(Color.white.opacity(0.1))
+            
+            ScrollView(.vertical, showsIndicators: true) {
+                Text(viewModel.consoleText)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundStyle(.cyan)
+                    .lineSpacing(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+            }
+            .frame(height: 140)
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 14)
+                .fill(.ultraThinMaterial)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(Color(hex: "FF6B9D").opacity(0.3), lineWidth: 1)
+                )
+        )
+    }
+}
+
+// MARK: - Stage Buttons Row (6 stages)
+struct StageButtonsRow: View {
+    @ObservedObject var viewModel: Lum1naViewModel
+    
+    let stages = [
+        ("KASLR", "memorychip"),
+        ("Heap", "cpu"),
+        ("ANE", "brain"),
+        ("KRW", "arrow.left.arrow.right"),
+        ("PPL", "lock.shield"),
+        ("Persist", "arrow.clockwise")
+    ]
+    
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(stages, id: \.0) { stage in
+                VStack(spacing: 4) {
+                    Image(systemName: stage.1)
+                        .font(.system(size: 12))
+                    Text(stage.0)
+                        .font(.system(size: 9, weight: .medium))
+                }
+                .foregroundStyle(viewModel.stageColor(for: stage.0))
+                .frame(width: 48, height: 40)
+                .background(
+                    Capsule()
+                        .fill(.ultraThinMaterial)
+                        .overlay(Capsule().stroke(Color.white.opacity(0.1), lineWidth: 1))
                 )
             }
-            
-            HStack(spacing: 8) {
-                HotButton(
-                    title: "OOB Write",
-                    icon: "pencil.circle",
-                    color: .orange,
-                    action: { viewModel.testOOBWrite() },
-                    disabled: viewModel.isRunning
-                )
-                
-                HotButton(
-                    title: "APFS",
-                    icon: "archivebox",
-                    color: .green,
-                    action: { viewModel.testAPFS() },
-                    disabled: viewModel.isRunning,
-                    isRisky: true
-                )
+        }
+    }
+}
+
+// MARK: - Action Buttons
+struct ActionButtons: View {
+    @ObservedObject var viewModel: Lum1naViewModel
+    @Binding var showingStageTester: Bool
+    
+    var body: some View {
+        HStack(spacing: 12) {
+            Button(action: { showingStageTester = true }) {
+                Label("Test Stages", systemImage: "slider.horizontal.3")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                    .background(Capsule().fill(.ultraThinMaterial))
             }
             
-            Button(action: { viewModel.startFullChain() }) {
-                Text("Full Chain")
+            Button(action: { viewModel.startJailbreak() }) {
+                Text("Jailbreak")
                     .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(.white)
+                    .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .frame(height: 44)
                     .background(
-                        LinearGradient(
-                            colors: [.pink, .purple],
-                            startPoint: .leading,
-                            endPoint: .trailing
+                        Capsule().fill(
+                            LinearGradient(
+                                colors: [Color(hex: "FF6B9D"), Color(hex: "9B59B6")],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
                         )
                     )
-                    .cornerRadius(10)
             }
             .disabled(viewModel.isRunning)
         }
     }
-    
-    // MARK: - Status & Actions
-    
-    private var statusAndActionsRow: some View {
-        HStack(spacing: 12) {
-            Button {
-                viewModel.clearConsole()
-            } label: {
-                Image(systemName: "trash")
-            }
-            .buttonStyle(.bordered)
-            .disabled(viewModel.isRunning)
-            
-            Button {
-                viewModel.showRecoveredLog()
-            } label: {
-                Image(systemName: "doc.text.magnifyingglass")
-            }
-            .buttonStyle(.bordered)
-            .disabled(viewModel.isRunning)
-            
-            Spacer()
-            
-            Button {
-                showMoreProbes = true
-            } label: {
-                Label("More", systemImage: "list.bullet")
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.indigo)
-            .disabled(viewModel.isRunning)
-        }
-    }
-    
-    // MARK: - Running Indicator
-    
-    private var runningIndicator: some View {
-        HStack(spacing: 12) {
-            ProgressView()
-                .controlSize(.small)
-            
-            Text(viewModel.exploitState.description)
-                .font(.caption)
-                .fontWeight(.medium)
-            
-            Spacer()
-            
-            Button {
-                viewModel.reset()
-            } label: {
-                Label("Cancel", systemImage: "xmark")
-                    .font(.caption)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.orange)
-            .controlSize(.small)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .background(Color.orange.opacity(0.1))
-        .cornerRadius(8)
-    }
 }
 
-// MARK: - Console Line View
-
-struct ConsoleLineView: View {
-    let line: String
-    
-    var body: some View {
-        HStack(alignment: .top, spacing: 4) {
-            // Parse level from line
-            let level = parseLevel(from: line)
-            let message = parseMessage(from: line)
-            
-            Image(systemName: iconForLevel(level))
-                .font(.caption2)
-                .foregroundColor(colorForLevel(level))
-                .frame(width: 16)
-            
-            Text(message)
-                .font(.system(.caption, design: .monospaced))
-                .foregroundColor(colorForLevel(level))
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
-    
-    private func parseLevel(from line: String) -> String {
-        if line.contains("[ERROR]") { return "ERROR" }
-        if line.contains("[SUCCESS]") { return "SUCCESS" }
-        if line.contains("[RECOVERY]") { return "RECOVERY" }
-        if line.contains("[WARN]") { return "WARN" }
-        return "INFO"
-    }
-    
-    private func parseMessage(from line: String) -> String {
-        // Extract message after timestamp and level
-        let components = line.components(separatedBy: "] ")
-        return components.last ?? line
-    }
-    
-    private func iconForLevel(_ level: String) -> String {
-        switch level {
-        case "ERROR": return "xmark.circle.fill"
-        case "SUCCESS": return "checkmark.circle.fill"
-        case "RECOVERY": return "bandage.fill"
-        case "WARN": return "exclamationmark.triangle.fill"
-        default: return "info.circle"
-        }
-    }
-    
-    private func colorForLevel(_ level: String) -> Color {
-        switch level {
-        case "ERROR": return .red
-        case "SUCCESS": return .green
-        case "RECOVERY": return .orange
-        case "WARN": return .yellow
-        default: return .primary
-        }
-    }
-}
-
-// MARK: - Hot Button
-
-struct HotButton: View {
-    let title: String
-    let icon: String
-    let color: Color
-    let action: () -> Void
-    let disabled: Bool
-    var isRisky: Bool = false
-    
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 4) {
-                Image(systemName: icon)
-                Text(title)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                if isRisky {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.caption2)
-                        .foregroundColor(.yellow)
-                }
-            }
-        }
-        .buttonStyle(.borderedProminent)
-        .tint(color)
-        .controlSize(.regular)
-        .frame(maxWidth: .infinity)
-        .disabled(disabled)
-    }
-}
-
-// MARK: - Recovered Log View
-
-struct RecoveredLogView: View {
-    let content: String
-    @Environment(\.dismiss) private var dismiss
-    
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                Text(content)
-                    .font(.system(.caption, design: .monospaced))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding()
-            }
-            .navigationTitle("Recovered Log")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }
-                }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        UIPasteboard.general.string = content
-                    } label: {
-                        Image(systemName: "doc.on.doc")
-                    }
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Probes List View
-
-struct ProbesListView: View {
+// MARK: - Stage Tester View
+struct StageTesterView: View {
     @ObservedObject var viewModel: Lum1naViewModel
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dismiss) var dismiss
+    
+    let stages = [
+        ("KASLR Bypass", "memorychip", "Test KASLR leak via ANE"),
+        ("Heap Corruption", "cpu", "Test UPL leak primitive"),
+        ("ANE Exploit", "brain", "Test ANE 254-input OOB"),
+        ("KRW Verify", "arrow.left.arrow.right", "Test kernel R/W"),
+        ("PPL Bypass", "lock.shield", "Test PPL defeat"),
+        ("Persistence", "arrow.clockwise", "Test tempRoot install")
+    ]
     
     var body: some View {
-        NavigationStack {
+        NavigationView {
             List {
-                Section("KASLR") {
-                    Button("AKS (CVE-2026-65343)") { 
-                        dismiss()
-                        viewModel.testAKS() 
+                Section(header: Text("Individual Stage Testing")) {
+                    ForEach(stages, id: \.0) { stage in
+                        Button(action: {
+                            viewModel.testIndividualStage(stage.0)
+                            dismiss()
+                        }) {
+                            HStack(spacing: 12) {
+                                Image(systemName: stage.1)
+                                    .font(.system(size: 20))
+                                    .foregroundStyle(Color(hex: "FF6B9D"))
+                                    .frame(width: 40, height: 40)
+                                    .background(Color(hex: "FF6B9D").opacity(0.1))
+                                    .cornerRadius(10)
+                                
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(stage.0)
+                                        .font(.system(size: 16, weight: .semibold))
+                                    Text(stage.2)
+                                        .font(.system(size: 12))
+                                        .foregroundStyle(.secondary)
+                                }
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
                     }
                 }
                 
-                Section("PAC") {
-                    Button("PAC Bypass (CVE-2026-65330)") { 
-                        dismiss()
-                        viewModel.testPACBypass() 
-                    }
+                Section {
+                    Button("Reset State") { viewModel.reset() }
+                        .foregroundStyle(.red)
                 }
                 
-                Section("OOB") {
-                    Button("OOB Write (CVE-2026-65349)") { 
-                        dismiss()
-                        viewModel.testOOBWrite() 
-                    }
-                }
-                
-                Section("Persistence") {
-                    Button("APFS (CVE-2026-84523)") { 
-                        dismiss()
-                        viewModel.testAPFS() 
-                    }
+                Section(header: Text("Device Info")) {
+                    LabeledContent("Machine", value: viewModel.deviceInfo?.machine ?? "Unknown")
+                    LabeledContent("iOS Version", value: viewModel.deviceInfo?.version ?? "?")
+                    LabeledContent("Build", value: viewModel.deviceInfo?.build ?? "?")
+                    LabeledContent("Kernel Slide", value: viewModel.currentKernelSlide != 0 ? 
+                        "0x\(String(viewModel.currentKernelSlide, radix: 16))" : "Not set")
                 }
             }
-            .navigationTitle("All Probes")
+            .navigationTitle("Stage Tester")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
+                ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }
                 }
             }
         }
+    }
+}
+
+// MARK: - Color Extension
+extension Color {
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 3: // RGB (12-bit)
+            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6: // RGB (24-bit)
+            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8: // ARGB (32-bit)
+            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (a, r, g, b) = (1, 1, 1, 0)
+        }
+        self.init(.sRGB, red: Double(r) / 255, green: Double(g) / 255, blue: Double(b) / 255, opacity: Double(a) / 255)
     }
 }
