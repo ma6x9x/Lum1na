@@ -102,10 +102,10 @@ final class RecoveryLogger {
 enum ExploitState: Equatable {
     case idle
     case preparing
-    case executingKernel      // KASLR + P044
-    case executingSandbox     // CVE-2026-65343
-    case executingDaemon      // Service injection
-    case executingPatchset    // Final rooting
+    case executingKernel      // Was .executingKASLR
+    case executingSandbox     // Was .executingHeap, etc.
+    case executingDaemon
+    case executingPatchset
     case success
     case failed(String, RecoverySuggestion)
     
@@ -113,12 +113,12 @@ enum ExploitState: Equatable {
         switch self {
         case .idle: return "Ready"
         case .preparing: return "Preparing..."
-        case .executingKernel: return "KERNEL: KASLR + P044..."
-        case .executingSandbox: return "SANDBOX: CVE-2026-65343..."
-        case .executingDaemon: return "DAEMON: Injection..."
-        case .executingPatchset: return "PATCHSET: Rooting..."
+        case .executingKernel: return "KERNEL..."
+        case .executingSandbox: return "SANDBOX..."
+        case .executingDaemon: return "DAEMON..."
+        case .executingPatchset: return "PATCHSET..."
         case .success: return "✅ Rooted"
-        case .failed(let reason, _): return "❌ Failed: \(reason)"
+        case .failed(let reason, _): return "❌ \(reason)"
         }
     }
 }
