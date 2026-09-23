@@ -125,50 +125,10 @@ struct DeviceInfoSection: View {
 }
 
 
-// MARK: - Star Beacon Section (matches existing StarBeaconView)
-struct StarBeaconSection: View {
-    @ObservedObject var viewModel: Lum1naViewModel
-    
-    var body: some View {
-        ZStack {
-            Circle()
-                .stroke(
-                    LinearGradient(
-                        colors: [.pink, .blue],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    ),
-                    lineWidth: 2
-                )
-                .frame(width: 130, height: 130)
-            
-            Circle()
-                .fill(Color.white.opacity(0.05))
-                .frame(width: 120, height: 120)
-            
-            // Use existing StarBeaconView with correct parameter
-            StarBeaconView(stage: viewModel.exploitState.toJailbreakStage())
-                .frame(width: 80, height: 80)
-        }
-        .frame(height: 140)
-    }
-}
-
-// Add extension to convert ExploitState to JailbreakStage
-extension ExploitState {
-    func toJailbreakStage() -> JailbreakStage {
-        switch self {
-        case .idle: return .idle
-        case .preparing: return .preparing
-        case .executingKernel: return .kernel
-        case .executingSandbox: return .sandbox
-        case .executingDaemon: return .daemon
-        case .executingPatchset: return .patchset
-        case .success: return .success
-        case .failed: return .failed
-        }
-    }
-}
+// Replace StarBeaconView with simple text
+Text("★")
+    .font(.system(size: 60))
+    .foregroundColor(.blue)
 
 // MARK: - Console Card
 struct ConsoleCard: View {
