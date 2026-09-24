@@ -89,6 +89,7 @@ jobs:
             "UI/LabOffsets.swift"
             "App/ContentView.swift"
             "UI/Lum1naViewModel.swift"
+            "Exploit/Bridges/ExploitManager.swift"
           )
           
           MISSING=0
@@ -197,7 +198,7 @@ jobs:
           xcodebuild -version
 
       # ============================================
-      # REMOVE PROBLEMATIC FILES (in build job too!)
+      # REMOVE PROBLEMATIC FILES
       # ============================================
       - name: Remove Problematic AVE Files
         run: |
@@ -224,7 +225,8 @@ jobs:
           </dict>
           </plist>
           EOF
-# ============================================
+
+      # ============================================
       # AUTO FRAMEWORK INJECTION
       # ============================================
       - name: Detect and Inject Missing Frameworks
@@ -270,24 +272,12 @@ jobs:
             echo "✅ All frameworks present"
           fi
 
+      # ============================================
+      # SINGLE BUILD STEP (Consolidated)
+      # ============================================
       - name: Build Unsigned IPA
         env:
           OTHER_LDFLAGS: ${{ steps.framework-injection.outputs.other_ldflags }}
-        run: |
-          xcodebuild \
-            -project "${PROJECT_NAME}.xcodeproj" \
-            -scheme "${SCHEME_NAME}" \
-            -configuration Release \
-            -sdk iphoneos \
-            -destination 'generic/platform=iOS' \
-            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
-            OTHER_LDFLAGS="$OTHER_LDFLAGS" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            IPHONEOS_DEPLOYMENT_TARGET="${DEPLOYMENT_TARGET}" \
-            build
-      - name: Build Unsigned IPA
         run: |
           set -euo pipefail
           
@@ -300,6 +290,7 @@ jobs:
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            OTHER_LDFLAGS="$OTHER_LDFLAGS" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
