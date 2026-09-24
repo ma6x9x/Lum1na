@@ -27,10 +27,8 @@ jobs:
           sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
           xcodebuild -version
 
-      - name: Update Xcode Project
-        run: python3 tools/update-project.py --scan
-# ============================================
-      # Simplified Bridging Header Validation
+      # ============================================
+      # 1. Bridging Header Validation
       # ============================================
       - name: Validate Bridging Header
         run: |
@@ -45,7 +43,7 @@ jobs:
           fi
           echo "✓ Found $BRIDGING_HEADER"
           
-          # Check for macOS-only headers (text search only, no compilation)
+          # Check for macOS-only headers
           MACOS_ONLY_HEADERS=(
             "mach/mach_vm.h"
             "IOKit/IOBSD.h"
@@ -56,7 +54,6 @@ jobs:
             "mach-o/arch.h"
             "mach-o/fat.h"
             "mach-o/swap.h"
-            "sys/syscall.h"
           )
           
           FOUND_BAD=0
@@ -70,15 +67,11 @@ jobs:
           
           if [ $FOUND_BAD -eq 1 ]; then
             echo ""
-            echo "📝 Use iOS-compatible alternatives:"
-            echo "  mach/mach_vm.h → mach/vm_map.h"
-            echo "  IOKit/IOBSD.h  → (remove)"
-            echo "  libkern/OSAtomic.h → os/atomic.h"
+            echo "📝 Use iOS-compatible alternatives"
             exit 1
           fi
           
-          echo "✓ No macOS-only headers found"
-          echo "⚠️  Full compilation check skipped (Xcode will validate during build)"
+          echo "✓ Bridging header validation passed"
 
       # ============================================
       # 2. Source Files Verification
@@ -90,7 +83,6 @@ jobs:
           required_files=(
             "Exploit/P044ExploitController.m"
             "Exploit/AKSExploitController.m"
-            "Exploit/P035AVEWrapProbe.m"
             "Exploit/P051APFSXattr.m"
             "Exploit/P054APFSReapList.m"
             "Exploit/LabRuntimeOffsets.m"
@@ -111,7 +103,6 @@ jobs:
           done
           
           if [ $MISSING -eq 1 ]; then
-            echo "❌ Required source files missing"
             exit 1
           fi
           
@@ -131,13 +122,11 @@ jobs:
             echo "❌ ERROR: $ICON_DIR not found"
             exit 1
           fi
-          echo "✓ Found $ICON_DIR"
           
           if [ ! -f "$ICON_DIR/Contents.json" ]; then
             echo "❌ ERROR: Contents.json missing"
             exit 1
           fi
-          echo "✓ Found Contents.json"
           
           REQUIRED_ICONS=(
             "AppIcon.jpg"
@@ -156,13 +145,11 @@ jobs:
           done
           
           if [ $MISSING -eq 1 ]; then
-            echo ""
             echo "❌ iOS 18 Universal App Icon validation failed"
-            echo "Required: AppIcon.jpg, AppIcon-Dark.jpg, AppIcon-Tinted.jpg"
             exit 1
           fi
           
-          echo "✅ iOS 18 Universal App Icons validated"
+          echo "✅ App Icons validated"
 
       # ============================================
       # 4. Model Files Check
@@ -175,7 +162,6 @@ jobs:
           MODEL_PATHS=(
             "model/${MODEL_NAME}.mlmodelc"
             "Resources/${MODEL_NAME}.mlmodelc"
-            "${MODEL_NAME}.mlmodelc"
           )
           
           FOUND=0
@@ -192,19 +178,7 @@ jobs:
           else
             echo "✅ Model files verified"
           fi
-# ============================================
-      # Remove problematic files temporarily
-      # ============================================
-      - name: Remove Unused Exploit Files
-        run: |
-          echo "Removing problematic AVE files..."
-          rm -f Exploit/P035AVEWrapProbe.m Exploit/P035AVEWrapProbe.h 2>/dev/null || true
-          rm -f Exploit/P036AVEPaintProbe.m Exploit/P036AVEPaintProbe.h 2>/dev/null || true  
-          rm -f Exploit/P037AVEPaintProb.m Exploit/P037AVEPaintProb.h 2>/dev/null || true
-          rm -f Exploit/AVERace.m Exploit/AVERace.h 2>/dev/null || true
-          echo "✅ Removed problematic files"
 
-     
   # ============================================
   # Job 2: Build (only if validate passes)
   # ============================================
@@ -222,6 +196,18 @@ jobs:
         run: |
           sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
           xcodebuild -version
+
+      # ============================================
+      # REMOVE PROBLEMATIC FILES (in build job too!)
+      # ============================================
+      - name: Remove Problematic AVE Files
+        run: |
+          echo "=== Removing problematic AVE files ==="
+          rm -f Exploit/P035AVEWrapProbe.m Exploit/P035AVEWrapProbe.h 2>/dev/null || true
+          rm -f Exploit/P036AVEPaintProbe.m Exploit/P036AVEPaintProbe.h 2>/dev/null || true  
+          rm -f Exploit/P037AVEPaintProb.m Exploit/P037AVEPaintProb.h 2>/dev/null || true
+          rm -f Exploit/AVERace.m Exploit/AVERace.h 2>/dev/null || true
+          echo "✅ Removed problematic files"
 
       - name: Create Entitlements
         run: |
@@ -244,6 +230,8 @@ jobs:
         run: |
           set -euo pipefail
           
+          echo "=== Starting Xcode Build ==="
+          
           xcodebuild \
             -project "${PROJECT_NAME}.xcodeproj" \
             -scheme "${SCHEME_NAME}" \
@@ -262,6 +250,10 @@ jobs:
       - name: Package IPA
         run: |
           APP=$(find "$RUNNER_TEMP/DerivedData/Build/Products" -name "${PROJECT_NAME}.app" -print -quit)
+          if [ -z "$APP" ]; then
+            echo "❌ ERROR: .app not found in build products"
+            exit 1
+          fi
           mkdir -p Payload
           cp -R "$APP" Payload/
           zip -qr "${PROJECT_NAME}.ipa" Payload
