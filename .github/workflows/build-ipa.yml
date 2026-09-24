@@ -27,6 +27,8 @@ jobs:
           sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
           xcodebuild -version
 
+      - name: Update Xcode Project
+        run: python3 tools/update-project.py --scan
 # ============================================
       # Simplified Bridging Header Validation
       # ============================================
