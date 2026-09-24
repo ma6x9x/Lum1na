@@ -1,15 +1,14 @@
 //
 //  ContentView.swift
-//  Lum1na - Complete Liquid Glass Integration
+//  Lum1na - Fixed Build
 //
 
 import SwiftUI
 
 struct ContentView: View {
     @StateObject private var viewModel = Lum1naViewModel()
-    @StateObject private var bubbleMotion = LiquidBubbleMotionState()
     @State private var showingAllExploits = false
-    @State private var selectedStage: ExploitChainStage?
+    @State private var selectedStage: ExploitStage?
     
     // Calculate current JailbreakStage from viewModel state
     private var currentStage: JailbreakStage {
@@ -25,51 +24,60 @@ struct ContentView: View {
         }
     }
     
-    // Calculate active badges based on exploit state
+    // Calculate active badges based on exploit state - FIXED: Removed fallthrough
     private var activeBadges: Set<BadgeType> {
         var badges: Set<BadgeType> = []
-        switch viewModel.exploitState {
-        case .executingKernel, .executingSandbox, .executingDaemon, .executingPatchset, .success:
+        let state = viewModel.exploitState
+        
+        if state == .executingKernel || state == .executingSandbox || 
+           state == .executingDaemon || state == .executingPatchset || state == .success {
             badges.insert(.kernel)
-            fallthrough
-        case .executingSandbox, .executingDaemon, .executingPatchset, .success:
-            badges.insert(.sandbox)
-            fallthrough
-        case .executingDaemon, .executingPatchset, .success:
-            badges.insert(.daemon)
-            fallthrough
-        case .executingPatchset, .success:
-            badges.insert(.patchset)
-        default: break
         }
+        if state == .executingSandbox || state == .executingDaemon || 
+           state == .executingPatchset || state == .success {
+            badges.insert(.sandbox)
+        }
+        if state == .executingDaemon || state == .executingPatchset || state == .success {
+            badges.insert(.daemon)
+        }
+        if state == .executingPatchset || state == .success {
+            badges.insert(.patchset)
+        }
+        
         return badges
     }
     
     var body: some View {
         ZStack {
-            // MARK: - Layer 1: Circuit Background (Base)
+            // Layer 1: Circuit Background
             CircuitBackgroundView(stage: currentStage)
                 .ignoresSafeArea()
             
-            // MARK: - Layer 2: Glyph Rain Overlay (30% opacity)
+            // Layer 2: Glyph Rain
             GlyphRainView(intensity: 0.3)
                 .opacity(0.3)
             
-            // MARK: - Main Content
+            // Main Content
             VStack(spacing: 0) {
-                // Header
                 headerSection
+                    .padding(.top, 20)
                 
-                // Central Star Beacon
                 StarBeaconView(stage: currentStage)
                     .frame(height: 120)
                     .padding(.vertical, 10)
                 
-                // Hexagon Badges for Stages
-                BadgeContainerView(activeBadges: activeBadges, stage: currentStage)
-                    .padding(.vertical, 8)
+                // Hexagon badges row
+                HStack(spacing: 16) {
+                    ForEach([BadgeType.kernel, .sandbox, .daemon, .patchset], id: \.self) { badge in
+                        HexagonBadgeView(
+                            type: badge,
+                            isActive: activeBadges.contains(badge),
+                            stage: currentStage
+                        )
+                    }
+                }
+                .padding(.vertical, 8)
                 
-                // Heap Address Display
                 CentralHeapView(
                     heapAddress: viewModel.currentKernelSlide != 0 
                         ? "0x\(String(viewModel.currentKernelSlide, radix: 16, uppercase: true))" 
@@ -78,38 +86,42 @@ struct ContentView: View {
                 )
                 .padding(.vertical, 8)
                 
-                // MARK: - Layer 3: Liquid Bubble Motion Particles
-                liquidBubblesSection
-                    .frame(height: 60)
+                // Liquid bubbles
+                HStack(spacing: 20) {
+                    ForEach(0..<3) { index in
+                        LiquidBubbleView(
+                            color: currentStage.color,
+                            delay: Double(index) * 0.3
+                        )
+                    }
+                }
+                .frame(height: 60)
                 
-                // Matrix Console
                 MatrixConsoleView()
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
                 
                 Spacer(minLength: 10)
                 
-                // Exploit Stage Selector (using ExploitStageSelector component)
+                // FIXED: Use $viewModel.isRunning for Binding
                 ExploitStageSelector(
                     selectedStage: $selectedStage,
-                    isRunning: viewModel.isRunning,
+                    isRunning: $viewModel.isRunning,
                     onStageSelected: { stage in
                         Task { await viewModel.executeStage(stage.rawValue) }
                     }
                 )
                 .padding(.horizontal, 16)
                 
-                // Execute Full Chain Button
                 fullChainButton
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
                 
-                // All Exploits Button
                 allExploitsButton
                     .padding(.bottom, 20)
             }
             
-            // MARK: - Layer 4: Rainbow Wave Ribbon (Bottom)
+            // Rainbow Wave at bottom
             VStack {
                 Spacer()
                 RainbowWaveRibbonView(power: viewModel.isRunning ? 1.0 : 0.3)
@@ -123,12 +135,12 @@ struct ContentView: View {
         }
     }
     
-    // MARK: - Header Section
+    // FIXED: Use proper font syntax for iOS 18
     private var headerSection: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text("Lum1na")
-                    .font(.system(.largeTitle, weight: .bold, design: .rounded))
+                    .font(.system(size: 42, weight: .bold, design: .rounded))
                     .foregroundStyle(
                         LinearGradient(
                             colors: [.lum1naViolet, .lum1naCyan],
@@ -151,7 +163,6 @@ struct ContentView: View {
             
             Spacer()
             
-            // Device Info Button
             Button(action: { showingAllExploits = true }) {
                 Image(systemName: "info.circle")
                     .font(.title3)
@@ -159,23 +170,8 @@ struct ContentView: View {
             }
         }
         .padding(.horizontal, 20)
-        .padding(.top, 20)
     }
     
-    // MARK: - Liquid Bubbles Section
-    private var liquidBubblesSection: some View {
-        HStack(spacing: 20) {
-            ForEach(0..<3) { index in
-                LiquidBubbleView(
-                    motion: bubbleMotion,
-                    color: currentStage.color,
-                    delay: Double(index) * 0.3
-                )
-            }
-        }
-    }
-    
-    // MARK: - Full Chain Button
     private var fullChainButton: some View {
         Button(action: {
             Task { await viewModel.executeStage("Full Chain") }
@@ -221,7 +217,6 @@ struct ContentView: View {
         .disabled(viewModel.isRunning)
     }
     
-    // MARK: - All Exploits Button
     private var allExploitsButton: some View {
         Button(action: { showingAllExploits = true }) {
             HStack(spacing: 6) {
@@ -244,7 +239,6 @@ struct ContentView: View {
         }
     }
     
-    // MARK: - Status Color Helper
     private var statusColor: Color {
         switch viewModel.exploitState {
         case .success: return .consoleSuccess
@@ -255,13 +249,13 @@ struct ContentView: View {
     }
 }
 
-// MARK: - Liquid Bubble View
+// Simplified Liquid Bubble without external state
 struct LiquidBubbleView: View {
-    @ObservedObject var motion: LiquidBubbleMotionState
     let color: Color
     let delay: Double
     
     @State private var isAnimating = false
+    @State private var dragOffset: CGSize = .zero
     
     var body: some View {
         Circle()
@@ -280,14 +274,16 @@ struct LiquidBubbleView: View {
             .frame(width: 40, height: 40)
             .scaleEffect(isAnimating ? 1.2 : 0.8)
             .opacity(isAnimating ? 0.6 : 0.3)
-            .offset(motion.offset)
+            .offset(dragOffset)
             .gesture(
                 DragGesture()
                     .onChanged { value in
-                        motion.updateDrag(translation: value.translation)
+                        dragOffset = value.translation
                     }
                     .onEnded { _ in
-                        motion.endDrag()
+                        withAnimation(.spring()) {
+                            dragOffset = .zero
+                        }
                     }
             )
             .onAppear {
@@ -302,7 +298,7 @@ struct LiquidBubbleView: View {
     }
 }
 
-// MARK: - All Exploits Sheet
+// All Exploits Sheet
 struct AllExploitsSheet: View {
     @ObservedObject var viewModel: Lum1naViewModel
     @Environment(\.dismiss) var dismiss
@@ -394,7 +390,7 @@ struct AllExploitsSheet: View {
     }
 }
 
-// MARK: - Preview
+// Preview
 struct ContentView_Previews: PreviewProvider {
     static var previews: some View {
         ContentView()
