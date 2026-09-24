@@ -225,7 +225,69 @@ jobs:
           </dict>
           </plist>
           EOF
+# ============================================
+      # AUTO FRAMEWORK INJECTION
+      # ============================================
+      - name: Detect and Inject Missing Frameworks
+        id: framework-injection
+        run: |
+          #!/bin/bash
+          set -e
+          
+          echo "🔍 Detecting missing frameworks..."
+          
+          PROJECT_FILE="${PROJECT_NAME}.xcodeproj/project.pbxproj"
+          
+          # Required frameworks for Lum1na (especially CVE-2026-43748 ANE)
+          declare -a REQUIRED=(
+            "IOSurface"   # ANE exploit - CRITICAL
+            "IOKit"       # Kernel comms - CRITICAL  
+            "CoreML"      # ANE models - CRITICAL
+            "Foundation"
+            "UIKit"
+            "CoreVideo"
+          )
+          
+          MISSING=()
+          for fw in "${REQUIRED[@]}"; do
+            if ! grep -q "${fw}.framework" "$PROJECT_FILE" 2>/dev/null; then
+              MISSING+=("$fw")
+              echo "  ⚠️  Missing: $fw.framework"
+            fi
+          done
+          
+          # Build OTHER_LDFLAGS for missing frameworks
+          OTHER_LDFLAGS=""
+          for fw in "${MISSING[@]}"; do
+            OTHER_LDFLAGS="$OTHER_LDFLAGS -framework $fw"
+          done
+          
+          # Export for next step
+          echo "other_ldflags=$OTHER_LDFLAGS" >> $GITHUB_OUTPUT
+          
+          if [ ${#MISSING[@]} -gt 0 ]; then
+            echo "⚡ Will inject: $OTHER_LDFLAGS"
+          else
+            echo "✅ All frameworks present"
+          fi
 
+      - name: Build Unsigned IPA
+        env:
+          OTHER_LDFLAGS: ${{ steps.framework-injection.outputs.other_ldflags }}
+        run: |
+          xcodebuild \
+            -project "${PROJECT_NAME}.xcodeproj" \
+            -scheme "${SCHEME_NAME}" \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            OTHER_LDFLAGS="$OTHER_LDFLAGS" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            IPHONEOS_DEPLOYMENT_TARGET="${DEPLOYMENT_TARGET}" \
+            build
       - name: Build Unsigned IPA
         run: |
           set -euo pipefail
