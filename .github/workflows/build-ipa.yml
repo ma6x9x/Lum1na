@@ -1,7 +1,4 @@
-Write it for me with both fixes 
-
 name: Lum1na Build
-
 on:
   workflow_dispatch:
   push:
