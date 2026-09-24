@@ -87,7 +87,7 @@ jobs:
             "Exploit/LabRuntimeOffsets.m"
             "Exploit/LabDeviceProfile.m"
             "UI/LabOffsets.swift"
-            "UI/ContentView.swift"
+            "App/ContentView.swift"
             "UI/Lum1naViewModel.swift"
           )
           
