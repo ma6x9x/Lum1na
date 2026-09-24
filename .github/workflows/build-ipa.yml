@@ -1,3 +1,5 @@
+Write it for me with both fixes 
+
 name: Lum1na Build
 
 on:
@@ -198,7 +200,7 @@ jobs:
           xcodebuild -version
 
       # ============================================
-      # REMOVE PROBLEMATIC FILES
+      # REMOVE PROBLEMATIC FILES (in build job too!)
       # ============================================
       - name: Remove Problematic AVE Files
         run: |
@@ -208,20 +210,6 @@ jobs:
           rm -f Exploit/P037AVEPaintProb.m Exploit/P037AVEPaintProb.h 2>/dev/null || true
           rm -f Exploit/AVERace.m Exploit/AVERace.h 2>/dev/null || true
           echo "✅ Removed problematic files"
-
-      # ============================================
-      # FIX ANE254InputController Duplicate Enum
-      # ============================================
-      - name: Fix ANE254InputController Enum Issue
-        run: |
-          echo "=== Fixing ANE254InputController duplicate enum ==="
-          if [ -f "Exploit/ANE254InputController.m" ]; then
-            # Remove duplicate enum definition from .m file (keep only in .h)
-            sed -i '/^typedef NS_ENUM(NSInteger, ANE254Error)/,/^};$/d' Exploit/ANE254InputController.m
-            # Replace deprecated mach_port_destroy with mach_port_deallocate
-            sed -i 's/mach_port_destroy/mach_port_deallocate/g' Exploit/ANE254InputController.m
-            echo "✅ Fixed ANE254InputController.m"
-          fi
 
       - name: Create Entitlements
         run: |
@@ -239,8 +227,7 @@ jobs:
           </dict>
           </plist>
           EOF
-
-      # ============================================
+# ============================================
       # AUTO FRAMEWORK INJECTION
       # ============================================
       - name: Detect and Inject Missing Frameworks
@@ -286,12 +273,24 @@ jobs:
             echo "✅ All frameworks present"
           fi
 
-      # ============================================
-      # SINGLE BUILD STEP (merged both builds)
-      # ============================================
       - name: Build Unsigned IPA
         env:
           OTHER_LDFLAGS: ${{ steps.framework-injection.outputs.other_ldflags }}
+        run: |
+          xcodebuild \
+            -project "${PROJECT_NAME}.xcodeproj" \
+            -scheme "${SCHEME_NAME}" \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            OTHER_LDFLAGS="$OTHER_LDFLAGS" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            IPHONEOS_DEPLOYMENT_TARGET="${DEPLOYMENT_TARGET}" \
+            build
+      - name: Build Unsigned IPA
         run: |
           set -euo pipefail
           
@@ -304,7 +303,6 @@ jobs:
             -sdk iphoneos \
             -destination 'generic/platform=iOS' \
             -derivedDataPath "$RUNNER_TEMP/DerivedData" \
-            OTHER_LDFLAGS="$OTHER_LDFLAGS" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
