@@ -54,7 +54,7 @@ Stale names (do **not** resurrect): FusionChain, KernelMap/LabOffsets.swift dupl
    Only import headers that exist. NSClassFromString does not need a bridge import, but `LabOff()` / `LabDeviceProfile` do.
 
 9. **Auto chain vs catalog**  
-   JAILBREAK must not invoke process-killing probes. P051 (gamed XPC) and P053 crashed the app; they stay in **All stages** only. Do not put them back on the SANDBOX pad without a proven non-crash tap.
+   JAILBREAK must not invoke process-killing probes. P051, P053, and unbounded P054 (4×500×30s unlink) jetsam'd the app. SANDBOX and DAEMON pads are HOLD. All-stages p054 is bounded (2s / 1 thread). Do not restore the storm loop.
 
 ## Probe wiring
 

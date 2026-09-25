@@ -53,10 +53,11 @@ public final class PersistentLogStore {
         "p052": "p052_nstream_extend_log.txt",
         "KERNEL": consoleLogName,
         "SANDBOX": consoleLogName,
-        "DAEMON": consoleLogName,
+        "DAEMON": "p054_reap_list_log.txt",
         "PATCHSET": consoleLogName,
         "FULL CHAIN": consoleLogName,
-        "Full Chain": consoleLogName
+        "Full Chain": consoleLogName,
+        "Full": consoleLogName
     ]
 
     private let docsURL: URL
