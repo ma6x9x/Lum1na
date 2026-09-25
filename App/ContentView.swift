@@ -335,6 +335,7 @@ struct SettingsSheet: View {
                     LabeledContent("iOS", value: DeviceUtils.marketingVersion)
                     LabeledContent("Build", value: DeviceUtils.osversion)
                     LabeledContent("Chip", value: DeviceUtils.currentChip)
+                    LabeledContent("Offset table", value: labOffsetTag())
                     LabeledContent("Supported",
                         value: DeviceUtils.isSupported ? "Yes" : "No")
                 }
