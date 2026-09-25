@@ -125,11 +125,11 @@ struct MatrixConsoleView: View {
         case .warning: return (.warning, line.message)
         case .info:
             let msg = line.message
-            if message.contains("KERNEL")   { return (.kernel, line.message) }
-            if message.contains("SANDBOX")  { return (.sandbox, line.message) }
-            if message.contains("DAEMON")   { return (.daemon, line.message) }
-            if message.contains("PATCHSET") { return (.patchset, line.message) }
-            if message.contains("===") || message.contains("Stage:") { return (.init_, line.message) }
+            if msg.contains("KERNEL")   { return (.kernel, msg) }
+            if msg.contains("SANDBOX")  { return (.sandbox, msg) }
+            if msg.contains("DAEMON")   { return (.daemon, msg) }
+            if msg.contains("PATCHSET") { return (.patchset, msg) }
+            if msg.contains("===") || msg.contains("Stage:") { return (.init_, msg) }
             return (.init_, line.message)
         }
     }
