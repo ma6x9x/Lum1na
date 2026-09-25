@@ -69,7 +69,6 @@
 				".gitignore",
 				"docs",
 				"Exploit/ClearSword.m",
-				"Exploit/Lum1naKRW.m",
 				"Exploit/UPLLeak.m",
 				"Lum1na.xcodeproj",
 				"Lum1naTests",
