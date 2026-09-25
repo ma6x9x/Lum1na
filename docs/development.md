@@ -27,7 +27,7 @@ A14 uses PPL. momentarius is A12/A13 after KRW. Do not copy it here.
 
 ## Open vs closed
 
-A class stays **open** until the 23F77 binary shows the 27-era guard, or two different angles on this SKU both die with a named IPS/errno. P039 VT wall does not close AVE. JPEG dest-timeout does not close AppleJPEGDriver UAR. See `88_GOLDMINE_26.5.txt`.
+A class stays **open** until the 23F77 binary shows the 27-era guard, or two different angles on this SKU both die with a named IPS/errno. P039 VT wall does not close AVE. JPEG dest-timeout does not close AppleJPEGDriver UAR. P053 hits=0 does not close NECP. P017 0 cd8 does not close 64788. See `88_GOLDMINE_26.5.txt` and `89_REOPEN_ONE_ANGLE.txt`.
 
 ## Do not
 

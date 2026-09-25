@@ -44,7 +44,7 @@ Lab note: `~/Desktop/lumina_primitives/88_GOLDMINE_26.5.txt`
 - **24A435 JPEG IOSurface UAR** is proven on iOS 27 GM (other silicon). Twin `structureInput+0x30` / `req+0x2b8` on T8101 before dropping JPEG.
 - **IOMD `_dmaReferences` +0x34** is one-branch-bounded on 27; 23F77 unmapped.
 
-One failed probe is not a closed class.
+One failed probe is not a closed class. Full reopen list: `~/Desktop/lumina_primitives/89_REOPEN_ONE_ANGLE.txt`.
 
 ## UI
 
