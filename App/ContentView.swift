@@ -8,7 +8,6 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var viewModel = ExploitManager.shared
     @State private var showingAllExploits = false
-    @State private var selectedStage: ExploitStage?
 
     var body: some View {
         ZStack {
@@ -59,15 +58,6 @@ struct ContentView: View {
                     .padding(.vertical, 8)
 
                 Spacer(minLength: 10)
-
-                ExploitStageSelector(
-                    selectedStage: $selectedStage,
-                    isRunning: $viewModel.isRunning,
-                    onStageSelected: { stage in
-                        Task { await viewModel.executeStage(stage.rawValue) }
-                    }
-                )
-                .padding(.horizontal, 16)
 
                 fullChainButton
                     .padding(.horizontal, 16)
@@ -269,54 +259,19 @@ struct AllExploitsSheet: View {
     let exploits = [
         ("P044 ANE 254-Input", "KERNEL", "brain", Color.badgeKernel),
         ("CVE-2026-65343 AKS", "SANDBOX", "lock.shield", Color.badgeSandbox),
-        ("P035 AVE Wrap", "KERNEL", "video", Color.lum1naViolet),
         ("P051 APFS Xattr", "SANDBOX", "folder", Color.badgeSandbox),
         ("P054 APFS Reap", "DAEMON", "archivebox", Color.badgeDaemon),
+是想"PATCHSET", "bandage", Color.badgePatchset),
     ]
 
     var body: some View {
         NavigationView {
             List {
-                Section(header: Text("EXPLOIT CHAIN")) {
-                    ForEach(exploits, id: \.0) { exploit in
-                        Button {
-                            Task {
-                                await viewModel.executeStage(exploit.1)
-                                dismiss()
-                            }
-                        } label: {
-                            HStack {
-                                Image(systemName: exploit.2)
-                                    .foregroundColor(exploit.3)
-                                    .frame(width: 24)
-
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(exploit.0)
-                                        .font(.system(.subheadline, weight: .semibold))
-                                        .foregroundColor(.primary)
-
-                                    Text(exploit.1)
-                                        .font(.system(.caption, design: .rounded))
-                                        .foregroundColor(exploit.3.opacity(0.8))
-                                }
-
-                                Spacer()
-
-                                Image(systemName: "chevron.right")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        .disabled(viewModel.isRunning)
-                    }
-                }
-
                 Section(header: Text("DEBUG")) {
                     Button {
                         UIPasteboard.general.string = viewModel.exportFullDebugLog()
-                        dismiss()
                     } label: {
-                        Label("Export Full Log", systemImage: "doc.on.clipboard")
+                        Label("Copy Full Log", systemImage: "doc.on.clipboard")
                     }
 
                     Button {
