@@ -8,17 +8,13 @@ struct CircuitBackgroundView: View {
         TimelineView(.animation(minimumInterval: 1/60, paused: false)) { context in
             GeometryReader { geometry in
                 ZStack {
-                    Color(hex: "#07060F").ignoresSafeArea()
-                    
+                    Color(hex: "#05040C").ignoresSafeArea()
                     PCBTraceGrid(size: geometry.size, stage: stage, time: context.date)
-                    EnergyNodes(size: geometry.size, stage: stage, time: context.date)
-                    DataFlowPaths(size: geometry.size, stage: stage, time: context.date)
-                    
                     RadialGradient(
-                        colors: [.clear, Color(hex: "#07060F").opacity(0.7)],
+                        colors: [stage.color.opacity(0.12), .clear],
                         center: .center,
-                        startRadius: 100,
-                        endRadius: 400
+                        startRadius: 20,
+                        endRadius: 280
                     )
                 }
             }

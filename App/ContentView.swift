@@ -14,11 +14,10 @@ struct ContentView: View {
     var body: some View {
         ZStack {
             CircuitBackgroundView(stage: visualStage)
-            GlyphRainView(intensity: viewModel.isRunning ? 0.18 : 0.08)
 
             VStack(spacing: 0) {
                 headerSection
-                    .padding(.top, 10)
+                    .padding(.top, 8)
                     .padding(.horizontal, 16)
 
                 if !recoveredNote.isEmpty {
@@ -80,7 +79,7 @@ struct ContentView: View {
             Text(recoveredNote)
                 .font(.system(.caption, design: .rounded))
                 .foregroundColor(.consoleWarning)
-                .lineLimit(2)
+                .lineLimit(3)
             Spacer()
             Button {
                 UIPasteboard.general.string =
@@ -94,72 +93,53 @@ struct ContentView: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color.consoleWarning.opacity(0.08))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(Color.consoleWarning.opacity(0.3), lineWidth: 1)
-                )
-        )
+        .luminaGlassRect(12)
         .padding(.horizontal, 16)
     }
 
     private var headerSection: some View {
-        HStack(alignment: .top, spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                ZStack(alignment: .topLeading) {
-                    CloudWispsView()
-                        .offset(x: 36, y: -10)
-                    HStack(spacing: 8) {
-                        Lum1naStarShape()
-                            .fill(
-                                LinearGradient(
-                                    colors: [Color.lum1naMagenta, Color.white, Color.lum1naCyan],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
+        VStack(spacing: 8) {
+            ZStack {
+                VStack(spacing: 2) {
+                    Text("LUM1NA")
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .tracking(4)
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [.lum1naViolet, .white, .lum1naCyan],
+                                startPoint: .leading,
+                                endPoint: .trailing
                             )
-                            .frame(width: 22, height: 22)
-                            .shadow(color: Color.lum1naCyan.opacity(0.6), radius: 6)
-                        Text("Lum1na")
-                            .font(.system(size: 32, weight: .bold, design: .rounded))
-                            .foregroundStyle(
-                                LinearGradient(
-                                    colors: [.lum1naViolet, .lum1naCyan],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
-                            )
-                    }
+                        )
+                    Text("The guiding light for Jailbreaks")
+                        .font(.system(size: 11, weight: .medium, design: .rounded))
+                        .italic()
+                        .foregroundColor(Color.white.opacity(0.45))
                 }
-                Text("The guiding light for Jailbreaks")
-                    .font(.system(size: 11, weight: .medium, design: .rounded))
-                    .italic()
-                    .foregroundColor(Color.white.opacity(0.45))
-                    .padding(.leading, 30)
-            }
-
-            Spacer(minLength: 8)
-
-            VStack(alignment: .trailing, spacing: 8) {
-                HStack(spacing: 8) {
-                    devicePill
+                HStack {
+                    Spacer()
                     Button(action: { showingSettings = true }) {
                         Image(systemName: "gearshape.fill")
-                            .font(.title3)
-                            .foregroundColor(.lum1naCyan)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.9))
+                            .frame(width: 36, height: 36)
+                            .luminaGlassCapsule()
                     }
                 }
+            }
+            HStack(spacing: 10) {
+                devicePill
                 HStack(spacing: 6) {
                     Circle()
                         .fill(statusColor)
                         .frame(width: 7, height: 7)
-                        .shadow(color: statusColor.opacity(0.5), radius: 3)
-                    Text(viewModel.isRunning ? "Running..." : "Ready")
-                        .font(.system(.caption, design: .rounded, weight: .medium))
+                    Text(viewModel.isRunning ? "Running" : "Ready")
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
                         .foregroundColor(statusColor)
                 }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .luminaGlassCapsule()
             }
         }
     }
@@ -173,16 +153,10 @@ struct ContentView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
         }
-        .foregroundColor(.white.opacity(0.85))
+        .foregroundColor(.white.opacity(0.9))
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(
-            Capsule()
-                .fill(Color.white.opacity(0.06))
-                .overlay(
-                    Capsule().stroke(Color.lum1naViolet.opacity(0.45), lineWidth: 1)
-                )
-        )
+        .luminaGlassCapsule()
     }
 
     private var jailbreakButton: some View {
@@ -204,26 +178,7 @@ struct ContentView: View {
             .foregroundColor(.white)
             .frame(maxWidth: .infinity)
             .frame(height: 52)
-            .background(
-                RoundedRectangle(cornerRadius: 14)
-                    .fill(
-                        LinearGradient(
-                            colors: viewModel.isRunning
-                                ? [Color.gray.opacity(0.35), Color.gray.opacity(0.18)]
-                                : [Color.lum1naCyan.opacity(0.85), Color.lum1naMagenta.opacity(0.85)],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14)
-                            .stroke(Color.white.opacity(viewModel.isRunning ? 0.15 : 0.35), lineWidth: 1)
-                    )
-            )
-            .shadow(
-                color: (viewModel.isRunning ? Color.clear : Color.lum1naCyan.opacity(0.35)),
-                radius: 10
-            )
+            .luminaGlassRect(16)
         }
         .disabled(viewModel.isRunning)
     }
@@ -239,14 +194,7 @@ struct ContentView: View {
             .foregroundColor(.lum1naCyan)
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
-            .background(
-                Capsule()
-                    .fill(Color.lum1naCyan.opacity(0.1))
-                    .overlay(
-                        Capsule()
-                            .stroke(Color.lum1naCyan.opacity(0.3), lineWidth: 1)
-                    )
-            )
+            .luminaGlassCapsule()
         }
         .disabled(viewModel.isRunning)
     }

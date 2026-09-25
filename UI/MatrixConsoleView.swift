@@ -41,14 +41,7 @@ struct MatrixConsoleView: View {
             }
         }
         .frame(minHeight: 220)
-        .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(hex: "#0A0A0F"))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color(hex: "#1E293B"), lineWidth: 1)
-                )
-        )
+        .luminaGlassRect(16)
     }
 
     private var header: some View {
