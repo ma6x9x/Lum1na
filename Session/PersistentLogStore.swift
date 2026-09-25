@@ -27,7 +27,7 @@ public final class PersistentLogStore {
     public static let probeLogFiles: [String: String] = [
         "aks": consoleLogName,
         "p044": consoleLogName,
-        "aio84530": consoleLogName,
+        "aio84530": "p84530_aio_kqueue_log.txt",
         "ident": "device_ident_log.txt",
         "p010": "p010_queue_leak_log.txt",
         "p017v2": "p017_confused_deputy_log.txt",
