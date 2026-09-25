@@ -30,7 +30,7 @@ struct PCBTraceGrid: View {
     let size: CGSize
     let stage: JailbreakStage
     let time: Date
-    let gridSpacing: CGFloat = 25
+    let gridSpacing: CGFloat = 14
     
     var body: some View {
         Canvas { context, _ in
@@ -43,7 +43,7 @@ struct PCBTraceGrid: View {
                 path.move(to: CGPoint(x: 0, y: y))
                 
                 while currentX < size.width {
-                    let segmentLength = CGFloat.random(in: 30...80)
+                    let segmentLength = 32 + CGFloat((row * 19 + Int(currentX)) % 48)
                     let nextX = min(currentX + segmentLength, size.width)
                     
                     if Int(nextX) % 100 < 20 {
@@ -75,7 +75,7 @@ struct PCBTraceGrid: View {
                 path.move(to: CGPoint(x: x, y: 0))
                 
                 while currentY < size.height {
-                    let segmentLength = CGFloat.random(in: 40...100)
+                    let segmentLength = 40 + CGFloat((col * 23 + Int(currentY)) % 56)
                     let nextY = min(currentY + segmentLength, size.height)
                     path.addLine(to: CGPoint(x: x, y: nextY))
                     currentY = nextY

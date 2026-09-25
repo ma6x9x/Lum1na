@@ -81,7 +81,7 @@ struct MotherboardPad: View {
                             .stroke(stage.color.opacity(isActive ? 0.95 : 0.35), lineWidth: isActive ? 1.6 : 1)
                     )
                     .frame(width: 58, height: 58)
-                    .shadow(color: isActive ? stage.color.opacity(0.45) : .clear, radius: 8)
+                    .shadow(color: isActive ? stage.color.opacity(0.85) : stage.color.opacity(0.18), radius: isActive ? 14 : 4)
 
                 if isRunning {
                     ProgressView()
@@ -111,32 +111,34 @@ struct MotherboardTraceLayer: View {
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: false)) { context in
             let t = context.date.timeIntervalSinceReferenceDate
-            Canvas { ctx, _ in
+            Canvas { ctx, size in
+                drawBoard(ctx: ctx, size: size, t: t)
                 for stage in ExploitStage.allCases {
                     guard let dest = pads[stage] else { continue }
                     let lit = active == stage
-                    let path = orthogonalTrace(from: center, to: dest)
-                    let color = lit ? stage.color : Color(hex: "#334155")
-                    ctx.stroke(path, with: .color(color.opacity(lit ? 0.95 : 0.35)), lineWidth: lit ? 2.2 : 1.1)
+                    let color = lit ? stage.color : Color(hex: "#3B82F6")
+                    let traces = manhattanBundle(from: center, to: dest)
+                    for (i, path) in traces.enumerated() {
+                        let w: CGFloat = lit ? (i == 0 ? 2.4 : 1.2) : 0.8
+                        ctx.stroke(path, with: .color(color.opacity(lit ? 0.95 : 0.22)), lineWidth: w)
+                        if lit {
+                            ctx.stroke(path, with: .color(stage.color.opacity(0.22)), lineWidth: 8)
+                        }
+                    }
+                    fillVia(ctx, at: dest, color: color, lit: lit)
+                    fillVia(ctx, at: midpoint(center, dest), color: color, lit: lit)
 
                     if lit {
-                        let glow = path
-                        ctx.stroke(glow, with: .color(stage.color.opacity(0.25)), lineWidth: 7)
-                    }
-
-                    let via = viaRect(at: midpoint(center, dest))
-                    ctx.fill(Path(via), with: .color(color.opacity(lit ? 0.9 : 0.4)))
-
-                    if lit && running {
-                        let packetT = (t * (0.45 + progress * 0.8)).truncatingRemainder(dividingBy: 1.0)
-                        let p = pointOnOrthogonal(from: center, to: dest, t: packetT)
-                        let r: CGFloat = 4.5
-                        let rect = CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2)
-                        ctx.fill(Path(ellipseIn: rect), with: .color(stage.color))
-                        ctx.fill(
-                            Path(ellipseIn: rect.insetBy(dx: -4, dy: -4)),
-                            with: .color(stage.color.opacity(0.25))
-                        )
+                        let speed = running ? (0.55 + progress * 0.9) : 0.22
+                        for k in 0..<4 {
+                            let packetT = (t * speed + Double(k) * 0.22).truncatingRemainder(dividingBy: 1.0)
+                            let p = pointOnOrthogonal(from: center, to: dest, t: packetT)
+                            let r: CGFloat = running ? 5.5 : 3.2
+                            let rect = CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2)
+                            ctx.fill(Path(ellipseIn: rect.insetBy(dx: -5, dy: -5)), with: .color(stage.color.opacity(0.28)))
+                            ctx.fill(Path(ellipseIn: rect), with: .color(stage.color))
+                            ctx.fill(Path(ellipseIn: rect.insetBy(dx: 1.8, dy: 1.8)), with: .color(.white.opacity(0.85)))
+                        }
                     }
                 }
             }
@@ -144,30 +146,77 @@ struct MotherboardTraceLayer: View {
         .allowsHitTesting(false)
     }
 
-    /// PCB-style: leave the star, then a straight run to the pad.
-    private func orthogonalTrace(from a: CGPoint, to b: CGPoint) -> Path {
-        var path = Path()
+    private func drawBoard(ctx: GraphicsContext, size: CGSize, t: Double) {
+        let inset: CGFloat = 6
+        let board = CGRect(x: inset, y: inset, width: size.width - inset * 2, height: size.height - inset * 2)
+        ctx.stroke(
+            Path(roundedRect: board, cornerRadius: 10),
+            with: .color(Color(hex: "#7C3AED").opacity(0.45)),
+            lineWidth: 1.4
+        )
+        let pinN = 18
+        for i in 0..<pinN {
+            let u = CGFloat(i) / CGFloat(pinN - 1)
+            let pulse = 0.35 + 0.65 * (0.5 + 0.5 * sin(t * 2.2 + Double(i) * 0.4))
+            let c = i % 2 == 0 ? Color.lum1naCyan : Color.lum1naMagenta
+            let pts: [CGPoint] = [
+                CGPoint(x: board.minX, y: board.minY + board.height * u),
+                CGPoint(x: board.maxX, y: board.minY + board.height * u),
+                CGPoint(x: board.minX + board.width * u, y: board.minY),
+                CGPoint(x: board.minX + board.width * u, y: board.maxY)
+            ]
+            for p in pts {
+                let r: CGFloat = 1.6
+                ctx.fill(
+                    Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2)),
+                    with: .color(c.opacity(pulse))
+                )
+            }
+        }
+    }
+
+    private func manhattanBundle(from a: CGPoint, to b: CGPoint) -> [Path] {
         let dx = b.x - a.x
         let dy = b.y - a.y
         let start: CGPoint
         if abs(dx) > abs(dy) {
-            start = CGPoint(x: a.x + (dx > 0 ? 28 : -28), y: a.y)
+            start = CGPoint(x: a.x + (dx > 0 ? 30 : -30), y: a.y)
         } else {
-            start = CGPoint(x: a.x, y: a.y + (dy > 0 ? 28 : -28))
+            start = CGPoint(x: a.x, y: a.y + (dy > 0 ? 30 : -30))
         }
-        path.move(to: start)
-        path.addLine(to: b)
-        return path
+        func elbow(_ offset: CGFloat) -> Path {
+            var path = Path()
+            let s = CGPoint(x: start.x, y: start.y + offset)
+            let mid = CGPoint(x: b.x, y: s.y)
+            path.move(to: s)
+            path.addLine(to: mid)
+            path.addLine(to: CGPoint(x: b.x, y: b.y + offset * 0.3))
+            return path
+        }
+        if abs(dx) > abs(dy) {
+            return [elbow(0), elbow(7), elbow(-7)]
+        }
+        func tee(_ offset: CGFloat) -> Path {
+            var path = Path()
+            let s = CGPoint(x: start.x + offset, y: start.y)
+            let mid = CGPoint(x: s.x, y: b.y)
+            path.move(to: s)
+            path.addLine(to: mid)
+            path.addLine(to: CGPoint(x: b.x, y: b.y))
+            return path
+        }
+        return [tee(0), tee(7), tee(-7)]
+    }
+
+    private func fillVia(_ ctx: GraphicsContext, at point: CGPoint, color: Color, lit: Bool) {
+        let s: CGFloat = lit ? 5 : 3.2
+        let rect = CGRect(x: point.x - s / 2, y: point.y - s / 2, width: s, height: s)
+        ctx.fill(Path(roundedRect: rect, cornerRadius: 1), with: .color(color.opacity(lit ? 0.95 : 0.4)))
     }
 
     private func pointOnOrthogonal(from a: CGPoint, to b: CGPoint, t: Double) -> CGPoint {
         let clamped = CGFloat(max(0, min(1, t)))
         return CGPoint(x: a.x + (b.x - a.x) * clamped, y: a.y + (b.y - a.y) * clamped)
-    }
-
-    private func viaRect(at point: CGPoint) -> CGRect {
-        let s: CGFloat = 4
-        return CGRect(x: point.x - s / 2, y: point.y - s / 2, width: s, height: s)
     }
 
     private func midpoint(_ a: CGPoint, _ b: CGPoint) -> CGPoint {

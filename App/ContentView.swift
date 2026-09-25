@@ -14,7 +14,7 @@ struct ContentView: View {
     var body: some View {
         ZStack {
             CircuitBackgroundView(stage: visualStage)
-            GlyphRainView(intensity: viewModel.isRunning ? 0.55 : 0.22)
+            GlyphRainView(intensity: viewModel.isRunning ? 0.18 : 0.08)
 
             VStack(spacing: 0) {
                 headerSection
@@ -43,11 +43,7 @@ struct ContentView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 8)
-                .padding(.bottom, 16)
-
-                RainbowWaveRibbonView(power: viewModel.isRunning ? 1.0 : 0.28)
-                    .frame(height: 28)
-                    .allowsHitTesting(false)
+                .padding(.bottom, 18)
             }
         }
         .preferredColorScheme(.dark)
@@ -59,8 +55,7 @@ struct ContentView: View {
         }
         .onAppear {
             if viewModel.lastRecoverySummary.isEmpty == false {
-                let tap = PersistentLogStore.shared.lastTapId().map { " last TAP \($0)" } ?? ""
-                recoveredNote = "Recovered from crash\(tap): \(viewModel.lastRecoverySummary)"
+                recoveredNote = "Recovered from crash: \(viewModel.lastRecoverySummary)"
             }
         }
     }
@@ -272,6 +267,7 @@ struct AllExploitsSheet: View {
                 Section(header: Text("EXPLOIT CATALOG - TAP TO RUN INDIVIDUALLY")) {
                     ForEach(ExploitManager.catalog) { entry in
                         Button {
+                            dismiss()
                             Task {
                                 await viewModel.executeExploit(entry)
                             }
@@ -360,6 +356,36 @@ struct SettingsSheet: View {
                     }
                 }
 
+                Section(header: Text("LAB / DEBUG")) {
+                    LabeledContent("Last TAP",
+                        value: PersistentLogStore.shared.lastTapId() ?? "none")
+                    LabeledContent("SKU", value: LabDeviceProfile.skuName())
+                    Button {
+                        if let ident = ExploitManager.catalog.first(where: { $0.id == "ident" }) {
+                            dismiss()
+                            Task { await viewModel.executeExploit(ident) }
+                        }
+                    } label: {
+                        Label("Run Ident", systemImage: "person.crop.rectangle")
+                    }
+                    Button {
+                        UIPasteboard.general.string = LabDeviceProfile.identBlock()
+                    } label: {
+                        Label("Copy Ident Block", systemImage: "doc.on.doc")
+                    }
+                    Button {
+                        UIPasteboard.general.string =
+                            PersistentLogStore.shared.readTapLog() ?? ""
+                    } label: {
+                        Label("Copy TAP Log (p011)", systemImage: "hand.tap")
+                    }
+                    Button {
+                        UIPasteboard.general.string = viewModel.exportFullDebugLog()
+                    } label: {
+                        Label("Copy Console Buffer", systemImage: "terminal")
+                    }
+                }
+
                 Section(header: Text("RECOVERY LOG")) {
                     Button {
                         UIPasteboard.general.string =
@@ -379,7 +405,7 @@ struct SettingsSheet: View {
                     Button {
                         PersistentLogStore.shared.clear()
                     } label: {
-                        Label("Clear Log", systemImage: "trash")
+                        Label("Clear Disk Logs", systemImage: "trash")
                             .foregroundColor(.red)
                     }
                 }
