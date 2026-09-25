@@ -34,6 +34,18 @@ FomoPeek/DarkSword local LPE stopped at iOS 26.1. Not this build.
 3. A14 PPL — not momentarius copy-paste
 4. Persist is semi-untethered TC reload each boot until a real iBoot bug exists (none found; skip-bane is a helper string)
 
+## GOLDMINE 26.5 (keep unrun angles open)
+
+Drop: `~/Library/Mobile Documents/com~apple~CloudDocs/Downloads/GOLDMINE 26.5/`
+Lab note: `~/Desktop/lumina_primitives/88_GOLDMINE_26.5.txt`
+
+- **84607** is an iOS 27 EncType-vs-session guard. 23F77 should still lack that string. P039 VT wall is one consumer, not a close.
+- **lockdownd** logic bugs are 26.5 userspace USB/pairing. `Exploit/Lockdownd/LockdowndFullChain` is a skeleton, not device-proven.
+- **24A435 JPEG IOSurface UAR** is proven on iOS 27 GM (other silicon). Twin `structureInput+0x30` / `req+0x2b8` on T8101 before dropping JPEG.
+- **IOMD `_dmaReferences` +0x34** is one-branch-bounded on 27; 23F77 unmapped.
+
+One failed probe is not a closed class.
+
 ## UI
 
 Star is the motherboard hub (no center ring). Traces light to KERNEL / SANDBOX / DAEMON / PATCHSET. Nephew sketch: neon clouds, tagline, `iPhone 12  update:26.5` pill. Logging stays military local time + `F_FULLFSYNC`.
