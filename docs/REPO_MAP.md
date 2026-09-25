@@ -41,9 +41,8 @@ Offsets: `LabRuntimeOffsets.m` only. SKU: `hw.machine` + `kern.osversion` **23F7
 
 ## Catalog (All stages)
 
-Wired `+tap`: ident, p010, p017v2, p032–p034, p040–p042, p046, p050–p055.  
-Wired `execute`: aks (`AKSExploitController`), p044, aio84530 (`CVE_2026_84530_KASLR`).  
-On disk but **not** in the live catalog: P009/P035–P039/P052 controllers, CSKRW, AVERace, Lockdownd, Momentarius, Lum1naKRW placeholder.
+Wired `+tap` in All stages: ident, aks, aio84530, p005, p009–p010, p017v2, p032–p034, p038, p040–p046, p050–p055, cskrw, lockdownd, p044.  
+CI strips P035/P036/P037/AVERace — not cataloged. Lum1naKRW.m is a pbx exception (placeholder). P051/P053/unbounded P054 stay off JAILBREAK.
 
 ## Agent rule
 

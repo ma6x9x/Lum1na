@@ -56,5 +56,14 @@
 #import "Exploit/P050GetattrlistOOB.h"
 #import "Exploit/P053NECPDoubleFree.h"
 #import "Exploit/P055IOSurfaceUPL.h"
+#import "Exploit/P009ReplaceBackingSmoke.h"
+#import "Exploit/P038WHuntSmoke.h"
+#import "Exploit/P043WriteClassMap.h"
+#import "Exploit/P045HybridMap.h"
+#import "Exploit/P052APFSNstream.h"
+#import "Exploit/CSKRW.h"
+#import "Exploit/P005JIT.h"
+#import "Exploit/Lockdownd/LockdowndFullChain.h"
+#import "Exploit/CVE_2026_84530_KASLR.h"
 
 #endif
