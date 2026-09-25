@@ -162,7 +162,7 @@ struct ContentView: View {
                         .frame(width: 7, height: 7)
                         .shadow(color: statusColor.opacity(0.5), radius: 3)
                     Text(viewModel.isRunning ? "Running..." : "Ready")
-                        .font(.system(.caption, weight: .medium, design: .rounded))
+                        .font(.system(.caption, design: .rounded, weight: .medium))
                         .foregroundColor(statusColor)
                 }
             }
@@ -196,9 +196,9 @@ struct ContentView: View {
         }) {
             HStack(spacing: 10) {
                 Image(systemName: "sparkle")
-                    .font(.system(.body, weight: .semibold))
+                    .font(.body.weight(.semibold))
                 Text("JAILBREAK")
-                    .font(.system(.subheadline, weight: .bold, design: .rounded))
+                    .font(.system(.subheadline, design: .rounded, weight: .bold))
                     .tracking(1.2)
                 if viewModel.isRunning {
                     ProgressView()
