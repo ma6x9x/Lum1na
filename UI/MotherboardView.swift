@@ -185,8 +185,10 @@ struct MotherboardPad: View {
             }
             .opacity(dim)
             .offset(y: floatY)
+            .frame(width: 92, height: 110)
             .animation(.spring(response: 0.35, dampingFraction: 0.72), value: scale)
         }
+        .frame(width: 92, height: 110)
     }
 }
 
