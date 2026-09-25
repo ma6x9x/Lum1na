@@ -299,10 +299,10 @@ struct SettingsSheet: View {
     @Environment(\.dismiss) var dismiss
 
     private func boardLeakLabel() -> String {
-        let leaks = Lum1naBoard.shared().leaks
+        let leaks = Lum1naBoard.shared().leaks ?? []
         var hits = 0
-        for case let e as NSDictionary in leaks {
-            let n = (e["hits"] as? NSNumber)?.intValue ?? 1
+        for e in leaks {
+            let n = (e["hits"] as? Int) ?? (e["hits"] as? NSNumber)?.intValue ?? 1
             hits += max(n, 1)
         }
         return "\(leaks.count) unique / \(hits) hits"

@@ -11,6 +11,7 @@ enum BoardMotion: Equatable {
     case failed
     case recovered
 
+    @MainActor
     static func from(_ manager: ExploitManager, recovered: Bool) -> BoardMotion {
         if manager.isRunning {
             if manager.fullChainActive {
