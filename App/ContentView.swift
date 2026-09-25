@@ -92,10 +92,21 @@ struct ContentView: View {
 
             Spacer()
 
-            Button(action: { showingSettings = true }) {
-                Image(systemName: "gearshape.fill")
-                    .font(.title3)
-                    .foregroundColor(.lum1naCyan)
+            HStack(spacing: 16) {
+                Button(action: {
+                    UIPasteboard.general.string = PersistentLogStore.shared.recoveryTranscript()
+                    viewModel.log("[+] Recovery log copied to clipboard", level: .success)
+                }) {
+                    Image(systemName: "clock.arrow.circlepath")
+                        .font(.title3)
+                        .foregroundColor(.consoleSuccess)
+                }
+
+                Button(action: { showingSettings = true }) {
+                    Image(systemName: "gearshape.fill")
+                        .font(.title3)
+                        .foregroundColor(.lum1naCyan)
+                }
             }
         }
     }
@@ -125,8 +136,12 @@ struct ContentView: View {
                     .fill(
                         LinearGradient(
                             colors: [
-                                viewModel.isRunning ? Color.gray.opacity(0.3) : currentStage.color.opacity(0.25),
-                                viewModel.isRunning ? Color.gray.opacity(0.15) : currentStage.color.opacity(0.1)
+                                viewModel.isRunning
+                                    ? Color.gray.opacity(0.3)
+                                    : currentStage.color.opacity(0.25),
+                                viewModel.isRunning
+                                    ? Color.gray.opacity(0.15)
+                                    : currentStage.color.opacity(0.1)
                             ],
                             startPoint: .topLeading,
                             endPoint: .bottomTrailing
@@ -135,7 +150,9 @@ struct ContentView: View {
                     .overlay(
                         RoundedRectangle(cornerRadius: 14)
                             .stroke(
-                                viewModel.isRunning ? Color.gray.opacity(0.5) : currentStage.color.opacity(0.6),
+                                viewModel.isRunning
+                                    ? Color.gray.opacity(0.5)
+                                    : currentStage.color.opacity(0.6),
                                 lineWidth: 1.5
                             )
                     )
@@ -193,7 +210,7 @@ struct AllExploitsSheet: View {
     var body: some View {
         NavigationView {
             List {
-                Section(header: Text("EXPLOIT CATALOG — TAP TO RUN INDIVIDUALLY")) {
+                Section(header: Text("EXPLOIT CATALOG - TAP TO RUN INDIVIDUALLY")) {
                     ForEach(ExploitManager.catalog) { entry in
                         Button {
                             Task {
@@ -217,7 +234,8 @@ struct AllExploitsSheet: View {
 
                                 Spacer()
 
-                                if viewModel.isRunning && viewModel.selectedStage == entry.stage {
+                                if viewModel.isRunning &&
+                                    viewModel.selectedStage == entry.stage {
                                     ProgressView()
                                         .scaleEffect(0.7)
                                 } else {
@@ -230,7 +248,7 @@ struct AllExploitsSheet: View {
                     }
                 }
 
-                Section(footer: Text("Run exploits one at a time to isolate crashes. Console and recovery log record every step.")) {
+                Section(footer: Text("Run one at a time. The recovery button in the header keeps the log if anything crashes.")) {
                     EmptyView()
                 }
             }
@@ -261,15 +279,18 @@ struct SettingsSheet: View {
 
                 Section(header: Text("EXPLOIT STATE")) {
                     LabeledContent("Kernel Slide", value: viewModel.currentKernelSlide != 0
-                        ? "0x\(String(viewModel.currentKernelSlide, radix: 16, uppercase: true))"
+                        ? "0x" + String(viewModel.currentKernelSlide, radix: 16, uppercase: true)
                         : "Not obtained")
                     LabeledContent("Kernel Base", value: viewModel.currentKernelBase != 0
-                        ? "0x\(String(viewModel.currentKernelBase, radix: 16, uppercase: true))"
+                        ? "0x" + String(viewModel.currentKernelBase, radix: 16, uppercase: true)
                         : "Not obtained")
                     LabeledContent("Last Result", value: viewModel.lastResult.isSuccess ? "Success" : "Idle/Failure")
+                    if !viewModel.lastRecoverySummary.isEmpty {
+                        LabeledContent("Last Crash", value: viewModel.lastRecoverySummary)
+                    }
                 }
 
-                Section(header: Text("CRASH RECOVERY")) {
+                Section(header: Text("RECOVERY LOG")) {
                     Button {
                         UIPasteboard.general.string = PersistentLogStore.shared.recoveryTranscript()
                     } label: {
@@ -285,30 +306,8 @@ struct SettingsSheet: View {
                     Button {
                         PersistentLogStore.shared.clear()
                     } label: {
-                        Label("Clear Recovery Log", systemImage: "trash")
+                        Label("Clear Log", systemImage: "trash")
                             .foregroundColor(.red)
-                    }
-                }
-
-                Section(header: Text("DEBUG")) {
-                    Button {
-                        UIPasteboard.general.string = viewModel.exportFullDebugLog()
-                    } label: {
-                        Label("Copy Session Log", systemImage: "doc.on.clipboard")
-                    }
-
-                    Button {
-                        viewModel.clearConsole()
-                    } label: {
-                        Label("Clear Console", systemImage: "trash")
-                            .foregroundColor(.red)
-                    }
-
-                    Button {
-                        viewModel.reset()
-                    } label: {
-                        Label("Reset State", systemImage: "arrow.counterclockwise")
-                            .foregroundColor(.orange)
                     }
                 }
             }
