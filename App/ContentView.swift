@@ -16,12 +16,10 @@ struct ContentView: View {
                 .padding(.top, 12)
                 .padding(.horizontal, 20)
 
-            // Console takes all remaining space
             MatrixConsoleView()
                 .padding(.horizontal, 16)
                 .padding(.top, 10)
 
-            // Bottom control deck
             VStack(spacing: 12) {
                 HStack(spacing: 16) {
                     ForEach(ExploitManager.catalog) { entry in
@@ -40,7 +38,6 @@ struct ContentView: View {
                 }
 
                 fullChainButton
-
                 allExploitsButton
             }
             .padding(.horizontal, 16)
@@ -143,7 +140,8 @@ struct ContentView: View {
                             )
                     )
             )
-oge        }
+            .shadow(color: currentStage.glowColor.opacity(viewModel.isRunning ? 0 : 0.3), radius: 8)
+        }
         .disabled(viewModel.isRunning)
     }
 
@@ -232,7 +230,7 @@ struct AllExploitsSheet: View {
                     }
                 }
 
-                Section(footer: Text("Run exploits one at a time to isolate crashes. Console records every step.")) {
+                Section(footer: Text("Run exploits one at a time to isolate crashes. Console and recovery log record every step.")) {
                     EmptyView()
                 }
             }
@@ -271,11 +269,32 @@ struct SettingsSheet: View {
                     LabeledContent("Last Result", value: viewModel.lastResult.isSuccess ? "Success" : "Idle/Failure")
                 }
 
+                Section(header: Text("CRASH RECOVERY")) {
+                    Button {
+                        UIPasteboard.general.string = PersistentLogStore.shared.recoveryTranscript()
+                    } label: {
+                        Label("Copy Recovery Log", systemImage: "clock.arrow.circlepath")
+                    }
+
+                    Button {
+                        UIPasteboard.general.string = PersistentLogStore.shared.readAll() ?? ""
+                    } label: {
+                        Label("Copy Full Disk Log", systemImage: "doc.text")
+                    }
+
+                    Button {
+                        PersistentLogStore.shared.clear()
+                    } label: {
+                        Label("Clear Recovery Log", systemImage: "trash")
+                            .foregroundColor(.red)
+                    }
+                }
+
                 Section(header: Text("DEBUG")) {
                     Button {
                         UIPasteboard.general.string = viewModel.exportFullDebugLog()
                     } label: {
-                        Label("Copy Full Log", systemImage: "doc.on.clipboard")
+                        Label("Copy Session Log", systemImage: "doc.on.clipboard")
                     }
 
                     Button {
