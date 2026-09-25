@@ -332,6 +332,13 @@ struct SettingsSheet: View {
                     } label: {
                         Label("Copy Console Buffer", systemImage: "terminal")
                     }
+                    Button {
+                        UIPasteboard.general.string = Lum1naBoard.shared().jsonDump()
+                    } label: {
+                        Label("Copy Kernel Board JSON", systemImage: "cpu")
+                    }
+                    LabeledContent("Board kread", value: Lum1naBoard.shared().hasKread ? "yes" : "no")
+                    LabeledContent("Board leaks", value: "\(Lum1naBoard.shared().leaks.count)")
                 }
 
                 Section(header: Text("RECOVERY LOG")) {

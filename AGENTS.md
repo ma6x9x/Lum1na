@@ -112,6 +112,10 @@ xcodebuild -project Lum1na.xcodeproj -scheme Lum1na \
 
 The `objective-c-xcode.yml` workflow is historically red. **Lum1na Build** (IPA) is the gate.
 
+## Kernel board
+
+`Kernel/Lum1naBoard` → Documents/`lum1na_board.json`. Heap leaks from probes go here. `hasKread` stays false until a known kernel string kread works. Do not set slide from heap−staticBase. Post-KRW slots: `Lum1naAfterKread` (HOLD). See `docs/BOARD.md`.
+
 ## Honesty
 
 Kernel read/write is **not** obtained. `Lum1naKRW` is a placeholder. One failed tap does not close a CVE class (`docs/FUTURE.md`, lab notes 89). Lab panic app is `~/Desktop/P007OpenOnly`. This repo is the public shell + catalog.

@@ -66,5 +66,7 @@
 #import "Exploit/Lockdownd/LockdowndFullChain.h"
 #import "Exploit/CVE_2026_84530_KASLR.h"
 #import "Exploit/P056VTCompressionReach.h"
+#import "Kernel/Lum1naBoard.h"
+#import "Kernel/Lum1naAfterKread.h"
 
 #endif
