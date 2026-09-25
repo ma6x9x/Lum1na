@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import UIKit
 
 // MARK: - Device Utils (single source of truth)
 public enum DeviceUtils {
@@ -49,5 +50,42 @@ public enum DeviceUtils {
         if a14Devices.contains(currentDeviceIdentifier) { return "A14" }
         if a12xDevices.contains(currentDeviceIdentifier) { return "A12X" }
         return "Unknown"
+    }
+
+    public static var osversion: String {
+        var size = 0
+        sysctlbyname("kern.osversion", nil, &size, nil, 0)
+        guard size > 0 else { return "?" }
+        var buf = [CChar](repeating: 0, count: size)
+        sysctlbyname("kern.osversion", &buf, &size, nil, 0)
+        return String(cString: buf)
+    }
+
+    public static var marketingVersion: String {
+        UIDevice.current.systemVersion
+    }
+
+    public static var friendlyProduct: String {
+        switch currentDeviceIdentifier {
+        case "iPhone13,1": return "iPhone 12 mini"
+        case "iPhone13,2": return "iPhone 12"
+        case "iPhone13,3": return "iPhone 12 Pro"
+        case "iPhone13,4": return "iPhone 12 Pro Max"
+        case "iPad8,1", "iPad8,2", "iPad8,3", "iPad8,4":
+            return "iPad Pro 11\""
+        case "iPad8,5", "iPad8,6", "iPad8,7", "iPad8,8":
+            return "iPad Pro 12.9\""
+        case "iPad8,9", "iPad8,10":
+            return "iPad Pro 11\" (2nd)"
+        case "iPad8,11", "iPad8,12":
+            return "iPad Pro 12.9\" (4th)"
+        default:
+            return currentDeviceIdentifier
+        }
+    }
+
+    /// Sketch-style device line: "iPhone 12  update:26.5"
+    public static var headerDeviceLine: String {
+        "\(friendlyProduct)  update:\(marketingVersion)"
     }
 }

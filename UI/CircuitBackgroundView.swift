@@ -144,12 +144,6 @@ struct EnergyNodes: View {
                 context.fill(Path(ellipseIn: glowRect), with: .color(stage.color.opacity(opacity * 0.3)))
                 context.fill(Path(ellipseIn: rect), with: .color(stage.color.opacity(opacity)))
             }
-            
-            let corePulse = (sin(timeVal * 2) + 1) / 2
-            let coreSize = 8.0 + corePulse * 6.0
-            let coreRect = CGRect(x: center.x - CGFloat(coreSize)/2, y: center.y - CGFloat(coreSize)/2, width: CGFloat(coreSize), height: CGFloat(coreSize))
-            
-            context.fill(Path(ellipseIn: coreRect), with: .color(stage.color.opacity(0.9)))
         }
     }
 }

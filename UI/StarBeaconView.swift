@@ -2,29 +2,15 @@ import SwiftUI
 
 struct StarBeaconView: View {
     let stage: JailbreakStage
-    @State private var pulsePhase: Double = 0
-    @State private var rotationAngle: Double = 0
     
     var body: some View {
         TimelineView(.animation(minimumInterval: 1/60, paused: false)) { context in
             ZStack {
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            colors: [
-                                stage.glowColor.opacity(0.3),
-                                stage.glowColor.opacity(0.1),
-                                .clear
-                            ],
-                            center: .center,
-                            startRadius: 0,
-                            endRadius: 100
-                        )
-                    )
-                    .scaleEffect(calculateGlowScale(at: context.date))
-                    .blur(radius: 25)
-                
-                // Renamed to avoid conflict with ContentView's FourPointedStar
+                BeaconFourPointedStar()
+                    .fill(stage.glowColor.opacity(0.28))
+                    .scaleEffect(calculateGlowScale(at: context.date) * 1.35)
+                    .blur(radius: 22)
+
                 BeaconFourPointedStar()
                     .fill(
                         LinearGradient(
@@ -51,12 +37,7 @@ struct StarBeaconView: View {
                     .frame(width: LayoutConstants.starSize * 0.35, height: LayoutConstants.starSize * 0.35)
                     .rotationEffect(.degrees(calculateCalmRotation(at: context.date)))
                     .blur(radius: 1.5)
-                
-                Circle()
-                    .fill(stage.color.opacity(0.8))
-                    .frame(width: 12, height: 12)
                     .scaleEffect(calculateCorePulse(at: context.date))
-                    .shadow(color: stage.glowColor, radius: 8)
             }
         }
     }

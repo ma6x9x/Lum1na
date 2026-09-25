@@ -12,47 +12,45 @@ struct ContentView: View {
     @State private var recoveredNote: String = ""
 
     var body: some View {
-        VStack(spacing: 0) {
-            headerSection
-                .padding(.top, 12)
-                .padding(.horizontal, 20)
+        ZStack {
+            CircuitBackgroundView(stage: visualStage)
+            GlyphRainView(intensity: viewModel.isRunning ? 0.55 : 0.22)
 
-            if !recoveredNote.isEmpty {
-                recoveryBanner
-            }
+            VStack(spacing: 0) {
+                headerSection
+                    .padding(.top, 10)
+                    .padding(.horizontal, 16)
 
-            MatrixConsoleView()
-                .padding(.horizontal, 16)
-                .padding(.top, 10)
-
-            VStack(spacing: 12) {
-                HStack(spacing: 16) {
-                    ForEach(ExploitManager.catalog) { entry in
-                        Button {
-                            Task { await viewModel.executeExploit(entry) }
-                        } label: {
-                            HexagonBadgeView(
-                                type: badgeType(for: entry.stage),
-                                isActive: viewModel.isRunning &&
-                                    viewModel.selectedStage == entry.stage
-                            )
-                        }
-                        .buttonStyle(PlainButtonStyle())
-                        .disabled(viewModel.isRunning)
-                    }
+                if !recoveredNote.isEmpty {
+                    recoveryBanner
+                        .padding(.top, 8)
                 }
 
-                fullChainButton
-                allExploitsButton
-            }
-            .padding(.horizontal, 16)
-            .padding(.top, 10)
-            .padding(.bottom, 20)
+                MotherboardView(manager: viewModel) { stage in
+                    Task { await viewModel.executeStage(stage.rawValue) }
+                }
+                .frame(height: 268)
+                .padding(.horizontal, 8)
+                .padding(.top, 4)
 
-            RainbowWaveRibbonView(power: viewModel.isRunning ? 1.0 : 0.3)
-                .frame(height: 40)
-                .allowsHitTesting(false)
+                MatrixConsoleView()
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
+
+                VStack(spacing: 10) {
+                    jailbreakButton
+                    allExploitsButton
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 16)
+
+                RainbowWaveRibbonView(power: viewModel.isRunning ? 1.0 : 0.28)
+                    .frame(height: 28)
+                    .allowsHitTesting(false)
+            }
         }
+        .preferredColorScheme(.dark)
         .sheet(isPresented: $showingAllExploits) {
             AllExploitsSheet(viewModel: viewModel)
         }
@@ -64,6 +62,19 @@ struct ContentView: View {
                 let tap = PersistentLogStore.shared.lastTapId().map { " last TAP \($0)" } ?? ""
                 recoveredNote = "Recovered from crash\(tap): \(viewModel.lastRecoverySummary)"
             }
+        }
+    }
+
+    private var visualStage: JailbreakStage {
+        guard viewModel.isRunning else {
+            return viewModel.lastResult.isSuccess ? .success : .idle
+        }
+        switch viewModel.selectedStage {
+        case .kernel?: return .kaslr
+        case .sandbox?: return .heap
+        case .daemon?: return .ppl
+        case .patchset?: return .persistence
+        default: return .detecting
         }
     }
 
@@ -99,73 +110,96 @@ struct ContentView: View {
         .padding(.horizontal, 16)
     }
 
-    private func badgeType(for stage: ExploitStage) -> BadgeType {
-        switch stage {
-        case .kernel: return .kernel
-        case .sandbox: return .sandbox
-        case .daemon: return .daemon
-        case .patchset: return .patchset
-        }
-    }
-
     private var headerSection: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Lum1na")
-                    .font(.system(size: 42, weight: .bold, design: .rounded))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.lum1naViolet, .lum1naCyan],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
+        HStack(alignment: .top, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                ZStack(alignment: .topLeading) {
+                    CloudWispsView()
+                        .offset(x: 36, y: -10)
+                    HStack(spacing: 8) {
+                        Lum1naStarShape()
+                            .fill(
+                                LinearGradient(
+                                    colors: [Color.lum1naMagenta, Color.white, Color.lum1naCyan],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .frame(width: 22, height: 22)
+                            .shadow(color: Color.lum1naCyan.opacity(0.6), radius: 6)
+                        Text("Lum1na")
+                            .font(.system(size: 32, weight: .bold, design: .rounded))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [.lum1naViolet, .lum1naCyan],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                )
+                            )
+                    }
+                }
+                Text("The guiding light for Jailbreaks")
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .italic()
+                    .foregroundColor(Color.white.opacity(0.45))
+                    .padding(.leading, 30)
+            }
 
+            Spacer(minLength: 8)
+
+            VStack(alignment: .trailing, spacing: 8) {
                 HStack(spacing: 8) {
+                    devicePill
+                    Button(action: { showingSettings = true }) {
+                        Image(systemName: "gearshape.fill")
+                            .font(.title3)
+                            .foregroundColor(.lum1naCyan)
+                    }
+                }
+                HStack(spacing: 6) {
                     Circle()
                         .fill(statusColor)
-                        .frame(width: 8, height: 8)
-                        .shadow(color: statusColor.opacity(0.5), radius: 4)
-
+                        .frame(width: 7, height: 7)
+                        .shadow(color: statusColor.opacity(0.5), radius: 3)
                     Text(viewModel.isRunning ? "Running..." : "Ready")
-                        .font(.system(.subheadline, weight: .medium))
+                        .font(.system(.caption, weight: .medium, design: .rounded))
                         .foregroundColor(statusColor)
                 }
             }
-
-            Spacer()
-
-            HStack(spacing: 16) {
-                Button(action: {
-                    UIPasteboard.general.string =
-                        PersistentLogStore.shared.recoveryTranscript()
-                    viewModel.log("[+] Recovery log copied", level: .success)
-                }) {
-                    Image(systemName: "clock.arrow.circlepath")
-                        .font(.title3)
-                        .foregroundColor(.consoleSuccess)
-                }
-
-                Button(action: { showingSettings = true }) {
-                    Image(systemName: "gearshape.fill")
-                        .font(.title3)
-                        .foregroundColor(.lum1naCyan)
-                }
-            }
         }
     }
 
-    private var fullChainButton: some View {
+    private var devicePill: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "iphone")
+                .font(.system(size: 11, weight: .semibold))
+            Text(DeviceUtils.headerDeviceLine)
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .foregroundColor(.white.opacity(0.85))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            Capsule()
+                .fill(Color.white.opacity(0.06))
+                .overlay(
+                    Capsule().stroke(Color.lum1naViolet.opacity(0.45), lineWidth: 1)
+                )
+        )
+    }
+
+    private var jailbreakButton: some View {
         Button(action: {
             Task { await viewModel.executeStage("Full Chain") }
         }) {
-            HStack(spacing: 12) {
-                Image(systemName: "bolt.fill")
+            HStack(spacing: 10) {
+                Image(systemName: "sparkle")
                     .font(.system(.body, weight: .semibold))
-
-                Text("Execute Full Chain")
-                    .font(.system(.subheadline, weight: .bold))
-
+                Text("JAILBREAK")
+                    .font(.system(.subheadline, weight: .bold, design: .rounded))
+                    .tracking(1.2)
                 if viewModel.isRunning {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
@@ -179,30 +213,22 @@ struct ContentView: View {
                 RoundedRectangle(cornerRadius: 14)
                     .fill(
                         LinearGradient(
-                            colors: [
-                                viewModel.isRunning
-                                    ? Color.gray.opacity(0.3)
-                                    : currentStage.color.opacity(0.25),
-                                viewModel.isRunning
-                                    ? Color.gray.opacity(0.15)
-                                    : currentStage.color.opacity(0.1)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
+                            colors: viewModel.isRunning
+                                ? [Color.gray.opacity(0.35), Color.gray.opacity(0.18)]
+                                : [Color.lum1naCyan.opacity(0.85), Color.lum1naMagenta.opacity(0.85)],
+                            startPoint: .leading,
+                            endPoint: .trailing
                         )
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 14)
-                            .stroke(
-                                viewModel.isRunning
-                                    ? Color.gray.opacity(0.5)
-                                    : currentStage.color.opacity(0.6),
-                                lineWidth: 1.5
-                            )
+                            .stroke(Color.white.opacity(viewModel.isRunning ? 0.15 : 0.35), lineWidth: 1)
                     )
             )
-            .shadow(color: currentStage.glowColor.opacity(
-                viewModel.isRunning ? 0 : 0.3), radius: 8)
+            .shadow(
+                color: (viewModel.isRunning ? Color.clear : Color.lum1naCyan.opacity(0.35)),
+                radius: 10
+            )
         }
         .disabled(viewModel.isRunning)
     }
@@ -210,7 +236,7 @@ struct ContentView: View {
     private var allExploitsButton: some View {
         Button(action: { showingAllExploits = true }) {
             HStack(spacing: 6) {
-                Text("All Exploits")
+                Text("All stages")
                     .font(.system(.subheadline, weight: .medium))
                 Image(systemName: "chevron.down")
                     .font(.caption)
@@ -227,24 +253,12 @@ struct ContentView: View {
                     )
             )
         }
-    }
-
-    private var currentStage: JailbreakStage {
-        guard viewModel.isRunning else {
-            return viewModel.lastResult.isSuccess ? .success : .idle
-        }
-        switch viewModel.selectedStage {
-        case .kernel?: return .ane
-        case .sandbox?: return .krw
-        case .daemon?: return .ppl
-        case .patchset?: return .persistence
-        default: return .detecting
-        }
+        .disabled(viewModel.isRunning)
     }
 
     private var statusColor: Color {
         if viewModel.lastResult.isSuccess { return .consoleSuccess }
-        return viewModel.isRunning ? currentStage.color : .gray
+        return viewModel.isRunning ? visualStage.color : .gray
     }
 }
 
@@ -316,8 +330,10 @@ struct SettingsSheet: View {
         NavigationView {
             List {
                 Section(header: Text("DEVICE INFO")) {
-                    LabeledContent("Machine", value: DeviceUtils.currentDevice)
-                    LabeledContent("Category", value: DeviceUtils.deviceCategory)
+                    LabeledContent("Product", value: DeviceUtils.friendlyProduct)
+                    LabeledContent("Machine", value: DeviceUtils.currentDeviceIdentifier)
+                    LabeledContent("iOS", value: DeviceUtils.marketingVersion)
+                    LabeledContent("Build", value: DeviceUtils.osversion)
                     LabeledContent("Chip", value: DeviceUtils.currentChip)
                     LabeledContent("Supported",
                         value: DeviceUtils.isSupported ? "Yes" : "No")
