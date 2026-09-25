@@ -256,12 +256,12 @@ struct AllExploitsSheet: View {
     @ObservedObject var viewModel: ExploitManager
     @Environment(\.dismiss) var dismiss
 
-    let exploits = [
+    let exploits: [(String, String, String, Color)] = [
         ("P044 ANE 254-Input", "KERNEL", "brain", Color.badgeKernel),
         ("CVE-2026-65343 AKS", "SANDBOX", "lock.shield", Color.badgeSandbox),
         ("P051 APFS Xattr", "SANDBOX", "folder", Color.badgeSandbox),
         ("P054 APFS Reap", "DAEMON", "archivebox", Color.badgeDaemon),
-是想"PATCHSET", "bandage", Color.badgePatchset),
+        ("PATCHSET", "PATCHSET", "bandage", Color.badgePatchset)
     ]
 
     var body: some View {
