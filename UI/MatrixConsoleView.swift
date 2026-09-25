@@ -1,3 +1,8 @@
+//
+//  MatrixConsoleView.swift
+//  Lum1na
+//
+
 import SwiftUI
 
 enum CategorizedLogLevel: String, CaseIterable {
@@ -6,11 +11,12 @@ enum CategorizedLogLevel: String, CaseIterable {
     case daemon = "[DAEM]"
     case patchset = "[PTCH]"
     case init_ = "[INIT]"
+    case warning = "[WARN]"
     case error = "[ERR]"
     case success = "[OK]"
-    
+
     var displayPrefix: String { rawValue }
-    
+
     var color: Color {
         switch self {
         case .kernel:   return Color(hex: "#EF4444")
@@ -18,6 +24,7 @@ enum CategorizedLogLevel: String, CaseIterable {
         case .daemon:   return Color(hex: "#10B981")
         case .patchset: return Color(hex: "#3B82F6")
         case .init_:    return Color(hex: "#22D3EE")
+        case .warning:  return Color(hex: "#FBBF24")
         case .error:    return Color(hex: "#F87171")
         case .success:  return Color(hex: "#4ADE80")
         }
@@ -29,13 +36,13 @@ struct CategorizedLogEntry: Identifiable {
     let timestamp: Date
     let level: CategorizedLogLevel
     let message: String
-    
+
     var formattedTimestamp: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm:ss"
         return formatter.string(from: timestamp)
     }
-    
+
     var formattedMilliseconds: String {
         let formatter = DateFormatter()
         formatter.dateFormat = ".SSS"
@@ -48,14 +55,14 @@ class MatrixConsoleViewModel: ObservableObject {
     @Published var logs: [CategorizedLogEntry] = []
     @Published var autoScroll = true
     @Published var filterLevel: CategorizedLogLevel?
-    
+
     var filteredLogs: [CategorizedLogEntry] {
         if let filter = filterLevel {
             return logs.filter { $0.level == filter }
         }
         return logs
     }
-    
+
     func addLog(level: CategorizedLogLevel, message: String) {
         let entry = CategorizedLogEntry(timestamp: Date(), level: level, message: message)
         logs.append(entry)
@@ -63,7 +70,7 @@ class MatrixConsoleViewModel: ObservableObject {
             logs.removeFirst(logs.count - 200)
         }
     }
-    
+
     func clear() {
         logs.removeAll()
     }
@@ -71,8 +78,10 @@ class MatrixConsoleViewModel: ObservableObject {
 
 struct MatrixConsoleView: View {
     @StateObject private var viewModel = MatrixConsoleViewModel()
+    @ObservedObject private var manager = ExploitManager.shared
     @State private var showFilters = false
-    
+    @State private var convertedCount = 0
+
     var body: some View {
         VStack(spacing: 0) {
             consoleHeader
@@ -89,14 +98,42 @@ struct MatrixConsoleView: View {
                 )
         )
         .onAppear {
-            viewModel.addLog(level: .init_, message: "Lum1na Beta 1 initialized")
-            viewModel.addLog(level: .init_, message: "Device: iPhone15,2 (iOS 26.0)")
-            viewModel.addLog(level: .init_, message: "Target: A14-A17 devices")
-            viewModel.addLog(level: .success, message: "Exploit chain loaded")
-            viewModel.addLog(level: .kernel, message: "Waiting for KASLR leak...")
+            // Real device info — no more hardcoded demo lines
+            if viewModel.logs.isEmpty {
+                viewModel.addLog(level: .init_, message: "Lum1na initialized")
+                viewModel.addLog(level: .init_, message: "Device: \(DeviceUtils.currentDevice)")
+                viewModel.addLog(level: .init_, message: "Chip: \(DeviceUtils.currentChip)")
+                viewModel.addLog(level: .success, message: "Exploit chain loaded")
+            }
+        }
+        .onReceive(manager.$lines) { lines in
+            // Bridge ExploitManager output into the categorized console
+            guard convertedCount < lines.count else { return }
+            for line in lines[convertedCount...] {
+                let (level, message) = Self.categorize(line)
+                viewModel.addLog(level: level, message: message)
+            }
+            convertedCount = lines.count
         }
     }
-    
+
+    /// Maps ExploitManager ConsoleLine → categorized console entry
+    private static func categorize(_ line: ConsoleLine) -> (CategorizedLogLevel, String) {
+        switch line.level {
+        case .success: return (.success, line.message)
+        case .error:   return (.error, line.message)
+        case .warning: return (.warning, line.message)
+        case .info:
+            let msg = line.message
+            if message.contains("KERNEL")   { return (.kernel, line.message) }
+            if message.contains("SANDBOX")  { return (.sandbox, line.message) }
+            if message.contains("DAEMON")   { return (.daemon, line.message) }
+            if message.contains("PATCHSET") { return (.patchset, line.message) }
+            if message.contains("===") || message.contains("Stage:") { return (.init_, line.message) }
+            return (.init_, line.message)
+        }
+    }
+
     private var consoleHeader: some View {
         HStack(spacing: 12) {
             HStack(spacing: 6) {
@@ -107,9 +144,20 @@ struct MatrixConsoleView: View {
                     .font(.system(.caption, design: .monospaced))
                     .foregroundStyle(Color(hex: "#64748B"))
             }
-            
+
             Spacer()
-            
+
+            // Copy log to clipboard
+            Button {
+                UIPasteboard.general.string = viewModel.logs.map { entry in
+                    "\(entry.level.displayPrefix) \(entry.formattedTimestamp) \(entry.message)"
+                }.joined(separator: "\n")
+            } label: {
+                Image(systemName: "doc.on.doc")
+                    .font(.system(size: 12))
+                    .foregroundStyle(Color(hex: "#64748B"))
+            }
+
             Button {
                 withAnimation(.easeInOut(duration: 0.2)) { showFilters.toggle() }
             } label: {
@@ -117,7 +165,7 @@ struct MatrixConsoleView: View {
                     .font(.system(size: 12))
                     .foregroundStyle(showFilters ? Color(hex: "#22D3EE") : Color(hex: "#64748B"))
             }
-            
+
             HStack(spacing: 6) {
                 Circle()
                     .fill(Color(hex: "#10B981"))
@@ -131,7 +179,7 @@ struct MatrixConsoleView: View {
         .padding(.vertical, 8)
         .background(Color(hex: "#0F0F14"))
     }
-    
+
     private var filterBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6) {
@@ -148,7 +196,7 @@ struct MatrixConsoleView: View {
                         }
                     }
                 }
-                
+
                 Button { viewModel.clear() } label: {
                     Text("CLEAR")
                         .font(.system(.caption2, weight: .bold))
@@ -160,7 +208,7 @@ struct MatrixConsoleView: View {
         }
         .background(Color(hex: "#0A0A0F"))
     }
-    
+
     private var logContent: some View {
         ScrollViewReader { proxy in
             ScrollView(.vertical, showsIndicators: true) {
@@ -183,7 +231,7 @@ struct MatrixConsoleView: View {
             }
         }
     }
-    
+
     func addLog(level: CategorizedLogLevel, message: String) {
         viewModel.addLog(level: level, message: message)
     }
@@ -194,7 +242,7 @@ struct FilterChip: View {
     let isSelected: Bool
     let count: Int
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 4) {
@@ -226,7 +274,7 @@ struct FilterChip: View {
 
 struct CategorizedLogRow: View {
     let entry: CategorizedLogEntry
-    
+
     var body: some View {
         HStack(alignment: .top, spacing: 6) {
             HStack(spacing: 0) {
@@ -237,18 +285,18 @@ struct CategorizedLogRow: View {
             }
             .font(.system(.caption2, design: .monospaced))
             .frame(width: 75, alignment: .leading)
-            
+
             Text(entry.level.displayPrefix)
                 .font(.system(.caption2, design: .monospaced, weight: .bold))
                 .foregroundStyle(entry.level.color)
                 .frame(width: 45, alignment: .leading)
-            
+
             Text(entry.message)
                 .font(.system(.caption2, design: .monospaced))
                 .foregroundStyle(Color(hex: "#E2E8F0"))
                 .lineLimit(nil)
                 .fixedSize(horizontal: false, vertical: true)
-            
+
             Spacer()
         }
         .padding(.vertical, 2)
