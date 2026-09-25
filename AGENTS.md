@@ -46,6 +46,7 @@ Stale names (do **not** resurrect): FusionChain, KernelMap/LabOffsets.swift dupl
 
 6. **Logging must stamp once**  
    `ConsoleLine.formatted` already has `yyyy-MM-dd HH:mm:ss z`. Never dump disk lines back through `log()` without `stripStamp`. Never dump `[RECOVER]` transcripts into the next session.  
+   Capture the recovery packet **before** `writeSessionStart`. Copy that packet from the banner / Settings — do not scrape the live console. Split last-session on `=== SESSION START` only, not probe banners (`=== P044 Session`).  
    On-screen console is **P007 replace-on-tap**: `resetOnScreenLog()` at each `executeExploit` / `executeStage`. Do not append the previous probe. Disk TAP + `p0xx_*_log.txt` stay append-only.
 
 7. **iOS 26 Liquid Glass API**  

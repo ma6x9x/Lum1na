@@ -6,7 +6,7 @@ Dopamine 3.0.10 keeps a `system_info` blob (slide, symbols, physrw, kcall) *afte
 
 - identity (machine, 23F77, LabOff tag)
 - unslid pins (fn4, wvek, AVE Close, ANE CheckandPrewire)
-- leak list `{va, kind, source, time}` — heap vs text
+- leak list `{va, kind, source, time, lastSeen, hits}` — unique by va+kind; repeats bump `hits` (aio84530 poll is one row, not 66)
 - `hasKread` / `hasKwrite` stay false until a kread of a **known kernel string** works
 - `commitSlide` refuses heap−staticBase
 
@@ -25,6 +25,8 @@ You do **not** tap “Kernel board JSON” to collect pointers. That button only
 | `kslide` / `hasKread` | Never auto. `commitSlide` refuses heap−staticBase | N/A until real kread |
 
 Wired today: **aio84530** (`sdata`), **cskrw** (race hit). Everyone else (p009, p010, p017, p056, p057, …) logs to the console / `p0xx_*_log.txt` only.
+
+`recordHeapLeak` of the same VA does **not** append. It increments `hits` and updates `lastSeen`. A new `source` on the same VA is recorded under `sources[]`. Cap is 64 unique rows. Launch compact collapses any old duplicate JSON.
 
 ## Hook a new probe
 

@@ -3,6 +3,7 @@
 /// Durable jailbreak-state file (Documents/lum1na_board.json).
 /// Inspired by Dopamine's system_info split (constants vs live primitives)
 /// but A14/PPL-shaped and honest: heap leaks are not kslide.
+/// leaks[] is unique by va+kind; repeats bump hits / lastSeen.
 @interface Lum1naBoard : NSObject
 
 + (instancetype)shared;

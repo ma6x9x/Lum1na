@@ -160,21 +160,28 @@ public final class PersistentLogStore {
         return String(data: data, encoding: .utf8)
     }
 
-    /// Last *run* only. Do NOT split on `=== verdict` — that ate the full log
-    /// in P007. Session headers look like `=== p051 session … ===`.
+    /// Last app session only. Split on `=== SESSION START`, never on a
+    /// probe banner like `=== P044 Session … ===` (that ate panic logs).
     public func lastSession(_ full: String) -> String {
+        lastSession(full, previous: false)
+    }
+
+    public func lastSession(_ full: String, previous: Bool) -> String {
         let trimmed = full.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return trimmed }
         let lines = trimmed.components(separatedBy: "\n")
         var starts: [Int] = []
         for (i, line) in lines.enumerated() {
-            let s = line.trimmingCharacters(in: .whitespaces)
-            if s.hasPrefix("==="), s.lowercased().contains("session") {
+            if line.hasPrefix(PersistentLogStore.sessionStartMarker) {
                 starts.append(i)
             }
         }
-        guard let start = starts.last else { return trimmed }
-        return lines[start...].joined(separator: "\n")
+        guard let last = starts.last else { return trimmed }
+        if previous, starts.count >= 2 {
+            let prev = starts[starts.count - 2]
+            return lines[prev..<last].joined(separator: "\n")
+        }
+        return lines[last...].joined(separator: "\n")
     }
 
     public func lastTapId() -> String? {
@@ -198,44 +205,63 @@ public final class PersistentLogStore {
         return !afterStart.contains(PersistentLogStore.sessionEndMarker)
     }
 
-    /// Prefer the probe log for the last TAP, then fall back to the console
-    /// last session, then newest mtime among Documents `*_log.txt`.
+    /// One pasteable packet: board + last console session + last TAP file +
+    /// tap markers. Call **before** `writeSessionStart` after a panic so
+    /// `lastSession` is still the crashed session. After a new SESSION START
+    /// pass `previousSession: true`.
+    public func captureRecoveryPacket(
+        boardJSON: String,
+        sku: String,
+        unclean: Bool,
+        previousSession: Bool = false
+    ) -> String {
+        let stamp = LabTime.militaryNow()
+        let tapId = lastTapId() ?? "none"
+        let console = readAll() ?? ""
+        let last = lastSession(console, previous: previousSession)
+        let tapLines = (readTapLog() ?? "")
+            .components(separatedBy: "\n")
+            .filter { !$0.isEmpty }
+            .suffix(8)
+            .joined(separator: "\n")
+
+        var extra = ""
+        let probeName = Self.probeLogFiles[tapId] ?? Self.probeLogFiles[tapId.lowercased()]
+        if let name = probeName,
+           name != Self.consoleLogName,
+           name != "lum1na_board.json",
+           let body = loadProbeLog(named: name),
+           !body.isEmpty {
+            extra = "\n=== LAST TAP FILE (\(tapId) → \(name)) ===\n\(body)\n"
+        }
+
+        return """
+        === LUM1NA RECOVERY \(stamp) ===
+        last TAP: \(tapId)
+        unclean: \(unclean ? "YES" : "NO")
+        sku: \(sku)
+
+        === BOARD ===
+        \(boardJSON)
+        \(extra)
+        === LAST SESSION (console) ===
+        \(last.isEmpty ? "(empty)" : last)
+
+        === TAP MARKERS (last 8) ===
+        \(tapLines.isEmpty ? "(none)" : tapLines)
+        === end ===
+        """
+    }
+
+    /// Live rebuild. Prefer `ExploitManager.lastRecoveryTranscript` (cached
+    /// at launch before SESSION START) so Copy does not pick this session.
     public func recoveryTranscript() -> String {
-        let tid = lastTapId()
-        if let tid {
-            let name = Self.probeLogFiles[tid] ?? Self.probeLogFiles[tid.lowercased()]
-            if let name, let body = loadProbeLog(named: name) {
-                return "=== RECOVERED (last TAP \(tid) → \(name)) ===\n"
-                    + body
-                    + "\n=== end ===\n"
-            }
-            if let name {
-                return "=== RECOVERED ===\n"
-                    + "Last TAP was \(tid), but \(name) is missing/empty "
-                    + "(common after panic before F_FULLFSYNC).\n"
-                    + "Check ips PC; re-run that probe after install.\n"
-                    + fallbackConsoleSession()
-                    + "\n=== end ===\n"
-            }
-        }
-
-        if let newest = newestProbeLog() {
-            var note = ""
-            if let tid, let wanted = Self.probeLogFiles[tid], newest.name != wanted {
-                note = "(NOTE: last TAP was \(tid) → wanted \(wanted); "
-                    + "showing newest durable log instead.)\n"
-            }
-            return "=== RECOVERED (newest mtime: \(newest.name)) ===\n"
-                + note
-                + newest.body
-                + "\n=== end ===\n"
-        }
-
-        let console = fallbackConsoleSession()
-        if console.isEmpty { return "" }
-        return "=== RECOVERED (console last session) ===\n"
-            + console
-            + "\n=== end ===\n"
+        captureRecoveryPacket(
+            boardJSON: Lum1naBoard.shared().jsonDump(),
+            sku: LabDeviceProfile.skuName() as String? ?? "?",
+            unclean: false,
+            previousSession: true
+        )
     }
 
     private func loadProbeLog(named name: String) -> String? {

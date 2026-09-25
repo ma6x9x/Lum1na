@@ -4,7 +4,6 @@
 #import "LabLocalTime.h"
 #import <sys/sysctl.h>
 
-
 static NSString *boardPath(void) {
     NSString *docs = [NSSearchPathForDirectoriesInDomains(
         NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
@@ -13,12 +12,6 @@ static NSString *boardPath(void) {
 
 @implementation Lum1naBoard {
     NSMutableDictionary *_d;
-    // Dedupe guard: one record per (va,kind,source) per app session.
-    // A fresh process start resets this, so a re-tap in a later session
-    // still records. Prevents the aio84530 poll-loop pattern from
-    // writing 66 identical rows (11:50 run).
-    NSMutableSet *_recordedKeys;
-    NSString *_session;
 }
 
 + (instancetype)shared {
@@ -37,11 +30,56 @@ static NSString *boardPath(void) {
     }
     if (!_d) _d = [NSMutableDictionary dictionary];
     if (!_d[@"leaks"]) _d[@"leaks"] = [NSMutableArray array];
-    _recordedKeys = [NSMutableSet set];
-    _session = [NSString stringWithFormat:@"s-%@-%u",
-                LabLocalMilitaryNow() ?: @"?", arc4random()];
+    [self compactLeaks];
     [self refreshIdentity];
     return self;
+}
+
+/// Collapse identical va+kind rows (aio84530 polled the same sdata ~66×).
+/// One row per unique heap VA; hits / lastSeen / sources keep the history.
+- (void)compactLeaks {
+    NSArray *raw = _d[@"leaks"];
+    if (![raw isKindOfClass:[NSArray class]] || raw.count == 0) {
+        _d[@"leaks"] = [NSMutableArray array];
+        return;
+    }
+    NSMutableArray *out = [NSMutableArray array];
+    NSMutableDictionary *index = [NSMutableDictionary dictionary];
+    for (id obj in raw) {
+        if (![obj isKindOfClass:[NSDictionary class]]) continue;
+        NSDictionary *e = obj;
+        NSString *va = e[@"va"] ?: @"";
+        NSString *kind = e[@"kind"] ?: @"heap";
+        NSString *src = e[@"source"] ?: @"?";
+        NSString *key = [NSString stringWithFormat:@"%@|%@", va, kind];
+        NSNumber *idx = index[key];
+        NSInteger add = [e[@"hits"] integerValue];
+        if (add < 1) add = 1;
+        if (idx) {
+            NSMutableDictionary *ex = [out[idx.unsignedIntegerValue] mutableCopy];
+            NSInteger hits = [ex[@"hits"] integerValue];
+            if (hits < 1) hits = 1;
+            ex[@"hits"] = @(hits + add);
+            NSString *seen = e[@"lastSeen"] ?: e[@"time"];
+            if (seen.length) ex[@"lastSeen"] = seen;
+            NSMutableArray *sources = [ex[@"sources"] mutableCopy] ?: [NSMutableArray array];
+            NSString *first = ex[@"source"];
+            if (first.length && ![sources containsObject:first]) [sources addObject:first];
+            if (src.length && ![sources containsObject:src]) [sources addObject:src];
+            if (sources.count > 1) ex[@"sources"] = sources;
+            out[idx.unsignedIntegerValue] = ex;
+        } else {
+            NSMutableDictionary *ex = [e mutableCopy] ?: [NSMutableDictionary dictionary];
+            if ([ex[@"hits"] integerValue] < 1) ex[@"hits"] = @(add);
+            if (!ex[@"lastSeen"]) ex[@"lastSeen"] = e[@"time"] ?: @"";
+            index[key] = @(out.count);
+            [out addObject:ex];
+        }
+    }
+    if (out.count > 64) {
+        [out removeObjectsInRange:NSMakeRange(0, out.count - 64)];
+    }
+    _d[@"leaks"] = out;
 }
 
 - (void)refreshIdentity {
@@ -90,25 +128,45 @@ static NSString *boardPath(void) {
 
 - (void)recordCandidate:(uint64_t)va kind:(NSString *)kind source:(NSString *)source {
     if (va < 0xffff000000000000ULL) return;
-
-    // v2: dedupe within this session — same (va,kind,source) recorded once
-    // per app launch. Cross-session and cross-source records are unaffected
-    // (aio84530 and p044 hitting the same region = two entries, which is
-    // the correlation signal we want on the board).
-    NSString *key = [NSString stringWithFormat:@"0x%llx|%@|%@", va, kind ?: @"", source ?: @""];
-    if ([_recordedKeys containsObject:key]) return;
-    [_recordedKeys addObject:key];
-
     NSMutableArray *leaks = _d[@"leaks"];
     if (![leaks isKindOfClass:[NSMutableArray class]]) {
         leaks = [leaks mutableCopy] ?: [NSMutableArray array];
         _d[@"leaks"] = leaks;
     }
+    NSString *vaStr = [NSString stringWithFormat:@"0x%llx", va];
+    NSString *k = kind.length ? kind : @"unknown";
+    NSString *src = source.length ? source : @"?";
+    NSString *now = LabLocalMilitaryNow() ?: @"";
+
+    for (NSUInteger i = 0; i < leaks.count; i++) {
+        NSDictionary *e = leaks[i];
+        if (![e isKindOfClass:[NSDictionary class]]) continue;
+        if (![e[@"va"] isEqualToString:vaStr]) continue;
+        if (![e[@"kind"] isEqualToString:k]) continue;
+        NSMutableDictionary *ex = [e mutableCopy];
+        NSInteger hits = [ex[@"hits"] integerValue];
+        if (hits < 1) hits = 1;
+        ex[@"hits"] = @(hits + 1);
+        ex[@"lastSeen"] = now;
+        if (![ex[@"source"] isEqualToString:src]) {
+            NSMutableArray *sources = [ex[@"sources"] mutableCopy] ?: [NSMutableArray array];
+            NSString *first = ex[@"source"];
+            if (first.length && ![sources containsObject:first]) [sources addObject:first];
+            if (![sources containsObject:src]) [sources addObject:src];
+            ex[@"sources"] = sources;
+        }
+        leaks[i] = ex;
+        [self persist];
+        return;
+    }
+
     [leaks addObject:@{
-        @"va": [NSString stringWithFormat:@"0x%llx", va],
-        @"kind": kind ?: @"unknown",
-        @"source": source ?: @"?",
-        @"time": LabLocalMilitaryNow() ?: @""
+        @"va": vaStr,
+        @"kind": k,
+        @"source": src,
+        @"time": now,
+        @"lastSeen": now,
+        @"hits": @1
     }];
     if (leaks.count > 64) {
         [leaks removeObjectsInRange:NSMakeRange(0, leaks.count - 64)];
@@ -135,22 +193,30 @@ static NSString *boardPath(void) {
     _d[@"kbase"] = @"0x0";
     _d[@"hasKread"] = @NO;
     _d[@"hasKwrite"] = @NO;
-    [_recordedKeys removeAllObjects];
     [self persist];
 }
 
 + (NSString *)tap {
     Lum1naBoard *b = [Lum1naBoard shared];
+    [b compactLeaks];
     [b refreshIdentity];
+    NSUInteger hits = 0;
+    for (NSDictionary *e in b.leaks) {
+        if (![e isKindOfClass:[NSDictionary class]]) continue;
+        NSInteger n = [e[@"hits"] integerValue];
+        hits += (n < 1) ? 1 : (NSUInteger)n;
+    }
     return [NSString stringWithFormat:
             @"=== lum1na board %@ ===\n"
             @"Documents/lum1na_board.json\n"
-            @"hasKread=%@ hasKwrite=%@ leaks=%lu\n"
-            @"kslide=%@ kbase=%@\n\n%@\n",
+            @"hasKread=%@ hasKwrite=%@ unique=%lu hits=%lu\n"
+            @"kslide=%@ kbase=%@\n"
+            @"same VA is one row (hits bumps, not a new leak).\n\n%@\n",
             LabLocalMilitaryNow(),
             b.hasKread ? @"YES" : @"NO",
             b.hasKwrite ? @"YES" : @"NO",
             (unsigned long)b.leaks.count,
+            (unsigned long)hits,
             b.kslide ? [NSString stringWithFormat:@"0x%llx", b.kslide] : @"0",
             b.kbase ? [NSString stringWithFormat:@"0x%llx", b.kbase] : @"0",
             [b jsonDump]];

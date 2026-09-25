@@ -82,12 +82,11 @@ struct ContentView: View {
                 .lineLimit(3)
             Spacer()
             Button {
-                UIPasteboard.general.string =
-                    PersistentLogStore.shared.recoveryTranscript()
-                viewModel.log("[+] Recovery transcript copied", level: .success)
+                UIPasteboard.general.string = viewModel.lastRecoveryTranscript
+                recoveredNote = "Recovery packet copied (last TAP \(viewModel.lastRecoverySummary))"
             } label: {
                 Text("Copy")
-                    .font(.system(.caption, weight: .semibold))
+                    .font(.system(.caption, design: .rounded, weight: .semibold))
                     .foregroundColor(.lum1naCyan)
             }
         }
@@ -270,6 +269,16 @@ struct SettingsSheet: View {
     @ObservedObject var viewModel: ExploitManager
     @Environment(\.dismiss) var dismiss
 
+    private func boardLeakLabel() -> String {
+        let leaks = Lum1naBoard.shared().leaks
+        var hits = 0
+        for case let e as NSDictionary in leaks {
+            let n = (e["hits"] as? NSNumber)?.intValue ?? 1
+            hits += max(n, 1)
+        }
+        return "\(leaks.count) unique / \(hits) hits"
+    }
+
     var body: some View {
         NavigationView {
             List {
@@ -307,7 +316,7 @@ struct SettingsSheet: View {
                 Section(header: Text("LAB / DEBUG")) {
                     LabeledContent("Last TAP",
                         value: PersistentLogStore.shared.lastTapId() ?? "none")
-                    LabeledContent("SKU", value: LabDeviceProfile.skuName())
+                    LabeledContent("SKU", value: LabDeviceProfile.skuName() as String? ?? "?")
                     Button {
                         if let ident = ExploitManager.catalog.first(where: { $0.id == "ident" }) {
                             dismiss()
@@ -338,15 +347,22 @@ struct SettingsSheet: View {
                         Label("Copy Kernel Board JSON", systemImage: "cpu")
                     }
                     LabeledContent("Board kread", value: Lum1naBoard.shared().hasKread ? "yes" : "no")
-                    LabeledContent("Board leaks", value: "\(Lum1naBoard.shared().leaks.count)")
+                    LabeledContent("Board leaks", value: boardLeakLabel())
                 }
 
-                Section(header: Text("RECOVERY LOG")) {
+                Section(header: Text("RECOVERY LOG"),
+                        footer: Text("Recovery packet is the previous session (board + last console session + TAP markers), captured at launch. Console Copy is this session only. Full Disk is everything.")) {
                     Button {
-                        UIPasteboard.general.string =
-                            PersistentLogStore.shared.recoveryTranscript()
+                        let packet = viewModel.lastRecoveryTranscript.isEmpty
+                            ? PersistentLogStore.shared.captureRecoveryPacket(
+                                boardJSON: Lum1naBoard.shared().jsonDump(),
+                                sku: LabDeviceProfile.skuName() as String? ?? "?",
+                                unclean: false,
+                                previousSession: true)
+                            : viewModel.lastRecoveryTranscript
+                        UIPasteboard.general.string = packet
                     } label: {
-                        Label("Copy Recovery Log",
+                        Label("Copy Recovery Packet",
                               systemImage: "clock.arrow.circlepath")
                     }
 
