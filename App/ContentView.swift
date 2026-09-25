@@ -8,106 +8,64 @@ import SwiftUI
 struct ContentView: View {
     @StateObject private var viewModel = ExploitManager.shared
     @State private var showingAllExploits = false
+    @State private var showingSettings = false
 
     var body: some View {
-        ZStack {
-            CircuitBackgroundView(stage: currentStage)
-                .ignoresSafeArea()
+        VStack(spacing: 0) {
+            headerSection
+                .padding(.top, 12)
+                .padding(.horizontal, 20)
 
-            GlyphRainView(intensity: 0.3)
-                .opacity(0.3)
+            // Console takes all remaining space
+            MatrixConsoleView()
+                .padding(.horizontal, 16)
+                .padding(.top, 10)
 
-            VStack(spacing: 0) {
-                headerSection
-                    .padding(.top, 20)
-
-                StarBeaconView(stage: currentStage)
-                    .frame(height: 120)
-                    .padding(.vertical, 10)
-
+            // Bottom control deck
+            VStack(spacing: 12) {
                 HStack(spacing: 16) {
-                    ForEach([BadgeType.kernel, .sandbox, .daemon, .patchset], id: \.self) { badge in
-                        HexagonBadgeView(
-                            type: badge,
-                            isActive: activeBadges.contains(badge)
-                        )
+                    ForEach(ExploitManager.catalog) { entry in
+                        Button {
+                            Task { await viewModel.executeExploit(entry) }
+                        } label: {
+                            HexagonBadgeView(
+                                type: badgeType(for: entry.stage),
+                                isActive: viewModel.isRunning &&
+                                    viewModel.selectedStage == entry.stage
+                            )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .disabled(viewModel.isRunning)
                     }
                 }
-                .padding(.vertical, 8)
-
-                CentralHeapView(
-                    heapAddress: viewModel.currentKernelSlide != 0
-                        ? "0x\(String(viewModel.currentKernelSlide, radix: 16, uppercase: true))"
-                        : nil,
-                    stage: currentStage
-                )
-                .padding(.vertical, 8)
-
-                HStack(spacing: 20) {
-                    ForEach(0..<3) { index in
-                        LiquidBubbleView(
-                            color: currentStage.color,
-                            delay: Double(index) * 0.3
-                        )
-                    }
-                }
-                .frame(height: 60)
-
-                MatrixConsoleView()
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-
-                Spacer(minLength: 10)
 
                 fullChainButton
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
 
                 allExploitsButton
-                    .padding(.bottom, 20)
             }
+            .padding(.horizontal, 16)
+            .padding(.top, 10)
+            .padding(.bottom, 20)
 
-            VStack {
-                Spacer()
-                RainbowWaveRibbonView(power: viewModel.isRunning ? 1.0 : 0.3)
-                    .frame(height: 60)
-                    .padding(.bottom, 8)
-            }
-            .allowsHitTesting(false)
+            RainbowWaveRibbonView(power: viewModel.isRunning ? 1.0 : 0.3)
+                .frame(height: 40)
+                .allowsHitTesting(false)
         }
         .sheet(isPresented: $showingAllExploits) {
             AllExploitsSheet(viewModel: viewModel)
         }
-    }
-
-    private var currentStage: JailbreakStage {
-        guard viewModel.isRunning else {
-            return viewModel.lastResult.isSuccess ? .success : .idle
-        }
-        switch viewModel.selectedStage {
-        case .kernel?: return .ane
-        case .sandbox?: return .krw
-        case .daemon?: return .ppl
-        case .patchset?: return .persistence
-        default: return .detecting
+        .sheet(isPresented: $showingSettings) {
+            SettingsSheet(viewModel: viewModel)
         }
     }
 
-    private var activeBadges: Set<BadgeType> {
-        var badges: Set<BadgeType> = []
-        guard let stage = viewModel.selectedStage else { return badges }
-
-        badges.insert(.kernel)
-        if stage == .sandbox || stage == .daemon || stage == .patchset {
-            badges.insert(.sandbox)
+    private func badgeType(for stage: ExploitStage) -> BadgeType {
+        switch stage {
+        case .kernel: return .kernel
+        case .sandbox: return .sandbox
+        case .daemon: return .daemon
+        case .patchset: return .patchset
         }
-        if stage == .daemon || stage == .patchset {
-            badges.insert(.daemon)
-        }
-        if stage == .patchset {
-            badges.insert(.patchset)
-        }
-        return badges
     }
 
     private var headerSection: some View {
@@ -137,13 +95,12 @@ struct ContentView: View {
 
             Spacer()
 
-            Button(action: { showingAllExploits = true }) {
-                Image(systemName: "info.circle")
+            Button(action: { showingSettings = true }) {
+                Image(systemName: "gearshape.fill")
                     .font(.title3)
                     .foregroundColor(.lum1naCyan)
             }
         }
-        .padding(.horizontal, 20)
     }
 
     private var fullChainButton: some View {
@@ -186,8 +143,7 @@ struct ContentView: View {
                             )
                     )
             )
-            .shadow(color: currentStage.glowColor.opacity(viewModel.isRunning ? 0 : 0.3), radius: 8)
-        }
+oge        }
         .disabled(viewModel.isRunning)
     }
 
@@ -213,42 +169,22 @@ struct ContentView: View {
         }
     }
 
+    private var currentStage: JailbreakStage {
+        guard viewModel.isRunning else {
+            return viewModel.lastResult.isSuccess ? .success : .idle
+        }
+        switch viewModel.selectedStage {
+        case .kernel?: return .ane
+        case .sandbox?: return .krw
+        case .daemon?: return .ppl
+        case .patchset?: return .persistence
+        default: return .detecting
+        }
+    }
+
     private var statusColor: Color {
         if viewModel.lastResult.isSuccess { return .consoleSuccess }
         return viewModel.isRunning ? currentStage.color : .gray
-    }
-}
-
-struct LiquidBubbleView: View {
-    let color: Color
-    let delay: Double
-    @State private var isAnimating = false
-    @State private var dragOffset: CGSize = .zero
-
-    var body: some View {
-        Circle()
-            .fill(
-                RadialGradient(
-                    colors: [color.opacity(0.4), color.opacity(0.1), .clear],
-                    center: .center,
-                    startRadius: 5,
-                    endRadius: 20
-                )
-            )
-            .frame(width: 40, height: 40)
-            .scaleEffect(isAnimating ? 1.2 : 0.8)
-            .opacity(isAnimating ? 0.6 : 0.3)
-            .offset(dragOffset)
-            .gesture(
-                DragGesture()
-                    .onChanged { value in dragOffset = value.translation }
-                    .onEnded { _ in withAnimation(.spring()) { dragOffset = .zero } }
-            )
-            .onAppear {
-                withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true).delay(delay)) {
-                    isAnimating = true
-                }
-            }
     }
 }
 
@@ -256,17 +192,85 @@ struct AllExploitsSheet: View {
     @ObservedObject var viewModel: ExploitManager
     @Environment(\.dismiss) var dismiss
 
-    let exploits: [(String, String, String, Color)] = [
-        ("P044 ANE 254-Input", "KERNEL", "brain", Color.badgeKernel),
-        ("CVE-2026-65343 AKS", "SANDBOX", "lock.shield", Color.badgeSandbox),
-        ("P051 APFS Xattr", "SANDBOX", "folder", Color.badgeSandbox),
-        ("P054 APFS Reap", "DAEMON", "archivebox", Color.badgeDaemon),
-        ("PATCHSET", "PATCHSET", "bandage", Color.badgePatchset)
-    ]
+    var body: some View {
+        NavigationView {
+            List {
+                Section(header: Text("EXPLOIT CATALOG — TAP TO RUN INDIVIDUALLY")) {
+                    ForEach(ExploitManager.catalog) { entry in
+                        Button {
+                            Task {
+                                await viewModel.executeExploit(entry)
+                            }
+                        } label: {
+                            HStack {
+                                Image(systemName: entry.stage.icon)
+                                    .foregroundColor(entry.stage.color)
+                                    .frame(width: 24)
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(entry.name)
+                                        .font(.system(.subheadline, weight: .semibold))
+                                        .foregroundColor(.primary)
+
+                                    Text(entry.description)
+                                        .font(.system(.caption, design: .rounded))
+                                        .foregroundColor(.secondary)
+                                }
+
+                                Spacer()
+
+                                if viewModel.isRunning && viewModel.selectedStage == entry.stage {
+                                    ProgressView()
+                                        .scaleEffect(0.7)
+                                } else {
+                                    Image(systemName: "play.circle")
+                                        .foregroundColor(entry.stage.color.opacity(0.7))
+                                }
+                            }
+                        }
+                        .disabled(viewModel.isRunning)
+                    }
+                }
+
+                Section(footer: Text("Run exploits one at a time to isolate crashes. Console records every step.")) {
+                    EmptyView()
+                }
+            }
+            .navigationTitle("All Exploits")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
+    }
+}
+
+struct SettingsSheet: View {
+    @ObservedObject var viewModel: ExploitManager
+    @Environment(\.dismiss) var dismiss
 
     var body: some View {
         NavigationView {
             List {
+                Section(header: Text("DEVICE INFO")) {
+                    LabeledContent("Machine", value: DeviceUtils.currentDevice)
+                    LabeledContent("Category", value: DeviceUtils.deviceCategory)
+                    LabeledContent("Chip", value: DeviceUtils.currentChip)
+                    LabeledContent("Supported", value: DeviceUtils.isSupported ? "Yes" : "No")
+                }
+
+                Section(header: Text("EXPLOIT STATE")) {
+                    LabeledContent("Kernel Slide", value: viewModel.currentKernelSlide != 0
+                        ? "0x\(String(viewModel.currentKernelSlide, radix: 16, uppercase: true))"
+                        : "Not obtained")
+                    LabeledContent("Kernel Base", value: viewModel.currentKernelBase != 0
+                        ? "0x\(String(viewModel.currentKernelBase, radix: 16, uppercase: true))"
+                        : "Not obtained")
+                    LabeledContent("Last Result", value: viewModel.lastResult.isSuccess ? "Success" : "Idle/Failure")
+                }
+
                 Section(header: Text("DEBUG")) {
                     Button {
                         UIPasteboard.general.string = viewModel.exportFullDebugLog()
@@ -288,16 +292,8 @@ struct AllExploitsSheet: View {
                             .foregroundColor(.orange)
                     }
                 }
-
-                Section(header: Text("DEVICE INFO")) {
-                    LabeledContent("Machine", value: DeviceUtils.currentDevice)
-                    LabeledContent("Category", value: DeviceUtils.deviceCategory)
-                    LabeledContent("Kernel Slide", value: viewModel.currentKernelSlide != 0
-                        ? "0x\(String(viewModel.currentKernelSlide, radix: 16, uppercase: true))"
-                        : "Not obtained")
-                }
             }
-            .navigationTitle("All Exploits")
+            .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
