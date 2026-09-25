@@ -4,6 +4,8 @@ Record the device model, OS version/build, Xcode version, component tested, resu
 
 Lab notes live in `~/Desktop/lumina_primitives/`. Start at `00_README.txt`, then `86_WEEK_HANDOFF.txt` and `87_EXTERNAL_CONTEXT_NOTES.txt`.
 
+Agents: read `AGENTS.md` first. Do not break the IPA job (Xcode 16.4).
+
 ## Devices
 
 - Active: iPhone 12 family (`iPhone13,*`) A14, iOS 26.5 **23F77**

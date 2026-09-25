@@ -1,192 +1,116 @@
-# AGENTS.md — Lum1na contributor and coding-agent guide
+# AGENTS.md — keep Lum1na compiling
 
-This is the operational guide for working in `ma6x9x/Lum1na`. Treat the repository at the pinned commit as the source of truth; do not rely on remembered file lists, old agent messages, or historical notes.
+Read this before editing. The IPA job (`.github/workflows/build-ipa.yml`) is the source of truth: **macos-15, Xcode 16.4, iOS 18.0 deployment, unsigned `iphoneos`**. If that job is red, the change is not done.
 
-## 1. Start every task this way
+Re-resolve `main` at the start of a task. Do not trust this file’s remembered file list if it disagrees with the tree.
 
-1. Resolve the current `main` tip:
-   `https://api.github.com/repos/ma6x9x/Lum1na/commits?sha=main&per_page=1`
-2. Record the returned commit SHA.
-3. Read the complete pinned tree:
-   `https://api.github.com/repos/ma6x9x/Lum1na/git/trees/<SHA>?recursive=1`
-4. Read relevant files from that same SHA only.
-5. Before editing, confirm each exact path exists in the pinned tree.
-6. After editing, re-check the diff and run the narrowest relevant validation available.
+## Layout (current)
 
-Current repository facts:
+| Path | Role |
+|---|---|
+| `App/ContentView.swift` | Home: centered LUM1NA, motherboard, console, JAILBREAK |
+| `App/Lum1naApp.swift` | `@main` |
+| `UI/` | Theme, motherboard, glass, circuit background, console |
+| `UI/LuminaGlass.swift` | Glass look via `ultraThinMaterial` (no `.glassEffect()` — Xcode 16.4 SDK) |
+| `Exploit/Bridges/ExploitManager.swift` | Catalog, TAP, invoke `+tap` / `execute` |
+| `Session/PersistentLogStore.swift` | POSIX + `F_FULLFSYNC`, `p011_tap_log.txt` |
+| `Session/LabTime.swift` | `yyyy-MM-dd HH:mm:ss z` |
+| `Exploit/LabRuntimeOffsets.*` | **Only** VA table. `LabOff()` |
+| `Exploit/LabDeviceProfile.*` | SKU = `hw.machine` + `kern.osversion` |
+| `Exploit/A14_23F77_LabOffsets.h` | Pins + `LabOff()` redirects |
+| `Exploit/A12X_23G71_LabOffsets.h` | iPad 23G71 pins |
+| `Lum1na-Bridging-Header.h` | iOS-safe Mach/IOKit + probe headers |
+| `docs/FUTURE.md`, `docs/development.md` | Status / experiment log |
 
-- Repository: `ma6x9x/Lum1na`
-- Default branch: `main`
-- Project: `Lum1na.xcodeproj`
-- Shared scheme: `Lum1na`
-- Primary CI workflow: `.github/workflows/build-ipa.yml`
-- Current pinned tip used for this guide: `052d10ebedfc3ab3d16a2e18ab37a6493f373b5d`
+The project uses `PBXFileSystemSynchronizedRootGroup`. New files under the root are picked up automatically. Do not hand-edit pbx file lists unless you are changing **exceptions**.
 
-The last item is only the revision used to write this document. Re-resolve `main` at the start of the next task.
+Stale names (do **not** resurrect): FusionChain, KernelMap/LabOffsets.swift duplicate table, `AIOKqueueLeakController`, `Font.system(.caption, weight:, design:)` with weight before design.
 
-## 2. Repository map
+## Compile landmines (already paid for)
 
-### App and UI
+1. **`Font.system` argument order**  
+   Wrong: `.system(.caption, weight: .bold, design: .rounded)` — Xcode 16.4 matches `size:` and dies (`CGFloat has no member caption`).  
+   Right: `.system(.caption, design: .rounded, weight: .bold)` **or** `.system(size: 12, weight: .bold, design: .rounded)`.
 
-- `App/Lum1naApp.swift` — SwiftUI `@main` entry point.
-- `App/ContentView.swift` — primary screen and stage controls.
-- `UI/Lum1naViewModel.swift` — UI-facing state support.
-- `UI/Lum1naTheme.swift` — palette and reusable visual styles.
-- `UI/MatrixConsoleView.swift` — console presentation.
-- `UI/ConsoleLine.swift` — console-line model.
-- `UI/StarBeaconView.swift`, `UI/GlyphRainView.swift`, `UI/LiquidBubbleMotion.swift`, `UI/RainbowWaveRibbon.swift`, `UI/CentralHeapView.swift`, `UI/CircuitBackgroundView.swift`, `UI/HexagonBadgeView.swift`, `UI/ExploitStageSelector.swift` — visual components and effects.
+2. **No macOS-only headers**  
+   Never `#import <mach/mach_vm.h>`, `IOKit/IOBSD.h`, `IOSurface/IOSurface.h`. IOSurface is `dlsym`. Mach via `<mach/mach.h>` + `<mach/vm_map.h>`.
 
-### Runtime and support
+3. **Do not duplicate `LabOff()` / `LabOffTab` in Swift.**  
+   C table in `LabRuntimeOffsets.m` is the only VA source. Swift helpers: `labOffsetTag()` in `UI/LabOffsets.swift`.
 
-- `Bootstrap/BootstrapCoordinator.swift` — bootstrap prerequisites and preparation.
-- `Device/DeviceCapabilities.swift` — device profile protocol and model.
-- `Device/DeviceUtils.swift` — device utility implementation currently present in the tree.
-- `Resources/Compatibility.swift` — compatibility helpers.
-- `Session/Logger.swift` and `Session/SessionPhase.swift` — session logging and phases.
-- `Support/IOSurfaceShim/IOSurface/IOSurface.h` — SDK compatibility shim.
+4. **`stopUnlessA14_23F77:`**  
+   P007 convention: **non-nil = STOP**. Probes do `if (stop) return stop`. Returning a sku string on success aborts every probe on a good 23F77 device.
 
-### Exploit and bridge code
+5. **ObjC `NSString *` in Swift**  
+   Interpolating an optional prints `Optional("…")`. Use `as String? ?? "?"`.
 
-Treat `Exploit/` as low-level, hardware/build-specific research code. Do not invent APIs, offsets, controller names, signatures, exploit behavior, or implementation status. Read a header and its implementation together before describing or changing behavior.
+6. **Logging must stamp once**  
+   `ConsoleLine.formatted` already has `yyyy-MM-dd HH:mm:ss z`. Never dump disk lines back through `log()` without `stripStamp`. Never dump `[RECOVER]` transcripts into the next session.
 
-Important bridge files:
+7. **iOS 26 Liquid Glass API**  
+   `.glassEffect()` / `.buttonStyle(.glass)` need Xcode 26. CI is 16.4. Use `luminaGlassCapsule()` / `luminaGlassRect()` only.
 
-- `Exploit/Bridges/ExploitManager.swift` — `@MainActor` UI-facing coordinator.
-- `Exploit/Bridges/ExploitControllerAdapters.swift` — Swift adapters for Objective-C controller methods.
-- `Exploit/Bridges/FusionChainDelegate.h` — delegate declarations.
-- `Exploit/Bridges/NativeLeakStubs.swift` — native-leak stubs.
-- `Exploit/Bridges/cs_run.h` — C/Objective-C bridge declarations.
+8. **Bridging header**  
+   Only import headers that exist. NSClassFromString does not need a bridge import, but `LabOff()` / `LabDeviceProfile` do.
 
-Important Objective-C pairs include:
+9. **Auto chain vs catalog**  
+   JAILBREAK must not invoke process-killing probes. P051 (gamed XPC) and P053 crashed the app; they stay in **All stages** only. Do not put them back on the SANDBOX pad without a proven non-crash tap.
 
-- `Exploit/P009Controller.h` + `Exploit/P009Controller.m`
-- `Exploit/P052Controller.h` + `Exploit/P052Controller.m`
-- `Exploit/P039Controller.h` + `Exploit/P039Controller.m`
-- `Exploit/ANE.h` + `Exploit/ANE.m`
-- `Exploit/AVERace.h` + `Exploit/AVERace.m`
-- `Exploit/CSKRW.h` + `Exploit/CSKRW.m`
-- `Exploit/FusionChain.h` + `Exploit/FusionChain.m`
-- `Exploit/KASLRLeak.h` + `Exploit/KASLRLeak.m`
-- `Exploit/Lum1naKRW.h` + `Exploit/Lum1naKRW.m`
-- `Exploit/Momentarius.h` + `Exploit/Momentarius.m`
-- `Exploit/UPLLeak.h` + `Exploit/UPLLeak.m`
+## Probe wiring
 
-Additional probe, profile, APFS, JPEG UAF, Lockdownd, and persistence sources are present under `Exploit/`; verify their exact paths in the pinned tree before referencing them.
-
-### Primitive and kernel-map layers
-
-- `KernelMap/KernelMapDescriptor.swift`
-- `KernelMap/KernelRW.swift`
-- `KernelMap/LabOffsets.swift`
-- `Primitive/PrimitiveProvider.swift`
-- `Exploit/ExploitProvider.swift`
-
-Do not describe placeholder methods as functional. In particular, inspect `KernelMap/KernelRW.swift` before making claims about kernel read/write capability.
-
-### Tests and resources
-
-- `Lum1naTests/Lum1naTests.swift` — unit tests.
-- `UITests/Lum1naUITests.swift` — UI tests.
-- `Assets.xcassets/` — app assets.
-- `model/` — bundled Core ML resources, including compiled/generated model data.
-- `docs/development.md` — experiment-record requirements.
-- `docs/PASTE_MAP.md` — historical migration note, not proof of current files.
-
-## 3. Swift/Objective-C interop checklist
-
-The bridge is intentionally explicit. Current `Lum1na-Bridging-Header.h` imports:
+New ObjC probe:
 
 ```objc
-#import "Exploit/KASLRLeak.h"
-#import "Exploit/UPLLeak.h"
-#import "Exploit/CSKRW.h"
-#import "Exploit/ANE.h"
-#import "Exploit/Lum1naKRW.h"
-#import "Exploit/FusionChain.h"
-#import "Exploit/Bridges/FusionChainDelegate.h"
-#import "Exploit/Bridges/cs_run.h"
-#import "Exploit/P009Controller.h"
-#import "Exploit/P052Controller.h"
-#import "Exploit/P039Controller.h"
+@interface P0XXThing : NSObject
++ (NSString *)tap;   // returns the log body
+@end
 ```
 
-Before diagnosing `cannot find ... in scope`, inspect all of the following at the same revision:
+Then:
 
-1. The relevant `.h` and `.m` files.
-2. `Lum1na-Bridging-Header.h`.
-3. `SWIFT_OBJC_BRIDGING_HEADER` in `Lum1na.xcodeproj/project.pbxproj`.
-4. `Exploit/Bridges/ExploitControllerAdapters.swift`.
-5. Target membership and filesystem-synchronized-group exceptions in `project.pbxproj`.
+1. Files under `Exploit/` (sync group).
+2. Add the `.h` to `Lum1na-Bridging-Header.h` if Swift must see the type.
+3. Catalog entry in `ExploitManager.catalog` with `controllerClass` **exactly** the ObjC class name.
+4. Map `id` → Documents log filename in `PersistentLogStore.probeLogFiles`.
+5. Log file: POSIX `open` / `write` / `F_FULLFSYNC`. Session banner `=== p0xx session <LabLocalMilitaryNow()> BUILD … ===`.
 
-The Objective-C controller APIs are authoritative. Do not assume an Objective-C method can be represented as a Swift tuple-returning `@objc` protocol, and do not add duplicate declarations to make an error disappear.
+`invokeController` order: instance `execute`, then `tap` (instance then class). `+tap` returning `NSString` is the P007 shape.
 
-The project uses `PBXFileSystemSynchronizedRootGroup`. Do not casually add PBX file references or manually duplicate source entries. Confirm the synchronized root and exception list before changing project structure.
+## Offsets / SKU
 
-## 4. Build and CI
+- Active: `iPhone13,*` + **23F77** → table tag `A14_23F77`.
+- Twin: `iPad8,*` + **23G71** → `A12X_23G71`.
+- Detect with `kern.osversion`, never `UIDevice` `"26.5"`.
+- Do not paste T8101 VAs onto T8020.
+- `A14_23F77_*` names in probes follow `LabOff()` via redirects (queue size 0x410 vs 0x408).
 
-The manually dispatched IPA workflow `.github/workflows/build-ipa.yml` currently:
+## UI contract
 
-1. Runs on `macos-15`.
-2. Selects `/Applications/Xcode_16.4.app/Contents/Developer`.
-3. Verifies selected source, header, bridge, and icon files.
-4. May rewrite imports in `Exploit/Bridges/cs_run.h` in the CI checkout.
-5. Applies a small SwiftUI compatibility replacement step in the CI checkout.
-6. Builds the `Lum1na` scheme in `Release` for `iphoneos` with signing disabled.
-7. Packages `Lum1na.app` as `Lum1na.ipa` and uploads it as `Lum1na-ipa`.
+- Centered **LUM1NA** at the top. No cloud wisps, glyph rain, or rainbow ribbon on the home screen.
+- Motherboard: four-point star hub, energy to KERNEL / SANDBOX / DAEMON / PATCHSET. No center ring.
+- Console: one monospaced stream of `ConsoleLine.formatted`. No second timestamp column.
+- PATCHSET / JAILBREAK must not claim success if `kreadbuf` is missing.
 
-Equivalent core command:
+## What not to change without an explicit ask
+
+- Race / UAF / OOB / remaining-fire bodies in `Exploit/*.m`
+- Offset numbers unless Ghidra + this SKU proved them
+- Entitlements
+- CI Xcode version
+- `LAB_OFFSETS_NO_REDIRECT` spelling (`1`, not `NO_REDIRECT1`)
+
+## Build check
 
 ```bash
-xcodebuild \
-  -project Lum1na.xcodeproj \
-  -scheme Lum1na \
-  -configuration Release \
-  -sdk iphoneos \
+xcodebuild -project Lum1na.xcodeproj -scheme Lum1na \
+  -configuration Release -sdk iphoneos \
   -destination 'generic/platform=iOS' \
-  CODE_SIGNING_ALLOWED=NO \
-  CODE_SIGNING_REQUIRED=NO \
-  CODE_SIGN_IDENTITY="" \
+  CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
   build
 ```
 
-Local device installation or archiving requires an authorized signing team/device. Do not claim a build or test passed unless it actually ran and passed. The Node 20 deprecation warning in Actions is not, by itself, a Swift compilation failure.
+The `objective-c-xcode.yml` workflow is historically red. **Lum1na Build** (IPA) is the gate.
 
-## 5. Change rules
+## Honesty
 
-- Read `README.md` and this file before editing.
-- Prefer the smallest change that addresses the observed problem.
-- Preserve public APIs unless the task explicitly requests an API change.
-- For UI or project-layout changes, inspect the app entry point, `ContentView`, `ExploitManager`, affected UI components, bridging header, and `project.pbxproj` first.
-- For interop changes, inspect headers, implementations, adapters, bridge imports, and target settings together.
-- Keep generated Xcode user data, DerivedData, archives, dSYMs, IPAs, signing material, and secrets out of commits.
-- Do not modify low-level exploit triggers, kernel read/write paths, offsets, or entitlements as a documentation/build-hygiene shortcut.
-- Record experiments in `docs/development.md` with device model, OS version/build, Xcode version, component, result, and recovery steps.
-- If a file is missing, report the exact pinned-tree lookup performed; never infer absence from an old README.
-- If CI mutates files temporarily, do not copy those generated changes back into the repository without explicit justification.
-
-## 6. Suggested investigation order
-
-For a build failure:
-
-1. Pin the revision and inspect the failing workflow.
-2. Read the exact compiler error and identify the first real error.
-3. Confirm the file exists and is in the intended target.
-4. For Swift/Objective-C errors, follow the interop checklist above.
-5. Reproduce with the narrowest `xcodebuild` command available.
-6. Make one focused change, then rerun validation.
-
-For a UI change:
-
-1. `App/Lum1naApp.swift`
-2. `App/ContentView.swift`
-3. `Exploit/Bridges/ExploitManager.swift`
-4. The affected UI component(s)
-5. `UI/Lum1naTheme.swift`
-6. `Lum1na-Bridging-Header.h` if bridge symbols are involved
-7. `Lum1na.xcodeproj/project.pbxproj`
-
-For low-level research code, stop and request clarification rather than guessing at missing primitives, offsets, devices, or exploit semantics.
-
-## 7. Safety and scope
-
-Lum1na is private experimental research software for hardware owned or controlled by the developer. Work only within authorized environments. Documentation, UI, tests, and project hygiene are ordinary maintenance areas; low-level exploit behavior and privileged entitlements require explicit scope and careful verification.
+Kernel read/write is **not** obtained. `Lum1naKRW` is a placeholder. One failed tap does not close a CVE class (`docs/FUTURE.md`, lab notes 89). Lab panic app is `~/Desktop/P007OpenOnly`. This repo is the public shell + catalog.
