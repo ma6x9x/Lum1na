@@ -54,6 +54,7 @@ public final class PersistentLogStore {
         "cskrw": consoleLogName,
         "p005": consoleLogName,
         "lockdownd": consoleLogName,
+        "p056": "p056_vt_compression_log.txt",
         "KERNEL": consoleLogName,
         "SANDBOX": consoleLogName,
         "DAEMON": "p054_reap_list_log.txt",

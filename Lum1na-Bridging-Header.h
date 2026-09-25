@@ -65,5 +65,6 @@
 #import "Exploit/P005JIT.h"
 #import "Exploit/Lockdownd/LockdowndFullChain.h"
 #import "Exploit/CVE_2026_84530_KASLR.h"
+#import "Exploit/P056VTCompressionReach.h"
 
 #endif

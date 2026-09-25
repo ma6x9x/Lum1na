@@ -208,12 +208,9 @@ jobs:
       # ============================================
       - name: Remove Problematic AVE Files
         run: |
-          echo "=== Removing problematic AVE files ==="
-          rm -f Exploit/P035AVEWrapProbe.m Exploit/P035AVEWrapProbe.h 2>/dev/null || true
-          rm -f Exploit/P036AVEPaintProbe.m Exploit/P036AVEPaintProbe.h 2>/dev/null || true  
-          rm -f Exploit/P037AVEPaintProb.m Exploit/P037AVEPaintProb.h 2>/dev/null || true
+          echo "=== Removing dual-session AVERace only (P056 is the VT reach tap) ==="
           rm -f Exploit/AVERace.m Exploit/AVERace.h 2>/dev/null || true
-          echo "✅ Removed problematic files"
+          echo "✅ Removed AVERace"
 
       - name: Create Entitlements
         run: |
