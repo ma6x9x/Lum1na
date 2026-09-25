@@ -45,7 +45,8 @@ Stale names (do **not** resurrect): FusionChain, KernelMap/LabOffsets.swift dupl
    Interpolating an optional prints `Optional("…")`. Use `as String? ?? "?"`.
 
 6. **Logging must stamp once**  
-   `ConsoleLine.formatted` already has `yyyy-MM-dd HH:mm:ss z`. Never dump disk lines back through `log()` without `stripStamp`. Never dump `[RECOVER]` transcripts into the next session.
+   `ConsoleLine.formatted` already has `yyyy-MM-dd HH:mm:ss z`. Never dump disk lines back through `log()` without `stripStamp`. Never dump `[RECOVER]` transcripts into the next session.  
+   On-screen console is **P007 replace-on-tap**: `resetOnScreenLog()` at each `executeExploit` / `executeStage`. Do not append the previous probe. Disk TAP + `p0xx_*_log.txt` stay append-only.
 
 7. **iOS 26 Liquid Glass API**  
    `.glassEffect()` / `.buttonStyle(.glass)` need Xcode 26. CI is 16.4. Use `luminaGlassCapsule()` / `luminaGlassRect()` only.
