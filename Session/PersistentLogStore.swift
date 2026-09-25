@@ -56,6 +56,8 @@ public final class PersistentLogStore {
         "luminakrw": "lumina_krw_log.txt",
         "apfs84523": "p052_nstream_extend_log.txt",
         "p057": "p057_wvek_log.txt",
+        "p058": "p058_jpeg_log.txt",
+        "p061": "p061_enctype_log.txt",
         "p005": consoleLogName,
         "lockdownd": consoleLogName,
         "p056": "p056_vt_compression_log.txt",

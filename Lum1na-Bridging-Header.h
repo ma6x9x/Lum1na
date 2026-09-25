@@ -71,6 +71,8 @@
 #import "Exploit/CSRaceCalib.h"
 #import "Exploit/APFS84523.h"
 #import "Exploit/P057WVEKReach.h"
+#import "Exploit/P058JPEGDriverReach.h"
+#import "Exploit/P061AVEEncTypeReach.h"
 #import "Exploit/Lum1naKRW.h"
 
 #endif

@@ -28,6 +28,13 @@ View: Settings → Copy Kernel Board JSON, or All stages → Kernel board JSON.
 
 AVE EncType / Close-async; JPEG `+0x30` teardown; NECP add/flow dest; 64788 other reclaim; IOMD `+0x34`; lockdownd USB from a Mac.
 
+## Untried reach (in All stages)
+
+- **p058** AppleJPEGDriver open (24A435 `+0x30` class)
+- **p061** H264+HEVC VT sessions (84607 EncType; 27 guard expect ABSENT)
+- **p057** wvek AKS/MobileKeyBag
+- **afterkread** constellation: AMFI UC open + 23F77 pins. No `/var/jb`. HOLD until `hasKread`
+
 ## After kread (HOLD)
 
 AMFI loadTrustCache, `pmap_cs_allow_invalid`, userspace reboot. A14 is **PPL**, not momentarius. See All stages → After-kread plan.
