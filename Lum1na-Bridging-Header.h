@@ -70,6 +70,7 @@
 #import "Kernel/Lum1naAfterKread.h"
 #import "Exploit/CSRaceCalib.h"
 #import "Exploit/APFS84523.h"
+#import "Exploit/P057WVEKReach.h"
 #import "Exploit/Lum1naKRW.h"
 
 #endif
