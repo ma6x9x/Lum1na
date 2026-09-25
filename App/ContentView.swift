@@ -9,42 +9,41 @@ struct ContentView: View {
     @StateObject private var viewModel = ExploitManager.shared
     @State private var showingAllExploits = false
     @State private var selectedStage: ExploitStage?
-    
+
     var body: some View {
         ZStack {
             CircuitBackgroundView(stage: currentStage)
                 .ignoresSafeArea()
-            
+
             GlyphRainView(intensity: 0.3)
                 .opacity(0.3)
-            
+
             VStack(spacing: 0) {
                 headerSection
                     .padding(.top, 20)
-                
+
                 StarBeaconView(stage: currentStage)
                     .frame(height: 120)
                     .padding(.vertical, 10)
-                
+
                 HStack(spacing: 16) {
                     ForEach([BadgeType.kernel, .sandbox, .daemon, .patchset], id: \.self) { badge in
                         HexagonBadgeView(
                             type: badge,
-                            isActive: activeBadges.contains(badge),
-                            stage: currentStage
+                            isActive: activeBadges.contains(badge)
                         )
                     }
                 }
                 .padding(.vertical, 8)
-                
+
                 CentralHeapView(
-                    heapAddress: viewModel.currentKernelSlide != 0 
-                        ? "0x\(String(viewModel.currentKernelSlide, radix: 16, uppercase: true))" 
+                    heapAddress: viewModel.currentKernelSlide != 0
+                        ? "0x\(String(viewModel.currentKernelSlide, radix: 16, uppercase: true))"
                         : nil,
                     stage: currentStage
                 )
                 .padding(.vertical, 8)
-                
+
                 HStack(spacing: 20) {
                     ForEach(0..<3) { index in
                         LiquidBubbleView(
@@ -54,13 +53,13 @@ struct ContentView: View {
                     }
                 }
                 .frame(height: 60)
-                
+
                 MatrixConsoleView()
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
-                
+
                 Spacer(minLength: 10)
-                
+
                 ExploitStageSelector(
                     selectedStage: $selectedStage,
                     isRunning: $viewModel.isRunning,
@@ -69,15 +68,15 @@ struct ContentView: View {
                     }
                 )
                 .padding(.horizontal, 16)
-                
+
                 fullChainButton
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
-                
+
                 allExploitsButton
                     .padding(.bottom, 20)
             }
-            
+
             VStack {
                 Spacer()
                 RainbowWaveRibbonView(power: viewModel.isRunning ? 1.0 : 0.3)
@@ -90,24 +89,24 @@ struct ContentView: View {
             AllExploitsSheet(viewModel: viewModel)
         }
     }
-    
+
     private var currentStage: JailbreakStage {
         guard viewModel.isRunning else {
             return viewModel.lastResult.isSuccess ? .success : .idle
         }
         switch viewModel.selectedStage {
-        case .kernel: return .ane
-        case .sandbox: return .krw
-        case .daemon: return .ppl
-        case .patchset: return .persistence
+        case .kernel?: return .ane
+        case .sandbox?: return .krw
+        case .daemon?: return .ppl
+        case .patchset?: return .persistence
         default: return .detecting
         }
     }
-    
+
     private var activeBadges: Set<BadgeType> {
         var badges: Set<BadgeType> = []
         guard let stage = viewModel.selectedStage else { return badges }
-        
+
         badges.insert(.kernel)
         if stage == .sandbox || stage == .daemon || stage == .patchset {
             badges.insert(.sandbox)
@@ -120,7 +119,7 @@ struct ContentView: View {
         }
         return badges
     }
-    
+
     private var headerSection: some View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
@@ -133,21 +132,21 @@ struct ContentView: View {
                             endPoint: .trailing
                         )
                     )
-                
+
                 HStack(spacing: 8) {
                     Circle()
                         .fill(statusColor)
                         .frame(width: 8, height: 8)
                         .shadow(color: statusColor.opacity(0.5), radius: 4)
-                    
+
                     Text(viewModel.isRunning ? "Running..." : "Ready")
                         .font(.system(.subheadline, weight: .medium))
                         .foregroundColor(statusColor)
                 }
             }
-            
+
             Spacer()
-            
+
             Button(action: { showingAllExploits = true }) {
                 Image(systemName: "info.circle")
                     .font(.title3)
@@ -156,7 +155,7 @@ struct ContentView: View {
         }
         .padding(.horizontal, 20)
     }
-    
+
     private var fullChainButton: some View {
         Button(action: {
             Task { await viewModel.executeStage("Full Chain") }
@@ -164,10 +163,10 @@ struct ContentView: View {
             HStack(spacing: 12) {
                 Image(systemName: "bolt.fill")
                     .font(.system(.body, weight: .semibold))
-                
+
                 Text("Execute Full Chain")
                     .font(.system(.subheadline, weight: .bold))
-                
+
                 if viewModel.isRunning {
                     ProgressView()
                         .progressViewStyle(CircularProgressViewStyle(tint: .white))
@@ -201,7 +200,7 @@ struct ContentView: View {
         }
         .disabled(viewModel.isRunning)
     }
-    
+
     private var allExploitsButton: some View {
         Button(action: { showingAllExploits = true }) {
             HStack(spacing: 6) {
@@ -223,7 +222,7 @@ struct ContentView: View {
             )
         }
     }
-    
+
     private var statusColor: Color {
         if viewModel.lastResult.isSuccess { return .consoleSuccess }
         return viewModel.isRunning ? currentStage.color : .gray
@@ -235,7 +234,7 @@ struct LiquidBubbleView: View {
     let delay: Double
     @State private var isAnimating = false
     @State private var dragOffset: CGSize = .zero
-    
+
     var body: some View {
         Circle()
             .fill(
@@ -266,7 +265,7 @@ struct LiquidBubbleView: View {
 struct AllExploitsSheet: View {
     @ObservedObject var viewModel: ExploitManager
     @Environment(\.dismiss) var dismiss
-    
+
     let exploits = [
         ("P044 ANE 254-Input", "KERNEL", "brain", Color.badgeKernel),
         ("CVE-2026-65343 AKS", "SANDBOX", "lock.shield", Color.badgeSandbox),
@@ -274,7 +273,7 @@ struct AllExploitsSheet: View {
         ("P051 APFS Xattr", "SANDBOX", "folder", Color.badgeSandbox),
         ("P054 APFS Reap", "DAEMON", "archivebox", Color.badgeDaemon),
     ]
-    
+
     var body: some View {
         NavigationView {
             List {
@@ -290,19 +289,19 @@ struct AllExploitsSheet: View {
                                 Image(systemName: exploit.2)
                                     .foregroundColor(exploit.3)
                                     .frame(width: 24)
-                                
+
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(exploit.0)
                                         .font(.system(.subheadline, weight: .semibold))
                                         .foregroundColor(.primary)
-                                    
+
                                     Text(exploit.1)
                                         .font(.system(.caption, design: .rounded))
                                         .foregroundColor(exploit.3.opacity(0.8))
                                 }
-                                
+
                                 Spacer()
-                                
+
                                 Image(systemName: "chevron.right")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
@@ -311,7 +310,7 @@ struct AllExploitsSheet: View {
                         .disabled(viewModel.isRunning)
                     }
                 }
-                
+
                 Section(header: Text("DEBUG")) {
                     Button {
                         UIPasteboard.general.string = viewModel.exportFullDebugLog()
@@ -319,14 +318,14 @@ struct AllExploitsSheet: View {
                     } label: {
                         Label("Export Full Log", systemImage: "doc.on.clipboard")
                     }
-                    
+
                     Button {
                         viewModel.clearConsole()
                     } label: {
                         Label("Clear Console", systemImage: "trash")
                             .foregroundColor(.red)
                     }
-                    
+
                     Button {
                         viewModel.reset()
                     } label: {
@@ -334,11 +333,11 @@ struct AllExploitsSheet: View {
                             .foregroundColor(.orange)
                     }
                 }
-                
+
                 Section(header: Text("DEVICE INFO")) {
                     LabeledContent("Machine", value: DeviceUtils.currentDevice)
                     LabeledContent("Category", value: DeviceUtils.deviceCategory)
-                    LabeledContent("Kernel Slide", value: viewModel.currentKernelSlide != 0 
+                    LabeledContent("Kernel Slide", value: viewModel.currentKernelSlide != 0
                         ? "0x\(String(viewModel.currentKernelSlide, radix: 16, uppercase: true))"
                         : "Not obtained")
                 }
