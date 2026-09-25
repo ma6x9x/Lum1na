@@ -34,13 +34,27 @@
 #import <CoreMedia/CoreMedia.h>
 
 // Your exploit headers - UPDATED
-#import "Exploit/P044ExploitController.h"        // NEW: P044 ANE 254-input
-#import "Exploit/AKSExploitController.h"          // AKS CVE-2026-65343
-#import "Exploit/P051APFSXattr.h"                 // P051 APFS
-#import "Exploit/P054APFSReapList.h"              // P054 APFS
+#import "Exploit/P044ExploitController.h"
+#import "Exploit/AKSExploitController.h"
+#import "Exploit/P051APFSXattr.h"
+#import "Exploit/P054APFSReapList.h"
 #import "Exploit/LabRuntimeOffsets.h"
 #import "Exploit/LabDeviceProfile.h"
 #import "Exploit/A14_23F77_LabOffsets.h"
 #import "Exploit/A12X_23G71_LabOffsets.h"
+#import "Exploit/DeviceIdentProbe.h"
+#import "Exploit/LabIOGPUQueue.h"
+#import "Exploit/P010QueueLeak.h"
+#import "Exploit/P017ConfusedDeputy.h"
+#import "Exploit/P032ANEOpenSmoke.h"
+#import "Exploit/P033CoreML1in1out.h"
+#import "Exploit/P034Kmsg3072Occupancy.h"
+#import "Exploit/P040NamespaceDestSmoke.h"
+#import "Exploit/P041SlideDestMap.h"
+#import "Exploit/P042ReachabilityProbe.h"
+#import "Exploit/P046F77PatchOracle.h"
+#import "Exploit/P050GetattrlistOOB.h"
+#import "Exploit/P053NECPDoubleFree.h"
+#import "Exploit/P055IOSurfaceUPL.h"
 
 #endif
