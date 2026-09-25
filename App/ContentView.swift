@@ -10,10 +10,15 @@ struct ContentView: View {
     @State private var showingAllExploits = false
     @State private var showingSettings = false
     @State private var recoveredNote: String = ""
+    @State private var starTickAt = Date.distantPast
+
+    private var boardMotion: BoardMotion {
+        BoardMotion.from(viewModel, recovered: !recoveredNote.isEmpty)
+    }
 
     var body: some View {
         ZStack {
-            GalaxyFieldView(accent: visualStage.color)
+            GalaxyFieldView(accent: visualStage.color, speed: boardMotion.galaxySpeed)
 
             VStack(spacing: 0) {
                 headerSection
@@ -25,10 +30,14 @@ struct ContentView: View {
                         .padding(.top, 8)
                 }
 
-                MotherboardView(manager: viewModel) { stage in
+                MotherboardView(
+                    manager: viewModel,
+                    recovered: !recoveredNote.isEmpty,
+                    tickAt: starTickAt
+                ) { stage in
                     Task { await viewModel.executeStage(stage.rawValue) }
                 }
-                .frame(height: 268)
+                .frame(height: LayoutConstants.motherboardHeight)
                 .padding(.horizontal, 8)
                 .padding(.top, 4)
 
@@ -56,6 +65,9 @@ struct ContentView: View {
             if viewModel.lastRecoverySummary.isEmpty == false {
                 recoveredNote = "Recovered from crash: \(viewModel.lastRecoverySummary)"
             }
+        }
+        .onChange(of: viewModel.lines.count) { _ in
+            starTickAt = Date()
         }
     }
 
@@ -162,39 +174,56 @@ struct ContentView: View {
         Button(action: {
             Task { await viewModel.executeStage("Full Chain") }
         }) {
-            HStack(spacing: 10) {
-                Image(systemName: "sparkle")
-                    .font(.body.weight(.semibold))
-                Text("JAILBREAK")
-                    .font(.system(.subheadline, design: .rounded, weight: .bold))
-                    .tracking(1.2)
-                if viewModel.isRunning {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                        .scaleEffect(0.8)
+            ZStack {
+                if viewModel.fullChainActive {
+                    TimelineView(.animation(minimumInterval: 1.0 / 24.0, paused: false)) { context in
+                        let t = context.date.timeIntervalSinceReferenceDate
+                        let x = CGFloat((t / 1.2).truncatingRemainder(dividingBy: 1.0))
+                        LinearGradient(
+                            colors: [.clear, Color.white.opacity(0.22), .clear],
+                            startPoint: UnitPoint(x: x - 0.3, y: 0.5),
+                            endPoint: UnitPoint(x: x + 0.3, y: 0.5)
+                        )
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .allowsHitTesting(false)
                 }
+                HStack(spacing: 10) {
+                    Image(systemName: "sparkle")
+                        .font(.system(size: 16, weight: .semibold))
+                    Text(viewModel.fullChainActive ? "RUNNING" : "JAILBREAK")
+                        .font(.system(.subheadline, design: .rounded, weight: .bold))
+                        .tracking(1.2)
+                    Text("✦")
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                }
+                .foregroundColor(.white)
             }
-            .foregroundColor(.white)
             .frame(maxWidth: .infinity)
             .frame(height: 52)
+            .clipped()
             .luminaGlassRect(16)
         }
+        .buttonStyle(LuminaPressStyle())
         .disabled(viewModel.isRunning)
     }
 
     private var allExploitsButton: some View {
         Button(action: { showingAllExploits = true }) {
-            HStack(spacing: 6) {
-                Text("All stages")
-                    .font(.system(.subheadline, weight: .medium))
-                Image(systemName: "chevron.down")
-                    .font(.caption)
+            HStack(spacing: 8) {
+                Image(systemName: "sparkle")
+                    .font(.system(size: 14, weight: .semibold))
+                Text("All Exploits")
+                    .font(.system(.subheadline, design: .rounded, weight: .medium))
+                Text("✦")
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
             }
             .foregroundColor(.lum1naCyan)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 8)
-            .luminaGlassCapsule()
+            .frame(maxWidth: .infinity)
+            .frame(height: 46)
+            .luminaGlassRect(16)
         }
+        .buttonStyle(LuminaPressStyle())
         .disabled(viewModel.isRunning)
     }
 

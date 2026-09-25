@@ -3,10 +3,11 @@ import SwiftUI
 /// Quiet star field. No glyph rain, no PCB grid.
 struct GalaxyFieldView: View {
     var accent: Color
+    var speed: Double = 1.0
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 24.0, paused: false)) { context in
-            let t = context.date.timeIntervalSinceReferenceDate
+            let t = context.date.timeIntervalSinceReferenceDate * speed
             Canvas { ctx, size in
                 ctx.fill(
                     Path(CGRect(origin: .zero, size: size)),

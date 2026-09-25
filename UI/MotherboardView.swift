@@ -4,7 +4,15 @@ import SwiftUI
 /// Pads light when that stage is selected/running. No center circle.
 struct MotherboardView: View {
     @ObservedObject var manager: ExploitManager
+    var recovered: Bool = false
+    var tickAt: Date = .distantPast
     let onSelectStage: (ExploitStage) -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var motion: BoardMotion {
+        BoardMotion.from(manager, recovered: recovered)
+    }
 
     var body: some View {
         GeometryReader { geo in
@@ -16,9 +24,9 @@ struct MotherboardView: View {
                 MotherboardTraceLayer(
                     center: center,
                     pads: pads,
-                    active: manager.selectedStage,
-                    fireLasers: manager.fullChainActive,
-                    progress: manager.progress
+                    motion: motion,
+                    progress: manager.progress,
+                    reduceMotion: reduceMotion
                 )
 
                 ForEach(ExploitStage.allCases) { stage in
@@ -28,8 +36,8 @@ struct MotherboardView: View {
                     } label: {
                         MotherboardPad(
                             stage: stage,
-                            isActive: manager.selectedStage == stage,
-                            isRunning: manager.isRunning && manager.selectedStage == stage
+                            motion: motion,
+                            reduceMotion: reduceMotion
                         )
                     }
                     .buttonStyle(PlainButtonStyle())
@@ -38,8 +46,10 @@ struct MotherboardView: View {
                 }
 
                 Lum1naStarMark(
-                    running: manager.fullChainActive,
-                    stageColor: (manager.selectedStage ?? .kernel).color
+                    motion: motion,
+                    stageColor: (manager.selectedStage ?? .kernel).color,
+                    tickAt: tickAt,
+                    reduceMotion: reduceMotion
                 )
                 .position(center)
                 .allowsHitTesting(false)
@@ -49,9 +59,9 @@ struct MotherboardView: View {
 
     private func padPoints(in size: CGSize) -> [ExploitStage: CGPoint] {
         [
-            .kernel:   CGPoint(x: size.width * 0.50, y: size.height * 0.18),
+            .kernel:   CGPoint(x: size.width * 0.50, y: size.height * 0.16),
             .sandbox:  CGPoint(x: size.width * 0.84, y: size.height * 0.50),
-            .daemon:   CGPoint(x: size.width * 0.50, y: size.height * 0.82),
+            .daemon:   CGPoint(x: size.width * 0.50, y: size.height * 0.84),
             .patchset: CGPoint(x: size.width * 0.16, y: size.height * 0.50)
         ]
     }
@@ -59,36 +69,123 @@ struct MotherboardView: View {
 
 struct MotherboardPad: View {
     let stage: ExploitStage
-    let isActive: Bool
-    let isRunning: Bool
+    let motion: BoardMotion
+    let reduceMotion: Bool
+
+    private let face: CGFloat = 80
+    private let radius: CGFloat = 22
+
+    private var isActive: Bool {
+        switch motion {
+        case .arming(let s), .firing(let s, _): return s == stage
+        case .chaining: return motion.liveRails.contains(stage)
+        case .success: return true
+        default: return false
+        }
+    }
+
+    private var isRunning: Bool {
+        switch motion {
+        case .firing(let s, _): return s == stage
+        case .chaining: return motion.liveRails.contains(stage)
+        default: return false
+        }
+    }
+
+    private var scale: CGFloat {
+        if reduceMotion { return 1 }
+        switch motion {
+        case .arming(let s): return s == stage ? 1.08 : 0.94
+        case .firing(let s, _): return s == stage ? 1.06 : 0.94
+        case .chaining: return isActive ? 1.06 : 0.92
+        case .success: return 1.08
+        case .failed: return 0.96
+        default: return 1
+        }
+    }
+
+    private var dim: Double {
+        switch motion {
+        case .arming(let s), .firing(let s, _): return s == stage ? 1 : 0.45
+        case .chaining: return isActive ? 1 : 0.4
+        case .failed: return 0.55
+        default: return 1
+        }
+    }
+
+    private var phase: Double {
+        switch stage {
+        case .kernel: return 0
+        case .sandbox: return 1.6
+        case .daemon: return 3.1
+        case .patchset: return 4.7
+        }
+    }
 
     var body: some View {
-        VStack(spacing: 4) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(stage.color.opacity(isActive ? 0.18 : 0.06))
-                    .frame(width: 58, height: 58)
-                    .luminaGlassRect(14)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .stroke(stage.color.opacity(isActive ? 0.9 : 0.35), lineWidth: isActive ? 1.4 : 0.8)
-                    )
-                    .shadow(color: isActive ? stage.color.opacity(0.55) : .clear, radius: isActive ? 10 : 0)
+        TimelineView(.animation(minimumInterval: 1.0 / 24.0, paused: reduceMotion)) { context in
+            let t = context.date.timeIntervalSinceReferenceDate
+            let floatY: CGFloat = {
+                guard !reduceMotion, motion == .idle else { return 0 }
+                return CGFloat(sin(t + phase) * 2)
+            }()
+            let sheen: CGFloat = {
+                guard isRunning, !reduceMotion else { return -1 }
+                return CGFloat((t * 0.7).truncatingRemainder(dividingBy: 2.0) - 1.0)
+            }()
+            let charge: CGFloat = {
+                if reduceMotion { return isActive ? 1 : 0 }
+                if case .arming(let s) = motion, s == stage { return 1 }
+                return 0
+            }()
 
-                if isRunning {
-                    ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: stage.color))
-                        .scaleEffect(0.75)
-                } else {
+            VStack(spacing: 5) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .fill(stage.color.opacity(isActive ? 0.18 : 0.06))
+                        .frame(width: face, height: face)
+                        .luminaGlassRect(radius)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                                .stroke(stage.color.opacity(isActive ? 0.9 : 0.35),
+                                        lineWidth: isActive ? 1.4 : 0.8)
+                        )
+                        .shadow(color: isActive ? stage.color.opacity(0.55) : .clear,
+                                radius: isActive ? 10 : 0)
+
+                    if isRunning && !reduceMotion {
+                        RoundedRectangle(cornerRadius: radius, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: [.clear, Color.white.opacity(0.28), .clear],
+                                    startPoint: UnitPoint(x: sheen, y: 0.2),
+                                    endPoint: UnitPoint(x: sheen + 0.45, y: 0.8)
+                                )
+                            )
+                            .frame(width: face, height: face)
+                            .allowsHitTesting(false)
+                    }
+
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .trim(from: 0, to: charge)
+                        .stroke(stage.color, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                        .frame(width: face + 4, height: face + 4)
+                        .animation(.easeOut(duration: 0.45), value: charge)
+                        .allowsHitTesting(false)
+
                     Image(systemName: stage.icon)
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.system(size: 25, weight: .semibold))
                         .foregroundColor(stage.color)
                 }
+                .scaleEffect(scale)
+                Text(stage.displayName)
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .foregroundColor(isActive ? stage.color : Color.white.opacity(0.55))
+                    .tracking(0.6)
             }
-            Text(stage.displayName)
-                .font(.system(size: 9, weight: .bold, design: .rounded))
-                .foregroundColor(isActive ? stage.color : Color.white.opacity(0.55))
-                .tracking(0.6)
+            .opacity(dim)
+            .offset(y: floatY)
+            .animation(.spring(response: 0.35, dampingFraction: 0.72), value: scale)
         }
     }
 }
@@ -96,81 +193,98 @@ struct MotherboardPad: View {
 struct MotherboardTraceLayer: View {
     let center: CGPoint
     let pads: [ExploitStage: CGPoint]
-    let active: ExploitStage?
-    let fireLasers: Bool
+    let motion: BoardMotion
     let progress: Double
+    let reduceMotion: Bool
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: false)) { context in
             let t = context.date.timeIntervalSinceReferenceDate
-            Canvas { ctx, size in
+            Canvas { ctx, _ in
+                let rails = motion.liveRails
+                let idleCrawl = !reduceMotion && motion == .idle
+                let packetN = rails.isEmpty ? 1 : 7
+
                 for stage in ExploitStage.allCases {
                     guard let dest = pads[stage] else { continue }
-                    let lit = fireLasers && active == stage
+                    let lit = rails.contains(stage)
                     let traces = manhattanBundle(from: center, to: dest)
                     for (i, path) in traces.enumerated() {
-                        let opacity: Double = lit ? 0.95 : 0.06
-                        let w: CGFloat = lit ? (i == 0 ? 2.4 : 1.1) : 0.5
+                        let opacity: Double
+                        let w: CGFloat
+                        if lit {
+                            opacity = 0.95
+                            w = i == 0 ? 2.4 : 1.1
+                        } else if case .failed = motion {
+                            opacity = 0.04
+                            w = 0.5
+                        } else {
+                            opacity = 0.06
+                            w = 0.5
+                        }
                         ctx.stroke(path, with: .color(stage.color.opacity(opacity)), lineWidth: w)
                         if lit {
                             ctx.stroke(path, with: .color(stage.color.opacity(0.28)), lineWidth: 8)
                         }
                     }
-                    if lit {
+
+                    if lit && !reduceMotion {
                         let speed = 0.55 + progress * 0.9
-                        for k in 0..<4 {
-                            let packetT = (t * speed + Double(k) * 0.22).truncatingRemainder(dividingBy: 1.0)
-                            let p = pointOnOrthogonal(from: center, to: dest, t: packetT)
-                            let r: CGFloat = 5.5
-                            let rect = CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2)
-                            ctx.fill(Path(ellipseIn: rect.insetBy(dx: -5, dy: -5)), with: .color(stage.color.opacity(0.28)))
-                            ctx.fill(Path(ellipseIn: rect), with: .color(stage.color))
-                            ctx.fill(Path(ellipseIn: rect.insetBy(dx: 1.8, dy: 1.8)), with: .color(.white.opacity(0.85)))
+                        let r: CGFloat = 4.5 + CGFloat(progress) * 2.5
+                        for k in 0..<packetN {
+                            let packetT = (t * speed + Double(k) * (1.0 / Double(packetN)))
+                                .truncatingRemainder(dividingBy: 1.0)
+                            drawPacket(ctx: ctx, from: center, to: dest, t: packetT,
+                                       color: stage.color, r: r)
+                        }
+                    } else if idleCrawl {
+                        let cycle = 8.0
+                        let slot = (t / cycle).truncatingRemainder(dividingBy: 1.0)
+                        let order: [ExploitStage] = [.kernel, .patchset, .daemon, .sandbox]
+                        if let idx = order.firstIndex(of: stage) {
+                            let a = Double(idx) / 4.0
+                            let b = Double(idx + 1) / 4.0
+                            if slot >= a && slot < b {
+                                let local = (slot - a) / (b - a)
+                                drawPacket(ctx: ctx, from: center, to: dest, t: local,
+                                           color: stage.color.opacity(0.55), r: 3.2)
+                            }
                         }
                     }
+                }
+
+                if case .success = motion, !reduceMotion {
+                    let pulse = 0.5 + 0.5 * sin(t * 6)
+                    var circle = Path()
+                    circle.addEllipse(in: CGRect(
+                        x: center.x - 40, y: center.y - 40, width: 80, height: 80
+                    ))
+                    ctx.stroke(circle, with: .color(Color.consoleSuccess.opacity(0.35 * pulse)),
+                               lineWidth: 2)
                 }
             }
         }
         .allowsHitTesting(false)
     }
 
-    private func drawBoard(ctx: GraphicsContext, size: CGSize, t: Double) {
-        let inset: CGFloat = 6
-        let board = CGRect(x: inset, y: inset, width: size.width - inset * 2, height: size.height - inset * 2)
-        ctx.stroke(
-            Path(roundedRect: board, cornerRadius: 10),
-            with: .color(Color(hex: "#7C3AED").opacity(0.45)),
-            lineWidth: 1.4
-        )
-        let pinN = 18
-        for i in 0..<pinN {
-            let u = CGFloat(i) / CGFloat(pinN - 1)
-            let pulse = 0.35 + 0.65 * (0.5 + 0.5 * sin(t * 2.2 + Double(i) * 0.4))
-            let c = i % 2 == 0 ? Color.lum1naCyan : Color.lum1naMagenta
-            let pts: [CGPoint] = [
-                CGPoint(x: board.minX, y: board.minY + board.height * u),
-                CGPoint(x: board.maxX, y: board.minY + board.height * u),
-                CGPoint(x: board.minX + board.width * u, y: board.minY),
-                CGPoint(x: board.minX + board.width * u, y: board.maxY)
-            ]
-            for p in pts {
-                let r: CGFloat = 1.6
-                ctx.fill(
-                    Path(ellipseIn: CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2)),
-                    with: .color(c.opacity(pulse))
-                )
-            }
-        }
+    private func drawPacket(ctx: GraphicsContext, from a: CGPoint, to b: CGPoint,
+                            t: Double, color: Color, r: CGFloat) {
+        let p = pointOnOrthogonal(from: a, to: b, t: t)
+        let rect = CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2)
+        ctx.fill(Path(ellipseIn: rect.insetBy(dx: -5, dy: -5)), with: .color(color.opacity(0.28)))
+        ctx.fill(Path(ellipseIn: rect), with: .color(color))
+        ctx.fill(Path(ellipseIn: rect.insetBy(dx: 1.8, dy: 1.8)), with: .color(.white.opacity(0.85)))
     }
 
     private func manhattanBundle(from a: CGPoint, to b: CGPoint) -> [Path] {
         let dx = b.x - a.x
         let dy = b.y - a.y
+        let clearance: CGFloat = 48
         let start: CGPoint
         if abs(dx) > abs(dy) {
-            start = CGPoint(x: a.x + (dx > 0 ? 30 : -30), y: a.y)
+            start = CGPoint(x: a.x + (dx > 0 ? clearance : -clearance), y: a.y)
         } else {
-            start = CGPoint(x: a.x, y: a.y + (dy > 0 ? 30 : -30))
+            start = CGPoint(x: a.x, y: a.y + (dy > 0 ? clearance : -clearance))
         }
         func elbow(_ offset: CGFloat) -> Path {
             var path = Path()
@@ -196,19 +310,9 @@ struct MotherboardTraceLayer: View {
         return [tee(0), tee(7), tee(-7)]
     }
 
-    private func fillVia(_ ctx: GraphicsContext, at point: CGPoint, color: Color, lit: Bool) {
-        let s: CGFloat = lit ? 5 : 3.2
-        let rect = CGRect(x: point.x - s / 2, y: point.y - s / 2, width: s, height: s)
-        ctx.fill(Path(roundedRect: rect, cornerRadius: 1), with: .color(color.opacity(lit ? 0.95 : 0.4)))
-    }
-
     private func pointOnOrthogonal(from a: CGPoint, to b: CGPoint, t: Double) -> CGPoint {
         let clamped = CGFloat(max(0, min(1, t)))
         return CGPoint(x: a.x + (b.x - a.x) * clamped, y: a.y + (b.y - a.y) * clamped)
-    }
-
-    private func midpoint(_ a: CGPoint, _ b: CGPoint) -> CGPoint {
-        CGPoint(x: (a.x + b.x) / 2, y: (a.y + b.y) / 2)
     }
 }
 

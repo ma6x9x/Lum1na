@@ -5,82 +5,135 @@ extension View {
         modifier(LuminaGlassCap())
     }
 
-    func luminaGlassRect(_ radius: CGFloat = 16) -> some View {
-        modifier(LuminaGlassBox(radius: radius))
+    /// Interactive by default (pads, CTAs, chips). Pass `false` for the
+    /// console plate so scrolling does not squash the glass.
+    func luminaGlassRect(_ radius: CGFloat = 16, interactive: Bool = true) -> some View {
+        modifier(LuminaGlassBox(radius: radius, interactive: interactive))
     }
 }
 
+private let luminaGlassSolid = Color(hex: "#1A2238")
+
 private struct LuminaGlassCap: ViewModifier {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
     func body(content: Content) -> some View {
-        #if compiler(>=6.2)
-        if #available(iOS 26.0, *) {
-            content.glassEffect(.regular.interactive(), in: Capsule())
+        if reduceTransparency {
+            content
+                .background(Capsule().fill(luminaGlassSolid))
+                .overlay(Capsule().strokeBorder(Color.white.opacity(0.30), lineWidth: 0.5))
         } else {
+            #if compiler(>=6.2)
+            if #available(iOS 26.0, *) {
+                content.glassEffect(.regular.interactive(), in: Capsule())
+            } else {
+                fallbackCap(content)
+            }
+            #else
             fallbackCap(content)
+            #endif
         }
-        #else
-        fallbackCap(content)
-        #endif
     }
 
     private func fallbackCap(_ content: Content) -> some View {
         content
             .background {
-                Capsule()
-                    .fill(.ultraThinMaterial)
-                    .overlay(
-                        Capsule().fill(
+                ZStack {
+                    Capsule().fill(.ultraThinMaterial)
+                    Capsule().fill(Color.white.opacity(0.06))
+                    Capsule()
+                        .fill(
                             LinearGradient(
-                                colors: [Color.white.opacity(0.28), Color.white.opacity(0.04)],
+                                colors: [Color.white.opacity(0.50), Color.white.opacity(0.16), .clear],
                                 startPoint: .top,
-                                endPoint: .bottom
+                                endPoint: UnitPoint(x: 0.5, y: 0.22)
                             )
                         )
-                    )
+                        .mask(
+                            LinearGradient(
+                                colors: [.clear, .white, .white, .clear],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                }
             }
-            .overlay(Capsule().stroke(Color.white.opacity(0.38), lineWidth: 0.8))
-            .shadow(color: Color.black.opacity(0.35), radius: 10, y: 4)
+            .overlay(Capsule().strokeBorder(Color.white.opacity(0.30), lineWidth: 0.5))
+            .shadow(color: Color.black.opacity(0.32), radius: 24, y: 10)
     }
 }
 
 private struct LuminaGlassBox: ViewModifier {
     var radius: CGFloat
+    var interactive: Bool
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     func body(content: Content) -> some View {
-        #if compiler(>=6.2)
-        if #available(iOS 26.0, *) {
-            content.glassEffect(
-                .regular.interactive(),
-                in: RoundedRectangle(cornerRadius: radius, style: .continuous)
-            )
+        if reduceTransparency {
+            content
+                .background(
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .fill(luminaGlassSolid)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.30), lineWidth: 0.5)
+                )
         } else {
+            #if compiler(>=6.2)
+            if #available(iOS 26.0, *) {
+                native(content)
+            } else {
+                fallbackBox(content)
+            }
+            #else
             fallbackBox(content)
+            #endif
         }
-        #else
-        fallbackBox(content)
-        #endif
     }
+
+    #if compiler(>=6.2)
+    @available(iOS 26.0, *)
+    @ViewBuilder
+    private func native(_ content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+        if interactive {
+            content.glassEffect(.regular.interactive(), in: shape)
+        } else {
+            content.glassEffect(.regular, in: shape)
+        }
+    }
+    #endif
 
     private func fallbackBox(_ content: Content) -> some View {
         content
             .background {
-                RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .fill(.ultraThinMaterial)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: radius, style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [Color.white.opacity(0.22), Color.white.opacity(0.03)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
+                ZStack {
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .fill(.ultraThinMaterial)
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .fill(Color.white.opacity(0.06))
+                    RoundedRectangle(cornerRadius: radius, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.white.opacity(0.50), Color.white.opacity(0.16), .clear],
+                                startPoint: .top,
+                                endPoint: UnitPoint(x: 0.5, y: 0.22)
                             )
-                    )
+                        )
+                        .mask(
+                            LinearGradient(
+                                colors: [.clear, .white, .white, .clear],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                }
             }
             .overlay(
                 RoundedRectangle(cornerRadius: radius, style: .continuous)
-                    .stroke(Color.white.opacity(0.32), lineWidth: 0.8)
+                    .strokeBorder(Color.white.opacity(0.30), lineWidth: 0.5)
             )
-            .shadow(color: Color.black.opacity(0.4), radius: 14, y: 6)
+            .shadow(color: Color.black.opacity(0.32), radius: 24, y: 10)
     }
 }

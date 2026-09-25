@@ -3,17 +3,18 @@
 //  Lum1na
 //
 //  P007-style: one monospaced stream of already-stamped lines.
-//  Do not add a second timestamp column — ConsoleLine.formatted already
-//  has `yyyy-MM-dd HH:mm:ss z`.
+//  Theater (typewriter/decode) is display-only. Disk TAP is untouched.
 //
 
 import SwiftUI
 
 struct MatrixConsoleView: View {
     @ObservedObject private var manager = ExploitManager.shared
+    @StateObject private var performer = ConsolePerformer()
     @State private var autoScroll = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    private var dump: String {
+    private var truthDump: String {
         manager.lines.map(\.formatted).joined(separator: "\n")
     }
 
@@ -22,9 +23,9 @@ struct MatrixConsoleView: View {
             header
             ScrollViewReader { proxy in
                 ScrollView(.vertical, showsIndicators: true) {
-                    Text(dump.isEmpty ? "\(LabTime.militaryNow()) [*] console idle" : dump)
+                    consoleBody
                         .font(.system(size: 10, design: .monospaced))
-                        .foregroundColor(Color(hex: "#E2E8F0"))
+                        .foregroundColor(performer.flashLast ? .white : Color(hex: "#E2E8F0"))
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .textSelection(.enabled)
                         .padding(.horizontal, 8)
@@ -32,16 +33,45 @@ struct MatrixConsoleView: View {
                         .id("console-bottom")
                 }
                 .onChange(of: manager.lines.count) { _ in
+                    performer.reduceMotion = reduceMotion
+                    performer.sync(from: manager.lines)
                     if autoScroll {
                         withAnimation(.easeOut(duration: 0.08)) {
                             proxy.scrollTo("console-bottom", anchor: .bottom)
                         }
                     }
                 }
+                .onChange(of: performer.draft) { _ in
+                    if autoScroll {
+                        proxy.scrollTo("console-bottom", anchor: .bottom)
+                    }
+                }
+                .onAppear {
+                    performer.reduceMotion = reduceMotion
+                    performer.sync(from: manager.lines)
+                }
+                .onChange(of: reduceMotion) { _ in
+                    performer.reduceMotion = reduceMotion
+                }
             }
         }
-        .frame(minHeight: 220)
-        .luminaGlassRect(16)
+        .frame(minHeight: LayoutConstants.consoleMinHeight)
+        .luminaGlassRect(26, interactive: false)
+    }
+
+    @ViewBuilder
+    private var consoleBody: some View {
+        let finished = performer.finished.joined(separator: "\n")
+        let cursor = performer.blink ? "█" : " "
+        let draft = performer.draft
+        let idle = manager.lines.isEmpty && finished.isEmpty && draft.isEmpty
+        if idle {
+            Text("\(LabTime.militaryNow()) [*] console idle")
+        } else if draft.isEmpty {
+            Text(finished.isEmpty ? truthDump : finished)
+        } else {
+            Text(finished.isEmpty ? (draft + cursor) : (finished + "\n" + draft + cursor))
+        }
     }
 
     private var header: some View {
@@ -64,7 +94,7 @@ struct MatrixConsoleView: View {
                     .foregroundColor(autoScroll ? Color(hex: "#10B981") : Color(hex: "#FBBF24"))
             }
             Button {
-                UIPasteboard.general.string = dump
+                UIPasteboard.general.string = truthDump
             } label: {
                 Image(systemName: "doc.on.doc")
                     .font(.system(size: 12))
@@ -72,6 +102,7 @@ struct MatrixConsoleView: View {
             }
             Button {
                 manager.clearConsole()
+                performer.reset()
             } label: {
                 Text("CLEAR")
                     .font(.system(.caption2, design: .monospaced, weight: .bold))

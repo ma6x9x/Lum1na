@@ -11,7 +11,7 @@ Re-resolve `main` at the start of a task. Do not trust this file’s remembered 
 | `App/ContentView.swift` | Home: centered LUM1NA, motherboard, console, JAILBREAK |
 | `App/Lum1naApp.swift` | `@main` |
 | `UI/` | Theme, motherboard, glass, circuit background, console |
-| `UI/LuminaGlass.swift` | Glass look via `ultraThinMaterial` (no `.glassEffect()` — Xcode 16.4 SDK) |
+| `UI/LuminaGlass.swift` | Native `.glassEffect` when compiler ≥ 6.2; else Music27-style ultra-thin + edge light (not chrome material) |
 | `Exploit/Bridges/ExploitManager.swift` | Catalog, TAP, invoke `+tap` / `execute` |
 | `Session/PersistentLogStore.swift` | POSIX + `F_FULLFSYNC`, `p011_tap_log.txt` |
 | `Session/LabTime.swift` | `yyyy-MM-dd HH:mm:ss z` |
@@ -47,10 +47,11 @@ Stale names (do **not** resurrect): FusionChain, KernelMap/LabOffsets.swift dupl
 6. **Logging must stamp once**  
    `ConsoleLine.formatted` already has `yyyy-MM-dd HH:mm:ss z`. Never dump disk lines back through `log()` without `stripStamp`. Never dump `[RECOVER]` transcripts into the next session.  
    Capture the recovery packet **before** `writeSessionStart`. Copy that packet from the banner / Settings — do not scrape the live console. Split last-session on `=== SESSION START` only, not probe banners (`=== P044 Session`).  
-   On-screen console is **P007 replace-on-tap**: `resetOnScreenLog()` at each `executeExploit` / `executeStage`. Do not append the previous probe. Disk TAP + `p0xx_*_log.txt` stay append-only.
+   On-screen console is **P007 replace-on-tap**: `resetOnScreenLog()` at each `executeExploit` / `executeStage`. Do not append the previous probe. Disk TAP + `p0xx_*_log.txt` stay append-only.  
+   `UI/ConsolePerformer.swift` is display-only (typewriter/decode). Never scramble disk logs. Reduce Motion → instant.
 
 7. **iOS 26 Liquid Glass API**  
-   `.glassEffect()` / `.buttonStyle(.glass)` need Xcode 26. CI is 16.4. Use `luminaGlassCapsule()` / `luminaGlassRect()` only.
+   `.glassEffect()` / `.buttonStyle(.glass)` need Xcode 26. CI is 16.4. Use `luminaGlassCapsule()` / `luminaGlassRect()` only. Fallback is Music27-style edge light (0.5 pt rim, ~3 pt sheen), not chrome material. Console plate: `luminaGlassRect(26, interactive: false)`.
 
 8. **Bridging header**  
    Only import headers that exist. NSClassFromString does not need a bridge import, but `LabOff()` / `LabDeviceProfile` do.

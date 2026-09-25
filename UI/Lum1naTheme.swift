@@ -76,10 +76,14 @@ extension Font {
 
 // MARK: - Layout Constants
 enum LayoutConstants {
-    static let starSize: CGFloat = 80
+    static let starSize: CGFloat = 132
+    static let padFace: CGFloat = 80
+    static let padRadius: CGFloat = 22
+    static let motherboardHeight: CGFloat = 300
+    static let consoleMinHeight: CGFloat = 198
     static let hexagonSize: CGFloat = 60
     static let badgeSize: CGFloat = 44
-    static let consoleHeight: CGFloat = 180
+    static let consoleHeight: CGFloat = 198
     static let circuitLineWidth: CGFloat = 1.5
     static let cornerRadius: CGFloat = 16
 }
