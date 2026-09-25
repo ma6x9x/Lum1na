@@ -2,6 +2,8 @@ import Foundation
 
 final class Logger {
     static func log(_ message: String) {
-        print("[Lum1na] \(message)")
+        let line = "\(LabTime.militaryNow()) \(message)"
+        print(line)
+        PersistentLogStore.shared.append(line)
     }
 }

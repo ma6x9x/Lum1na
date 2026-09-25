@@ -38,15 +38,7 @@ struct CategorizedLogEntry: Identifiable {
     let message: String
 
     var formattedTimestamp: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm:ss"
-        return formatter.string(from: timestamp)
-    }
-
-    var formattedMilliseconds: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = ".SSS"
-        return formatter.string(from: timestamp)
+        LabTime.militaryNow(from: timestamp)
     }
 }
 
@@ -66,8 +58,8 @@ class MatrixConsoleViewModel: ObservableObject {
     func addLog(level: CategorizedLogLevel, message: String) {
         let entry = CategorizedLogEntry(timestamp: Date(), level: level, message: message)
         logs.append(entry)
-        if logs.count > 200 {
-            logs.removeFirst(logs.count - 200)
+        if logs.count > 1000 {
+            logs.removeFirst(logs.count - 1000)
         }
     }
 
@@ -98,12 +90,11 @@ struct MatrixConsoleView: View {
                 )
         )
         .onAppear {
-            // Real device info — no more hardcoded demo lines
             if viewModel.logs.isEmpty {
                 viewModel.addLog(level: .init_, message: "Lum1na initialized")
-                viewModel.addLog(level: .init_, message: "Device: \(DeviceUtils.currentDevice)")
-                viewModel.addLog(level: .init_, message: "Chip: \(DeviceUtils.currentChip)")
-                viewModel.addLog(level: .success, message: "Exploit chain loaded")
+                viewModel.addLog(level: .init_, message: "machine \(DeviceUtils.currentDeviceIdentifier)")
+                viewModel.addLog(level: .init_, message: "osversion \(LabTime.sysctl("kern.osversion"))")
+                viewModel.addLog(level: .init_, message: "chip \(DeviceUtils.currentChip)")
             }
         }
         .onReceive(manager.$lines) { lines in
@@ -150,7 +141,7 @@ struct MatrixConsoleView: View {
             // Copy log to clipboard
             Button {
                 UIPasteboard.general.string = viewModel.logs.map { entry in
-                    "\(entry.level.displayPrefix) \(entry.formattedTimestamp) \(entry.message)"
+                    "\(entry.formattedTimestamp) \(entry.level.displayPrefix) \(entry.message)"
                 }.joined(separator: "\n")
             } label: {
                 Image(systemName: "doc.on.doc")
@@ -277,14 +268,10 @@ struct CategorizedLogRow: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: 6) {
-            HStack(spacing: 0) {
-                Text(entry.formattedTimestamp)
-                    .foregroundStyle(Color(hex: "#64748B"))
-                Text(entry.formattedMilliseconds)
-                    .foregroundStyle(Color(hex: "#475569"))
-            }
-            .font(.system(.caption2, design: .monospaced))
-            .frame(width: 75, alignment: .leading)
+            Text(entry.formattedTimestamp)
+                .foregroundStyle(Color(hex: "#64748B"))
+                .font(.system(.caption2, design: .monospaced))
+                .frame(width: 148, alignment: .leading)
 
             Text(entry.level.displayPrefix)
                 .font(.system(.caption2, design: .monospaced, weight: .bold))

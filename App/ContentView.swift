@@ -61,7 +61,8 @@ struct ContentView: View {
         }
         .onAppear {
             if viewModel.lastRecoverySummary.isEmpty == false {
-                recoveredNote = "Recovered from crash: \(viewModel.lastRecoverySummary)"
+                let tap = PersistentLogStore.shared.lastTapId().map { " last TAP \($0)" } ?? ""
+                recoveredNote = "Recovered from crash\(tap): \(viewModel.lastRecoverySummary)"
             }
         }
     }
