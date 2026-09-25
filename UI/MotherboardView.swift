@@ -17,7 +17,7 @@ struct MotherboardView: View {
                     center: center,
                     pads: pads,
                     active: manager.selectedStage,
-                    running: manager.isRunning,
+                    fireLasers: manager.fullChainActive,
                     progress: manager.progress
                 )
 
@@ -38,7 +38,7 @@ struct MotherboardView: View {
                 }
 
                 Lum1naStarMark(
-                    running: manager.isRunning,
+                    running: manager.fullChainActive,
                     stageColor: (manager.selectedStage ?? .kernel).color
                 )
                 .position(center)
@@ -65,23 +65,15 @@ struct MotherboardPad: View {
     var body: some View {
         VStack(spacing: 4) {
             ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                stage.color.opacity(isActive ? 0.28 : 0.08),
-                                Color(hex: "#0A0A0F").opacity(0.9)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(stage.color.opacity(isActive ? 0.95 : 0.35), lineWidth: isActive ? 1.6 : 1)
-                    )
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(stage.color.opacity(isActive ? 0.18 : 0.06))
                     .frame(width: 58, height: 58)
-                    .shadow(color: isActive ? stage.color.opacity(0.85) : stage.color.opacity(0.18), radius: isActive ? 14 : 4)
+                    .luminaGlassRect(14)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(stage.color.opacity(isActive ? 0.9 : 0.35), lineWidth: isActive ? 1.4 : 0.8)
+                    )
+                    .shadow(color: isActive ? stage.color.opacity(0.55) : .clear, radius: isActive ? 10 : 0)
 
                 if isRunning {
                     ProgressView()
@@ -105,35 +97,31 @@ struct MotherboardTraceLayer: View {
     let center: CGPoint
     let pads: [ExploitStage: CGPoint]
     let active: ExploitStage?
-    let running: Bool
+    let fireLasers: Bool
     let progress: Double
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: false)) { context in
             let t = context.date.timeIntervalSinceReferenceDate
             Canvas { ctx, size in
-                drawBoard(ctx: ctx, size: size, t: t)
                 for stage in ExploitStage.allCases {
                     guard let dest = pads[stage] else { continue }
-                    let lit = active == stage
-                    let color = lit ? stage.color : Color(hex: "#3B82F6")
+                    let lit = fireLasers && active == stage
                     let traces = manhattanBundle(from: center, to: dest)
                     for (i, path) in traces.enumerated() {
-                        let w: CGFloat = lit ? (i == 0 ? 2.4 : 1.2) : 0.8
-                        ctx.stroke(path, with: .color(color.opacity(lit ? 0.95 : 0.22)), lineWidth: w)
+                        let opacity: Double = lit ? 0.95 : 0.06
+                        let w: CGFloat = lit ? (i == 0 ? 2.4 : 1.1) : 0.5
+                        ctx.stroke(path, with: .color(stage.color.opacity(opacity)), lineWidth: w)
                         if lit {
-                            ctx.stroke(path, with: .color(stage.color.opacity(0.22)), lineWidth: 8)
+                            ctx.stroke(path, with: .color(stage.color.opacity(0.28)), lineWidth: 8)
                         }
                     }
-                    fillVia(ctx, at: dest, color: color, lit: lit)
-                    fillVia(ctx, at: midpoint(center, dest), color: color, lit: lit)
-
                     if lit {
-                        let speed = running ? (0.55 + progress * 0.9) : 0.22
+                        let speed = 0.55 + progress * 0.9
                         for k in 0..<4 {
                             let packetT = (t * speed + Double(k) * 0.22).truncatingRemainder(dividingBy: 1.0)
                             let p = pointOnOrthogonal(from: center, to: dest, t: packetT)
-                            let r: CGFloat = running ? 5.5 : 3.2
+                            let r: CGFloat = 5.5
                             let rect = CGRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2)
                             ctx.fill(Path(ellipseIn: rect.insetBy(dx: -5, dy: -5)), with: .color(stage.color.opacity(0.28)))
                             ctx.fill(Path(ellipseIn: rect), with: .color(stage.color))

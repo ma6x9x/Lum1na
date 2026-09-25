@@ -13,7 +13,7 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            CircuitBackgroundView(stage: visualStage)
+            GalaxyFieldView(accent: visualStage.color)
 
             VStack(spacing: 0) {
                 headerSection
