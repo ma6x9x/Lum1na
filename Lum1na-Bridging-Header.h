@@ -35,7 +35,7 @@
 
 // Your exploit headers - UPDATED
 #import "Exploit/P044ExploitController.h"
-#import "Exploit/ANE254InputController.h"
+#import "Exploit/ANE/ANE254InputController.h"
 #import "Exploit/AKSExploitController.h"
 #import "Exploit/P051APFSXattr.h"
 #import "Exploit/P054APFSReapList.h"
@@ -75,8 +75,6 @@
 #import "Exploit/P058JPEGDriverReach.h"
 #import "Exploit/P061AVEEncTypeReach.h"
 #import "Exploit/Lum1naKRW.h"
-
-// --- Batch 2/3 additions ---
 #import "Exploit/ANE/ANEDirectIn.h"
 #import "Exploit/IOGPU/IOGPU64788Controller.h"
 #import "Exploit/IOGPU/P062StaleEntryOracle.h"
