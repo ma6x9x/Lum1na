@@ -80,6 +80,9 @@
 #import "Exploit/ANEDirectIn.h"
 #import "Exploit/IOGPU64788Controller.h"
 #import "Exploit/P062StaleEntryOracle.h"
+#import "Exploit/P06xTaps.h"
+#import "Exploit/P064AVE84607Racer.h"
+#import "Exploit/P06xLog.h"
 
 
 #endif
