@@ -505,7 +505,7 @@ final class Lum1naViewModel: ObservableObject {
         let anySuccess = p022ProbeResults.contains { $0.succeeded }
         if anySuccess {
             p022Status = .ok
-ecalogo            logSuccess("P022: bypass confirmed — elevate to KRW workstream")
+            logSuccess("P022: bypass confirmed — elevate to KRW workstream")
         } else {
             p022Status = .fail(errno: p022ProbeResults.first?.errnoValue ?? 0, kr: 0)
             logError("P022: all probes errno — sf_fd=-1 appears walled on 23F77")
