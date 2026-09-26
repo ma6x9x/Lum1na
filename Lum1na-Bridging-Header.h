@@ -34,7 +34,7 @@
 #import <CoreMedia/CoreMedia.h>
 
 // Your exploit headers - UPDATED
-#import "KRWBridge.h"
+#import "Exploit/KRWBridge.h"
 #import "Exploit/P044ExploitController.h"
 #import "Exploit/ANE254InputController.h"
 #import "Exploit/AKSExploitController.h"
