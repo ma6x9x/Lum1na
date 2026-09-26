@@ -76,4 +76,9 @@
 #import "Exploit/P061AVEEncTypeReach.h"
 #import "Exploit/Lum1naKRW.h"
 
+// --- Batch 2/3 additions ---
+#import "Exploit/ANEDirectIn.h"
+#import "Exploit/IOGPU64788Controller.h"
+#import "Exploit/P062StaleEntryOracle.h"
+
 #endif
