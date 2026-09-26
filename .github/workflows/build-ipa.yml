@@ -76,7 +76,7 @@ jobs:
           echo "✓ Bridging header validation passed"
 
       # ============================================
-      # 2. Source Files Verification
+      # 2. Source Files Verification (UPDATED)
       # ============================================
       - name: Verify Source Files
         run: |
@@ -84,11 +84,16 @@ jobs:
           
           required_files=(
             "Exploit/P044ExploitController.m"
+            "Exploit/ANE254InputController.m"
+            "Exploit/ANE254InputController.h"
+            "Exploit/Lum1naKRW.m"
+            "Exploit/Lum1naKRW.h"
             "Exploit/AKSExploitController.m"
             "Exploit/P051APFSXattr.m"
             "Exploit/P054APFSReapList.m"
             "Exploit/LabRuntimeOffsets.m"
             "Exploit/LabDeviceProfile.m"
+            "Exploit/A14_23F77_LabOffsets.h"
             "UI/LabOffsets.swift"
             "App/ContentView.swift"
             "UI/Lum1naViewModel.swift"
@@ -223,6 +228,16 @@ jobs:
               <true/>
               <key>com.apple.private.IOSurface</key>
               <true/>
+              <key>com.apple.private.ane</key>
+              <true/>
+              <key>com.apple.private.ane.allow</key>
+              <true/>
+              <key>com.apple.security.exception.iokit-user-client-class</key>
+              <array>
+                  <string>AppleNeuralEngineUserClient</string>
+                  <string>IOSurfaceRootUserClient</string>
+                  <string>IOGPUDevice</string>
+              </array>
               <key>get-task-allow</key>
               <true/>
           </dict>
@@ -250,6 +265,7 @@ jobs:
             "Foundation"
             "UIKit"
             "CoreVideo"
+            "VideoToolbox"
           )
           
           MISSING=()
