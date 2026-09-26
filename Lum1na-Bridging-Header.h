@@ -78,6 +78,6 @@
 #import "Exploit/ANE/ANEDirectIn.h"
 #import "Exploit/IOGPU/IOGPU64788Controller.h"
 #import "Exploit/IOGPU/P062StaleEntryOracle.h"
-#import "Exploit/ANE/P06xLog.h"
+#import "Exploit/P06xLog.h"
 
 #endif
