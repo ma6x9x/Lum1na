@@ -122,6 +122,8 @@ jobs:
             "Kernel/Lum1naBoard.h"
             "Kernel/Lum1naBoard.m"
             "Exploit/KRWBridge.m"
+            "Exploit/ANE254ChainController.h"
+            "Exploit/ANE254ChainController.m"
           )
 
           MISSING=0
