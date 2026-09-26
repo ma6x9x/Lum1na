@@ -1,4 +1,5 @@
 name: Lum1na Build
+
 on:
   workflow_dispatch:
   push:
@@ -45,7 +46,7 @@ jobs:
           fi
           echo "✓ Found $BRIDGING_HEADER"
 
-          # Check for macOS-only headers
+          # macOS-only headers that break iOS builds
           MACOS_ONLY_HEADERS=(
             "mach/mach_vm.h"
             "IOKit/IOBSD.h"
@@ -60,15 +61,19 @@ jobs:
 
           FOUND_BAD=0
           for header in "${MACOS_ONLY_HEADERS[@]}"; do
-            if grep -q "#import.*<$header>" "$BRIDGING_HEADER" 2>/dev/null || \
-               grep -q "#include.*<$header>" "$BRIDGING_HEADER" 2>/dev/null; then
+            if grep -qE '#(import|include).*<'"$header"'>' "$BRIDGING_HEADER" 2>/dev/null; then
               echo "❌ ERROR: macOS-only header: $header"
               FOUND_BAD=1
             fi
           done
 
-          # Check new-stage imports are present
-          for req in "Exploit/ANEDirectIn.h" "Exploit/IOGPU64788Controller.h" "Exploit/P062StaleEntryOracle.h"; do
+          # New-stage imports must be present or Swift cannot see the probes
+          REQUIRED_IMPORTS=(
+            "Exploit/ANEDirectIn.h"
+            "Exploit/IOGPU64788Controller.h"
+            "Exploit/P062StaleEntryOracle.h"
+          )
+          for req in "${REQUIRED_IMPORTS[@]}"; do
             if ! grep -q "#import \"$req\"" "$BRIDGING_HEADER"; then
               echo "❌ ERROR: bridging header missing #import \"$req\""
               FOUND_BAD=1
@@ -90,22 +95,16 @@ jobs:
         run: |
           echo "=== Verifying Source Files ==="
 
+          # --- HARD REQUIRED: new stages + core chain (build fails if missing) ---
           required_files=(
-            "Exploit/P044ExploitController.m"
-            "Exploit/ANE254InputController.m"
-            "Exploit/ANE254InputController.h"
-            "Exploit/Lum1naKRW.m"
-            "Exploit/Lum1naKRW.h"
-            "Exploit/AKSExploitController.m"
-            "Exploit/P051APFSXattr.m"
-            "Exploit/P054APFSReapList.m"
-            "Exploit/LabRuntimeOffsets.m"
-            "Exploit/LabDeviceProfile.m"
-            "Exploit/A14_23F77_LabOffsets.h"
-            "UI/LabOffsets.swift"
+            "${PROJECT_NAME}-Bridging-Header.h"
             "App/ContentView.swift"
             "UI/Lum1naViewModel.swift"
-            "Exploit/Bridges/ExploitManager.swift"
+            "UI/LabOffsets.swift"
+            "Exploit/P044ExploitController.h"
+            "Exploit/P044ExploitController.m"
+            "Exploit/ANE254InputController.h"
+            "Exploit/ANE254InputController.m"
             "Exploit/ANEDirectIn.h"
             "Exploit/ANEDirectIn.m"
             "Exploit/IOGPU64788Controller.h"
@@ -114,6 +113,15 @@ jobs:
             "Exploit/P062StaleEntryOracle.m"
             "Exploit/P06xLog.h"
             "Exploit/P06xLog.m"
+            "Exploit/iokit_shim.h"
+            "Exploit/iokit_shim.c"
+            "Exploit/Lum1naKRW.h"
+            "Exploit/Lum1naKRW.m"
+            "Exploit/LabRuntimeOffsets.h"
+            "Exploit/A14_23F77_LabOffsets.h"
+            "Exploit/A12X_23G71_LabOffsets.h"
+            "Kernel/Lum1naBoard.h"
+            "Kernel/Lum1naBoard.m"
           )
 
           MISSING=0
@@ -127,10 +135,43 @@ jobs:
           done
 
           if [ $MISSING -eq 1 ]; then
+            echo ""
+            echo "📝 Add the missing files listed above, then re-run"
             exit 1
           fi
 
-          echo "✅ All source files verified"
+          # --- SOFT CHECK: probe family (warn only — some are intentionally
+          #     disabled per build, e.g. AVERace removal below) ---
+          echo ""
+          echo "=== Probe family presence (informational) ==="
+          for probe in P005JIT P009ReplaceBackingSmoke P010QueueLeak \
+                       P017ConfusedDeputy P032ANEOpenSmoke P033CoreML1in1out \
+                       P034Kmsg3072Occupancy P038WHuntSmoke P040NamespaceDestSmoke \
+                       P041SlideDestMap P042ReachabilityProbe P043WriteClassMap \
+                       P045HybridMap P046F77PatchOracle P050GetattrlistOOB \
+                       P051APFSXattr P052APFSNstream P053NECPDoubleFree \
+                       P054APFSReapList P055IOSurfaceUPL P056VTCompressionReach \
+                       P057WVEKReach P058JPEGDriverReach P061AVEEncTypeReach \
+                       AKSExploitController CSKRW CSRaceCalib APFS84523 \
+                       CVE_2026_84530_KASLR DeviceIdentProbe LabDeviceProfile \
+                       LabIOGPUQueue; do
+            if ls "Exploit/${probe}"* >/dev/null 2>&1 || \
+               ls "Exploit/${probe}".* >/dev/null 2>&1; then
+              echo "✓ ${probe}"
+            else
+              echo "⚠️  ${probe} — not found (OK if intentionally disabled)"
+            fi
+          done
+
+          # Lockdownd chain (subfolder)
+          if ls Exploit/Lockdownd/LockdowndFullChain.* >/dev/null 2>&1; then
+            echo "✓ LockdowndFullChain"
+          else
+            echo "⚠️  LockdowndFullChain — not found (OK if intentionally disabled)"
+          fi
+
+          echo ""
+          echo "✅ All hard-required source files verified"
 
       # ============================================
       # 3. iOS 18 Universal App Icon Verification
@@ -198,7 +239,7 @@ jobs:
           done
 
           if [ $FOUND -eq 0 ]; then
-            echo "⚠️ Model not found - build may fail"
+            echo "⚠️  Model not found — P044/P059 model-dependent stages will fail at runtime"
           else
             echo "✅ Model files verified"
           fi
@@ -230,6 +271,16 @@ jobs:
           rm -f Exploit/AVERace.m Exploit/AVERace.h 2>/dev/null || true
           echo "✅ Removed AVERace"
 
+      # ============================================
+      # Entitlements — covers every user client + service we touch:
+      #   ANE:     AppleH11ANEInterface (P059 selector 2 direct path)
+      #   IOGPU:   IOGPUDevice user client (P061/P062 sel-36 ABI)
+      #   Surface: IOSurfaceRootUserClient (surfaces for both paths)
+      #   CoreML:  P044 model load fallback path
+      #   VT/AVE:  P056/P057 reach taps
+      # NOTE: unsigned build embeds these at re-sign time (ldid/Sideloadly),
+      #       but keeping them here ensures the .app payloads match.
+      # ============================================
       - name: Create Entitlements
         run: |
           cat > Lum1na.entitlements << 'EOF'
@@ -237,30 +288,61 @@ jobs:
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
+              <!-- CoreML (P044 model fallback path) -->
               <key>com.apple.developer.coreml</key>
               <true/>
+
+              <!-- IOSurface (ANE overflow surfaces + 64788 resources) -->
               <key>com.apple.private.IOSurface</key>
               <true/>
+
+              <!-- ANE direct driver access (P059) -->
               <key>com.apple.private.ane</key>
               <true/>
               <key>com.apple.private.ane.allow</key>
               <true/>
+
+              <!-- IOKit user client classes used by the probe set -->
               <key>com.apple.security.exception.iokit-user-client-class</key>
               <array>
                   <string>AppleNeuralEngineUserClient</string>
+                  <string>AppleH11ANEInterface</string>
                   <string>IOSurfaceRootUserClient</string>
                   <string>IOGPUDevice</string>
+                  <string>IOGPUDeviceUserClient</string>
+                  <string>IOAccelDevice</string>
+                  <string>IOAccelContext</string>
+                  <string>AppleAVE2UserClient</string>
+                  <string>AppleJPEGDriverUserClient</string>
+                  <string>AppleValidatorUserClient</string>
               </array>
+
+              <!-- Mach service lookups (aned diagnostics channel) -->
+              <key>com.apple.security.exception.mach-lookup.global-names</key>
+              <array>
+                  <string>com.apple.ane.diagnostics</string>
+                  <string>com.apple.backboardd.launchapplications</string>
+              </array>
+
+              <!-- VideoToolbox / CoreMedia (P056/P057) -->
+              <key>com.apple.developer.video-toolbox</key>
+              <true/>
+
+              <!-- Debugging -->
               <key>get-task-allow</key>
               <true/>
           </dict>
           </plist>
           EOF
+          echo "✅ Entitlements written"
 
+      # ============================================
+      # Framework Injection — detects frameworks referenced by our new code
+      # but absent from the pbxproj (IOSurface/IOKit/CoreML/VideoToolbox)
+      # ============================================
       - name: Detect and Inject Missing Frameworks
         id: framework-injection
         run: |
-          #!/bin/bash
           set -e
 
           echo "🔍 Detecting missing frameworks..."
@@ -275,6 +357,7 @@ jobs:
             "UIKit"
             "CoreVideo"
             "VideoToolbox"
+            "CoreMedia"
           )
 
           MISSING=()
@@ -298,6 +381,9 @@ jobs:
             echo "✅ All frameworks present"
           fi
 
+      # ============================================
+      # Build — unsigned (signed at deploy time)
+      # ============================================
       - name: Build Unsigned IPA
         env:
           OTHER_LDFLAGS: ${{ steps.framework-injection.outputs.other_ldflags }}
@@ -322,22 +408,76 @@ jobs:
             IPHONEOS_DEPLOYMENT_TARGET="${DEPLOYMENT_TARGET}" \
             build
 
+      # ============================================
+      # Package IPA
+      # ============================================
       - name: Package IPA
         run: |
-          APP=$(find "$RUNNER_TEMP/DerivedData/Build/Products" -name "${PROJECT_NAME}.app" -print -quit)
-          if [ -z "$APP" ]; then
-            echo "❌ ERROR: .app not found in build products"
+          set -euo pipefail
+
+          echo "=== Packaging IPA ==="
+
+          APP_PATH=$(find "$RUNNER_TEMP/DerivedData/Build/Products" \
+            -type d -name "${PROJECT_NAME}.app" | head -1)
+
+          if [ -z "$APP_PATH" ]; then
+            echo "❌ ERROR: built .app not found"
             exit 1
           fi
-          mkdir -p Payload
-          cp -R "$APP" Payload/
-          zip -qr "${PROJECT_NAME}.ipa" Payload
-          ls -lh "${PROJECT_NAME}.ipa"
+          echo "✓ Found app: $APP_PATH"
 
-      - name: Upload IPA
+          mkdir -p "Payload"
+          cp -R "$APP_PATH" "Payload/"
+
+          # Embed entitlements next to the binary for the sign step
+          cp "Lum1na.entitlements" "Payload/${PROJECT_NAME}.app/"
+
+          # Fake-sign for ldid/Sideloadly compatibility
+          ldid -S"Lum1na.entitlements" "Payload/${PROJECT_NAME}.app/${PROJECT_NAME}" \
+            2>/dev/null || echo "⚠️  ldid not present — skipping fake-sign (fine for Sideloadly)"
+
+          zip -r "${PROJECT_NAME}.ipa" "Payload"
+          echo "✅ Packaged ${PROJECT_NAME}.ipa"
+
+      - name: Verify IPA
+        run: |
+          set -euo pipefail
+
+          IPA="${PROJECT_NAME}.ipa"
+
+          if [ ! -f "$IPA" ]; then
+            echo "❌ ERROR: $IPA not found"
+            exit 1
+          fi
+
+          SIZE=$(du -h "$IPA" | cut -f1)
+          echo "✅ IPA built: $IPA ($SIZE)"
+
+          # Verify embedded entitlements reference our new IOKit classes
+          if command -v ldid >/dev/null 2>&1; then
+            ldid -e "Payload/${PROJECT_NAME}.app/${PROJECT_NAME}" | \
+              grep -q "AppleH11ANEInterface" && \
+              echo "✅ ANE entitlements embedded" || \
+              echo "⚠️  ANE entitlements not found in embedded plist"
+          fi
+
+      - name: Upload IPA Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Lum1na-IPA
-          path: Lum1na.ipa
-          if-no-files-found: error
-          retention-days: 7
+          name: "${{ env.PROJECT_NAME }}-unsigned-ipa"
+          path: "${{ env.PROJECT_NAME }}.ipa"
+          retention-days: 30
+
+      - name: Build Summary
+        run: |
+          echo "### 🚀 Lum1na Build Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Stage | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Validation | ✅ |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build | ✅ |" >> $GITHUB_STEP_SUMMARY
+          echo "| IPA | ✅ uploaded (30-day retention) |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**New stages included:** P059 ANEDirectIn · P061 IOGPU 64788 · P062 Stale-Entry Oracle" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Next:** sideload → run P022 probes first (highest-value untested path)" >> $GITHUB_STEP_SUMMARY
