@@ -391,9 +391,8 @@ jobs:
           OTHER_LDFLAGS: ${{ steps.framework-injection.outputs.other_ldflags }}
         run: |
           set -euo pipefail
-
           echo "=== Starting Xcode Build ==="
-
+          set +e
           xcodebuild \
             -project "${PROJECT_NAME}.xcodeproj" \
             -scheme "${SCHEME_NAME}" \
@@ -408,7 +407,16 @@ jobs:
             CODE_SIGN_ENTITLEMENTS="Lum1na.entitlements" \
             SWIFT_OBJC_BRIDGING_HEADER="${PROJECT_NAME}-Bridging-Header.h" \
             IPHONEOS_DEPLOYMENT_TARGET="${DEPLOYMENT_TARGET}" \
-            build
+            build 2>&1 | tee "$RUNNER_TEMP/build.log"
+          RC=${PIPESTATUS[0]}
+          set -e
+          if [ $RC -ne 0 ]; then
+            echo ""
+            echo "================ REAL ERRORS ================"
+            grep -nE "error:|fatal error" "$RUNNER_TEMP/build.log" | grep -v "cc1\|Failed frontend" | head -40
+            echo "============================================="
+            exit $RC
+          fi
 
       # ============================================
       # Package IPA
