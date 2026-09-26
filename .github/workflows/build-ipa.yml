@@ -121,7 +121,7 @@ jobs:
             "Exploit/A12X_23G71_LabOffsets.h"
             "Kernel/Lum1naBoard.h"
             "Kernel/Lum1naBoard.m"
-            "Exploit/KRWBridge"
+            "Exploit/KRWBridge.m"
           )
 
           MISSING=0
