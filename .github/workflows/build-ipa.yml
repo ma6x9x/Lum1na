@@ -69,9 +69,9 @@ jobs:
 
           # New-stage imports must be present or Swift cannot see the probes
           REQUIRED_IMPORTS=(
-            "Exploit/ANE/ANEDirectIn.h"
-            "Exploit/IOGPU/IOGPU64788Controller.h"
-            "Exploit/IOGPU/P062StaleEntryOracle.h"
+            "Exploit/ANEDirectIn.h"
+            "Exploit/IOGPU64788Controller.h"
+            "Exploit/P062StaleEntryOracle.h"
           )
           for req in "${REQUIRED_IMPORTS[@]}"; do
             if ! grep -q "#import \"$req\"" "$BRIDGING_HEADER"; then
@@ -103,18 +103,16 @@ jobs:
             "UI/LabOffsets.swift"
             "Exploit/P044ExploitController.h"
             "Exploit/P044ExploitController.m"
-            "Exploit/ANE/ANE254InputController.h"
-            "Exploit/ANE/ANE254InputController.m"
-            "Exploit/ANE/ANEDirectIn.h"
-            "Exploit/ANE/ANEDirectIn.m"
-            "Exploit/IOGPU/IOGPU64788Controller.h"
-            "Exploit/IOGPU/IOGPU64788Controller.m"
-            "Exploit/IOGPU/P062StaleEntryOracle.h"
-            "Exploit/IOGPU/P062StaleEntryOracle.m"
-            "Exploit/P06xLog.h"
-            "Exploit/P06xLog.m"
-            "Exploit/ANE/iokit_shim.h"
-            "Exploit/ANE/iokit_shim.c"
+            "Exploit/ANE254InputController.h"
+            "Exploit/ANE254InputController.m"
+            "Exploit/ANEDirectIn.h"
+            "Exploit/ANEDirectIn.m"
+            "Exploit/IOGPU64788Controller.h"
+            "Exploit/IOGPU64788Controller.m"
+            "Exploit/P062StaleEntryOracle.h"
+            "Exploit/P062StaleEntryOracle.m"
+            "Exploit/iokit_shim.h"
+            "Exploit/iokit_shim.c"
             "Exploit/Lum1naKRW.h"
             "Exploit/Lum1naKRW.m"
             "Exploit/LabRuntimeOffsets.h"
