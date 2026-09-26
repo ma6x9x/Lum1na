@@ -77,8 +77,8 @@
 #import "Exploit/Lum1naKRW.h"
 
 // --- Batch 2/3 additions ---
-#import "Exploit/ANEDirectIn.h"
-#import "Exploit/IOGPU64788Controller.h"
-#import "Exploit/P062StaleEntryOracle.h"
+#import "Exploit/ANE/ANEDirectIn.h"
+#import "Exploit/IOGPU/IOGPU64788Controller.h"
+#import "Exploit/IOGPU/P062StaleEntryOracle.h"
 
 #endif
