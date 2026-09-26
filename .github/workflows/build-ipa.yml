@@ -16,7 +16,7 @@ jobs:
   validate:
     runs-on: macos-15
     name: "🔍 Validation"
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,15 +36,15 @@ jobs:
         run: |
           set -euo pipefail
           echo "=== Validating Bridging Header ==="
-          
+
           BRIDGING_HEADER="${PROJECT_NAME}-Bridging-Header.h"
-          
+
           if [ ! -f "$BRIDGING_HEADER" ]; then
             echo "❌ ERROR: $BRIDGING_HEADER not found!"
             exit 1
           fi
           echo "✓ Found $BRIDGING_HEADER"
-          
+
           # Check for macOS-only headers
           MACOS_ONLY_HEADERS=(
             "mach/mach_vm.h"
@@ -57,7 +57,7 @@ jobs:
             "mach-o/fat.h"
             "mach-o/swap.h"
           )
-          
+
           FOUND_BAD=0
           for header in "${MACOS_ONLY_HEADERS[@]}"; do
             if grep -q "#import.*<$header>" "$BRIDGING_HEADER" 2>/dev/null || \
@@ -66,22 +66,30 @@ jobs:
               FOUND_BAD=1
             fi
           done
-          
+
+          # Check new-stage imports are present
+          for req in "Exploit/ANEDirectIn.h" "Exploit/IOGPU64788Controller.h" "Exploit/P062StaleEntryOracle.h"; do
+            if ! grep -q "#import \"$req\"" "$BRIDGING_HEADER"; then
+              echo "❌ ERROR: bridging header missing #import \"$req\""
+              FOUND_BAD=1
+            fi
+          done
+
           if [ $FOUND_BAD -eq 1 ]; then
             echo ""
-            echo "📝 Use iOS-compatible alternatives"
+            echo "📝 Fix bridging header before building"
             exit 1
           fi
-          
+
           echo "✓ Bridging header validation passed"
 
       # ============================================
-      # 2. Source Files Verification (UPDATED)
+      # 2. Source Files Verification
       # ============================================
       - name: Verify Source Files
         run: |
           echo "=== Verifying Source Files ==="
-          
+
           required_files=(
             "Exploit/P044ExploitController.m"
             "Exploit/ANE254InputController.m"
@@ -98,8 +106,16 @@ jobs:
             "App/ContentView.swift"
             "UI/Lum1naViewModel.swift"
             "Exploit/Bridges/ExploitManager.swift"
+            "Exploit/ANEDirectIn.h"
+            "Exploit/ANEDirectIn.m"
+            "Exploit/IOGPU64788Controller.h"
+            "Exploit/IOGPU64788Controller.m"
+            "Exploit/P062StaleEntryOracle.h"
+            "Exploit/P062StaleEntryOracle.m"
+            "Exploit/P06xLog.h"
+            "Exploit/P06xLog.m"
           )
-          
+
           MISSING=0
           for file in "${required_files[@]}"; do
             if [ -f "$file" ]; then
@@ -109,11 +125,11 @@ jobs:
               MISSING=1
             fi
           done
-          
+
           if [ $MISSING -eq 1 ]; then
             exit 1
           fi
-          
+
           echo "✅ All source files verified"
 
       # ============================================
@@ -123,25 +139,25 @@ jobs:
         run: |
           set -euo pipefail
           echo "=== Validating iOS 18 Universal App Icons ==="
-          
+
           ICON_DIR="Assets.xcassets/AppIcon.appiconset"
-          
+
           if [ ! -d "$ICON_DIR" ]; then
             echo "❌ ERROR: $ICON_DIR not found"
             exit 1
           fi
-          
+
           if [ ! -f "$ICON_DIR/Contents.json" ]; then
             echo "❌ ERROR: Contents.json missing"
             exit 1
           fi
-          
+
           REQUIRED_ICONS=(
             "AppIcon.jpg"
             "AppIcon-Dark.jpg"
             "AppIcon-Tinted.jpg"
           )
-          
+
           MISSING=0
           for icon in "${REQUIRED_ICONS[@]}"; do
             if [ -f "$ICON_DIR/$icon" ]; then
@@ -151,12 +167,12 @@ jobs:
               MISSING=1
             fi
           done
-          
+
           if [ $MISSING -eq 1 ]; then
             echo "❌ iOS 18 Universal App Icon validation failed"
             exit 1
           fi
-          
+
           echo "✅ App Icons validated"
 
       # ============================================
@@ -165,13 +181,13 @@ jobs:
       - name: Verify Model Files
         run: |
           echo "=== Checking Model Files ==="
-          
+
           MODEL_NAME="XVRC27_254in_1out_addchain"
           MODEL_PATHS=(
             "model/${MODEL_NAME}.mlmodelc"
             "Resources/${MODEL_NAME}.mlmodelc"
           )
-          
+
           FOUND=0
           for path in "${MODEL_PATHS[@]}"; do
             if [ -d "$path" ]; then
@@ -180,7 +196,7 @@ jobs:
               break
             fi
           done
-          
+
           if [ $FOUND -eq 0 ]; then
             echo "⚠️ Model not found - build may fail"
           else
@@ -195,7 +211,7 @@ jobs:
     needs: validate
     timeout-minutes: 45
     name: "🔨 Build IPA"
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -208,9 +224,6 @@ jobs:
           sudo xcode-select -s "$XCODE/Contents/Developer"
           xcodebuild -version
 
-      # ============================================
-      # REMOVE PROBLEMATIC FILES
-      # ============================================
       - name: Remove Problematic AVE Files
         run: |
           echo "=== Removing dual-session AVERace only (P056 is the VT reach tap) ==="
@@ -244,30 +257,26 @@ jobs:
           </plist>
           EOF
 
-      # ============================================
-      # AUTO FRAMEWORK INJECTION
-      # ============================================
       - name: Detect and Inject Missing Frameworks
         id: framework-injection
         run: |
           #!/bin/bash
           set -e
-          
+
           echo "🔍 Detecting missing frameworks..."
-          
+
           PROJECT_FILE="${PROJECT_NAME}.xcodeproj/project.pbxproj"
-          
-          # Required frameworks for Lum1na (especially CVE-2026-43748 ANE)
+
           declare -a REQUIRED=(
-            "IOSurface"   # ANE exploit - CRITICAL
-            "IOKit"       # Kernel comms - CRITICAL  
-            "CoreML"      # ANE models - CRITICAL
+            "IOSurface"
+            "IOKit"
+            "CoreML"
             "Foundation"
             "UIKit"
             "CoreVideo"
             "VideoToolbox"
           )
-          
+
           MISSING=()
           for fw in "${REQUIRED[@]}"; do
             if ! grep -q "${fw}.framework" "$PROJECT_FILE" 2>/dev/null; then
@@ -275,33 +284,28 @@ jobs:
               echo "  ⚠️  Missing: $fw.framework"
             fi
           done
-          
-          # Build OTHER_LDFLAGS for missing frameworks
+
           OTHER_LDFLAGS=""
           for fw in "${MISSING[@]}"; do
             OTHER_LDFLAGS="$OTHER_LDFLAGS -framework $fw"
           done
-          
-          # Export for next step
+
           echo "other_ldflags=$OTHER_LDFLAGS" >> $GITHUB_OUTPUT
-          
+
           if [ ${#MISSING[@]} -gt 0 ]; then
             echo "⚡ Will inject: $OTHER_LDFLAGS"
           else
             echo "✅ All frameworks present"
           fi
 
-      # ============================================
-      # SINGLE BUILD STEP (Consolidated)
-      # ============================================
       - name: Build Unsigned IPA
         env:
           OTHER_LDFLAGS: ${{ steps.framework-injection.outputs.other_ldflags }}
         run: |
           set -euo pipefail
-          
+
           echo "=== Starting Xcode Build ==="
-          
+
           xcodebuild \
             -project "${PROJECT_NAME}.xcodeproj" \
             -scheme "${SCHEME_NAME}" \
