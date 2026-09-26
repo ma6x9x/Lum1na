@@ -48,6 +48,7 @@
 #import "Exploit/P010QueueLeak.h"
 #import "Exploit/P017ConfusedDeputy.h"
 #import "Exploit/P032ANEOpenSmoke.h"
+#import "Lum1naLogBridge.h"
 #import "Exploit/P033CoreML1in1out.h"
 #import "Exploit/P034Kmsg3072Occupancy.h"
 #import "Exploit/P040NamespaceDestSmoke.h"
