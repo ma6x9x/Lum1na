@@ -72,6 +72,7 @@ jobs:
             "Exploit/ANEDirectIn.h"
             "Exploit/IOGPU64788Controller.h"
             "Exploit/P062StaleEntryOracle.h"
+            "Exploit/KRWBridge.h"
           )
           for req in "${REQUIRED_IMPORTS[@]}"; do
             if ! grep -q "#import \"$req\"" "$BRIDGING_HEADER"; then
@@ -120,6 +121,7 @@ jobs:
             "Exploit/A12X_23G71_LabOffsets.h"
             "Kernel/Lum1naBoard.h"
             "Kernel/Lum1naBoard.m"
+            "Exploit/KRWBridge"
           )
 
           MISSING=0
