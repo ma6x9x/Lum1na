@@ -37,6 +37,7 @@ public final class PersistentLogStore {
         "p040": "p040_ns_dest_log.txt",
         "p041": "p041_slide_dest_map_log.txt",
         "staleentry": "p06x_IOGPUStaleEntry_log.txt",
+        "socketkrw": "p06x_socketkrw_log.txt",
         "replacerace": "p06x_IOGPUReplaceRace_log.txt",
         "p042": "p042_reachability_log.txt",
         "stalepage": "p06x_GPUStalePage_log.txt",
