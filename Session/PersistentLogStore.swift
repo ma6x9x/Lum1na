@@ -36,6 +36,8 @@ public final class PersistentLogStore {
         "p034": "p034_kmsg3072_occupancy_log.txt",
         "p040": "p040_ns_dest_log.txt",
         "p041": "p041_slide_dest_map_log.txt",
+        "staleentry": "p06x_IOGPUStaleEntry_log.txt",
+        "replacerace": "p06x_IOGPUReplaceRace_log.txt",
         "p042": "p042_reachability_log.txt",
         "p046": "p046_f77_patch_oracle_log.txt",
         "p050": "p050_getattrlist_oob_log.txt",
