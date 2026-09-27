@@ -46,6 +46,7 @@
 #import "Exploit/A12X_23G71_LabOffsets.h"
 #import "Exploit/DeviceIdentProbe.h"
 #import "Exploit/LabIOGPUQueue.h"
+#import "Exploit/GPUStalePageProbe.h"
 #import "Exploit/P010QueueLeak.h"
 #import "Exploit/P017ConfusedDeputy.h"
 #import "Exploit/P032ANEOpenSmoke.h"
