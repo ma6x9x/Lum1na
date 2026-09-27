@@ -3,6 +3,47 @@
 #import "LabRuntimeOffsets.h"
 #import "LabLocalTime.h"
 #import <sys/sysctl.h>
+// Add to Lum1naBoard.h interface:
+@property (nonatomic, assign) Lum1naSocketKRWContext *krwContext;
+
+// Add to Lum1naBoard.m - in commitSlide:
+- (BOOL)commitSlide:(uint64_t)slide reason:(NSString *)reason {
+    P06xLogF(@"board", @"commitSlide: 0x%016llx reason: %@", slide, reason);
+    
+    // Validate slide is in reasonable range
+    if (slide > 0x100000000) {
+        P06xLog(@"board", @"commitSlide: ERROR - slide out of range");
+        return NO;
+    }
+    
+    _kslide = slide;
+    _kbase = 0xFFFFFFF007004000ULL + slide;
+    
+    // Verify KRW works by reading a known kernel string
+    // Use the stored context to call kread
+    if (!_krwContext) {
+        P06xLog(@"board", @"commitSlide: ERROR - no KRW context");
+        return NO;
+    }
+    
+    uint64_t version_ptr = _kbase + 0x1c;
+    uint64_t version_str = Lum1naSocketKRW_kread64(_krwContext, version_ptr);
+    
+    if (version_str == 0) {
+        P06xLog(@"board", @"commitSlide: ERROR - kread verification failed");
+        _kslide = 0;
+        _kbase = 0;
+        return NO;
+    }
+    
+    _hasKread = YES;
+    _hasKwrite = YES;
+    
+    P06xLogF(@"board", @"commitSlide: SUCCESS - kbase=0x%016llx hasKread=%d", 
+              _kbase, _hasKread);
+    
+    return YES;
+}
 
 static NSString *boardPath(void) {
     NSString *docs = [NSSearchPathForDirectoriesInDomains(
