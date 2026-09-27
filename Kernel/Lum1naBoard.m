@@ -127,6 +127,7 @@ static NSString *boardPath(void) {
 - (NSString *)machine { return _d[@"machine"]; }
 - (NSString *)osversion { return _d[@"osversion"]; }
 - (NSString *)skuTag { return _d[@"skuTag"]; }
+- (NSString *)sku { return _d[@"skuTag"]; }
 - (uint64_t)staticBase { return strtoull([_d[@"staticBase"] UTF8String], NULL, 16); }
 - (uint64_t)kslide { return _kslide; }
 - (uint64_t)kbase { return _kbase; }
