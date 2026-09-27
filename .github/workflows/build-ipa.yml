@@ -70,8 +70,8 @@ jobs:
           # New-stage imports must be present or Swift cannot see the probes
           REQUIRED_IMPORTS=(
             "Exploit/ANEDirectIn.h"
-            "Exploit/IOGPU64788Controller.h"
-            "Exploit/P062StaleEntryOracle.h"
+            "Exploit/IOGPUStaleEntryProbe.h"
+            "Exploit/IOGPUReplaceRaceProbe.h"
             "Exploit/KRWBridge.h"
           )
           for req in "${REQUIRED_IMPORTS[@]}"; do
@@ -108,10 +108,10 @@ jobs:
             "Exploit/ANE254InputController.m"
             "Exploit/ANEDirectIn.h"
             "Exploit/ANEDirectIn.m"
-            "Exploit/IOGPU64788Controller.h"
-            "Exploit/IOGPU64788Controller.m"
-            "Exploit/P062StaleEntryOracle.h"
-            "Exploit/P062StaleEntryOracle.m"
+            "Exploit/IOGPUStaleEntryProbe.m"
+            "Exploit/IOGPUReplaceRaceProbe.m"
+            "Exploit/IOGPUStaleEntryProbe.h"
+            "Exploit/IOGPUReplaceRaceProbe.h"
             "Exploit/iokit_shim.h"
             "Exploit/iokit_shim.c"
             "Exploit/Lum1naKRW.h"
