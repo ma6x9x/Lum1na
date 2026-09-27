@@ -1,9 +1,10 @@
+//
+//  Lum1naBoard.h
+//  Lum1na
+//
+
 #import <Foundation/Foundation.h>
 
-/// Durable jailbreak-state file (Documents/lum1na_board.json).
-/// Inspired by Dopamine's system_info split (constants vs live primitives)
-/// but A14/PPL-shaped and honest: heap leaks are not kslide.
-/// leaks[] is unique by va+kind; repeats bump hits / lastSeen.
 @interface Lum1naBoard : NSObject
 
 + (instancetype)shared;
@@ -18,6 +19,9 @@
 @property (nonatomic, readonly) BOOL hasKread;
 @property (nonatomic, readonly) BOOL hasKwrite;
 @property (nonatomic, readonly) NSArray<NSDictionary *> *leaks;
+
+// KRW context storage for glue code
+@property (nonatomic, assign) void *krwContext;
 
 - (void)refreshIdentity;
 - (void)recordHeapLeak:(uint64_t)va source:(NSString *)source;
