@@ -29,6 +29,8 @@ public final class PersistentLogStore {
         "p044": consoleLogName,
         "aio84530": "p84530_aio_kqueue_log.txt",
         "ident": "device_ident_log.txt",
+        "socketkrw": "p06x_socketkrw_log.txt",
+        "lightsword": "p06x_lightsword_log.txt",
         "p010": "p010_queue_leak_log.txt",
         "p017v2": "p017_confused_deputy_log.txt",
         "p032": "p032_ane_open_log.txt",
