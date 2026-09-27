@@ -13,6 +13,7 @@
 @property (nonatomic, readonly) NSString *machine;
 @property (nonatomic, readonly) NSString *osversion;
 @property (nonatomic, readonly) NSString *skuTag;
+@property (nonatomic, readonly) NSString *sku;
 @property (nonatomic, readonly) uint64_t staticBase;
 @property (nonatomic, readonly) uint64_t kslide;
 @property (nonatomic, readonly) uint64_t kbase;
