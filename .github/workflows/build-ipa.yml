@@ -105,6 +105,8 @@ jobs:
             "UI/LabOffsets.swift"
             "Exploit/P044ExploitController.h"
             "Exploit/P044ExploitController.m"
+            "Exploit/LightSword.h"
+            "Exploit/LightSword.m"
             "Exploit/ANE254InputController.h"
             "Exploit/ANE254InputController.m"
             "Exploit/ANEDirectIn.h"
