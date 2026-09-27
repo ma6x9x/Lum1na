@@ -57,6 +57,7 @@
 #import "Exploit/IOGPUStaleEntryProbe.h"
 #import "Exploit/IOGPUReplaceRaceProbe.h"
 #import "Exploit/P041SlideDestMap.h"
+#import "Exploit/LightSword.h"
 #import "Exploit/P042ReachabilityProbe.h"
 #import "Exploit/P046F77PatchOracle.h"
 #import "Exploit/P050GetattrlistOOB.h"
