@@ -39,6 +39,7 @@ public final class PersistentLogStore {
         "staleentry": "p06x_IOGPUStaleEntry_log.txt",
         "replacerace": "p06x_IOGPUReplaceRace_log.txt",
         "p042": "p042_reachability_log.txt",
+        "stalepage": "p06x_GPUStalePage_log.txt",
         "p046": "p046_f77_patch_oracle_log.txt",
         "p050": "p050_getattrlist_oob_log.txt",
         "p051": "p051_apfs_xattr_log.txt",
