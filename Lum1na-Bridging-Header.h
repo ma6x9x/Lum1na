@@ -53,6 +53,8 @@
 #import "Exploit/P033CoreML1in1out.h"
 #import "Exploit/P034Kmsg3072Occupancy.h"
 #import "Exploit/P040NamespaceDestSmoke.h"
+#import "Exploit/IOGPUStaleEntryProbe.h"
+#import "Exploit/IOGPUReplaceRaceProbe.h"
 #import "Exploit/P041SlideDestMap.h"
 #import "Exploit/P042ReachabilityProbe.h"
 #import "Exploit/P046F77PatchOracle.h"
@@ -78,8 +80,6 @@
 #import "Exploit/P061AVEEncTypeReach.h"
 #import "Exploit/Lum1naKRW.h"
 #import "Exploit/ANEDirectIn.h"
-#import "Exploit/IOGPU64788Controller.h"
-#import "Exploit/P062StaleEntryOracle.h"
 #import "Exploit/P064AVE84607Racer.h"
 #import "Exploit/P06xLog.h"
 
