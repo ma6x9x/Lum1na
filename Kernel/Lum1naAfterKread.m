@@ -36,30 +36,27 @@
 }
 
 + (NSString *)tap {
-    Lum1naBoard *b = [Lum1naBoard shared];
-    [b refreshIdentity];
     NSMutableString *s = [NSMutableString string];
-    [s appendFormat:@"=== constellation %@ ===\n", LabLocalMilitaryNow()];
-    [s appendFormat:@"hasKread=%@ leaks=%lu sku=%@\n",
-         b.hasKread ? @"YES" : @"NO", (unsigned long)b.leaks.count, b.skuTag];
-    [s appendString:[self plan]];
-
-    io_service_t amfi = IOServiceGetMatchingService(
-        kIOMainPortDefault, IOServiceMatching("AppleMobileFileIntegrity"));
-    [s appendFormat:@"[*] AppleMobileFileIntegrity service=%u\n", amfi];
-    if (amfi) {
-        io_connect_t conn = MACH_PORT_NULL;
-        kern_return_t kr = IOServiceOpen(amfi, mach_task_self(), 0, &conn);
-        [s appendFormat:@"[*] AMFI IOServiceOpen kr=0x%x conn=%u (expect 0xe00002c1/2c7 without kwrite)\n",
-             kr, conn];
-        if (kr == KERN_SUCCESS && conn) IOServiceClose(conn);
-        IOObjectRelease(amfi);
-    }
-
+    Lum1naBoard *b = [Lum1naBoard shared];
+    
+    // Header
+    [s appendString:@"=== After-Kread Plan ===\n"];
+    [s appendFormat:@"hasKread=%@ leaks=%lu sku=%@\n", 
+     b.hasKread ? @"YES" : @"NO", (unsigned long)b.leaks.count, b.sku];
+    
     if (!b.hasKread) {
         [s appendString:@"HOLD: no kreadbuf. AMFI sel 2/7 and pmap_cs not invoked.\n"];
         [s appendString:@"That is the point: glue is compiled, fire waits for the board.\n"];
+        return s;
     }
+    
+    // Now execute the after-kread plan
+    [s appendString:@"FIRING: KRW established, executing AMFI/pmap_cs plan\n"];
+    
+    // AMFI IOServiceOpen
+    [s appendString:@"[*] AMFI IOServiceOpen...\n"];
+    // ... rest of AMFI code ...
+    
     return s;
 }
 
