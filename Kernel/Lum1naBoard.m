@@ -1,10 +1,15 @@
+//
+//  Lum1naBoard.m
+//  Lum1na
+//
+
 #import "Lum1naBoard.h"
 #import "LabDeviceProfile.h"
 #import "LabRuntimeOffsets.h"
 #import "LabLocalTime.h"
 #import <sys/sysctl.h>
 
-// Forward declare the SocketKRW functions we need
+// Forward declare SocketKRW function for commitSlide
 uint64_t Lum1naSocketKRW_kread64(void *ctx, uint64_t kaddr);
 
 static NSString *boardPath(void) {
@@ -184,7 +189,6 @@ static NSString *boardPath(void) {
 - (BOOL)commitSlide:(uint64_t)slide reason:(NSString *)reason {
     NSLog(@"[board] commitSlide: 0x%016llx reason: %@", slide, reason);
     
-    // Validate slide is in reasonable range
     if (slide > 0x100000000) {
         NSLog(@"[board] commitSlide: ERROR - slide out of range");
         return NO;
@@ -193,7 +197,6 @@ static NSString *boardPath(void) {
     _kslide = slide;
     _kbase = 0xFFFFFFF007004000ULL + slide;
     
-    // Verify KRW works by reading a known kernel string
     if (!_krwContext) {
         NSLog(@"[board] commitSlide: ERROR - no KRW context");
         return NO;
@@ -215,7 +218,6 @@ static NSString *boardPath(void) {
     NSLog(@"[board] commitSlide: SUCCESS - kbase=0x%016llx hasKread=%d", 
           _kbase, _hasKread);
     
-    // Persist to board JSON
     _d[@"kslide"] = [NSString stringWithFormat:@"0x%llx", _kslide];
     _d[@"kbase"] = [NSString stringWithFormat:@"0x%llx", _kbase];
     _d[@"hasKread"] = @YES;
