@@ -72,6 +72,7 @@ jobs:
             "Exploit/ANEDirectIn.h"
             "Exploit/IOGPUStaleEntryProbe.h"
             "Exploit/IOGPUReplaceRaceProbe.h"
+            "Exploit/GPUStalePageProbe.h"
             "Exploit/KRWBridge.h"
           )
           for req in "${REQUIRED_IMPORTS[@]}"; do
@@ -108,6 +109,8 @@ jobs:
             "Exploit/ANE254InputController.m"
             "Exploit/ANEDirectIn.h"
             "Exploit/ANEDirectIn.m"
+            "Exploit/GPUStalePageProbe.h"
+            "Exploit/GPUStalePageProbe.m"
             "Exploit/IOGPUStaleEntryProbe.m"
             "Exploit/IOGPUReplaceRaceProbe.m"
             "Exploit/IOGPUStaleEntryProbe.h"
