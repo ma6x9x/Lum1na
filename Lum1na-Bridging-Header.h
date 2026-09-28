@@ -37,7 +37,7 @@
 #import "Exploit/KRWBridge.h"
 #import "Exploit/P044ExploitController.h"
 #import "Exploit/ANE254InputController.h"
-#import "Exploit/P027MetalCallback."
+#import "Exploit/P027MetalCallback.h"
 #import "Exploit/AKSExploitController.h"
 #import "Exploit/P051APFSXattr.h"
 #import "Exploit/P054APFSReapList.h"
