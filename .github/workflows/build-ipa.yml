@@ -104,6 +104,8 @@ jobs:
             "UI/Lum1naViewModel.swift"
             "UI/LabOffsets.swift"
             "Exploit/P044ExploitController.h"
+            "Exploit/P027MetalCallback.h"
+            "Exploit/P027MetalCallback.m"
             "Exploit/P044ExploitController.m"
             "Exploit/LightSword.h"
             "Exploit/LightSword.m"
