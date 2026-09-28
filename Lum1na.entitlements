@@ -75,6 +75,12 @@
     <array>
         <string>$(AppIdentifierPrefix)com.research.lum1na</string>
     </array>
+
+    <key>com.apple.security.application-groups</key>
+    <array>
+         <string>group.com.lum1na.probe</string>
+    </array>
+
     
     <!-- Platform application (no sandbox) -->
     <key>platform-application</key>
