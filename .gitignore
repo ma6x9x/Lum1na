@@ -22,6 +22,10 @@ Package.resolved
 .env
 .env.*
 
+# Local IPSW markdown diffs (blacktop-style; too large to commit)
+ipsw-diffs-out/
+*.ipsw
+
 # Packaged / export artifacts (build these locally; do not commit)
 *.ipa
 *.dSYM/

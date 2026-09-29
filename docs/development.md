@@ -21,6 +21,10 @@ Agents: read `AGENTS.md` first. Do not break the IPA job (Xcode 16.4). Repo cont
 - PATCHSET “chain complete” after a sleep is a stub
 - Ident first. TAP markers go to `p011_tap_log.txt` before invoke
 
+## IPSW diffs
+
+Public size+CStrings maps: [blacktop/ipsw-diffs](https://github.com/blacktop/ipsw-diffs) (CI device is **iPhone18,1**). Lab method: `docs/IPSW_DIFFS.md` + `tools/ipsw-diff-lab.sh` on **iPhone13,2 / iPad8,*** IPSWs. Same flags as blacktop (`ipsw diff --markdown --strs --fw …`). Do not copy T8150 VAs onto T8101.
+
 ## After a real kreadbuf (not before)
 
 Dopamine 3.0.10 does not run on this SKU. Its BaseBin names (trustcache, jbserver, launchdhook, userspace reboot) are the post-KRW map, not a KRW.

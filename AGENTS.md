@@ -20,7 +20,7 @@ Re-resolve `main` at the start of a task. Do not trust this file’s remembered 
 | `Exploit/A14_23F77_LabOffsets.h` | Pins + `LabOff()` redirects |
 | `Exploit/A12X_23G71_LabOffsets.h` | iPad 23G71 pins |
 | `Lum1na-Bridging-Header.h` | iOS-safe Mach/IOKit + probe headers |
-| `docs/FUTURE.md`, `docs/development.md` | Status / experiment log |
+| `docs/FUTURE.md`, `docs/development.md`, `docs/IPSW_DIFFS.md` | Status / experiment log / IPSW size+CString maps |
 
 The project uses `PBXFileSystemSynchronizedRootGroup`. New files under the root are picked up automatically. Do not hand-edit pbx file lists unless you are changing **exceptions**.
 

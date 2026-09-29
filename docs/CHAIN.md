@@ -31,7 +31,7 @@ AVE EncType / Close-async; JPEG `+0x30` teardown; NECP add/flow dest; 64788 othe
 ## Untried reach (in All stages)
 
 - **p058** AppleJPEGDriver open (24A435 `+0x30` class)
-- **p061** H264+HEVC VT sessions (84607 EncType; 27 guard expect ABSENT)
+- **p061** H264+HEVC VT sessions (84607 EncType; 23F77 AVE 905.36.1 already has EncType_Max — do not expect ABSENT)
 - **p057** wvek AKS/MobileKeyBag
 - **afterkread** constellation: AMFI UC open + 23F77 pins. No `/var/jb`. HOLD until `hasKread`
 

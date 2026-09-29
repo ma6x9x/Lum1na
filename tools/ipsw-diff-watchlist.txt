@@ -1,0 +1,35 @@
+# Substrings to grep in a blacktop-style ipsw diff tree.
+# Size + CStrings only. A hit is not a fire, not a slide, not hasKread.
+
+owns_replaceable_backing
+replace_backing
+GARTReclaim
+iogpu_gart
+create_resource_iosurface
+detach memory for invalid resource
+AVE_EncType
+EncType_Max
+ClientType_Max
+offset + size
+AppleJPEGDriver
+partialDecodeFakeHeader
+MARKERRAM
+startOfRawBitStream
+copyTrustCacheFromInputArguments
+copyBytesFromInputArguments
+loadTrustCache
+performCommandV
+_check_cdhash_in_trustcache
+personalized.trust-cache
+pmap_cs
+necp_client_add
+max_flows_per_client
+_aa_moveto
+_aa_clip_edge
+_aa_lineto
+kn_sdata
+aio_kevent
+CheckandPrewire
+AppleH11ANE
+AppleH16ANE
+com.apple.private.security.revoke

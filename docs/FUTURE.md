@@ -39,7 +39,7 @@ FomoPeek/DarkSword local LPE stopped at iOS 26.1. Not this build.
 Drop: `~/Library/Mobile Documents/com~apple~CloudDocs/Downloads/GOLDMINE 26.5/`
 Lab note: `~/Desktop/lumina_primitives/88_GOLDMINE_26.5.txt`
 
-- **84607** is an iOS 27 EncType-vs-session guard. 23F77 should still lack that string. P039 VT wall is one consumer, not a close.
+- **84607** EncType-vs-session: `AVE_EncType_None < encType && encType < AVE_EncType_Max` landed in AppleAVE2 **905.36.1** (26.4 beta 2). 23F77 AVE is already 905.36.1 — the string is **present**, not a 27-only absence. That is a bounds assert, not a close of Close-vs-async. Do not remaining-fire. See `docs/IPSW_DIFFS.md`.
 - **lockdownd** logic bugs are 26.5 userspace USB/pairing. `Exploit/Lockdownd/LockdowndFullChain` is a skeleton, not device-proven.
 - **24A435 JPEG IOSurface UAR** is proven on iOS 27 GM (other silicon). Twin `structureInput+0x30` / `req+0x2b8` on T8101 before dropping JPEG.
 - **IOMD `_dmaReferences` +0x34** is one-branch-bounded on 27; 23F77 unmapped.
