@@ -2,6 +2,7 @@
 #import "Lum1naBoard.h"
 #import "LabLocalTime.h"
 #import "LabRuntimeOffsets.h"
+#import "A14_23F77_LabOffsets.h"
 #import <IOKit/IOKitLib.h>
 #import <string.h>
 
@@ -19,18 +20,28 @@
     if (off && off->tag && strcmp(off->tag, "A12X_23G71") == 0) {
         [s appendString:@"A12X 23G71 = no SPTM. momentarius is PPL-on-KRW, not a kernel slot.\n"];
         [s appendFormat:@"T8020 pins (unslid) tag %s:\n", tag];
-        [s appendString:@"  AMFIUserClient_externalMethod  0xFFFFFFF008B3FFE8\n"];
-        [s appendString:@"  loadTrustCache                 0xFFFFFFF008B40088  sel 2 / 7\n"];
-        [s appendString:@"  pmap_cs_allow_invalid_internal 0xFFFFFFF00A4DA8FC\n"];
+        [s appendFormat:@"  AMFIUserClient_externalMethod  0x%llx\n", off->amfi_external];
+        [s appendFormat:@"  loadTrustCache                 0x%llx  sel %u / %u\n",
+         off->amfi_loadtc, off->amfi_sel_copy, off->amfi_sel_manifest];
+        [s appendFormat:@"  pmap_cs_allow_invalid_internal 0x%llx\n", off->pmap_cs_allow];
         [s appendString:@"  pmap_load_trust_cache          (cstring absent — not pinned)\n"];
         [s appendFormat:@"  aks_wvek                       0x%llx\n", off->aks_wvek_overflow];
+        [s appendString:@"  owns_replaceable               present (twin 23G71)\n"];
     } else {
         [s appendString:@"A14 = PPL. pmap_cs_allow_invalid + AMFI UC sel 2/7 from the same process.\n"];
-        [s appendFormat:@"23F77 pins (unslid) tag %s:\n", tag];
-        [s appendString:@"  AMFIUserClient_externalMethod  0xFFFFFFF008B673F8\n"];
-        [s appendString:@"  loadTrustCache                 0xFFFFFFF008B67498  sel 2 / 7\n"];
-        [s appendString:@"  pmap_cs_allow_invalid_internal 0xFFFFFFF00A610458  *(pmap+0xca)=1\n"];
-        [s appendString:@"  pmap_load_trust_cache          0xFFFFFFF00A60D8D0\n"];
+        [s appendFormat:@"23F77 pins (unslid) tag %s Ghidra 2026-09-29:\n", tag];
+        [s appendFormat:@"  AMFIUserClient_externalMethod  0x%llx\n",
+         off ? off->amfi_external : A14_23F77_AMFI_EXTERNALMETHOD];
+        [s appendFormat:@"  loadTrustCache                 0x%llx  sel %u / %u\n",
+         off ? off->amfi_loadtc : A14_23F77_AMFI_LOADTRUSTCACHE,
+         off ? off->amfi_sel_copy : A14_23F77_AMFI_LOADTC_SEL_COPY,
+         off ? off->amfi_sel_manifest : A14_23F77_AMFI_LOADTC_SEL_MANIFEST];
+        [s appendFormat:@"  pmap_cs_allow_invalid_internal 0x%llx  *(pmap+0xca)=1\n",
+         off ? off->pmap_cs_allow : A14_23F77_PMAP_CS_ALLOW_INVALID];
+        [s appendFormat:@"  pmap_load_trust_cache          0x%llx\n",
+         off ? off->pmap_load_tc : A14_23F77_PMAP_LOAD_TRUST_CACHE];
+        [s appendString:@"  owns_replaceable               ABSENT (detach bit + size only)\n"];
+        [s appendString:@"  EncType_Max                    PRESENT; session-mismatch ABSENT\n"];
     }
     return s;
 }

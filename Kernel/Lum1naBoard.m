@@ -169,6 +169,10 @@ static inline void boardSet(NSMutableDictionary *d, NSString *key, id val) {
             pins[@"ane_checkandprewire"] = [NSString stringWithFormat:@"0x%llx", off->ane_checkandprewire];
             pins[@"sysmem_md"] = [NSString stringWithFormat:@"0x%x", off->sysmem_md];
             pins[@"so_necp"] = [NSString stringWithFormat:@"0x%x", off->so_necp];
+            pins[@"amfi_external"] = [NSString stringWithFormat:@"0x%llx", off->amfi_external];
+            pins[@"amfi_loadtc"] = [NSString stringWithFormat:@"0x%llx", off->amfi_loadtc];
+            pins[@"pmap_cs_allow"] = [NSString stringWithFormat:@"0x%llx", off->pmap_cs_allow];
+            pins[@"owns_replaceable"] = @(off->owns_replaceable);
         }
         _d[@"pins"] = pins;
         boardSet(_d, @"updated", LabLocalMilitaryNow() ?: @"?");   // ← nil-guarded now

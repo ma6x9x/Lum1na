@@ -18,6 +18,7 @@ View: Settings → Copy Kernel Board JSON, or All stages → Kernel board JSON.
 
 - P009 PathB = **F** (stale GPU), not W
 - QueueCreate A14 `0x410` leak `+0x558`; A12X `0x408` / `+0x550`
+- LightSword fd cap is `min(rlim, dtablesize)` (23F77 live: rlim 65535, dtablesize **10240**). v1.7 used rlim as room so punch-after-hole never ran.
 - CS hop 1 `cluster_*_contig` **EINVAL** unless `UPL_PHYS_CONTIG` (26.1)
 - P052 nstream **EFBIG 27** already on 26.5
 - CVE-2026-84530 AIO `kqext_sdata` class live until **26.7/27**
