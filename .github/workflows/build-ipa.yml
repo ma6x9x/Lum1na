@@ -133,6 +133,14 @@ jobs:
             "Exploit/BadQueryProbe.m"
             "Exploit/ANE254ChainController.h"
             "Exploit/ANE254ChainController.m"
+            #import "Exploit/ColdForge.h"
+            #import "Exploit/Rapier.h"
+            #import "Exploit/Anvil.h"
+            #import "Exploit/LightSwordABC.h"
+            #import "Exploit/ColdForge.m"
+            #import "Exploit/Rapier.m"
+            #import "Exploit/Anvil.m"
+            #import "Exploit/LightSwordABC.m"
           )
 
           MISSING=0
