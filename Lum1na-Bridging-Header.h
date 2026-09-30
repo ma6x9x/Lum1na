@@ -86,6 +86,10 @@
 #import "Exploit/ANEDirectIn.h"
 #import "Exploit/P064AVE84607Racer.h"
 #import "Exploit/P06xLog.h"
+#import "Exploit/ColdForge.h"
+#import "Exploit/Rapier.h"
+#import "Exploit/Anvil.h"
+#import "Exploit/LightSwordABC.h"
 
 
 #endif
