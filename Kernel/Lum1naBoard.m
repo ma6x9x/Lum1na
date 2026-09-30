@@ -265,6 +265,64 @@ static inline void boardSet(NSMutableDictionary *d, NSString *key, id val) {
     }
 }
 
+- (void)recordEvent:(NSString *)event
+               kind:(NSString *)kind
+             detail:(NSString *)detail
+             source:(NSString *)source {
+    if (event.length == 0) return;
+    @synchronized (self) {
+        NSMutableArray *leaks = [_d[@"leaks"] isKindOfClass:[NSMutableArray class]] ? _d[@"leaks"] : nil;
+        if (!leaks) {
+            leaks = [[_d[@"leaks"] isKindOfClass:[NSArray class]] ? _d[@"leaks"] : @[] mutableCopy]
+                    ?: [NSMutableArray array];
+            _d[@"leaks"] = leaks;
+        }
+        NSString *k = kind.length ? kind : @"event";
+        NSString *src = source.length ? source : @"?";
+        NSString *now = LabLocalMilitaryNow() ?: @"";
+
+        for (NSUInteger i = 0; i < leaks.count; i++) {
+            NSDictionary *e = leaks[i];
+            if (![e isKindOfClass:[NSDictionary class]]) continue;
+            if (![e[@"va"] isEqualToString:event]) continue;
+            if (![e[@"kind"] isEqualToString:k]) continue;
+            NSMutableDictionary *ex = [e mutableCopy];
+            NSInteger hits = [ex[@"hits"] respondsToSelector:@selector(integerValue)]
+                ? [ex[@"hits"] integerValue] : 1;
+            if (hits < 1) hits = 1;
+            ex[@"hits"] = @(hits + 1);
+            ex[@"lastSeen"] = now;
+            if (detail.length) boardSet(ex, @"detail", detail);
+            if (![ex[@"source"] isEqualToString:src]) {
+                NSMutableArray *sources = [[ex[@"sources"] isKindOfClass:[NSArray class]]
+                    ? ex[@"sources"] : nil mutableCopy] ?: [NSMutableArray array];
+                NSString *first = [ex[@"source"] isKindOfClass:[NSString class]]
+                    ? ex[@"source"] : nil;
+                if (first.length && ![sources containsObject:first]) [sources addObject:first];
+                if (![sources containsObject:src]) [sources addObject:src];
+                ex[@"sources"] = sources;
+            }
+            leaks[i] = ex;
+            [self persist];
+            return;
+        }
+
+        NSMutableDictionary *row = [NSMutableDictionary dictionary];
+        boardSet(row, @"va", event);
+        boardSet(row, @"kind", k);
+        boardSet(row, @"source", src);
+        boardSet(row, @"time", now);
+        boardSet(row, @"lastSeen", now);
+        row[@"hits"] = @1;
+        if (detail.length) boardSet(row, @"detail", detail);
+        [leaks addObject:row];
+        if (leaks.count > 64) {
+            [leaks removeObjectsInRange:NSMakeRange(0, leaks.count - 64)];
+        }
+        [self persist];
+    }
+}
+
 - (BOOL)commitSlide:(uint64_t)slide reason:(NSString *)reason {
     @synchronized (self) {
         NSLog(@"[board] commitSlide: 0x%016llx reason: %@", slide, reason);
@@ -356,3 +414,4 @@ static inline void boardSet(NSMutableDictionary *d, NSString *key, id val) {
 }
 
 @end
+

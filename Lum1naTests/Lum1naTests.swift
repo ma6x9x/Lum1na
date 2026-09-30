@@ -29,6 +29,13 @@ struct Lum1naOffsetTests {
         #expect(t.owns_replaceable == 0)
         #expect(t.ane_fill_cap == 0)
         #expect(t.sysmem_md == 0x90)
+        #expect(t.iosurface_md == 0x30)
+        #expect(t.gmd_elemsz == 0xb0)
+        #expect(t.mag_cap == 8)
+        #expect(t.sel36 == 36)
+        #expect(t.panic_cc8 == 0xFFFFFFF009857CC8)
+        #expect(t.panic_cd8 == 0xFFFFFFF009857CD8)
+        #expect(t.panic_d00 == 0xFFFFFFF009857D00)
         #expect(t.socket_usecount == 0x23c)
 
         #expect(t.replace_bytes == 0xFFFFFFF0095E20D4)
@@ -57,6 +64,9 @@ struct Lum1naOffsetTests {
         #expect(t.owns_replaceable == 1)
         #expect(t.ane_fill_cap == 1)
         #expect(t.sysmem_md == 0x90)
+        #expect(t.iosurface_md == 0x30)
+        #expect(t.gmd_elemsz == 0xb0)
+        #expect(t.mag_cap == 8)
 
         #expect(t.replace_bytes == 0xFFFFFFF0094B8FE4)
         #expect(t.getter == 0xFFFFFFF0094E1070)
@@ -110,5 +120,49 @@ struct Lum1naOffsetTests {
         #expect(LabOffForSku(.A12X_other) == LabOffForSku(.A12X_23G71))
         #expect(LabOffForSku(.unknown) == nil)
         #expect(LabOffForSku(.XR_22H311) == nil)
+    }
+
+    @Test @MainActor func catalogWiresColdForgeRapierAnvilAndABC() {
+        let ids = Set(ExploitManager.catalog.map(\.id))
+        #expect(ids.contains("coldforge"))
+        #expect(ids.contains("rapier"))
+        #expect(ids.contains("anvil"))
+        #expect(ids.contains("lsabc"))
+        #expect(ids.contains("p055"))
+        #expect(ids.contains("lightsword"))
+
+        func cls(_ id: String) -> String {
+            ExploitManager.catalog.first { $0.id == id }?.controllerClass ?? ""
+        }
+        #expect(cls("coldforge") == "ColdForge")
+        #expect(cls("rapier") == "Rapier")
+        #expect(cls("anvil") == "Anvil")
+        #expect(cls("lsabc") == "LightSwordABC")
+        #expect(cls("p055") == "P055IOSurfaceUPL")
+        #expect(cls("anvil").isEmpty == false)
+    }
+
+    @Test func probeLogsMapNewTaps() {
+        #expect(PersistentLogStore.probeLogFiles["coldforge"] == "p06x_coldforge_log.txt")
+        #expect(PersistentLogStore.probeLogFiles["rapier"] == "p06x_rapier_log.txt")
+        #expect(PersistentLogStore.probeLogFiles["anvil"] == "p06x_anvil_log.txt")
+        #expect(PersistentLogStore.probeLogFiles["lsabc"] == "p06x_lsabc_log.txt")
+        #expect(PersistentLogStore.probeLogFiles["p055"] == "p055_iosurface_upl_log.txt")
+    }
+
+    @Test func boardRecordEventDedupeByEventAndKind() {
+        let board = Lum1naBoard.shared()
+        board.recordEvent("unit_test_coldforge", kind: "deputy",
+                          detail: "first", source: "tests")
+        board.recordEvent("unit_test_coldforge", kind: "deputy",
+                          detail: "second", source: "tests")
+        let rows = board.leaks.compactMap { $0 as? [String: Any] }.filter {
+            ($0["va"] as? String) == "unit_test_coldforge"
+                && ($0["kind"] as? String) == "deputy"
+        }
+        #expect(rows.count == 1)
+        let hits = (rows.first?["hits"] as? NSNumber)?.intValue ?? 0
+        #expect(hits >= 2)
+        #expect((rows.first?["detail"] as? String) == "second")
     }
 }
