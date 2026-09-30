@@ -27,6 +27,11 @@
 - (void)refreshIdentity;
 - (void)recordHeapLeak:(uint64_t)va source:(NSString *)source;
 - (void)recordCandidate:(uint64_t)va kind:(NSString *)kind source:(NSString *)source;
+// Stage-progress row in leaks[] with no kernel VA. Keyed on event|kind; hits bump.
+- (void)recordEvent:(NSString *)event
+               kind:(NSString *)kind
+             detail:(NSString *)detail
+             source:(NSString *)source;
 - (BOOL)commitSlide:(uint64_t)slide reason:(NSString *)reason;
 - (NSString *)jsonDump;
 - (void)resetLeaks;
