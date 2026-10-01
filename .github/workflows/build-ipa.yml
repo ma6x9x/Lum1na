@@ -109,6 +109,8 @@ jobs:
             "Exploit/P044ExploitController.m"
             "Exploit/LightSword.h"
             "Exploit/LightSword.m"
+            "Exploit/Lum1naCorruptionChain.h"
+            "Exploit/Lum1naCorruptionChain.m"
             "Exploit/ANE254InputController.h"
             "Exploit/ANE254InputController.m"
             "Exploit/ANEDirectIn.h"
