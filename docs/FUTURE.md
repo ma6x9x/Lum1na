@@ -17,7 +17,7 @@ This is the public-app companion to `~/Desktop/lumina_primitives/87_EXTERNAL_CON
 - ANE CheckandPrewire `0xFFFFFFF00874C070` (G71+ fill-capped)
 - wvek `0xFFFFFFF009BD96D4` (26.7 adds `len <= 512`)
 - icmp6filt `+0x148` unused until a real inpcb
-- AKS user client **opens**. Deserialize length leak **not** implemented
+- AKS user client **opens**. CVE-2026-65343 deserialize is a KASLR OOB read (ACM `declared_length`). Catalog `aks` tap is bounded ACM capture. Not KRW.
 - CVE-2026-84530 class is public and live until iOS 27
 
 ## Public write-ups worth keeping
@@ -32,7 +32,7 @@ FomoPeek/DarkSword local LPE stopped at iOS 26.1. Not this build.
 Dopamine 3.0.10 does not run on A14 23F77. Relaxin is a RootHide/ElleKit jailbreak on other SKUs. Lum1na reuses **names and layout**, not their KRW.
 
 1. AMFI UserClient loadTrustCache sel 2/7 + `pmap_cs_allow_invalid` + `pmap_load_trust_cache`
-2. Drop `basebin.tc` into `Documents/basebin` (Dopamine: launchdhook, systemhook, dyldhook, watchdoghook, forkfix, opainject, libjailbreak; Relaxin: `basebin.tar`, `Relaxin.roothide`, ElleKit-as-Substrate)
+2. AfterKread stages bundled `Resources/basebin/basebin.tar` (Dopamine 3.0.10) plus `Relaxin.roothide` / `relaxin.tc` into `Documents/basebin`. Names: launchdhook, systemhook, dyldhook, watchdoghook, forkfix, opainject, libjailbreak, ElleKit-as-Substrate. Credit in `Resources/basebin/CREDITS.md`. Drop extra tweak dylibs into `Documents/tweaks`.
 3. Drop tweak dylibs into `Documents/tweaks`
 4. A14 PPL — AMFI UC from this process after `hasKread`
 5. Persist / tempRoot / boot-time auto-rejailbreak stay later — that is the novel Lum1na layer, after this injection basis works

@@ -14,6 +14,7 @@
 		E6A80238305F9CDC00473E8B /* ImageIO.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E6A80237305F9CDC00473E8B /* ImageIO.framework */; };
 		E6A8023A305F9CE800473E8B /* CoreImage.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E6A80239305F9CE800473E8B /* CoreImage.framework */; };
 		E6A80246305FAD3900473E8B /* libpthread.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = E6A80245305FAD3900473E8B /* libpthread.tbd */; };
+		E6A80350305FAE0100473E8B /* Security.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E6A80351305FAE0100473E8B /* Security.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXBuildRule section */
@@ -56,6 +57,7 @@
 		E6A80237305F9CDC00473E8B /* ImageIO.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ImageIO.framework; path = System/Library/Frameworks/ImageIO.framework; sourceTree = SDKROOT; };
 		E6A80239305F9CE800473E8B /* CoreImage.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreImage.framework; path = System/Library/Frameworks/CoreImage.framework; sourceTree = SDKROOT; };
 		E6A80245305FAD3900473E8B /* libpthread.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libpthread.tbd; path = usr/lib/libpthread.tbd; sourceTree = SDKROOT; };
+		E6A80351305FAE0100473E8B /* Security.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Security.framework; path = System/Library/Frameworks/Security.framework; sourceTree = SDKROOT; };
 		E6DAA280305DD93E00B0914F /* Lum1na.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Lum1na.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E6DAA28D305DD94500B0914F /* Lum1naTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Lum1naTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E6DAA297305DD94500B0914F /* Lum1naUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Lum1naUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -115,6 +117,7 @@
 				E6A80234305F9CC200473E8B /* IOSurface.framework in Frameworks */,
 				E6A801B2305F96D200473E8B /* IOKit.framework in Frameworks */,
 				E6A80120305F556E00473E8B /* CoreML.framework in Frameworks */,
+				E6A80350305FAE0100473E8B /* Security.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -142,6 +145,7 @@
 				E6A80239305F9CE800473E8B /* CoreImage.framework */,
 				E6A8011F305F556E00473E8B /* CoreML.framework */,
 				E6A800F6305F2FE000473E8B /* IOKit.framework */,
+				E6A80351305FAE0100473E8B /* Security.framework */,
 				E6A800F5305F2FE000473E8B /* IOSurface.framework */,
 				E6A80237305F9CDC00473E8B /* ImageIO.framework */,
 				E6A80235305F9CCE00473E8B /* VideoToolbox.framework */,

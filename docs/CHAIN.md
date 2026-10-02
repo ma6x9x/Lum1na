@@ -20,10 +20,10 @@ View: Settings → Copy Kernel Board JSON, or All stages → Kernel board JSON.
 - QueueCreate A14 `0x410` leak `+0x558`; A12X `0x408` / `+0x550`
 - LightSword fd cap is `min(rlim, dtablesize)` (23F77 live: rlim 65535, dtablesize **10240**). v1.7 used rlim as room so punch-after-hole never ran.
 - CS hop 1 `cluster_*_contig` **EINVAL** unless `UPL_PHYS_CONTIG` (26.1)
-- P052 nstream **EFBIG 27** already on 26.5
+- P052 nstream **EFBIG 27** already on 26.5 — a different 84523 guess than wvek. Do not remaining-fire.
 - CVE-2026-84530 AIO `kqext_sdata` class live until **26.7/27**
 - wvek: `apfs_aks_create_wvek` `0xFFFFFFF009BD96D4`; F77 `len>0x210` is **BRK**, 26.7 adds `len<=512`
-- AKS UC **opens**; deserialize length sweep not implemented
+- AKS UC **opens** (live P057). CVE-2026-65343 is an OOB **read** (KASLR) via ACM deserialize. Catalog `aks` tap is bounded ACM capture, not the 163-selector crash. Not KRW.
 
 ## Open (one failed tap ≠ closed)
 
@@ -37,7 +37,8 @@ Live 2026-10-02 (iPhone13,2 23F77):
 - LightSword v1.8 Full Chain: REPLACE_OK, blit zeros or live `0xA5` new MD, kptrs=0 after 24 attempts (empty GART / new MD, not inpcb).
 - BadQuery consume `-4`. SANDBOX still the app container.
 - PATCHSET HOLD. Not a jailbreak.
-- v37 restores P007 fire: punch even simple kmsgs, sync XVRC27, harvest kmsgs. Direct sel 2 still tried after DeviceOpen.
+- v37 restores P007 fire: punch even simple kmsgs, sync XVRC27, harvest kmsgs. Direct sel 2 still tried after DeviceOpen. Live 12:49 FILL HIT simple[511]/[509]; krw SKIP (icmp6filt wrong zone).
+- v38: keep even-simple punch + sync CoreML occupancy. Interleave fat type-3 OOL (`n=128` descriptors, kdata `0x824` in kalloc.3072). Do not punch OOL (v36 12:43 MAF). Recv of smashed type-3 can panic — isolate one tap per force-quit. P010 QueueCreate word1 is CommandQueue+0x558 userspace, 0 kptrs. P053 flow_add×close hits=0 (dest is NECP client).
 
 ## Untried reach (in All stages)
 
@@ -48,7 +49,7 @@ Live 2026-10-02 (iPhone13,2 23F77):
 
 ## After kread (HOLD until `commitSlide`)
 
-Dopamine 3.0.10 BaseBin names + Relaxin/RootHide (ElleKit as CydiaSubstrate, `Relaxin.roothide` marker, `basebin.tc`, `basebin.tar`):
+Dopamine 3.0.10 BaseBin names + Relaxin/RootHide (ElleKit as CydiaSubstrate, `Relaxin.roothide` marker, `basebin.tc`, `basebin.tar`). IPA now ships `Resources/basebin/` (tar + tc + licenses). AfterKread tap copies/extracts into `Documents/basebin` even on HOLD. Files present is inventory, not injection. Credit: opa334 / Dopamine MIT, Relaxin/ElleKit, opainject — see `Resources/basebin/CREDITS.md`. Not copied: kfd, ClearSword, physrw, Fugu14 kcall.
 
 1. `pmap_cs_allow_invalid` `*(pmap+0xca)=1`
 2. AMFI UC loadTrustCache sel 2/7 of `Documents/basebin/basebin.tc`
