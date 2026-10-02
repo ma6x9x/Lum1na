@@ -33,9 +33,11 @@ P044 43748 (All-stages, isolate: one tap per force-quit): P032 live path is `H11
 
 Live 2026-10-02 (iPhone13,2 23F77):
 - P044 v34/v35: Direct sel 2 `0xe00002c2`, hits=0. v35 skipped CoreML because Direct opened.
+- P044 v36: DeviceOpen `0x68` OK. Prepare sel 4 `0xe00002c2`. Bind aborted. CoreML async + `harvestKmsgs=NO` → t+0s hits=0. Regression vs P007 v18 (spray hole+victim → sync `predictionFromFeatures` → recv victims).
 - LightSword v1.8 Full Chain: REPLACE_OK, blit zeros or live `0xA5` new MD, kptrs=0 after 24 attempts (empty GART / new MD, not inpcb).
 - BadQuery consume `-4`. SANDBOX still the app container.
 - PATCHSET HOLD. Not a jailbreak.
+- v37 restores P007 fire: punch even simple kmsgs, sync XVRC27, harvest kmsgs. Direct sel 2 still tried after DeviceOpen.
 
 ## Untried reach (in All stages)
 
