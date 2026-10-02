@@ -29,7 +29,7 @@ View: Settings → Copy Kernel Board JSON, or All stages → Kernel board JSON.
 
 AVE EncType / Close-async; JPEG `+0x30` teardown; NECP add/flow dest; 64788 other reclaim; IOMD `+0x34`; lockdownd USB from a Mac.
 
-P044 43748 (All-stages): Oct 2 panics were `kalloc.3072` modified-after-free after CoreML teardown of the 254 table. v32 keeps the 254 fire, retains the ANE request, punches OOL `n-2` so `n-1` is the live forward neighbor, and `Adopt`s a smashed icmp6filt pair into SocketKRW. `aio84530` is the fill seed, not an Arm target. `hasKread` only after `commitSlide`.
+P044 43748 (All-stages): the 254 fire that hit CheckandPrewire is the bundled `XVRC27_254in_1out_addchain.mlmodelc` via CoreML prediction — already compiled espresso, not tap-time `.mil`/`.hwx` compile, not Direct IOKit (`AppleH11ANEInterface` is not visible from this signing). Poll sockets while prediction is in flight; harvest on return. `aio84530` is the fill seed, not an Arm target. `hasKread` only after `commitSlide`.
 
 ## Untried reach (in All stages)
 
