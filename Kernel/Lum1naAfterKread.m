@@ -11,6 +11,15 @@
 #import <stdio.h>
 #import <uuid/uuid.h>
 #import <stdarg.h>
+#import <spawn.h>
+#import <sys/wait.h>
+#import <errno.h>
+
+#ifndef MH_MAGIC_64
+#define MH_MAGIC_64 0xfeedfacf
+#endif
+
+extern char **environ;
 
 #define AK_TAG @"afterkread"
 #define LUM_CDHASH_LEN 20
@@ -86,11 +95,13 @@ static NSArray<NSString *> *ak_searchRoots(void) {
         [roots addObject:docs];
         [roots addObject:[docs stringByAppendingPathComponent:@"basebin"]];
         [roots addObject:[docs stringByAppendingPathComponent:@"tweaks"]];
+        [roots addObject:[docs stringByAppendingPathComponent:@"pkgman"]];
     }
     NSString *bundle = [[NSBundle mainBundle] resourcePath];
     if (bundle) {
         [roots addObject:bundle];
         [roots addObject:[bundle stringByAppendingPathComponent:@"basebin"]];
+        [roots addObject:[bundle stringByAppendingPathComponent:@"pkgman"]];
     }
     return roots;
 }
@@ -197,7 +208,14 @@ static BOOL ak_extractUstar(NSData *tar, NSString *destDir, NSMutableString *s) 
         NSString *parent = [outPath stringByDeletingLastPathComponent];
         [fm createDirectoryAtPath:parent withIntermediateDirectories:YES attributes:nil error:nil];
         NSData *blob = [NSData dataWithBytes:p + dataOff length:(NSUInteger)size];
-        if ([blob writeToFile:outPath atomically:YES]) files++;
+        if ([blob writeToFile:outPath atomically:YES]) {
+            files++;
+            uint64_t mode = ak_tarOctal(hdr + 100, 8);
+            if (mode) {
+                [fm setAttributes:@{ NSFilePosixPermissions: @(mode & 0777) }
+                     ofItemAtPath:outPath error:nil];
+            }
+        }
         off += padded;
     }
     ak_log(s, @"[*] extracted %u files from basebin.tar into %@", files, destDir);
@@ -224,41 +242,59 @@ static void ak_stageBundledBasebin(NSMutableString *s) {
     [fm createDirectoryAtPath:dest withIntermediateDirectories:YES attributes:nil error:nil];
     [fm createDirectoryAtPath:tweaksDest withIntermediateDirectories:YES attributes:nil error:nil];
 
-    NSString *bundleBB = [[[NSBundle mainBundle] resourcePath]
-                          stringByAppendingPathComponent:@"basebin"];
     NSString *bundleTweaks = [[[NSBundle mainBundle] resourcePath]
                               stringByAppendingPathComponent:@"tweaks"];
+    NSString *pkgDest = [docs stringByAppendingPathComponent:@"pkgman"];
+    [fm createDirectoryAtPath:pkgDest withIntermediateDirectories:YES attributes:nil error:nil];
 
     ak_log(s, @"[*] staging bundled BaseBin -> Documents/basebin");
     ak_log(s, @"[*] credit: Dopamine 3.0.10 (opa334, MIT) + Relaxin 0.5.4 RootHide/ElleKit");
+    ak_log(s, @"[*] pkgman: Sileo first, Zebra second (Dopamine 3 bundled debs). dpkg after KRW.");
     ak_log(s, @"[*] not copied: kfd / ClearSword / physrw / Fugu14 kcall / bootstrap zst");
 
     NSArray<NSString *> *copyNames = @[
         @"basebin.tar", @"basebin.tc", @"relaxin.tc",
         @"Relaxin.roothide", @"CREDITS.md",
         @"LICENSE_Dopamine.md", @"LICENSE_ElleKit.md", @"LICENSE_opainject.md",
+        @"LICENSE_Sileo.md", @"LICENSE_Zebra.md",
     ];
     for (NSString *name in copyNames) {
-        NSString *src = [bundleBB stringByAppendingPathComponent:name];
-        if (![fm fileExistsAtPath:src]) continue;
+        NSString *src = ak_findFile(name);
+        if (!src) continue;
         NSString *dst = [dest stringByAppendingPathComponent:name];
+        if ([src isEqualToString:dst]) continue;
         if ([fm fileExistsAtPath:dst]) continue;
         NSError *err = nil;
         [fm copyItemAtPath:src toPath:dst error:&err];
-        ak_log(s, @"    copy %@ (%@)", name, err ? err.localizedDescription : @"ok");
+        ak_log(s, @"    copy %@ <- %@ (%@)", name, src.lastPathComponent,
+               err ? err.localizedDescription : @"ok");
+    }
+
+    NSArray<NSString *> *pkgNames = @[ @"sileo.deb", @"zebra.deb",
+                                       @"LICENSE_Sileo.md", @"LICENSE_Zebra.md" ];
+    for (NSString *name in pkgNames) {
+        NSString *src = ak_findFile(name);
+        if (!src) continue;
+        NSString *dst = [pkgDest stringByAppendingPathComponent:name];
+        if ([src isEqualToString:dst]) continue;
+        if ([fm fileExistsAtPath:dst]) continue;
+        NSError *err = nil;
+        [fm copyItemAtPath:src toPath:dst error:&err];
+        ak_log(s, @"    pkgman %@ (%@)", name, err ? err.localizedDescription : @"ok");
     }
 
     NSString *tarPath = [dest stringByAppendingPathComponent:@"basebin.tar"];
-    if (![fm fileExistsAtPath:tarPath]) tarPath = [bundleBB stringByAppendingPathComponent:@"basebin.tar"];
+    if (![fm fileExistsAtPath:tarPath]) tarPath = ak_findFile(@"basebin.tar");
     NSString *already = [dest stringByAppendingPathComponent:@"launchdhook.dylib"];
-    NSData *tar = [NSData dataWithContentsOfFile:tarPath];
+    NSData *tar = tarPath ? [NSData dataWithContentsOfFile:tarPath] : nil;
     if ([fm fileExistsAtPath:already]) {
         ak_log(s, @"[*] Documents/basebin already extracted (launchdhook present)");
     } else if (tar) {
+        ak_log(s, @"[*] extracting %@ (%lu bytes)", tarPath, (unsigned long)tar.length);
         ak_extractUstar(tar, dest, s);
     }
     if (![fm fileExistsAtPath:already] && !tar) {
-        ak_log(s, @"[-] no basebin.tar in bundle/Documents — IPA missing Resources/basebin");
+        ak_log(s, @"[-] no basebin.tar — looked App.app/, App.app/basebin/, Documents/basebin");
     }
     ak_alias([dest stringByAppendingPathComponent:@"dyldhook_merge.arm64e.iOS18+.dylib"],
              [dest stringByAppendingPathComponent:@"dyldhook.dylib"], s);
@@ -271,6 +307,12 @@ static void ak_stageBundledBasebin(NSMutableString *s) {
     ak_alias(elle, [dest stringByAppendingPathComponent:@"libellekit.dylib"], s);
     ak_alias([dest stringByAppendingPathComponent:@"rootlesshooks.dylib"],
              [dest stringByAppendingPathComponent:@"rootlesshooks"], s);
+
+    for (NSString *bin in @[ @"opainject", @"jbctl", @"hookd" ]) {
+        NSString *p = [dest stringByAppendingPathComponent:bin];
+        if (![fm fileExistsAtPath:p]) continue;
+        [fm setAttributes:@{ NSFilePosixPermissions: @0755 } ofItemAtPath:p error:nil];
+    }
 
     if ([fm fileExistsAtPath:bundleTweaks]) {
         NSArray *tnames = [fm contentsOfDirectoryAtPath:bundleTweaks error:nil];
@@ -315,6 +357,156 @@ static io_connect_t ak_openAMFI(NSMutableString *s) {
     return conn;
 }
 
+static void ak_printKRWSteps(NSMutableString *s) {
+    ak_log(s, @"KRW remaining (do not skip):");
+    ak_log(s, @"  1 aio84530 heap leak (live A14+A12X) — fill seed, not inpcb");
+    ak_log(s, @"  2 43748 fill into fat type-3 OOL kdata (A14 occupancy live; G71 fill_cap SKIP)");
+    ak_log(s, @"  3 SocketKRW Adopt+Arm of smashed pair → VerifyPrimitive R/W round-trip");
+    ak_log(s, @"  4 kread leaked object's vtable → text VA → slide");
+    ak_log(s, @"  5 board.commitSlide: kread(kbase)==MH_MAGIC_64 and kbase+0x1c is a kptr");
+    ak_log(s, @"  6 this slot: pmap_cs, AMFI TC, opainject launchdhook, Sileo then Zebra, respring");
+}
+
+static int ak_spawn(NSString *path, NSArray<NSString *> *args, NSMutableString *s) {
+    if (!path.length) {
+        ak_log(s, @"[-] spawn miss (nil path)");
+        return -1;
+    }
+    if (![[NSFileManager defaultManager] isExecutableFileAtPath:path] &&
+        ![[NSFileManager defaultManager] fileExistsAtPath:path]) {
+        ak_log(s, @"[-] spawn miss %@", path);
+        return -1;
+    }
+    NSMutableArray<NSString *> *argv = [NSMutableArray arrayWithObject:path];
+    if (args.count) [argv addObjectsFromArray:args];
+    NSUInteger n = argv.count;
+    char **cargv = calloc(n + 1, sizeof(char *));
+    if (!cargv) return -1;
+    for (NSUInteger i = 0; i < n; i++) {
+        cargv[i] = (char *)argv[i].fileSystemRepresentation;
+    }
+    pid_t pid = 0;
+    int rc = posix_spawn(&pid, path.fileSystemRepresentation, NULL, NULL, cargv, environ);
+    free(cargv);
+    if (rc != 0) {
+        ak_log(s, @"[-] posix_spawn %@ rc=%d (%s)", path.lastPathComponent, rc, strerror(rc));
+        return rc;
+    }
+    int st = 0;
+    waitpid(pid, &st, 0);
+    int code = WIFEXITED(st) ? WEXITSTATUS(st) : (WIFSIGNALED(st) ? 128 + WTERMSIG(st) : -1);
+    ak_log(s, @"[*] spawn %@ pid=%d exit=%d", path.lastPathComponent, pid, code);
+    return code;
+}
+
+/* True KRW test: Mach-O magic at kbase, then kbase+0x1c is a kernel VA.
+   Heap leaks and blit 0xA5 do not pass. */
+static BOOL ak_krwSelfTest(NSMutableString *s) {
+    Lum1naBoard *b = [Lum1naBoard shared];
+    Lum1naSocketKRWContext *ctx = (Lum1naSocketKRWContext *)b.krwContext;
+    if (!b.hasKread || !ctx) {
+        ak_log(s, @"[-] KRW test SKIP — hasKread=%@ ctx=%p",
+               b.hasKread ? @"YES" : @"NO", ctx);
+        ak_printKRWSteps(s);
+        return NO;
+    }
+    uint64_t kbase = b.kbase ? b.kbase : ctx->kbase;
+    if (!kbase) {
+        ak_log(s, @"[-] KRW test SKIP — kbase=0");
+        return NO;
+    }
+    uint32_t magic = Lum1naSocketKRW_KRead32(ctx, kbase);
+    ak_log(s, @"[*] KRW test kread32(kbase=0x%llx)=0x%08x (want MH_MAGIC_64 0xfeedfacf)",
+           (unsigned long long)kbase, magic);
+    if (magic != MH_MAGIC_64) {
+        ak_log(s, @"[-] KRW test FAIL — kbase is not a Mach-O. hasKread is a lie; refuse inject.");
+        return NO;
+    }
+    uint64_t vptr = Lum1naSocketKRW_KRead64(ctx, kbase + 0x1c);
+    ak_log(s, @"[*] KRW test kread64(kbase+0x1c)=0x%llx", (unsigned long long)vptr);
+    if (vptr < 0xFFFFFF8000000000ULL) {
+        ak_log(s, @"[-] KRW test FAIL — kbase+0x1c is not a kernel VA");
+        return NO;
+    }
+    uint8_t buf[16] = {0};
+    if (Lum1naSocketKRW_KReadBuf(ctx, vptr, buf, sizeof(buf))) {
+        ak_log(s, @"[*] KRW test version bytes %02x %02x %02x %02x %02x %02x %02x %02x",
+               buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]);
+    }
+    ak_log(s, @"[+] KRW test PASS — Mach-O magic + version ptr. Injection may fire.");
+    return YES;
+}
+
+static void ak_tryInject(NSMutableString *s) {
+    NSString *opainject = ak_findFile(@"opainject");
+    NSString *launchdhook = ak_findFile(@"launchdhook.dylib");
+    if (!opainject || !launchdhook) {
+        ak_log(s, @"[-] inject SKIP — opainject=%@ launchdhook=%@",
+               opainject.lastPathComponent ?: @"(missing)",
+               launchdhook.lastPathComponent ?: @"(missing)");
+        return;
+    }
+    ak_log(s, @"[*] inject: opainject 1 (launchd) %@", launchdhook.lastPathComponent);
+    ak_spawn(opainject, @[ @"1", launchdhook ], s);
+    NSArray<NSString *> *tweaks = ak_tweakDylibs();
+    if (tweaks.count == 0) {
+        ak_log(s, @"[*] Documents/tweaks empty — TweakLoader has nothing to load this respring");
+        return;
+    }
+    ak_log(s, @"[*] %lu tweak dylib(s) staged for ElleKit TweakLoader after respring",
+           (unsigned long)tweaks.count);
+}
+
+static void ak_tryRespring(NSMutableString *s) {
+    NSString *jbctl = ak_findFile(@"jbctl");
+    if (jbctl) {
+        ak_log(s, @"[*] respring via jbctl (Dopamine 3 name: sbreload / backboardd SIGTERM)");
+        int rc = ak_spawn(jbctl, @[ @"respring" ], s);
+        if (rc == 0) return;
+    }
+    ak_log(s, @"[*] respring fallback: killall -9 backboardd (sandbox will deny until unsandboxed)");
+    ak_spawn(@"/usr/bin/killall", @[ @"-9", @"backboardd" ], s);
+}
+
+static void ak_tryInstallPkgman(NSMutableString *s) {
+    /* Sileo first, Zebra second — same debs Dopamine 3.0.10 ships. dpkg lives
+       in Procursus bootstrap (bootstrap zst is NOT copied). */
+    NSArray<NSDictionary *> *pkgs = @[
+        @{ @"file": @"sileo.deb", @"name": @"Sileo" },
+        @{ @"file": @"zebra.deb", @"name": @"Zebra" },
+    ];
+    NSString *dpkg = nil;
+    NSArray<NSString *> *cands = @[
+        @"/var/jb/usr/bin/dpkg",
+        @"/var/containers/Bundle/Application/.jbroot/usr/bin/dpkg",
+        @"/usr/bin/dpkg",
+    ];
+    NSString *docs = NSSearchPathForDirectoriesInDomains(
+        NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+    if (docs) {
+        NSMutableArray *m = [cands mutableCopy];
+        [m addObject:[docs stringByAppendingPathComponent:@"basebin/usr/bin/dpkg"]];
+        cands = m;
+    }
+    for (NSString *p in cands) {
+        if ([[NSFileManager defaultManager] isExecutableFileAtPath:p]) { dpkg = p; break; }
+    }
+    for (NSDictionary *pkg in pkgs) {
+        NSString *deb = ak_findFile(pkg[@"file"]);
+        ak_log(s, @"[*] pkgman %@ %@%@",
+               pkg[@"name"],
+               deb ? deb : @"(deb missing — drop into Documents/pkgman)",
+               [pkg[@"name"] isEqualToString:@"Sileo"] ? @" (first)" : @"");
+        if (!deb) continue;
+        if (!dpkg) {
+            ak_log(s, @"[*]   staged. dpkg missing until Procursus bootstrap after KRW.");
+            continue;
+        }
+        ak_log(s, @"[*]   dpkg -i %@", deb.lastPathComponent);
+        ak_spawn(dpkg, @[ @"-i", deb ], s);
+    }
+}
+
 @implementation Lum1naAfterKread
 
 + (NSString *)plan {
@@ -323,12 +515,15 @@ static io_connect_t ak_openAMFI(NSMutableString *s) {
     NSMutableString *s = [NSMutableString string];
     [s appendString:
      @"LUM1NA CONSTELLATION (Dopamine 3.0.10 BaseBin + Relaxin/RootHide names):\n"
-     @"  0 HOLD until kreadbuf of a known kernel string -> board.commitSlide.\n"
+     @"  KRW test: kread32(kbase)==MH_MAGIC_64 and kbase+0x1c is a kernel VA.\n"
+     @"  0 HOLD until that test via board.commitSlide.\n"
      @"  1 pmap_cs_allow_invalid *(pmap+0xca)=1 (A14 PPL; not momentarius).\n"
      @"  2 AMFI UC loadTrustCache sel 2/7 of Documents/basebin/basebin.tc.\n"
      @"  3 trustcache launchdhook/systemhook/dyldhook/watchdoghook/forkfix.\n"
-     @"  4 inject via opainject + ElleKit TweakLoader (Relaxin.roothide marker).\n"
-     @"  5 persist/tempRoot/boot-rejailbreak stay HOLD — novel Lum1na, later.\n"];
+     @"  4 inject via opainject 1 launchdhook + ElleKit TweakLoader.\n"
+     @"  5 package managers: Sileo first, then Zebra (Documents/pkgman/*.deb).\n"
+     @"  6 respring: jbctl respring (sbreload / backboardd SIGTERM).\n"
+     @"  7 persist/tempRoot/boot-rejailbreak stay HOLD — novel Lum1na, later.\n"];
     if (off && off->tag && strcmp(off->tag, "A12X_23G71") == 0) {
         [s appendString:@"A12X 23G71 = no SPTM. momentarius is PPL-on-KRW, not a kernel slot.\n"];
         [s appendFormat:@"T8020 pins (unslid) tag %s:\n", tag];
@@ -398,9 +593,16 @@ static io_connect_t ak_openAMFI(NSMutableString *s) {
         conn = 0;
     }
 
+    ak_log(s, @"[*] pkgman inventory (Sileo first):");
+    for (NSString *name in @[ @"sileo.deb", @"zebra.deb" ]) {
+        NSString *path = ak_findFile(name);
+        ak_log(s, @"    %-12s %@", name.UTF8String, path ?: @"(missing — Resources/pkgman)");
+    }
+
     if (!b.hasKread) {
-        ak_log(s, @"HOLD: no kreadbuf. AMFI sel 2/7 and pmap_cs poke stay compiled, unfired.");
-        ak_log(s, @"Bundled BaseBin is staged into Documents/basebin. Files present ≠ injection.");
+        ak_log(s, @"HOLD: no kreadbuf. AMFI sel 2/7, pmap_cs, opainject, dpkg, respring unfired.");
+        ak_log(s, @"Bundled BaseBin + Sileo/Zebra debs are staged. Files present ≠ injection.");
+        ak_printKRWSteps(s);
         ak_log(s, @"Re-tap after LightSword or P044 commitSlide. persist/tempRoot stay later.");
         [[Lum1naBoard shared] recordEvent:@"afterkread"
                                      kind:@"hold"
@@ -410,7 +612,17 @@ static io_connect_t ak_openAMFI(NSMutableString *s) {
         return body.length ? body : s;
     }
 
-    ak_log(s, @"FIRING: board.hasKread, running Dopamine-shaped AMFI/pmap_cs path");
+    if (!ak_krwSelfTest(s)) {
+        ak_log(s, @"HOLD: KRW self-test failed. Injection/respring/Sileo stay unfired.");
+        [[Lum1naBoard shared] recordEvent:@"afterkread"
+                                     kind:@"hold"
+                                   detail:@"krw-test-fail"
+                                   source:@"afterkread"];
+        NSString *body = P06xLogDump(AK_TAG);
+        return body.length ? body : s;
+    }
+
+    ak_log(s, @"FIRING: KRW test PASS — Dopamine-shaped AMFI/pmap_cs + inject + Sileo + respring");
     [[Lum1naBoard shared] recordEvent:@"afterkread"
                                  kind:@"fire"
                                detail:@"hasKread=YES"
@@ -455,7 +667,9 @@ static io_connect_t ak_openAMFI(NSMutableString *s) {
         IOServiceClose(conn);
     }
 
-    ak_log(s, @"[*] tweak injection: trustcached launchdhook + opainject/ElleKit TweakLoader.");
+    ak_tryInject(s);
+    ak_tryInstallPkgman(s);
+    ak_tryRespring(s);
     ak_log(s, @"[*] persist/tempRoot/boot-rejailbreak HOLD — first injection is this slot, novel later.");
     NSString *body = P06xLogDump(AK_TAG);
     return body.length ? body : s;

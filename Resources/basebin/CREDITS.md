@@ -33,6 +33,19 @@ Do not treat dropping these files as proof of injection.
 
 - `LICENSE_opainject.md` from the Dopamine IPA.
 
+## Sileo (first package manager)
+
+- Deb: `Resources/pkgman/sileo.deb` (from the Dopamine 3.0.10 IPA).
+- License: `Resources/pkgman/LICENSE_Sileo.md` (Sileo Team).
+- AfterKread stages it to `Documents/pkgman/sileo.deb`. `dpkg -i` waits for
+  KRW self-test + Procursus `dpkg`. Files present ≠ Sileo running.
+
+## Zebra (second package manager)
+
+- Deb: `Resources/pkgman/zebra.deb` (from the Dopamine 3.0.10 IPA).
+- License: `Resources/pkgman/LICENSE_Zebra.md` (GPL-3).
+- Same staging / same dpkg gate as Sileo. Sileo is installed first.
+
 ## CVE-2026-65343 (AppleKeyStore deserialize — KASLR leak)
 
 Discovered by **Drinor Selmanaj** (Sentry) and **Surya Narayan Kushwaha**

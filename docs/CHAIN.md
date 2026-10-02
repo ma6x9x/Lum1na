@@ -23,13 +23,13 @@ View: Settings → Copy Kernel Board JSON, or All stages → Kernel board JSON.
 - P052 nstream **EFBIG 27** already on 26.5 — a different 84523 guess than wvek. Do not remaining-fire.
 - CVE-2026-84530 AIO `kqext_sdata` class live until **26.7/27**
 - wvek: `apfs_aks_create_wvek` `0xFFFFFFF009BD96D4`; F77 `len>0x210` is **BRK**, 26.7 adds `len<=512`
-- AKS UC **opens** (live P057). CVE-2026-65343 is an OOB **read** (KASLR) via ACM deserialize. Catalog `aks` tap is ACM capture + P010-style size sweep (`aks-capture-v2`), not the 163-selector crash. Sibling leak of aio84530. Does not replace 43748 fill (`surfaceId` is u32). Not KRW.
+- AKS UC **opens** (live P057). CVE-2026-65343 is an OOB **read** (KASLR) via ACM deserialize. Catalog `aks` tap is ACM capture (`aks-capture-v4`), not the 163-selector crash. Fingerprint: sel0/1 empty; sel2–4,6–7 `0xe00002c2` BadArgument; **sel5 `0xe00002c1` NotPrivileged** (privilege, not size — more insz will not deserialize). Sibling leak of aio84530. Does not replace 43748 fill (`surfaceId` is u32). Not KRW.
 
 ## 23G71 A12X iPad (T8020) — dual-SKU gates
 
 SKU is `hw.machine` + `kern.osversion`: iPad8,* + 23G71. Runtime `LabOff()` is the pin table. Do not paste T8101 VAs onto T8020. Do not bump Dopamine 3.0.10 `End` 26.0.1 → 26.6.
 
-**Unpatched on 23G71 (run these):** 64788 LightSword until 23G82; AKS 65343 until 23G83; aio84530 until 26.7/27; wvek create BRK if `len>0x210` (`FUN_fffffff009ab24c0`).
+**Unpatched on 23G71 (run these):** 64788 LightSword until 23G82 — live detach is `0xe00002e2` NotPermitted (sandbox; abort after first, do not spin 24×); AKS 65343 until 23G83; aio84530 until 26.7/27; wvek create BRK if `len>0x210` (`FUN_fffffff009ab24c0`).
 
 **Patched / capped (skip remaining-fire):** 64747 AVE mul FIXED; 64751 NECP flow UAF FIXED (`necp_client_add_flow FUN_fffffff009f965a8`) — P053 keeps PHASE 1 socket reach, skips PHASE 2 race; 43748 CheckandPrewire fill_cap (`FUN_fffffff008701990`, `>=0x80` → `0xe00002c2`) — P044 / p044chain SKIP 254 fire; CS hop-1 `cluster_*_contig` EINVAL 0x16 unless `UPL_PHYS_CONTIG` since 26.1 (`write FUN_fffffff009e6b2b0` / `read FUN_fffffff009e711f0`) — cscalib/cskrw SKIP.
 
@@ -44,12 +44,17 @@ P044 43748 (All-stages, isolate: one tap per force-quit): P032 live path is `H11
 Live 2026-10-02 (iPhone13,2 23F77):
 - P044 v34/v35: Direct sel 2 `0xe00002c2`, hits=0. v35 skipped CoreML because Direct opened.
 - P044 v36: DeviceOpen `0x68` OK. Prepare sel 4 `0xe00002c2`. Bind aborted. CoreML async + `harvestKmsgs=NO` → t+0s hits=0. Regression vs P007 v18 (spray hole+victim → sync `predictionFromFeatures` → recv victims).
-- LightSword v1.8 Full Chain: REPLACE_OK, blit zeros or live `0xA5` new MD, kptrs=0 after 24 attempts (empty GART / new MD, not inpcb).
+- LightSword v1.8 Full Chain: REPLACE_OK, blit zeros or live `0xA5` new MD, kptrs=0 after 24 attempts (empty GART / new MD, not inpcb). v1.9 aborts on first detach `0xe00002e2`.
 - BadQuery consume `-4`. SANDBOX still the app container.
 - PATCHSET HOLD. Not a jailbreak.
 - v37 restores P007 fire: punch even simple kmsgs, sync XVRC27, harvest kmsgs. Direct sel 2 still tried after DeviceOpen. Live 12:49 FILL HIT simple[511]/[509]; krw SKIP (icmp6filt wrong zone).
 - v38: keep even-simple punch + sync CoreML occupancy. Interleave fat type-3 OOL (`n=128` descriptors, kdata `0x824` in kalloc.3072). Do not punch OOL (v36 12:43 MAF). Recv of smashed type-3 can panic — isolate one tap per force-quit. P010 QueueCreate word1 is CommandQueue+0x558 userspace, 0 kptrs. P053 flow_add×close hits=0 (dest is NECP client).
-- AKS 13:28: `se_ok=YES` `capture_done=0`. sel0/1 `kr=0` empty; sel2–7 `0xe00002c2`/`0xe00002c1`. Getting past 2c2 is ACM capture + matching insz, not a 163-sel crash. AKS complements aio84530 as KASLR; it cannot replace 43748 fill.
+- AKS 13:28 / 13:56 / 14:05 / 14:19: `se_ok=YES` `capture_done=0` `hook_n=0`. sel0/1 `kr=0` empty; sel2–4,6–7 `0xe00002c2` BadArgument; **sel5 `0xe00002c1` NotPrivileged**. 2c1 is privilege, not a new leak. Getting past 2c2 is in-process ACM on our AppleKeyStore conn, not a size sweep and not a 163-sel crash. AKS complements aio84530 as KASLR; it cannot replace 43748 fill.
+- v39 live iPad 14:12: aio84530 heap `0xffffffe016645000`, fill_cap SKIP, `anchor=YES`.
+- v39 live A14 14:21 p044chain: FILL HIT simple[509] 16-byte records; fat OOL mut=0; krw SKIP icmp6filt. Direct sel2 `0xe00002c2`, CoreML -1.
+- v40: spray simples → punch evens → fat type-3 OOL **into the holes** (14:21 fill hit trailing simple extra because fat OOL was allocated too early).
+- LightSword A14 14:18: REPLACE_OK, zeros, one A5-full new MD, jetsam ~attempt 16. A12X 14:04: detach `0xe00002e2` ×24 — v1.9 aborts on first NotPermitted.
+- AfterKread live iPad listed `App.app/basebin.tar` then claimed missing `Resources/basebin` — lookup now includes app-root Copy Bundle Resources.
 
 ## Untried reach (in All stages)
 
@@ -60,12 +65,16 @@ Live 2026-10-02 (iPhone13,2 23F77):
 
 ## After kread (HOLD until `commitSlide`)
 
-Dopamine 3.0.10 BaseBin names + Relaxin/RootHide (ElleKit as CydiaSubstrate, `Relaxin.roothide` marker, `basebin.tc`, `basebin.tar`). IPA now ships `Resources/basebin/` (tar + tc + licenses). AfterKread tap copies/extracts into `Documents/basebin` even on HOLD. Files present is inventory, not injection. Credit: opa334 / Dopamine MIT, Relaxin/ElleKit, opainject — see `Resources/basebin/CREDITS.md`. Not copied: kfd, ClearSword, physrw, Fugu14 kcall.
+Dopamine 3.0.10 BaseBin names + Relaxin/RootHide (ElleKit as CydiaSubstrate, `Relaxin.roothide` marker, `basebin.tc`, `basebin.tar`). IPA ships `Resources/basebin/` (tar + tc + licenses) and `Resources/pkgman/` (`sileo.deb` first, `zebra.deb` second). AfterKread copies/extracts into `Documents/basebin` and `Documents/pkgman` even on HOLD. Files present is inventory, not injection. Credit: opa334 / Dopamine MIT, Relaxin/ElleKit, opainject, Sileo Team, Zebra — see `Resources/basebin/CREDITS.md`. Not copied: kfd, ClearSword, physrw, Fugu14 kcall, bootstrap zst.
+
+KRW self-test (must pass before inject): `kread32(kbase) == MH_MAGIC_64` and `kbase+0x1c` is a kernel VA. Heap leaks and blit `0xA5` fail this test.
 
 1. `pmap_cs_allow_invalid` `*(pmap+0xca)=1`
 2. AMFI UC loadTrustCache sel 2/7 of `Documents/basebin/basebin.tc`
 3. trustcache `launchdhook` / `systemhook` / `dyldhook` / `watchdoghook` / `forkfix`
-4. inject via `opainject` + ElleKit `TweakLoader` of `Documents/tweaks/*.dylib`
+4. inject via `opainject 1 launchdhook` + ElleKit `TweakLoader` of `Documents/tweaks/*.dylib`
+5. `dpkg -i` Sileo, then Zebra (needs Procursus `dpkg`; debs stay staged until then)
+6. respring: `jbctl respring` (sbreload / `backboardd` SIGTERM)
 
 A14 is **PPL**, not momentarius. Drop files into the app container, then re-tap **afterkread** after `hasKread`. Persist / tempRoot / boot-time auto-rejailbreak stay later (novel Lum1na, not a Dopamine copy). See All stages → After-kread plan.
 
