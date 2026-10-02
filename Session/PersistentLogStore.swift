@@ -28,6 +28,7 @@ public final class PersistentLogStore {
         "aks": consoleLogName,
         "p044": "p06x_p044_log.txt",
         "p044chain": "p06x_ane254chain_log.txt",
+        "krw": "p06x_krw_log.txt",
         "aio84530": "p84530_aio_kqueue_log.txt",
         "ident": "device_ident_log.txt",
         "lightsword": "p06x_lightsword_log.txt",

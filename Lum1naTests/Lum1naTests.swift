@@ -51,6 +51,7 @@ struct Lum1naOffsetTests {
         #expect(t.ave_close == 0xFFFFFFF008371094)
         #expect(t.aks_wvek_overflow == 0xFFFFFFF009BD96D4)
         #expect(t.static_base == 0xFFFFFFF007004000)
+        #expect(t.pmap_cs_allow_off == 0xca)
     }
 
     @Test func a12xTableIsT8020_23G71() {
@@ -78,6 +79,8 @@ struct Lum1naOffsetTests {
         #expect(t.pmap_load_tc == 0)
         #expect(t.ave_close == 0xFFFFFFF0083A4CF0)
         #expect(t.aks_wvek_overflow == 0xFFFFFFF009AB24C0)
+        #expect(t.static_base == 0xFFFFFFF007004000)
+        #expect(t.pmap_cs_allow_off == 0xca)
     }
 
     @Test func tablesDoNotPasteAcrossSilicon() {
@@ -130,6 +133,7 @@ struct Lum1naOffsetTests {
         #expect(ids.contains("lsabc"))
         #expect(ids.contains("p055"))
         #expect(ids.contains("lightsword"))
+        #expect(ids.contains("krw"))
 
         func cls(_ id: String) -> String {
             ExploitManager.catalog.first { $0.id == id }?.controllerClass ?? ""
@@ -142,6 +146,7 @@ struct Lum1naOffsetTests {
         #expect(cls("anvil").isEmpty == false)
         #expect(cls("p044") == "P044ExploitController")
         #expect(cls("p044chain") == "ANE254ChainController")
+        #expect(cls("krw") == "KRWChainController")
         #expect(cls("afterkread") == "Lum1naAfterKread")
         #expect(ids.contains("dopaminecompat"))
         #expect(cls("dopaminecompat") == "DopamineCompat")
@@ -158,6 +163,7 @@ struct Lum1naOffsetTests {
         #expect(PersistentLogStore.probeLogFiles["p055"] == "p055_iosurface_upl_log.txt")
         #expect(PersistentLogStore.probeLogFiles["p044"] == "p06x_p044_log.txt")
         #expect(PersistentLogStore.probeLogFiles["p044chain"] == "p06x_ane254chain_log.txt")
+        #expect(PersistentLogStore.probeLogFiles["krw"] == "p06x_krw_log.txt")
         #expect(PersistentLogStore.probeLogFiles["afterkread"] == "p06x_afterkread_log.txt")
         #expect(PersistentLogStore.probeLogFiles["dopaminecompat"] == "dopaminecompat_log.txt")
         #expect(PersistentLogStore.probeLogFiles["p053"] == "p053_necp_dfree_log.txt")

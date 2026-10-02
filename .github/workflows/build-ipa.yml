@@ -133,6 +133,8 @@ jobs:
             "Exploit/BadQueryProbe.m"
             "Exploit/ANE254ChainController.h"
             "Exploit/ANE254ChainController.m"
+            "Exploit/KRWChainController.h"
+            "Exploit/KRWChainController.m"
             #import "Exploit/ColdForge.h"
             #import "Exploit/Rapier.h"
             #import "Exploit/Anvil.h"

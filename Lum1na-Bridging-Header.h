@@ -91,6 +91,8 @@
 #import "Exploit/Anvil.h"
 #import "Exploit/LightSwordABC.h"
 #import "Exploit/DopamineCompat.h"
+#import "Exploit/ANE254ChainController.h"
+#import "Exploit/KRWChainController.h"
 
 
 #endif

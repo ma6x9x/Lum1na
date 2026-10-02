@@ -1,6 +1,18 @@
 # Chain map (public)
 
-This is not a claim of KRW. Pins are **unslid** 23F77 T8101 unless noted.
+This is not a claim of KRW. Pins are **unslid** per `LabOff()` (A14 23F77 T8101 / A12X 23G71 T8020).
+
+## KRW TEST button
+
+Home **KRW TEST** / catalog `krw` (`KRWChainController`) walks PATH B once per tap:
+
+1. IDENT / `LabOff()`
+2. aio84530 heap leak (both SKUs)
+3. 43748 fill + fat OOL + SocketKRW — **SKIP** when `ane_fill_cap=1` (23G71)
+4. vtable → slide → `commitSlide`
+5. AfterKread inject stays a **separate** TAP
+
+PATH A LightSword stays KERNEL pad / `lightsword` TAP (abort on first `0xe00002e2` or GART-zero / A5-full). Force-quit between PATH A and KRW TEST. JAILBREAK is SANDBOX + LightSword + AfterKread HOLD, not this stepper.
 
 ## Auto-filled board
 
@@ -44,7 +56,7 @@ P044 43748 (All-stages, isolate: one tap per force-quit): P032 live path is `H11
 Live 2026-10-02 (iPhone13,2 23F77):
 - P044 v34/v35: Direct sel 2 `0xe00002c2`, hits=0. v35 skipped CoreML because Direct opened.
 - P044 v36: DeviceOpen `0x68` OK. Prepare sel 4 `0xe00002c2`. Bind aborted. CoreML async + `harvestKmsgs=NO` → t+0s hits=0. Regression vs P007 v18 (spray hole+victim → sync `predictionFromFeatures` → recv victims).
-- LightSword v1.8 Full Chain: REPLACE_OK, blit zeros or live `0xA5` new MD, kptrs=0 after 24 attempts (empty GART / new MD, not inpcb). v1.9 aborts on first detach `0xe00002e2`.
+- LightSword v1.8 Full Chain: REPLACE_OK, blit zeros or live `0xA5` new MD, kptrs=0 after 24 attempts (empty GART / new MD, not inpcb). v1.10 aborts on first detach `0xe00002e2` **and** first GART-zero / A5-full with kptrs=0.
 - BadQuery consume `-4`. SANDBOX still the app container.
 - PATCHSET HOLD. Not a jailbreak.
 - v37 restores P007 fire: punch even simple kmsgs, sync XVRC27, harvest kmsgs. Direct sel 2 still tried after DeviceOpen. Live 12:49 FILL HIT simple[511]/[509]; krw SKIP (icmp6filt wrong zone).
@@ -53,7 +65,7 @@ Live 2026-10-02 (iPhone13,2 23F77):
 - v39 live iPad 14:12: aio84530 heap `0xffffffe016645000`, fill_cap SKIP, `anchor=YES`.
 - v39 live A14 14:21 p044chain: FILL HIT simple[509] 16-byte records; fat OOL mut=0; krw SKIP icmp6filt. Direct sel2 `0xe00002c2`, CoreML -1.
 - v40: spray simples → punch evens → fat type-3 OOL **into the holes** (14:21 fill hit trailing simple extra because fat OOL was allocated too early).
-- LightSword A14 14:18: REPLACE_OK, zeros, one A5-full new MD, jetsam ~attempt 16. A12X 14:04: detach `0xe00002e2` ×24 — v1.9 aborts on first NotPermitted.
+- LightSword A14 14:18: REPLACE_OK, zeros, one A5-full new MD, jetsam ~attempt 16. A12X 14:04: detach `0xe00002e2` ×24 — v1.10 aborts on first NotPermitted and first empty blit.
 - AfterKread live iPad listed `App.app/basebin.tar` then claimed missing `Resources/basebin` — lookup now includes app-root Copy Bundle Resources.
 
 ## Untried reach (in All stages)

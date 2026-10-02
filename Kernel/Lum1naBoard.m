@@ -173,6 +173,7 @@ static inline void boardSet(NSMutableDictionary *d, NSString *key, id val) {
             pins[@"amfi_external"] = [NSString stringWithFormat:@"0x%llx", off->amfi_external];
             pins[@"amfi_loadtc"] = [NSString stringWithFormat:@"0x%llx", off->amfi_loadtc];
             pins[@"pmap_cs_allow"] = [NSString stringWithFormat:@"0x%llx", off->pmap_cs_allow];
+            pins[@"pmap_cs_allow_off"] = [NSString stringWithFormat:@"0x%x", off->pmap_cs_allow_off];
             pins[@"owns_replaceable"] = @(off->owns_replaceable);
         }
         _d[@"pins"] = pins;
@@ -337,7 +338,7 @@ static inline void boardSet(NSMutableDictionary *d, NSString *key, id val) {
             return NO;
         }
 
-        uint64_t kbase = 0xFFFFFFF007004000ULL + slide;
+        uint64_t kbase = LabStaticBase() + slide;
 
         // Live kread of kbase+0x1c must look like a kernel VA (pointer, not Darwin version text).
         uint64_t version_ptr = kbase + 0x1c;

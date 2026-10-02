@@ -46,6 +46,7 @@ struct ContentView: View {
                     .padding(.top, 8)
 
                 VStack(spacing: 10) {
+                    krwTestButton
                     jailbreakButton
                     allExploitsButton
                 }
@@ -168,6 +169,30 @@ struct ContentView: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .luminaGlassCapsule()
+    }
+
+    private var krwTestButton: some View {
+        Button(action: {
+            if let entry = ExploitManager.catalog.first(where: { $0.id == "krw" }) {
+                Task { await viewModel.executeExploit(entry) }
+            }
+        }) {
+            HStack(spacing: 8) {
+                Image(systemName: "memorychip")
+                    .font(.system(size: 14, weight: .semibold))
+                Text("KRW TEST")
+                    .font(.system(.subheadline, design: .rounded, weight: .bold))
+                    .tracking(1.0)
+                Text("✦")
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+            }
+            .foregroundColor(.lum1naCyan)
+            .frame(maxWidth: .infinity)
+            .frame(height: 46)
+            .luminaGlassRect(16)
+        }
+        .buttonStyle(LuminaPressStyle())
+        .disabled(viewModel.isRunning)
     }
 
     private var jailbreakButton: some View {
