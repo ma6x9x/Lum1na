@@ -37,15 +37,44 @@ static void ak_log(NSMutableString *s, NSString *fmt, ...) {
 }
 
 static NSArray<NSString *> *ak_basebinNames(void) {
+    // Dopamine 3.0.10 BaseBin/ + Relaxin 0.5.4 RootHide payload names.
+    // Drop into Documents/basebin. Do not copy Dopamine kfd/ClearSword.
     return @[
         @"basebin.tc",
+        @"basebin.tar",
         @"trustcache",
-        @"jbserver",
+        @"jbctl",
         @"launchdhook.dylib",
+        @"systemhook.dylib",
+        @"watchdoghook.dylib",
         @"dyldhook.dylib",
+        @"forkfix.dylib",
         @"hookd",
         @"opainject",
+        @"libjailbreak.dylib",
+        @"rootlesshooks",
+        @"TweakLoader.dylib",
+        @"libellekit.dylib",
+        @"CydiaSubstrate",
+        @"Relaxin.roothide",
     ];
+}
+
+static NSArray<NSString *> *ak_tweakDylibs(void) {
+    NSMutableArray *out = [NSMutableArray array];
+    NSString *docs = NSSearchPathForDirectoriesInDomains(
+        NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+    if (!docs) return out;
+    NSString *tweaks = [docs stringByAppendingPathComponent:@"tweaks"];
+    NSArray<NSString *> *names = [[NSFileManager defaultManager]
+                                  contentsOfDirectoryAtPath:tweaks error:nil];
+    for (NSString *n in names) {
+        if ([n.pathExtension.lowercaseString isEqualToString:@"dylib"] ||
+            [n.pathExtension.lowercaseString isEqualToString:@"deb"]) {
+            [out addObject:[tweaks stringByAppendingPathComponent:n]];
+        }
+    }
+    return out;
 }
 
 static NSArray<NSString *> *ak_searchRoots(void) {
@@ -111,11 +140,13 @@ static io_connect_t ak_openAMFI(NSMutableString *s) {
     const char *tag = (off && off->tag) ? off->tag : "?";
     NSMutableString *s = [NSMutableString string];
     [s appendString:
-     @"LUM1NA CONSTELLATION (Dopamine 3.0.10 BaseBin names, A14 PPL path):\n"
-     @"  After kreadbuf of a known kernel string -> board.commitSlide.\n"
-     @"  Then AMFI loadTrustCache sel 2/7 + pmap_cs_allow_invalid *(pmap+0xca)=1.\n"
-     @"  Tweak injection is trustcache of launchdhook/dyldhook/hookd, then inject.\n"
-     @"  Persist/tempRoot stay HOLD this pass.\n"];
+     @"LUM1NA CONSTELLATION (Dopamine 3.0.10 BaseBin + Relaxin/RootHide names):\n"
+     @"  0 HOLD until kreadbuf of a known kernel string -> board.commitSlide.\n"
+     @"  1 pmap_cs_allow_invalid *(pmap+0xca)=1 (A14 PPL; not momentarius).\n"
+     @"  2 AMFI UC loadTrustCache sel 2/7 of Documents/basebin/basebin.tc.\n"
+     @"  3 trustcache launchdhook/systemhook/dyldhook/watchdoghook/forkfix.\n"
+     @"  4 inject via opainject + ElleKit TweakLoader (Relaxin.roothide marker).\n"
+     @"  5 persist/tempRoot/boot-rejailbreak stay HOLD — novel Lum1na, later.\n"];
     if (off && off->tag && strcmp(off->tag, "A12X_23G71") == 0) {
         [s appendString:@"A12X 23G71 = no SPTM. momentarius is PPL-on-KRW, not a kernel slot.\n"];
         [s appendFormat:@"T8020 pins (unslid) tag %s:\n", tag];
@@ -161,10 +192,19 @@ static io_connect_t ak_openAMFI(NSMutableString *s) {
     [s appendString:[self plan]];
     P06xLog(AK_TAG, @"plan dumped");
 
-    ak_log(s, @"[*] Dopamine BaseBin names this slot will consume after hasKread:");
+    ak_log(s, @"[*] Dopamine 3.0.10 / Relaxin-RootHide names this slot consumes after hasKread:");
     for (NSString *name in ak_basebinNames()) {
         NSString *path = ak_findFile(name);
-        ak_log(s, @"    %-20s %@", name.UTF8String, path ?: @"(missing)");
+        ak_log(s, @"    %-22s %@", name.UTF8String, path ?: @"(missing)");
+    }
+    NSArray<NSString *> *tweaks = ak_tweakDylibs();
+    if (tweaks.count == 0) {
+        ak_log(s, @"[*] Documents/tweaks empty — drop dylibs here for first injection");
+    } else {
+        ak_log(s, @"[*] Documents/tweaks (%lu):", (unsigned long)tweaks.count);
+        for (NSString *p in tweaks) {
+            ak_log(s, @"    %@", p.lastPathComponent);
+        }
     }
 
     io_connect_t conn = ak_openAMFI(s);
@@ -176,7 +216,8 @@ static io_connect_t ak_openAMFI(NSMutableString *s) {
 
     if (!b.hasKread) {
         ak_log(s, @"HOLD: no kreadbuf. AMFI sel 2/7 and pmap_cs poke stay compiled, unfired.");
-        ak_log(s, @"Drop basebin.tc (and tweak dylibs) into Documents/basebin, then re-tap after commitSlide.");
+        ak_log(s, @"Drop basebin.tc into Documents/basebin and tweak dylibs into Documents/tweaks.");
+        ak_log(s, @"Re-tap after LightSword or P044 commitSlide. persist/tempRoot stay later.");
         [[Lum1naBoard shared] recordEvent:@"afterkread"
                                      kind:@"hold"
                                    detail:@"hasKread=NO"
@@ -230,7 +271,8 @@ static io_connect_t ak_openAMFI(NSMutableString *s) {
         IOServiceClose(conn);
     }
 
-    ak_log(s, @"[*] tweak injection waits for a trustcached launchdhook.dylib (opainject). persist/tempRoot HOLD.");
+    ak_log(s, @"[*] tweak injection: trustcached launchdhook + opainject/ElleKit TweakLoader.");
+    ak_log(s, @"[*] persist/tempRoot/boot-rejailbreak HOLD — first injection is this slot, novel later.");
     NSString *body = P06xLogDump(AK_TAG);
     return body.length ? body : s;
 }

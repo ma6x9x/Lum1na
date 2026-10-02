@@ -27,7 +27,9 @@ Public size+CStrings maps: [blacktop/ipsw-diffs](https://github.com/blacktop/ips
 
 ## After a real kreadbuf (not before)
 
-Dopamine 3.0.10 does not run on this SKU. Its BaseBin names (trustcache, jbserver, launchdhook, userspace reboot) are the post-KRW map, not a KRW.
+Dopamine 3.0.10 does not run on this SKU. Relaxin/RootHide does not either. Their BaseBin names (trustcache, launchdhook, systemhook, ElleKit TweakLoader) are the post-KRW map, not a KRW.
+
+2026-10-02 live (iPhone13,2 23F77): P044 v34/v35 Direct sel 2 `0xe00002c2` (need DeviceOpen 0x68 + send 0x948); LightSword REPLACE_OK with blit zeros/`0xA5` and kptrs=0; BadQuery consume `-4`. v36 restores CoreML if Direct send misses.
 
 A14 uses PPL. momentarius is A12/A13 after KRW. Do not copy it here.
 

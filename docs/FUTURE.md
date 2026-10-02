@@ -27,12 +27,15 @@ This is the public-app companion to `~/Desktop/lumina_primitives/87_EXTERNAL_CON
 
 FomoPeek/DarkSword local LPE stopped at iOS 26.1. Not this build.
 
-## After kreadbuf
+## After kreadbuf (first tweak injection)
 
-1. AMFI UserClient loadTrustCache sel 2/7 + `pmap_cs_allow_invalid` + `pmap_load_trust_cache` (pins in lab note 84/86)
-2. Drop `basebin.tc` + tweak dylibs into Documents/basebin (Dopamine names: jbserver, launchdhook, dyldhook, trustcache, hookd)
-3. A14 PPL — AMFI UC from this process after hasKread
-4. Persist/tempRoot stay later; this pass is bootstrap + trustcache only
+Dopamine 3.0.10 does not run on A14 23F77. Relaxin is a RootHide/ElleKit jailbreak on other SKUs. Lum1na reuses **names and layout**, not their KRW.
+
+1. AMFI UserClient loadTrustCache sel 2/7 + `pmap_cs_allow_invalid` + `pmap_load_trust_cache`
+2. Drop `basebin.tc` into `Documents/basebin` (Dopamine: launchdhook, systemhook, dyldhook, watchdoghook, forkfix, opainject, libjailbreak; Relaxin: `basebin.tar`, `Relaxin.roothide`, ElleKit-as-Substrate)
+3. Drop tweak dylibs into `Documents/tweaks`
+4. A14 PPL — AMFI UC from this process after `hasKread`
+5. Persist / tempRoot / boot-time auto-rejailbreak stay later — that is the novel Lum1na layer, after this injection basis works
 
 ## GOLDMINE 26.5 (keep unrun angles open)
 

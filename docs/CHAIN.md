@@ -29,18 +29,33 @@ View: Settings → Copy Kernel Board JSON, or All stages → Kernel board JSON.
 
 AVE EncType / Close-async; JPEG `+0x30` teardown; NECP add/flow dest; 64788 other reclaim; IOMD `+0x34`; lockdownd USB from a Mac.
 
-P044 43748 (All-stages): P032 live path is `H11ANEIn` **type=1** (type=0 `0xe00002c7` Unsupported; `AppleH11ANEInterface` not found). Direct sel 2 on that UC, program from bundled `XVRC27_254in_1out_addchain.mlmodelc`. Open + 255 surfaces + program handle happen **before** the 3072 spray; punch n-2 then immediate send (v34 created surfaces after the punch and overflow record 192 landed in a freed neighbor). Wait the async port, then harvest. No CoreML if Direct opened. `aio84530` is the fill seed, not an Arm target. `hasKread` only after `commitSlide`.
+P044 43748 (All-stages, isolate: one tap per force-quit): P032 live path is `H11ANEIn` **type=1** (type=0 `0xe00002c7` Unsupported; `AppleH11ANEInterface` not found). 23F77 DirectPath TABLE 0: DeviceOpen `stIn=stOut=0x68`, Prepare sel 4 `0x38`, Send sel 2/19 `scIn=1 stIn=0x948 stOut=0x28`. WeightBufs `{ptr, 0xA60}` / 88-byte DeviceOpen is `0xe00002c2` on this UC (v34/v35 live). Program from bundled `XVRC27_254in_1out_addchain.mlmodelc`. Open + 255 surfaces + handle + Prepare happen **before** the 3072 spray; punch n-2 then immediate send (v34 created surfaces after the punch and overflow record 192 landed in a freed neighbor). Direct uses **real IOSurface IDs** (count_gate lookup). `aio84530` is the later Arm/vtable seed, not a Direct surfaceId. If sel 2 misses, fire already-loaded CoreML (v35 skip-CoreML-if-opened was hits=0). `hasKread` only after `commitSlide`.
+
+Live 2026-10-02 (iPhone13,2 23F77):
+- P044 v34/v35: Direct sel 2 `0xe00002c2`, hits=0. v35 skipped CoreML because Direct opened.
+- LightSword v1.8 Full Chain: REPLACE_OK, blit zeros or live `0xA5` new MD, kptrs=0 after 24 attempts (empty GART / new MD, not inpcb).
+- BadQuery consume `-4`. SANDBOX still the app container.
+- PATCHSET HOLD. Not a jailbreak.
 
 ## Untried reach (in All stages)
 
 - **p058** AppleJPEGDriver open (24A435 `+0x30` class)
 - **p061** H264+HEVC VT sessions (84607 EncType; 23F77 AVE 905.36.1 already has EncType_Max — do not expect ABSENT)
 - **p057** wvek AKS/MobileKeyBag
-- **afterkread** constellation: AMFI UC open + 23F77 pins. Dopamine BaseBin names (`basebin.tc`, launchdhook, dyldhook, hookd). HOLD until `hasKread`
+- **afterkread** constellation: AMFI UC open + 23F77 pins. Dopamine 3 / Relaxin-RootHide names (`basebin.tc`, launchdhook, systemhook, ElleKit TweakLoader). HOLD until `hasKread`
 
-## After kread (HOLD)
+## After kread (HOLD until `commitSlide`)
 
-AMFI loadTrustCache sel 2/7, `pmap_cs_allow_invalid` `*(pmap+0xca)=1`, then trustcache of tweak dylibs. A14 is **PPL**, not momentarius. Persist/tempRoot stay later. See All stages → After-kread plan.
+Dopamine 3.0.10 BaseBin names + Relaxin/RootHide (ElleKit as CydiaSubstrate, `Relaxin.roothide` marker, `basebin.tc`, `basebin.tar`):
+
+1. `pmap_cs_allow_invalid` `*(pmap+0xca)=1`
+2. AMFI UC loadTrustCache sel 2/7 of `Documents/basebin/basebin.tc`
+3. trustcache `launchdhook` / `systemhook` / `dyldhook` / `watchdoghook` / `forkfix`
+4. inject via `opainject` + ElleKit `TweakLoader` of `Documents/tweaks/*.dylib`
+
+A14 is **PPL**, not momentarius. Drop files into the app container, then re-tap **afterkread** after `hasKread`. Persist / tempRoot / boot-time auto-rejailbreak stay later (novel Lum1na, not a Dopamine copy). See All stages → After-kread plan.
+
+Full Chain order: SANDBOX BadQuery → KERNEL LightSword → AfterKread. P044 stays All-stages. Auto chain skips P051/P053/P054. Parked All-stages: ColdForge, Rapier, p055, p058 JPEG open, p056/p061 AVE reach, Anvil open-only.
 
 ## Not in this repo
 
