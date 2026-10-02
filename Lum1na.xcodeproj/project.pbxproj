@@ -90,6 +90,15 @@
 			exceptions = (
 				E6A800E3305F1B8200473E8B /* Exceptions for "Sources" folder in "Lum1na" target */,
 			);
+			explicitFileTypes = {
+				"Resources/pkgman/sileo.deb" = file;
+				"Resources/pkgman/zebra.deb" = file;
+			};
+			explicitFolders = (
+				Resources/basebin,
+				Resources/pkgman,
+				Resources/tweaks,
+			);
 			path = .;
 			sourceTree = "<group>";
 		};

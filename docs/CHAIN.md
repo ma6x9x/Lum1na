@@ -77,7 +77,7 @@ Live 2026-10-02 (iPhone13,2 23F77):
 
 ## After kread (HOLD until `commitSlide`)
 
-Dopamine 3.0.10 BaseBin names + Relaxin/RootHide (ElleKit as CydiaSubstrate, `Relaxin.roothide` marker, `basebin.tc`, `basebin.tar`). IPA ships `Resources/basebin/` (tar + tc + licenses) and `Resources/pkgman/` (`sileo.deb` first, `zebra.deb` second). AfterKread copies/extracts into `Documents/basebin` and `Documents/pkgman` even on HOLD. Files present is inventory, not injection. Credit: opa334 / Dopamine MIT, Relaxin/ElleKit, opainject, Sileo Team, Zebra — see `Resources/basebin/CREDITS.md`. Not copied: kfd, ClearSword, physrw, Fugu14 kcall, bootstrap zst.
+Dopamine 3.0.10 BaseBin names + Relaxin/RootHide (ElleKit as CydiaSubstrate, `Relaxin.roothide` marker, `basebin.tc`, `basebin.tar`). IPA ships `Resources/basebin/` (tar + tc + licenses) and `Resources/pkgman/` (`sileo.deb` first, `zebra.deb` second). Those payload folders are Xcode folder references so `.deb` (`ar`) is not passed to `ld`. AfterKread copies/extracts into `Documents/basebin` and `Documents/pkgman` even on HOLD. Files present is inventory, not injection. Credit: opa334 / Dopamine MIT, Relaxin/ElleKit, opainject, Sileo Team, Zebra — see `Resources/basebin/CREDITS.md`. Not copied: kfd, ClearSword, physrw, Fugu14 kcall, bootstrap zst.
 
 KRW self-test (must pass before inject): `kread32(kbase) == MH_MAGIC_64` and `kbase+0x1c` is a kernel VA. Heap leaks and blit `0xA5` fail this test.
 

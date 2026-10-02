@@ -59,6 +59,9 @@ Stale names (do **not** resurrect): FusionChain, KernelMap/LabOffsets.swift dupl
 9. **Auto chain vs catalog**  
    JAILBREAK must not invoke process-killing probes. P051, P053, and unbounded P054 (4×500×30s unlink) jetsam'd the app. SANDBOX and DAEMON pads are HOLD. All-stages p054 is bounded (2s / 1 thread). Do not restore the storm loop.
 
+10. **`.deb` is an `ar` archive**  
+   `sileo.deb` / `zebra.deb` will be **linked** if the synchronized root treats them as static libs (`ld: archive member 'debian-binary' not a mach-o file`). Keep `Resources/pkgman`, `Resources/basebin`, `Resources/tweaks` as `explicitFolders` and the two debs as `explicitFileTypes = file`. Do not add a Makefile — the IPA gate is `xcodebuild` in `build-ipa.yml`.
+
 ## Probe wiring
 
 New ObjC probe:
