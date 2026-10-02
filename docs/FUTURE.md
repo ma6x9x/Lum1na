@@ -8,7 +8,7 @@ This is the public-app companion to `~/Desktop/lumina_primitives/87_EXTERNAL_CON
 | --- | --- |
 | `P007OpenOnly` | Panic lab. Ident, probes, Documents logs |
 | `Lum1na` (this repo) | Motherboard UI, P007-style logging, catalog of `+tap` probes |
-| Dopamine 3.0.10 | Post-KRW BaseBin reference only. Supports 26.0–26.0.1 A12/A13, not A14 23F77 |
+| Dopamine 3.0.10 | Post-KRW BaseBin reference only. Supports 26.0–26.0.1 A12/A13. A12X iPad is A12 CPU (Vortex/Tempest) but 26.6 is past End; hop-1 dead since 26.1. Do not bump End. Catalog `dopaminecompat` is the honest diagnostic. |
 
 ## Proven on 23F77 (do not backtrack)
 
@@ -19,6 +19,12 @@ This is the public-app companion to `~/Desktop/lumina_primitives/87_EXTERNAL_CON
 - icmp6filt `+0x148` unused until a real inpcb
 - AKS user client **opens**. CVE-2026-65343 deserialize is a KASLR OOB read (ACM `declared_length`). Catalog `aks` tap is bounded ACM capture. Not KRW.
 - CVE-2026-84530 class is public and live until iOS 27
+
+## 23G71 A12X (T8020) — do not paste T8101
+
+Unpatched: 64788 until 23G82; AKS 65343 until 23G83; aio84530 until 26.7/27; wvek BRK `len>0x210`.
+
+Capped / FIXED: 43748 fill_cap; 64747 AVE mul; 64751 NECP flow UAF; CS hop-1 26.1. P044/P053/cscalib skip remaining-fire on those.
 
 ## Public write-ups worth keeping
 

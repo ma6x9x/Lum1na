@@ -90,6 +90,7 @@
 #import "Exploit/Rapier.h"
 #import "Exploit/Anvil.h"
 #import "Exploit/LightSwordABC.h"
+#import "Exploit/DopamineCompat.h"
 
 
 #endif

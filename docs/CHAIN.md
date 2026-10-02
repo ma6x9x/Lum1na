@@ -23,7 +23,17 @@ View: Settings → Copy Kernel Board JSON, or All stages → Kernel board JSON.
 - P052 nstream **EFBIG 27** already on 26.5 — a different 84523 guess than wvek. Do not remaining-fire.
 - CVE-2026-84530 AIO `kqext_sdata` class live until **26.7/27**
 - wvek: `apfs_aks_create_wvek` `0xFFFFFFF009BD96D4`; F77 `len>0x210` is **BRK**, 26.7 adds `len<=512`
-- AKS UC **opens** (live P057). CVE-2026-65343 is an OOB **read** (KASLR) via ACM deserialize. Catalog `aks` tap is bounded ACM capture, not the 163-selector crash. Not KRW.
+- AKS UC **opens** (live P057). CVE-2026-65343 is an OOB **read** (KASLR) via ACM deserialize. Catalog `aks` tap is ACM capture + P010-style size sweep (`aks-capture-v2`), not the 163-selector crash. Sibling leak of aio84530. Does not replace 43748 fill (`surfaceId` is u32). Not KRW.
+
+## 23G71 A12X iPad (T8020) — dual-SKU gates
+
+SKU is `hw.machine` + `kern.osversion`: iPad8,* + 23G71. Runtime `LabOff()` is the pin table. Do not paste T8101 VAs onto T8020. Do not bump Dopamine 3.0.10 `End` 26.0.1 → 26.6.
+
+**Unpatched on 23G71 (run these):** 64788 LightSword until 23G82; AKS 65343 until 23G83; aio84530 until 26.7/27; wvek create BRK if `len>0x210` (`FUN_fffffff009ab24c0`).
+
+**Patched / capped (skip remaining-fire):** 64747 AVE mul FIXED; 64751 NECP flow UAF FIXED (`necp_client_add_flow FUN_fffffff009f965a8`) — P053 keeps PHASE 1 socket reach, skips PHASE 2 race; 43748 CheckandPrewire fill_cap (`FUN_fffffff008701990`, `>=0x80` → `0xe00002c2`) — P044 / p044chain SKIP 254 fire; CS hop-1 `cluster_*_contig` EINVAL 0x16 unless `UPL_PHYS_CONTIG` since 26.1 (`write FUN_fffffff009e6b2b0` / `read FUN_fffffff009e711f0`) — cscalib/cskrw SKIP.
+
+QueueCreate A12X `0x408` / leak `+0x550`. A14 `0x410` on this iPad is `0xe00002c2`. Catalog `dopaminecompat` is an honest CPU/OS vs End=26.0.1 diagnostic (Vortex/Tempest = A12 hardware). hop-1 is already dead on 26.6.
 
 ## Open (one failed tap ≠ closed)
 
@@ -39,6 +49,7 @@ Live 2026-10-02 (iPhone13,2 23F77):
 - PATCHSET HOLD. Not a jailbreak.
 - v37 restores P007 fire: punch even simple kmsgs, sync XVRC27, harvest kmsgs. Direct sel 2 still tried after DeviceOpen. Live 12:49 FILL HIT simple[511]/[509]; krw SKIP (icmp6filt wrong zone).
 - v38: keep even-simple punch + sync CoreML occupancy. Interleave fat type-3 OOL (`n=128` descriptors, kdata `0x824` in kalloc.3072). Do not punch OOL (v36 12:43 MAF). Recv of smashed type-3 can panic — isolate one tap per force-quit. P010 QueueCreate word1 is CommandQueue+0x558 userspace, 0 kptrs. P053 flow_add×close hits=0 (dest is NECP client).
+- AKS 13:28: `se_ok=YES` `capture_done=0`. sel0/1 `kr=0` empty; sel2–7 `0xe00002c2`/`0xe00002c1`. Getting past 2c2 is ACM capture + matching insz, not a 163-sel crash. AKS complements aio84530 as KASLR; it cannot replace 43748 fill.
 
 ## Untried reach (in All stages)
 

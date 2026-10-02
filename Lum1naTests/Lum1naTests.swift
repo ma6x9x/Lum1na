@@ -143,6 +143,11 @@ struct Lum1naOffsetTests {
         #expect(cls("p044") == "P044ExploitController")
         #expect(cls("p044chain") == "ANE254ChainController")
         #expect(cls("afterkread") == "Lum1naAfterKread")
+        #expect(ids.contains("dopaminecompat"))
+        #expect(cls("dopaminecompat") == "DopamineCompat")
+        #expect(cls("aks") == "AKSExploitController")
+        #expect(cls("cscalib") == "CSRaceCalib")
+        #expect(cls("cskrw") == "CSKRW")
     }
 
     @Test func probeLogsMapNewTaps() {
@@ -154,6 +159,9 @@ struct Lum1naOffsetTests {
         #expect(PersistentLogStore.probeLogFiles["p044"] == "p06x_p044_log.txt")
         #expect(PersistentLogStore.probeLogFiles["p044chain"] == "p06x_ane254chain_log.txt")
         #expect(PersistentLogStore.probeLogFiles["afterkread"] == "p06x_afterkread_log.txt")
+        #expect(PersistentLogStore.probeLogFiles["dopaminecompat"] == "dopaminecompat_log.txt")
+        #expect(PersistentLogStore.probeLogFiles["p053"] == "p053_necp_dfree_log.txt")
+        #expect(PersistentLogStore.probeLogFiles["cscalib"] == "racecalib_log.txt")
     }
 
     @Test func boardRecordEventDedupeByEventAndKind() {

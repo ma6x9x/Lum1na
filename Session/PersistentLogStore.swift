@@ -78,6 +78,7 @@ public final class PersistentLogStore {
         "p056": "p056_vt_compression_log.txt",
         "board": "lum1na_board.json",
         "afterkread": "p06x_afterkread_log.txt",
+        "dopaminecompat": "dopaminecompat_log.txt",
         "KERNEL": consoleLogName,
         "SANDBOX": consoleLogName,
         "DAEMON": "p054_reap_list_log.txt",
