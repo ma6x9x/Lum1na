@@ -29,7 +29,7 @@ View: Settings → Copy Kernel Board JSON, or All stages → Kernel board JSON.
 
 AVE EncType / Close-async; JPEG `+0x30` teardown; NECP add/flow dest; 64788 other reclaim; IOMD `+0x34`; lockdownd USB from a Mac.
 
-P044 43748 (All-stages): the 254 fire that hit CheckandPrewire is the bundled `XVRC27_254in_1out_addchain.mlmodelc` via CoreML prediction — already compiled espresso, not tap-time `.mil`/`.hwx` compile, not Direct IOKit (`AppleH11ANEInterface` is not visible from this signing). Poll sockets while prediction is in flight; harvest on return. `aio84530` is the fill seed, not an Arm target. `hasKread` only after `commitSlide`.
+P044 43748 (All-stages): P032 live path is `H11ANEIn` **type=1** (type=0 `0xe00002c7` Unsupported; `AppleH11ANEInterface` not found). Direct sel 2 on that UC, program from bundled `XVRC27_254in_1out_addchain.mlmodelc`. CoreML prediction is the fallback if Direct send fails. `aio84530` is the fill seed, not an Arm target. `hasKread` only after `commitSlide`.
 
 ## Untried reach (in All stages)
 
