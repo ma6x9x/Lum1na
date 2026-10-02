@@ -29,7 +29,7 @@ View: Settings → Copy Kernel Board JSON, or All stages → Kernel board JSON.
 
 AVE EncType / Close-async; JPEG `+0x30` teardown; NECP add/flow dest; 64788 other reclaim; IOMD `+0x34`; lockdownd USB from a Mac.
 
-P044 43748 (All-stages): P032 live path is `H11ANEIn` **type=1** (type=0 `0xe00002c7` Unsupported; `AppleH11ANEInterface` not found). Direct sel 2 on that UC, program from bundled `XVRC27_254in_1out_addchain.mlmodelc`. CoreML prediction is the fallback if Direct send fails. `aio84530` is the fill seed, not an Arm target. `hasKread` only after `commitSlide`.
+P044 43748 (All-stages): P032 live path is `H11ANEIn` **type=1** (type=0 `0xe00002c7` Unsupported; `AppleH11ANEInterface` not found). Direct sel 2 on that UC, program from bundled `XVRC27_254in_1out_addchain.mlmodelc`. Open + 255 surfaces + program handle happen **before** the 3072 spray; punch n-2 then immediate send (v34 created surfaces after the punch and overflow record 192 landed in a freed neighbor). Wait the async port, then harvest. No CoreML if Direct opened. `aio84530` is the fill seed, not an Arm target. `hasKread` only after `commitSlide`.
 
 ## Untried reach (in All stages)
 
