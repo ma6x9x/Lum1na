@@ -91,13 +91,7 @@ static NSData *ak_loadTrustcacheBlob(NSMutableString *s) {
 }
 
 static io_connect_t ak_openAMFI(NSMutableString *s) {
-    mach_port_t master = 0;
-#if defined(kIOMainPortDefault)
-    master = kIOMainPortDefault;
-#else
-    master = kIOMasterPortDefault;
-#endif
-    io_service_t svc = IOServiceGetMatchingService(master, IOServiceMatching("AppleMobileFileIntegrity"));
+    io_service_t svc = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AppleMobileFileIntegrity"));
     if (!svc) {
         ak_log(s, @"[-] AppleMobileFileIntegrity service missing");
         return 0;
