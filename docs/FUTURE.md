@@ -30,9 +30,9 @@ FomoPeek/DarkSword local LPE stopped at iOS 26.1. Not this build.
 ## After kreadbuf
 
 1. AMFI UserClient loadTrustCache sel 2/7 + `pmap_cs_allow_invalid` + `pmap_load_trust_cache` (pins in lab note 84/86)
-2. Userspace reboot + bootstrap (Dopamine BaseBin names: jbserver, launchdhook, dyldhook, trustcache)
-3. A14 PPL — not momentarius copy-paste
-4. Persist is semi-untethered TC reload each boot until a real iBoot bug exists (none found; skip-bane is a helper string)
+2. Drop `basebin.tc` + tweak dylibs into Documents/basebin (Dopamine names: jbserver, launchdhook, dyldhook, trustcache, hookd)
+3. A14 PPL — AMFI UC from this process after hasKread
+4. Persist/tempRoot stay later; this pass is bootstrap + trustcache only
 
 ## GOLDMINE 26.5 (keep unrun angles open)
 

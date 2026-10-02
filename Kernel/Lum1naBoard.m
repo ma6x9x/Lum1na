@@ -13,6 +13,7 @@
 #import "LabDeviceProfile.h"
 #import "LabRuntimeOffsets.h"
 #import "LabLocalTime.h"
+#import "P06xLog.h"
 #import <sys/sysctl.h>
 
 // Forward declare SocketKRW function for commitSlide.
@@ -325,24 +326,24 @@ static inline void boardSet(NSMutableDictionary *d, NSString *key, id val) {
 
 - (BOOL)commitSlide:(uint64_t)slide reason:(NSString *)reason {
     @synchronized (self) {
-        NSLog(@"[board] commitSlide: 0x%016llx reason: %@", slide, reason);
+        P06xLogF(@"board", @"commitSlide 0x%016llx reason=%@", slide, reason ?: @"?");
 
         if (slide > 0x100000000) {
-            NSLog(@"[board] commitSlide: ERROR - slide out of range");
+            P06xLog(@"board", @"commitSlide FAIL slide out of range");
             return NO;
         }
         if (!_krwContext) {
-            NSLog(@"[board] commitSlide: ERROR - no KRW context");
+            P06xLog(@"board", @"commitSlide FAIL no KRW context");
             return NO;
         }
 
         uint64_t kbase = 0xFFFFFFF007004000ULL + slide;
 
-        // Verify KRW by reading a real kernel pointer
+        // Live kread of kbase+0x1c must look like a kernel VA (pointer, not Darwin version text).
         uint64_t version_ptr = kbase + 0x1c;
         uint64_t version_str = Lum1naSocketKRW_kread64(_krwContext, version_ptr);
         if (version_str < 0xFFFFFF8000000000ULL) {
-            NSLog(@"[board] commitSlide: ERROR - kread verification failed (0x%llx)", version_str);
+            P06xLogF(@"board", @"commitSlide FAIL kread kbase+0x1c=0x%llx (not a kernel VA)", version_str);
             return NO;
         }
 
@@ -351,13 +352,17 @@ static inline void boardSet(NSMutableDictionary *d, NSString *key, id val) {
         _hasKread = YES;
         _hasKwrite = YES;
 
-        NSLog(@"[board] commitSlide: SUCCESS - kbase=0x%016llx", _kbase);
+        P06xLogF(@"board", @"commitSlide OK kbase=0x%016llx kread(kbase+0x1c)=0x%llx", _kbase, version_str);
 
         _d[@"kslide"] = [NSString stringWithFormat:@"0x%llx", _kslide];
         _d[@"kbase"] = [NSString stringWithFormat:@"0x%llx", _kbase];
         _d[@"hasKread"] = @YES;
         _d[@"hasKwrite"] = @YES;
         [self persist];
+        [self recordEvent:@"commitSlide"
+                     kind:@"kread"
+                   detail:[NSString stringWithFormat:@"kbase=0x%llx", _kbase]
+                   source:@"board"];
         return YES;
     }
 }

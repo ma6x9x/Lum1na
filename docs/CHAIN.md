@@ -34,11 +34,11 @@ AVE EncType / Close-async; JPEG `+0x30` teardown; NECP add/flow dest; 64788 othe
 - **p058** AppleJPEGDriver open (24A435 `+0x30` class)
 - **p061** H264+HEVC VT sessions (84607 EncType; 23F77 AVE 905.36.1 already has EncType_Max — do not expect ABSENT)
 - **p057** wvek AKS/MobileKeyBag
-- **afterkread** constellation: AMFI UC open + 23F77 pins. No `/var/jb`. HOLD until `hasKread`
+- **afterkread** constellation: AMFI UC open + 23F77 pins. Dopamine BaseBin names (`basebin.tc`, launchdhook, dyldhook, hookd). HOLD until `hasKread`
 
 ## After kread (HOLD)
 
-AMFI loadTrustCache, `pmap_cs_allow_invalid`, userspace reboot. A14 is **PPL**, not momentarius. See All stages → After-kread plan.
+AMFI loadTrustCache sel 2/7, `pmap_cs_allow_invalid` `*(pmap+0xca)=1`, then trustcache of tweak dylibs. A14 is **PPL**, not momentarius. Persist/tempRoot stay later. See All stages → After-kread plan.
 
 ## Not in this repo
 
