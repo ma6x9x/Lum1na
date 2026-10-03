@@ -8,12 +8,12 @@ Home **KRW TEST** / catalog `krw` (`KRWChainController`) walks PATH A once per t
 
 1. IDENT / `LabOff()`
 2. aio84530 heap leak (board; both SKUs)
-3. LightSword v2.1: placement-heap overlap spy, then dual-wrap of one `vm_allocate`, then `vm_remap`. Detach A, unpin CPU pages, **DetachBacking spy B** (last wire), blit B, spray inpcb, SocketKRW, `commitSlide`. 18:34 dual-wrap `0x11` after unpin was spy MD still wiring, not a free page.
+3. **64788 Facet A** (`IOGPUStaleEntryProbe`, GOLDMINE `poc_iogpu_uaf`): census a legit 64×64 IOSurface texture, plant `newTextureWithDescriptor` **1×65535**, `IOConnectTrap2` sel=3 (`set_resource_purgeable`). `0xe00002be` (`kIOReturnNoResources`) after kalloc.256 spray = Call1 on attacker heap. **Not** `kreadbuf` (iOS 26 zone sequestration). Dual-wrap LightSword last-wire blit is **sealed** (18:45 GPU OOM Code=8). GOLDMINE wrote `0xe0002be` (dropped zero); the check is `0xe00002be`.
 4. AfterKread inject stays a **separate** TAP
 
 43748 / PATH B 3072 conversion is **sealed** on 23F77: type-1 extra is payload-only, type-3 fat OOL dies at `ipc_kmsg.c:460` PACGA, second ANE 0x820 table is mapped then `IOFreeType` inside the same CheckandPrewire. KRW TEST does **not** fire 254. Solo `p044` / `p044chain` stay All-stages occupancy probes.
 
-Force-quit between KRW TEST and solo `p044`. JAILBREAK is SANDBOX + LightSword + AfterKread HOLD. LightSword / `lsabc` D abort on first `0xe00002e2`, Busy retry, or alias geometry miss. CVE-2026-86950 CoreGraphics is userspace ACE in our process — not kernel kread; no CG PoC in the IPA.
+Force-quit between KRW TEST and solo `p044` / `lsabc` / `lightsword`. JAILBREAK is SANDBOX + Facet A oracle + AfterKread HOLD. Dual-wrap spy TAP stays All-stages. CVE-2026-86950 CoreGraphics is userspace ACE in our process — not kernel kread; no CG PoC in the IPA.
 
 ## Auto-filled board
 

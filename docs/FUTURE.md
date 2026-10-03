@@ -19,7 +19,7 @@ This is the public-app companion to `~/Desktop/lumina_primitives/87_EXTERNAL_CON
 - icmp6filt `+0x148` unused until a real inpcb
 - AKS user client **opens**. CVE-2026-65343 deserialize is a KASLR OOB read (ACM `declared_length`). Catalog `aks` tap is bounded ACM capture. Not KRW.
 - CVE-2026-84530 class is public and live until iOS 27
-- PATH B 43748 kalloc.3072 conversion is sealed on 23F77 (type-1 payload-only, type-3 PACGA, second ANE table ephemeral). KRW TEST is PATH A LightSword v2.1 spy. Dual-wrap 18:34: `0x11` after unpin is spy B's MD still wiring; next TAP detaches that last wire.
+- PATH B 43748 kalloc.3072 conversion is sealed on 23F77. Dual-wrap LightSword last-wire detach is GPU OOM (18:45). KRW TEST is 64788 Facet A (`create_resource_iosurface` 1×65535 + Trap2 sel=3). `0xe00002be` = UAF oracle, not kreadbuf.
 
 ## 23G71 A12X (T8020) — do not paste T8101
 
