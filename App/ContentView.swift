@@ -46,7 +46,7 @@ struct ContentView: View {
                     .padding(.top, 8)
 
                 VStack(spacing: 10) {
-                    krwTestButton
+                    krwTheoryGrid
                     jailbreakButton
                     allExploitsButton
                 }
@@ -171,25 +171,40 @@ struct ContentView: View {
         .luminaGlassCapsule()
     }
 
-    private var krwTestButton: some View {
+    private var krwTheoryGrid: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("KRW THEORIES")
+                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .foregroundColor(.white.opacity(0.45))
+                .tracking(1.4)
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8),
+                                GridItem(.flexible(), spacing: 8)], spacing: 8) {
+                theoryButton(id: "krw", title: "T1 ANE WRITE", subtitle: "43748 [1]")
+                theoryButton(id: "krw2", title: "T2 FACET A", subtitle: "64788 UAF")
+                theoryButton(id: "krw3", title: "T3 ANE→SOCK", subtitle: "icmp6filt")
+                theoryButton(id: "krw4", title: "T4 LS SPY", subtitle: "dual-wrap")
+            }
+        }
+    }
+
+    private func theoryButton(id: String, title: String, subtitle: String) -> some View {
         Button(action: {
-            if let entry = ExploitManager.catalog.first(where: { $0.id == "krw" }) {
+            if let entry = ExploitManager.catalog.first(where: { $0.id == id }) {
                 Task { await viewModel.executeExploit(entry) }
             }
         }) {
-            HStack(spacing: 8) {
-                Image(systemName: "memorychip")
-                    .font(.system(size: 14, weight: .semibold))
-                Text("KRW TEST")
-                    .font(.system(.subheadline, design: .rounded, weight: .bold))
-                    .tracking(1.0)
-                Text("✦")
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+            VStack(spacing: 2) {
+                Text(title)
+                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .tracking(0.4)
+                Text(subtitle)
+                    .font(.system(size: 9, weight: .medium, design: .rounded))
+                    .foregroundColor(.lum1naCyan.opacity(0.7))
             }
             .foregroundColor(.lum1naCyan)
             .frame(maxWidth: .infinity)
-            .frame(height: 46)
-            .luminaGlassRect(16)
+            .frame(height: 44)
+            .luminaGlassRect(14)
         }
         .buttonStyle(LuminaPressStyle())
         .disabled(viewModel.isRunning)

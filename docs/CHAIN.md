@@ -2,18 +2,20 @@
 
 This is not a claim of KRW. Pins are **unslid** per `LabOff()` (A14 23F77 T8101 / A12X 23G71 T8020).
 
-## KRW TEST button
+## KRW theory buttons (home)
 
-Home **KRW TEST** / catalog `krw` (`KRWChainController`) walks PATH A once per tap:
+Four isolated TAPs. Reboot + force-quit between them. `ui-build krw-theories-1`. None of these set `hasKread` from occupancy, `0xe00002be`, or blit `0x11`.
 
-1. IDENT / `LabOff()`
-2. aio84530 heap leak (board; both SKUs)
-3. **64788 Facet A** (`IOGPUStaleEntryProbe`, GOLDMINE `poc_iogpu_uaf`): census a legit 64×64 IOSurface texture, plant `newTextureWithDescriptor` **1×65535**, `IOConnectTrap2` sel=3 (`set_resource_purgeable`). `0xe00002be` (`kIOReturnNoResources`) after kalloc.256 spray = Call1 on attacker heap. **Not** `kreadbuf` (iOS 26 zone sequestration). Dual-wrap LightSword last-wire blit is **sealed** (18:45 GPU OOM Code=8). GOLDMINE wrote `0xe0002be` (dropped zero); the check is `0xe00002be`.
-4. AfterKread inject stays a **separate** TAP
+| Button | Catalog | Theory |
+| --- | --- | --- |
+| **T1 ANE WRITE** | `krw` (`KRWChainController`) | aio84530 → 43748 CheckandPrewire OOB. Named store into **next kalloc.3072**. 23G71 `fill_cap` skips 254. FILL HIT is write-proof (type-1 extra payload). Conversion HOLD. |
+| **T2 FACET A** | `krw2` (`KRWTheoryFacetA`) | 64788 census + 1×65535 + Trap2 sel=3. `0xe00002be` is Call1 / `new_resource` NULL, not `kreadbuf`. 23F77 create is wrapping ADD. |
+| **T3 ANE→SOCK** | `krw3` (`KRWTheoryANESocket`) | 43748 fill then SocketKRW Adopt of `icmp6filt/+0x148`. Expected SKIP: inpcb is the wrong zone. |
+| **T4 LS SPY** | `krw4` (`KRWTheoryLightSword`) | Dual-wrap last-wire. 18:45 GPU blit Code=8 OOM. Sealed. |
 
-43748 / PATH B 3072 conversion is **sealed** on 23F77: type-1 extra is payload-only, type-3 fat OOL dies at `ipc_kmsg.c:460` PACGA, second ANE 0x820 table is mapped then `IOFreeType` inside the same CheckandPrewire. KRW TEST does **not** fire 254. Solo `p044` / `p044chain` stay All-stages occupancy probes.
+Dopamine 3.0.10 (`DOJailbreaker`, `multicast_bytecopy`, `weightBufs`, ClearSword `socket.c`, `physrw_pte`) is the **after-kread** order and iOS 15–26.0.1 kernel bugs. Do not copy those exploits into this IPA. After `hasKread`: IOSurface primitives → PAC → PPL/SPTM → `physrw_pte` → uid0 lives in `Lum1naAfterKread` (HOLD).
 
-Force-quit between KRW TEST and solo `p044` / `lsabc` / `lightsword`. JAILBREAK is SANDBOX + Facet A oracle + AfterKread HOLD. Dual-wrap spy TAP stays All-stages. CVE-2026-86950 CoreGraphics is userspace ACE in our process — not kernel kread; no CG PoC in the IPA.
+Solo `p044` / `staleentry` / `lightsword` stay All-stages. JAILBREAK is SANDBOX + T1 + AfterKread HOLD. CVE-2026-86950 stays parked.
 
 ## Auto-filled board
 

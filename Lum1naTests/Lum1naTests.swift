@@ -134,6 +134,9 @@ struct Lum1naOffsetTests {
         #expect(ids.contains("p055"))
         #expect(ids.contains("lightsword"))
         #expect(ids.contains("krw"))
+        #expect(ids.contains("krw2"))
+        #expect(ids.contains("krw3"))
+        #expect(ids.contains("krw4"))
 
         func cls(_ id: String) -> String {
             ExploitManager.catalog.first { $0.id == id }?.controllerClass ?? ""
@@ -147,6 +150,9 @@ struct Lum1naOffsetTests {
         #expect(cls("p044") == "P044ExploitController")
         #expect(cls("p044chain") == "ANE254ChainController")
         #expect(cls("krw") == "KRWChainController")
+        #expect(cls("krw2") == "KRWTheoryFacetA")
+        #expect(cls("krw3") == "KRWTheoryANESocket")
+        #expect(cls("krw4") == "KRWTheoryLightSword")
         #expect(cls("afterkread") == "Lum1naAfterKread")
         #expect(ids.contains("dopaminecompat"))
         #expect(cls("dopaminecompat") == "DopamineCompat")
@@ -164,6 +170,9 @@ struct Lum1naOffsetTests {
         #expect(PersistentLogStore.probeLogFiles["p044"] == "p06x_p044_log.txt")
         #expect(PersistentLogStore.probeLogFiles["p044chain"] == "p06x_ane254chain_log.txt")
         #expect(PersistentLogStore.probeLogFiles["krw"] == "p06x_krw_log.txt")
+        #expect(PersistentLogStore.probeLogFiles["krw2"] == "p06x_krw2_log.txt")
+        #expect(PersistentLogStore.probeLogFiles["krw3"] == "p06x_krw3_log.txt")
+        #expect(PersistentLogStore.probeLogFiles["krw4"] == "p06x_krw4_log.txt")
         #expect(PersistentLogStore.probeLogFiles["afterkread"] == "p06x_afterkread_log.txt")
         #expect(PersistentLogStore.probeLogFiles["dopaminecompat"] == "dopaminecompat_log.txt")
         #expect(PersistentLogStore.probeLogFiles["p053"] == "p053_necp_dfree_log.txt")

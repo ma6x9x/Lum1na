@@ -93,6 +93,7 @@
 #import "Exploit/DopamineCompat.h"
 #import "Exploit/ANE254ChainController.h"
 #import "Exploit/KRWChainController.h"
+#import "Exploit/KRWTheoryChains.h"
 
 
 #endif
