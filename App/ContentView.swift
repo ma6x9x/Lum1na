@@ -129,7 +129,7 @@ struct ContentView: View {
                                 endPoint: .trailing
                             )
                         )
-                    Text("compact-1")
+                    Text("phys-map-1")
                         .font(.system(size: 9, weight: .medium, design: .monospaced))
                         .foregroundColor(Color.white.opacity(0.4))
                 }
@@ -191,6 +191,7 @@ struct ContentView: View {
                 theoryButton(id: "krw4", title: "T4 LS", subtitle: "spy")
                 theoryButton(id: "krw5", title: "T5 PAC", subtitle: "HOLD")
                 theoryButton(id: "krw6", title: "T6 PPL", subtitle: "inject")
+                theoryButton(id: "krw7", title: "T7 PHYS", subtitle: "map")
             }
         }
     }

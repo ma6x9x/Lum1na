@@ -26,6 +26,9 @@ Do not treat dropping these files as proof of injection.
   (PAC badRecovery → PPL Titan/momentarius/dmaFail → physrw_pte → uid0 →
   trustcache → opainject). T6 runs `Lum1naAfterKread` which still HOLDs
   AMFI/opainject until `hasKread`.
+- Home T7 PHYS MAP credits Titan `iorvbar = 0x206050000` (A14) and walks
+  IOKit registry / read-only `IOConnectMapMemory`. Titan GPU ROP / PTE
+  write is not copied. IOMD `dmaCommandOperation +0x34` is logged, unfired.
 - **Not copied:** kfd, ClearSword, physrw, Fugu14 kcall, `bootstrap_*.tar.zst`,
   momentarius / Titan / dmaFail / multicast_bytecopy / weightBufs bodies.
 

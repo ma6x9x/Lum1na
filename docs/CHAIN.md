@@ -4,7 +4,7 @@ This is not a claim of KRW. Pins are **unslid** per `LabOff()` (A14 23F77 T8101 
 
 ## KRW theory buttons (home)
 
-Six isolated TAPs. Reboot + force-quit between T1–T4. `ui-build compact-1`. Home is scaled down (star/pads clipped to the board; **JAILBREAK / ALL / COPY** on one row). Console glass is interactive. None of T1–T4 set `hasKread` from occupancy, `0xe00002be`, or blit `0x11`. PAC/PPL maps (T5/T6) do not skip kreadbuf.
+Seven isolated TAPs. Reboot + force-quit between T1–T4 and T7 GPU map. `ui-build phys-map-1`. Home is scaled down (star/pads clipped to the board; **JAILBREAK / ALL / COPY** on one row). Console glass is interactive. None of T1–T4 set `hasKread` from occupancy, `0xe00002be`, or blit `0x11`. PAC/PPL maps (T5/T6) do not skip kreadbuf. T7 is registry + read-only MapMemory.
 
 | Button | Catalog | Theory |
 | --- | --- | --- |
@@ -14,6 +14,7 @@ Six isolated TAPs. Reboot + force-quit between T1–T4. `ui-build compact-1`. Ho
 | **T4 LS** | `krw4` | Dual-wrap last-wire. 18:45 OOM sealed. |
 | **T5 PAC** | `krw5` | Dopamine `badRecovery` / 65330 map. kcall after kread. Does not fire hop-1. |
 | **T6 PPL** | `krw6` | Titan A14 / momentarius map. Always runs AfterKread; AMFI/opainject still HOLD without `hasKread`. |
+| **T7 PHYS** | `krw7` | IOKit registry + read-only `IOConnectMapMemory` for A14 IORVBAR `0x206050000`. No DMA/`+0x34` fire, no Titan write. |
 
 Credit: opa334 / Lars Fröder — Dopamine 3.0.10 (`primitives_external.h`, `DOJailbreaker.m`, Titan, momentarius, `physrw_pte.c`, `trustcache.c`). Copied into Lum1na: `Exploit/DopaminePrimitives.h` (vtable contract only). Hop-1 / kfd / multicast_bytecopy bodies stay in the Dopamine tree.
 
