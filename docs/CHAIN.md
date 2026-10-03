@@ -8,7 +8,7 @@ Home **KRW TEST** / catalog `krw` (`KRWChainController`) walks PATH A once per t
 
 1. IDENT / `LabOff()`
 2. aio84530 heap leak (board; both SKUs)
-3. LightSword v2.1: placement-heap overlap spy, then dual-wrap of one `vm_allocate`, then `vm_remap`. Detach A, read via B, spray inpcb, SocketKRW, `commitSlide`
+3. LightSword v2.1: placement-heap overlap spy, then dual-wrap of one `vm_allocate`, then `vm_remap`. Detach A, unpin CPU pages, **DetachBacking spy B** (last wire), blit B, spray inpcb, SocketKRW, `commitSlide`. 18:34 dual-wrap `0x11` after unpin was spy MD still wiring, not a free page.
 4. AfterKread inject stays a **separate** TAP
 
 43748 / PATH B 3072 conversion is **sealed** on 23F77: type-1 extra is payload-only, type-3 fat OOL dies at `ipc_kmsg.c:460` PACGA, second ANE 0x820 table is mapped then `IOFreeType` inside the same CheckandPrewire. KRW TEST does **not** fire 254. Solo `p044` / `p044chain` stay All-stages occupancy probes.
