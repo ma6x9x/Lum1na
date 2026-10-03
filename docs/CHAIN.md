@@ -4,15 +4,16 @@ This is not a claim of KRW. Pins are **unslid** per `LabOff()` (A14 23F77 T8101 
 
 ## KRW TEST button
 
-Home **KRW TEST** / catalog `krw` (`KRWChainController`) walks PATH B once per tap:
+Home **KRW TEST** / catalog `krw` (`KRWChainController`) walks PATH A once per tap:
 
 1. IDENT / `LabOff()`
-2. aio84530 heap leak (both SKUs)
-3. 43748 fill + fat OOL + SocketKRW — **SKIP** when `ane_fill_cap=1` (23G71)
-4. vtable → slide → `commitSlide`
-5. AfterKread inject stays a **separate** TAP
+2. aio84530 heap leak (board; both SKUs)
+3. LightSword v2.1: placement-heap overlap spy, then dual-wrap of one `vm_allocate`, then `vm_remap`. Detach A, read via B, spray inpcb, SocketKRW, `commitSlide`
+4. AfterKread inject stays a **separate** TAP
 
-PATH A LightSword stays KERNEL pad / `lightsword` TAP (v2.0 spy alias: abort on first `0xe00002e2`, Busy retry, or alias geometry miss). Force-quit between PATH A and KRW TEST. JAILBREAK is SANDBOX + LightSword + AfterKread HOLD, not this stepper.
+43748 / PATH B 3072 conversion is **sealed** on 23F77: type-1 extra is payload-only, type-3 fat OOL dies at `ipc_kmsg.c:460` PACGA, second ANE 0x820 table is mapped then `IOFreeType` inside the same CheckandPrewire. KRW TEST does **not** fire 254. Solo `p044` / `p044chain` stay All-stages occupancy probes.
+
+Force-quit between KRW TEST and solo `p044`. JAILBREAK is SANDBOX + LightSword + AfterKread HOLD. LightSword / `lsabc` D abort on first `0xe00002e2`, Busy retry, or alias geometry miss. CVE-2026-86950 CoreGraphics is userspace ACE in our process — not kernel kread; no CG PoC in the IPA.
 
 ## Auto-filled board
 
