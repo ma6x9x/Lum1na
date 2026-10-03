@@ -81,11 +81,12 @@ struct Lum1naStarMark: View {
 
                 Lum1naStarShape()
                     .fill(Color.white.opacity(0.55 + Double(coreFlash)))
-                    .frame(width: 34, height: 34)
+                    .frame(width: LayoutConstants.starSize * 0.35,
+                           height: LayoutConstants.starSize * 0.35)
                     .blur(radius: 0.6)
                     .scaleEffect(breathe * (1 + coreFlash) * settle)
             }
-            .frame(width: 132, height: 132)
+            .frame(width: LayoutConstants.starSize, height: LayoutConstants.starSize)
         }
         .accessibilityLabel("Lum1na")
     }

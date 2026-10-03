@@ -38,21 +38,27 @@ struct ContentView: View {
                     Task { await viewModel.executeStage(stage.rawValue) }
                 }
                 .frame(height: LayoutConstants.motherboardHeight)
+                .clipped()
                 .padding(.horizontal, 8)
-                .padding(.top, 4)
+                .padding(.top, 2)
 
                 MatrixConsoleView()
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
+                    .frame(maxHeight: .infinity)
+                    .layoutPriority(1)
+                    .padding(.horizontal, 12)
+                    .padding(.top, 4)
 
-                VStack(spacing: 10) {
+                VStack(spacing: 6) {
                     krwTheoryGrid
-                    jailbreakButton
-                    allExploitsButton
+                    HStack(spacing: 6) {
+                        jailbreakButton
+                        allExploitsButton
+                        homeCopyButton
+                    }
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-                .padding(.bottom, 18)
+                .padding(.horizontal, 12)
+                .padding(.top, 4)
+                .padding(.bottom, 10)
             }
         }
         .preferredColorScheme(.dark)
@@ -114,8 +120,8 @@ struct ContentView: View {
             ZStack {
                 VStack(spacing: 2) {
                     Text("LUM1NA")
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
-                        .tracking(4)
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .tracking(3)
                         .foregroundStyle(
                             LinearGradient(
                                 colors: [.lum1naViolet, .white, .lum1naCyan],
@@ -123,10 +129,9 @@ struct ContentView: View {
                                 endPoint: .trailing
                             )
                         )
-                    Text("The guiding light for Jailbreaks")
-                        .font(.system(size: 11, weight: .medium, design: .rounded))
-                        .italic()
-                        .foregroundColor(Color.white.opacity(0.45))
+                    Text("compact-1")
+                        .font(.system(size: 9, weight: .medium, design: .monospaced))
+                        .foregroundColor(Color.white.opacity(0.4))
                 }
                 HStack {
                     Spacer()
@@ -173,16 +178,19 @@ struct ContentView: View {
 
     private var krwTheoryGrid: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("KRW THEORIES")
-                .font(.system(size: 10, weight: .semibold, design: .rounded))
+            Text("THEORIES  force-quit between")
+                .font(.system(size: 9, weight: .semibold, design: .rounded))
                 .foregroundColor(.white.opacity(0.45))
-                .tracking(1.4)
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 8),
-                                GridItem(.flexible(), spacing: 8)], spacing: 8) {
-                theoryButton(id: "krw", title: "T1 ANE WRITE", subtitle: "43748 [1]")
-                theoryButton(id: "krw2", title: "T2 FACET A", subtitle: "64788 UAF")
-                theoryButton(id: "krw3", title: "T3 ANE→SOCK", subtitle: "icmp6filt")
-                theoryButton(id: "krw4", title: "T4 LS SPY", subtitle: "dual-wrap")
+                .tracking(0.8)
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 6),
+                                GridItem(.flexible(), spacing: 6),
+                                GridItem(.flexible(), spacing: 6)], spacing: 6) {
+                theoryButton(id: "krw", title: "T1 ANE", subtitle: "43748")
+                theoryButton(id: "krw2", title: "T2 FACET", subtitle: "64788")
+                theoryButton(id: "krw3", title: "T3 SOCK", subtitle: "inpcb")
+                theoryButton(id: "krw4", title: "T4 LS", subtitle: "spy")
+                theoryButton(id: "krw5", title: "T5 PAC", subtitle: "HOLD")
+                theoryButton(id: "krw6", title: "T6 PPL", subtitle: "inject")
             }
         }
     }
@@ -203,8 +211,8 @@ struct ContentView: View {
             }
             .foregroundColor(.lum1naCyan)
             .frame(maxWidth: .infinity)
-            .frame(height: 44)
-            .luminaGlassRect(14)
+            .frame(height: 34)
+            .luminaGlassRect(10)
         }
         .buttonStyle(LuminaPressStyle())
         .disabled(viewModel.isRunning)
@@ -230,9 +238,9 @@ struct ContentView: View {
                 }
                 HStack(spacing: 10) {
                     Image(systemName: "sparkle")
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 12, weight: .semibold))
                     Text(viewModel.fullChainActive ? "RUNNING" : "JAILBREAK")
-                        .font(.system(.subheadline, design: .rounded, weight: .bold))
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
                         .tracking(1.2)
                     Text("✦")
                         .font(.system(size: 14, weight: .semibold, design: .rounded))
@@ -240,28 +248,49 @@ struct ContentView: View {
                 .foregroundColor(.white)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 52)
+            .frame(height: 36)
             .clipped()
-            .luminaGlassRect(16)
+            .luminaGlassRect(10)
         }
         .buttonStyle(LuminaPressStyle())
         .disabled(viewModel.isRunning)
     }
 
-    private var allExploitsButton: some View {
-        Button(action: { showingAllExploits = true }) {
-            HStack(spacing: 8) {
-                Image(systemName: "sparkle")
-                    .font(.system(size: 14, weight: .semibold))
-                Text("All Exploits")
-                    .font(.system(.subheadline, design: .rounded, weight: .medium))
-                Text("✦")
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+    private var homeCopyButton: some View {
+        Button(action: {
+            let dump = viewModel.exportFullDebugLog()
+            UIPasteboard.general.string = dump.count > 0 ? dump : viewModel.lines.map(\.formatted).joined(separator: "\n")
+        }) {
+            HStack(spacing: 6) {
+                Image(systemName: "doc.on.doc")
+                    .font(.system(size: 12, weight: .semibold))
+                Text("COPY")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .tracking(0.8)
             }
             .foregroundColor(.lum1naCyan)
             .frame(maxWidth: .infinity)
-            .frame(height: 46)
-            .luminaGlassRect(16)
+            .frame(height: 36)
+            .contentShape(Rectangle())
+            .luminaGlassRect(10)
+        }
+        .buttonStyle(LuminaPressStyle())
+    }
+
+    private var allExploitsButton: some View {
+        Button(action: { showingAllExploits = true }) {
+            HStack(spacing: 6) {
+                Image(systemName: "square.grid.2x2")
+                    .font(.system(size: 12, weight: .semibold))
+                Text("ALL")
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .tracking(0.8)
+            }
+            .foregroundColor(.lum1naCyan)
+            .frame(maxWidth: .infinity)
+            .frame(height: 36)
+            .contentShape(Rectangle())
+            .luminaGlassRect(10)
         }
         .buttonStyle(LuminaPressStyle())
         .disabled(viewModel.isRunning)

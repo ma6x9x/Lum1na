@@ -53,10 +53,10 @@ struct MatrixConsoleView: View {
                 .onChange(of: reduceMotion) { _ in
                     performer.reduceMotion = reduceMotion
                 }
+                .luminaGlassRect(16, interactive: false)
             }
         }
         .frame(minHeight: LayoutConstants.consoleMinHeight)
-        .luminaGlassRect(26, interactive: false)
     }
 
     @ViewBuilder
@@ -96,9 +96,12 @@ struct MatrixConsoleView: View {
             Button {
                 UIPasteboard.general.string = truthDump
             } label: {
-                Image(systemName: "doc.on.doc")
-                    .font(.system(size: 12))
-                    .foregroundColor(Color(hex: "#64748B"))
+                Text("COPY")
+                    .font(.system(.caption2, design: .monospaced, weight: .bold))
+                    .foregroundColor(Color(hex: "#38BDF8"))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 4)
+                    .contentShape(Rectangle())
             }
             Button {
                 manager.clearConsole()

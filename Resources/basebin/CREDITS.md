@@ -19,8 +19,15 @@ Do not treat dropping these files as proof of injection.
   `fallback/CydiaSubstrate.framework/CydiaSubstrate`
 - Covers iOS 26.0–26.0.1 on A12/A13. Does not run on A14 23F77 by bumping
   End versions.
+- **Copied (contract only):** `Exploit/DopaminePrimitives.h` — `gPrimitives`
+  vtable from `BaseBin/libjailbreak/src/primitives_external.h` (kreadbuf /
+  kwritebuf / kcall / kmap). No exploit body.
+- Home T5 PAC / T6 PPL dump the after-kread order from `DOJailbreaker.m`
+  (PAC badRecovery → PPL Titan/momentarius/dmaFail → physrw_pte → uid0 →
+  trustcache → opainject). T6 runs `Lum1naAfterKread` which still HOLDs
+  AMFI/opainject until `hasKread`.
 - **Not copied:** kfd, ClearSword, physrw, Fugu14 kcall, `bootstrap_*.tar.zst`,
-  momentarius / Titan.
+  momentarius / Titan / dmaFail / multicast_bytecopy / weightBufs bodies.
 
 ## Relaxin 0.5.4 — RootHide / ElleKit
 

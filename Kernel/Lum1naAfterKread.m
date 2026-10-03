@@ -523,9 +523,11 @@ static void ak_tryInstallPkgman(NSMutableString *s) {
     const char *tag = (off && off->tag) ? off->tag : "?";
     NSMutableString *s = [NSMutableString string];
     [s appendString:
-     @"LUM1NA CONSTELLATION (Dopamine 3.0.10 BaseBin + Relaxin/RootHide names):\n"
+     @"LUM1NA CONSTELLATION (credit: opa334/Dopamine 3.0.10 BaseBin + Relaxin/RootHide):\n"
      @"  KRW test: kread32(kbase)==MH_MAGIC_64 and kbase+0x1c is a kernel VA.\n"
      @"  0 HOLD until that test via board.commitSlide.\n"
+     @"  PAC: badRecovery Fugu14 kcall (T5). 65330 is a consumer after a write.\n"
+     @"  PPL: Titan gfx PTE on A14 (T6); momentarius A12/A13 End 26.0.1; dmaFail A15+.\n"
      @"  1 pmap_cs_allow_invalid *(pmap+0xca)=1 (A14 PPL; not momentarius).\n"
      @"  2 AMFI UC loadTrustCache sel 2/7 of Documents/basebin/basebin.tc.\n"
      @"  3 trustcache launchdhook/systemhook/dyldhook/watchdoghook/forkfix.\n"

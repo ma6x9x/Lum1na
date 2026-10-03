@@ -4,16 +4,18 @@ This is not a claim of KRW. Pins are **unslid** per `LabOff()` (A14 23F77 T8101 
 
 ## KRW theory buttons (home)
 
-Four isolated TAPs. Reboot + force-quit between them. `ui-build krw-theories-1`. None of these set `hasKread` from occupancy, `0xe00002be`, or blit `0x11`.
+Six isolated TAPs. Reboot + force-quit between T1–T4. `ui-build compact-1`. Home is scaled down (star/pads clipped to the board; **JAILBREAK / ALL / COPY** on one row). Console glass is interactive. None of T1–T4 set `hasKread` from occupancy, `0xe00002be`, or blit `0x11`. PAC/PPL maps (T5/T6) do not skip kreadbuf.
 
 | Button | Catalog | Theory |
 | --- | --- | --- |
-| **T1 ANE WRITE** | `krw` (`KRWChainController`) | aio84530 → 43748 CheckandPrewire OOB. Named store into **next kalloc.3072**. 23G71 `fill_cap` skips 254. FILL HIT is write-proof (type-1 extra payload). Conversion HOLD. |
-| **T2 FACET A** | `krw2` (`KRWTheoryFacetA`) | 64788 census + 1×65535 + Trap2 sel=3. `0xe00002be` is Call1 / `new_resource` NULL, not `kreadbuf`. 23F77 create is wrapping ADD. |
-| **T3 ANE→SOCK** | `krw3` (`KRWTheoryANESocket`) | 43748 fill then SocketKRW Adopt of `icmp6filt/+0x148`. Expected SKIP: inpcb is the wrong zone. |
-| **T4 LS SPY** | `krw4` (`KRWTheoryLightSword`) | Dual-wrap last-wire. 18:45 GPU blit Code=8 OOM. Sealed. |
+| **T1 ANE** | `krw` | 43748 store into next kalloc.3072. FILL HIT = write proof. |
+| **T2 FACET** | `krw2` | 64788 1×65535 + Trap2 sel=3 oracle. |
+| **T3 SOCK** | `krw3` | 43748 then icmp6filt. Expected SKIP. |
+| **T4 LS** | `krw4` | Dual-wrap last-wire. 18:45 OOM sealed. |
+| **T5 PAC** | `krw5` | Dopamine `badRecovery` / 65330 map. kcall after kread. Does not fire hop-1. |
+| **T6 PPL** | `krw6` | Titan A14 / momentarius map. Always runs AfterKread; AMFI/opainject still HOLD without `hasKread`. |
 
-Dopamine 3.0.10 (`DOJailbreaker`, `multicast_bytecopy`, `weightBufs`, ClearSword `socket.c`, `physrw_pte`) is the **after-kread** order and iOS 15–26.0.1 kernel bugs. Do not copy those exploits into this IPA. After `hasKread`: IOSurface primitives → PAC → PPL/SPTM → `physrw_pte` → uid0 lives in `Lum1naAfterKread` (HOLD).
+Credit: opa334 / Lars Fröder — Dopamine 3.0.10 (`primitives_external.h`, `DOJailbreaker.m`, Titan, momentarius, `physrw_pte.c`, `trustcache.c`). Copied into Lum1na: `Exploit/DopaminePrimitives.h` (vtable contract only). Hop-1 / kfd / multicast_bytecopy bodies stay in the Dopamine tree.
 
 Solo `p044` / `staleentry` / `lightsword` stay All-stages. JAILBREAK is SANDBOX + T1 + AfterKread HOLD. CVE-2026-86950 stays parked.
 

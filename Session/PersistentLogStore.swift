@@ -32,6 +32,8 @@ public final class PersistentLogStore {
         "krw2": "p06x_krw2_log.txt",
         "krw3": "p06x_krw3_log.txt",
         "krw4": "p06x_krw4_log.txt",
+        "krw5": "p06x_krw5_log.txt",
+        "krw6": "p06x_krw6_log.txt",
         "aio84530": "p84530_aio_kqueue_log.txt",
         "ident": "device_ident_log.txt",
         "lightsword": "p06x_lightsword_log.txt",

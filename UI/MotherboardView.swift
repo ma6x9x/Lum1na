@@ -59,9 +59,9 @@ struct MotherboardView: View {
 
     private func padPoints(in size: CGSize) -> [ExploitStage: CGPoint] {
         [
-            .kernel:   CGPoint(x: size.width * 0.50, y: size.height * 0.16),
+            .kernel:   CGPoint(x: size.width * 0.50, y: size.height * 0.22),
             .sandbox:  CGPoint(x: size.width * 0.84, y: size.height * 0.50),
-            .daemon:   CGPoint(x: size.width * 0.50, y: size.height * 0.84),
+            .daemon:   CGPoint(x: size.width * 0.50, y: size.height * 0.78),
             .patchset: CGPoint(x: size.width * 0.16, y: size.height * 0.50)
         ]
     }
@@ -72,8 +72,8 @@ struct MotherboardPad: View {
     let motion: BoardMotion
     let reduceMotion: Bool
 
-    private let face: CGFloat = 80
-    private let radius: CGFloat = 22
+    private let face: CGFloat = LayoutConstants.padFace
+    private let radius: CGFloat = LayoutConstants.padRadius
 
     private var isActive: Bool {
         switch motion {
@@ -139,7 +139,7 @@ struct MotherboardPad: View {
                 return 0
             }()
 
-            VStack(spacing: 5) {
+            VStack(spacing: 2) {
                 ZStack {
                     RoundedRectangle(cornerRadius: radius, style: .continuous)
                         .fill(stage.color.opacity(isActive ? 0.18 : 0.06))
@@ -151,7 +151,7 @@ struct MotherboardPad: View {
                                         lineWidth: isActive ? 1.4 : 0.8)
                         )
                         .shadow(color: isActive ? stage.color.opacity(0.55) : .clear,
-                                radius: isActive ? 10 : 0)
+                                radius: isActive ? 6 : 0)
 
                     if isRunning && !reduceMotion {
                         RoundedRectangle(cornerRadius: radius, style: .continuous)
@@ -174,21 +174,23 @@ struct MotherboardPad: View {
                         .allowsHitTesting(false)
 
                     Image(systemName: stage.icon)
-                        .font(.system(size: 25, weight: .semibold))
+                        .font(.system(size: 14, weight: .semibold))
                         .foregroundColor(stage.color)
                 }
                 .scaleEffect(scale)
                 Text(stage.displayName)
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .font(.system(size: 8, weight: .bold, design: .rounded))
                     .foregroundColor(isActive ? stage.color : Color.white.opacity(0.55))
-                    .tracking(0.6)
+                    .tracking(0.4)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
             .opacity(dim)
             .offset(y: floatY)
-            .frame(width: 92, height: 110)
+            .frame(width: 58, height: 56)
             .animation(.spring(response: 0.35, dampingFraction: 0.72), value: scale)
         }
-        .frame(width: 92, height: 110)
+        .frame(width: 58, height: 56)
     }
 }
 
