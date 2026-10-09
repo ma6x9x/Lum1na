@@ -80,6 +80,15 @@ Then:
 4. Map `id` → Documents log filename in `PersistentLogStore.probeLogFiles`.
 5. Log file: POSIX `open` / `write` / `F_FULLFSYNC`. Session banner `=== p0xx session <LabLocalMilitaryNow()> BUILD … ===`.
 
+Numbering collisions to keep:
+
+- Catalog `p064` is `P064AVE84607Racer` (Close-vs-async, PARK remaining-fire). HT149041 print map is catalog id `ht149041` (`P064Ht149041ChainMap`). P007 uses `p064` for that map.
+- Catalog `p057` is `P057WVEKReach`. P007 `p057` is AKS deserialize.
+- Catalog `p063` aliases `aio84530` (`CVE_2026_84530_KASLR`). Log is `p84530_aio_kqueue_log.txt`.
+- `p066` is one 128x128 EncType MAP. `p061` is dual H264+HEVC. Keep both.
+- `P069DmaCommandMap` uses a local `mach_vm_map` prototype. Do not `#import <mach/mach_vm.h>`.
+- JAILBREAK stays SANDBOX BadQuery + KERNEL T1 + AfterKread HOLD. Do not auto-invoke P065–P072.
+
 `invokeController` order: instance `execute`, then `tap` (instance then class). `+tap` returning `NSString` is the P007 shape.
 
 ## Offsets / SKU

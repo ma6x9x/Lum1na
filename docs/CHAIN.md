@@ -20,6 +20,39 @@ Credit: opa334 / Lars Fröder — Dopamine 3.0.10 (`primitives_external.h`, `DOJ
 
 Solo `p044` / `staleentry` / `lightsword` stay All-stages. JAILBREAK is SANDBOX + T1 + AfterKread HOLD. CVE-2026-86950 stays parked.
 
+Home also has **CHAINS** (`p070` census), **KREAD** (`kreadtest` commitSlide bar), **FILES** (`p072` parser census). Same processing contract as P007: TAP marker in `p011_tap_log.txt` before invoke, POSIX + `F_FULLFSYNC` probe logs, recover last TAP mapped log, `hasKread` only after `kread32(kbase)==MH_MAGIC_64`.
+
+## P007 TAP-id parity (All-stages)
+
+Port path after a primitive is proven on P007: copy `+tap` + catalog id + log name. Isolation: one TAP per force-quit.
+
+| Id | Class | Log | Notes |
+| --- | --- | --- | --- |
+| `p063` | `CVE_2026_84530_KASLR` | `p84530_aio_kqueue_log.txt` | Alias of `aio84530`. HEAP, not kslide. |
+| `p064` | `P064AVE84607Racer` | `p06x_P064_log.txt` | Close-vs-async PARK. **Not** the HT149041 map. |
+| `ht149041` | `P064Ht149041ChainMap` | `p064_ht149041_chain_log.txt` | Print-only 26.7 map. P007 calls this `p064`. |
+| `p065` | `P065FacetAOracle` | `p065_facet_a_log.txt` | 0xe00002be oracle. T2 `krw2` is the theory twin. |
+| `p066` | `P066AveEncTypeMap` | `p066_ave_enctype_log.txt` | One 128x128 H.264. Distinct from `p061` dual-session. |
+| `p067` | `P067AvdReach` | `p067_avd_reach_log.txt` | IOServiceOpen only. |
+| `p068` | `P068ChrootPrivMap` | `p068_chroot_priv_log.txt` | errno MAP. |
+| `p069` | `P069DmaCommandMap` | `p069_dma_command_log.txt` | One map. Local `mach_vm_map` prototype. |
+| `p070` | `P070ChainSequencer` | `p070_chain_sequencer_log.txt` | Five doors + AMFI HOLD. |
+| `p071` | `P071AneOverflowMap` | `p071_ane_overflow_log.txt` | DeviceOpen 0x68. Not 43748 fill. |
+| `p072` | `P072FileParserMap` | `p072_file_parser_log.txt` | dlopen + 1x1 PNG. Not ACE. |
+| `kreadtest` | `Lum1naKreadTest` | `lum1na_kread_test_log.txt` | FAIL unless armed kread returns `0xfeedfacf`. |
+
+Lum1na `p057` is WVEK reach. P007 `p057` is AKS deserialize. Do not overwrite either.
+
+## File-parser chain (P072)
+
+Three slots. None of them is first KRW.
+
+1. **In-app parse** of CG / ImageIO / SceneKit / JPEG / CoreMedia ACEs this IPA process. The app already owns that process. Cannot skip `commitSlide`.
+2. **Daemon plant** (MobileBackup 84598, lockdownd, Photos) is sandbox-adjacent. PARK remaining-fire.
+3. **AfterKread ingest** of board JSON + `basebin.tar` / `basebin.tc` is the jailbreak file mechanic. HOLD until `hasKread`.
+
+P072 is print/dlopen census plus a 1x1 PNG we just encoded. No `trigger.pdf`. CVE-2026-86950 stays parked.
+
 ## Auto-filled board
 
 On launch, `Kernel/Lum1naBoard` writes **Documents/`lum1na_board.json`** from `LabOff()`:
@@ -80,6 +113,7 @@ Live 2026-10-02 (iPhone13,2 23F77):
 - **p058** AppleJPEGDriver open (24A435 `+0x30` class)
 - **p061** H264+HEVC VT sessions (84607 EncType; 23F77 AVE 905.36.1 already has EncType_Max — do not expect ABSENT)
 - **p057** wvek AKS/MobileKeyBag
+- **p065–p072 / ht149041 / kreadtest** P007-parity MAP/reach/oracle/census. Isolate one TAP per force-quit.
 - **afterkread** constellation: AMFI UC open + 23F77 pins. Dopamine 3 / Relaxin-RootHide names (`basebin.tc`, launchdhook, systemhook, ElleKit TweakLoader). HOLD until `hasKread`
 
 ## After kread (HOLD until `commitSlide`)
@@ -97,7 +131,7 @@ KRW self-test (must pass before inject): `kread32(kbase) == MH_MAGIC_64` and `kb
 
 A14 is **PPL**, not momentarius. Drop files into the app container, then re-tap **afterkread** after `hasKread`. Persist / tempRoot / boot-time auto-rejailbreak stay later (novel Lum1na, not a Dopamine copy). See All stages → After-kread plan.
 
-Full Chain order: SANDBOX BadQuery → KERNEL LightSword → AfterKread. P044 stays All-stages. Auto chain skips P051/P053/P054. Parked All-stages: ColdForge, Rapier, p055, p058 JPEG open, p056/p061 AVE reach, Anvil open-only.
+Full Chain order: SANDBOX BadQuery → KERNEL LightSword → AfterKread. P044 stays All-stages. Auto chain skips P051/P053/P054. Parked All-stages: ColdForge, Rapier, p055, p058 JPEG open, p056/p061 AVE reach, Anvil open-only, P064AVE84607Racer remaining-fire, P065–P072 (invoke solo).
 
 ## Not in this repo
 

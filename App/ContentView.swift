@@ -192,6 +192,9 @@ struct ContentView: View {
                 theoryButton(id: "krw5", title: "T5 PAC", subtitle: "HOLD")
                 theoryButton(id: "krw6", title: "T6 PPL", subtitle: "inject")
                 theoryButton(id: "krw7", title: "T7 PHYS", subtitle: "map")
+                theoryButton(id: "p070", title: "CHAINS", subtitle: "census")
+                theoryButton(id: "kreadtest", title: "KREAD", subtitle: "MH_MAGIC")
+                theoryButton(id: "p072", title: "FILES", subtitle: "parse")
             }
         }
     }

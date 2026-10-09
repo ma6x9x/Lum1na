@@ -9,6 +9,7 @@ Dopamine 3.0.10 keeps a `system_info` blob (slide, symbols, physrw, kcall) *afte
 - leak list `{va, kind, source, time, lastSeen, hits}` — unique by va+kind; repeats bump `hits` (aio84530 poll is one row, not 66)
 - `hasKread` / `hasKwrite` stay false until a kread of a **known kernel string** works
 - `commitSlide` refuses heap−staticBase
+- Home **KREAD** (`kreadtest` / `Lum1naKreadTest`) prints the same bar as P007: FAIL unless armed kread returns `MH_MAGIC_64` at `staticBase`. Occupancy / `0xe00002be` / heap leaks stay FAIL. Log: `lum1na_kread_test_log.txt`.
 
 After kread (HOLD until KRW self-test `kread32(kbase)==MH_MAGIC_64`): AMFI loadTrustCache sel 2/7 (Dopamine 3 / Relaxin `basebin.tc` layout), pmap_cs_allow_invalid `*(pmap+0xca)=1`, `opainject 1 launchdhook`, Sileo then Zebra (`Documents/pkgman`), `jbctl respring`. Persist/tempRoot stay later. See All stages → **afterkread**.
 

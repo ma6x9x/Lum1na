@@ -9,6 +9,8 @@
 
 + (instancetype)shared;
 + (NSString *)tap;
+/// Live kread32(kbase)==MH_MAGIC_64. Occupancy / IPS slide / heap leak never pass.
++ (NSString *)tapKreadTest NS_SWIFT_NAME(tapKreadTest());
 
 @property (nonatomic, readonly) NSString *machine;
 @property (nonatomic, readonly) NSString *osversion;
@@ -19,6 +21,7 @@
 @property (nonatomic, readonly) uint64_t kbase;
 @property (nonatomic, readonly) BOOL hasKread;
 @property (nonatomic, readonly) BOOL hasKwrite;
+@property (nonatomic, readonly) NSString *kreadSignal;
 @property (nonatomic, readonly) NSArray<NSDictionary *> *leaks;
 
 // KRW context storage for glue code

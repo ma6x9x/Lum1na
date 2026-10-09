@@ -74,6 +74,10 @@ jobs:
             "Exploit/IOGPUReplaceRaceProbe.h"
             "Exploit/GPUStalePageProbe.h"
             "Exploit/KRWBridge.h"
+            "Exploit/P065FacetAOracle.h"
+            "Exploit/P070ChainSequencer.h"
+            "Exploit/P072FileParserMap.h"
+            "Exploit/Lum1naKreadTest.h"
           )
           for req in "${REQUIRED_IMPORTS[@]}"; do
             if ! grep -q "#import \"$req\"" "$BRIDGING_HEADER"; then
@@ -135,6 +139,16 @@ jobs:
             "Exploit/ANE254ChainController.m"
             "Exploit/KRWChainController.h"
             "Exploit/KRWChainController.m"
+            "Exploit/P065FacetAOracle.h"
+            "Exploit/P065FacetAOracle.m"
+            "Exploit/P070ChainSequencer.h"
+            "Exploit/P070ChainSequencer.m"
+            "Exploit/P072FileParserMap.h"
+            "Exploit/P072FileParserMap.m"
+            "Exploit/Lum1naKreadTest.h"
+            "Exploit/Lum1naKreadTest.m"
+            "Exploit/P064Ht149041ChainMap.h"
+            "Exploit/P064Ht149041ChainMap.m"
             #import "Exploit/ColdForge.h"
             #import "Exploit/Rapier.h"
             #import "Exploit/Anvil.h"
