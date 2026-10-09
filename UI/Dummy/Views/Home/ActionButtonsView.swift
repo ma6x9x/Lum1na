@@ -32,7 +32,7 @@ struct ActionButtonsView: View {
 
     private var buttonFill: some View {
         let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
-        ZStack {
+        return ZStack {
             shape.fill(.ultraThinMaterial)
             shape.fill(
                 LinearGradient(
