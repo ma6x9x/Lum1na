@@ -5,6 +5,7 @@ import SwiftUI
 struct DeviceProgressBar: View {
     @Environment(LuminaRunModel.self) private var model
     @ObservedObject private var exploits = ExploitManager.shared
+    @ObservedObject private var bootstrap = Lum1naBootstrap.shared
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
@@ -83,10 +84,19 @@ struct DeviceProgressBar: View {
         return min(4, max(1, Int((exploits.progress * 4).rounded(.up))))
     }
 
-    private var stageTitle: String { "STAGE \(stageNumber) / 4" }
+    private var stageTitle: String {
+        if bootstrap.bootstrapInstalled {
+            return bootstrap.pkgmanInstalled?.uppercased() ?? "JAILBROKEN"
+        }
+        return "STAGE \(stageNumber) / 4"
+    }
 
     private var statusWord: String {
-        if model.isFinished { return "COMPLETE" }
+        if model.isFinished {
+            // "JAILBROKEN" only on real evidence: a jbroot dpkg + a
+            // package-manager app bundle present post-respring.
+            return bootstrap.bootstrapInstalled ? "JAILBROKEN" : "COMPLETE"
+        }
         if exploits.isRunning { return "RUNNING" }
         if exploits.progress >= 1 { return "HOLD" }
         return "READY"

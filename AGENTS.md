@@ -13,6 +13,7 @@ Re-resolve `main` at the start of a task. Do not trust this file’s remembered 
 | `UI/` | Theme, motherboard, glass, circuit background, console |
 | `UI/LuminaGlass.swift` | Native `.glassEffect` when compiler ≥ 6.2; else Music27-style ultra-thin + edge light (not chrome material) |
 | `Exploit/Bridges/ExploitManager.swift` | Catalog, TAP, invoke `+tap` / `execute` |
+| `Bootstrap/Lum1naBootstrap.swift` | Real post-KRW pipeline: staging → KRW self-test gate → inject → `dpkg -i` Sileo/Zebra → respring; post-respring jbroot detection. HOLD until the gate passes |
 | `Session/PersistentLogStore.swift` | POSIX + `F_FULLFSYNC`, `p011_tap_log.txt` |
 | `Session/LabTime.swift` | `yyyy-MM-dd HH:mm:ss z` |
 | `Exploit/LabRuntimeOffsets.*` | **Only** VA table. `LabOff()` |
@@ -104,7 +105,7 @@ Numbering collisions to keep:
 - Centered **LUM1NA** at the top. No cloud wisps, glyph rain, or rainbow ribbon on the home screen.
 - Motherboard: four-point star hub, energy to KERNEL / SANDBOX / DAEMON / PATCHSET. No center ring.
 - Console: one monospaced stream of `ConsoleLine.formatted`. No second timestamp column.
-- PATCHSET / JAILBREAK must not claim success if `kreadbuf` is missing.
+- PATCHSET / JAILBREAK must not claim success if `kreadbuf` is missing. The pipeline (AfterKread STAGE/FIRE via `Lum1naBootstrap`) fires only on a passing KRW self-test; COMPLETE shows on `hasKread`, JAILBROKEN only on real post-respring evidence (jbroot dpkg + Sileo/Zebra present).
 
 ## What not to change without an explicit ask
 

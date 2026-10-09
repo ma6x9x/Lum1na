@@ -563,19 +563,12 @@ static void ak_tryInstallPkgman(NSMutableString *s) {
     return s;
 }
 
-+ (NSString *)tap {
+/* STAGE phase: payload staging + inventory. No gates, no fires. */
++ (NSString *)stageOnly {
     P06xLogBegin(AK_TAG);
     NSMutableString *s = [NSMutableString string];
-    Lum1naBoard *b = [Lum1naBoard shared];
-    const LabOffTab *off = LabOff();
 
-    ak_log(s, @"=== After-Kread %@ ===", LabLocalMilitaryNow() ?: @"?");
-    ak_log(s, @"hasKread=%@ hasKwrite=%@ leaks=%lu sku=%@ kslide=0x%llx",
-           b.hasKread ? @"YES" : @"NO",
-           b.hasKwrite ? @"YES" : @"NO",
-           (unsigned long)b.leaks.count,
-           b.sku ?: @"?",
-           (unsigned long long)b.kslide);
+    ak_log(s, @"=== After-Kread STAGE %@ ===", LabLocalMilitaryNow() ?: @"?");
     [s appendString:[self plan]];
     P06xLog(AK_TAG, @"plan dumped");
 
@@ -596,17 +589,37 @@ static void ak_tryInstallPkgman(NSMutableString *s) {
         }
     }
 
+    ak_log(s, @"[*] pkgman inventory (Sileo first):");
+    for (NSString *name in @[ @"sileo.deb", @"zebra.deb" ]) {
+        NSString *path = ak_findFile(name);
+        ak_log(s, @"    %-12s %@", name.UTF8String, path ?: @"(missing — Resources/pkgman)");
+    }
+
+    NSString *body = P06xLogDump(AK_TAG);
+    return body.length ? body : s;
+}
+
+/* FIRE phase: KRW self-test gate, then the real pipeline. HOLD unless
+   kread32(kbase)==MH_MAGIC_64 and kbase+0x1c is a kernel VA. */
++ (NSString *)fire {
+    P06xLogBegin(AK_TAG);
+    NSMutableString *s = [NSMutableString string];
+    Lum1naBoard *b = [Lum1naBoard shared];
+    const LabOffTab *off = LabOff();
+
+    ak_log(s, @"=== After-Kread FIRE %@ ===", LabLocalMilitaryNow() ?: @"?");
+    ak_log(s, @"hasKread=%@ hasKwrite=%@ leaks=%lu sku=%@ kslide=0x%llx",
+           b.hasKread ? @"YES" : @"NO",
+           b.hasKwrite ? @"YES" : @"NO",
+           (unsigned long)b.leaks.count,
+           b.sku ?: @"?",
+           (unsigned long long)b.kslide);
+
     io_connect_t conn = ak_openAMFI(s);
     if (conn) {
         ak_log(s, @"[+] AMFI user client open — reach OK");
         IOServiceClose(conn);
         conn = 0;
-    }
-
-    ak_log(s, @"[*] pkgman inventory (Sileo first):");
-    for (NSString *name in @[ @"sileo.deb", @"zebra.deb" ]) {
-        NSString *path = ak_findFile(name);
-        ak_log(s, @"    %-12s %@", name.UTF8String, path ?: @"(missing — Resources/pkgman)");
     }
 
     if (!b.hasKread) {
@@ -693,6 +706,14 @@ static void ak_tryInstallPkgman(NSMutableString *s) {
     ak_log(s, @"[*] persist/tempRoot/boot-rejailbreak HOLD — first injection is this slot, novel later.");
     NSString *body = P06xLogDump(AK_TAG);
     return body.length ? body : s;
+}
+
+/* Full slot: STAGE then FIRE. Same output as before the split;
+   Lum1naBootstrap drives the phases individually. */
++ (NSString *)tap {
+    NSString *staged = [self stageOnly];
+    NSString *fired = [self fire];
+    return [NSString stringWithFormat:@"%@\n%@", staged, fired];
 }
 
 @end

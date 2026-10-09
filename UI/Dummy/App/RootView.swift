@@ -6,6 +6,7 @@ struct RootView: View {
     @State private var settings = AppSettings()
     @State private var model = LuminaRunModel()
     @ObservedObject private var exploits = ExploitManager.shared
+    @ObservedObject private var bootstrap = Lum1naBootstrap.shared
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -16,11 +17,18 @@ struct RootView: View {
             .environment(\.luminaMotion, effectiveMotion)
             .preferredColorScheme(settings.appearance.preferredColorScheme)
             .tint(Palette.violet)
-            .onAppear(perform: syncLive)
+            .onAppear {
+                // Post-respring truth: a jbroot dpkg either exists or it
+                // does not. Detection only — never a claim of success.
+                bootstrap.refreshInstalledState()
+                syncLive()
+            }
             .onChange(of: exploits.isRunning) { syncLive() }
             .onChange(of: exploits.fullChainActive) { syncLive() }
             .onChange(of: exploits.selectedStage) { syncLive() }
             .onChange(of: exploits.progress) { syncLive() }
+            .onChange(of: bootstrap.bootstrapInstalled) { syncLive() }
+            .onChange(of: bootstrap.pkgmanInstalled) { syncLive() }
     }
 
     private func syncLive() {
@@ -28,7 +36,7 @@ struct RootView: View {
             running: exploits.isRunning || exploits.fullChainActive,
             stage: exploits.selectedStage,
             progress: exploits.progress,
-            proven: Lum1naBoard.shared().hasKread
+            proven: Lum1naBoard.shared().hasKread || bootstrap.bootstrapInstalled
         )
     }
 
