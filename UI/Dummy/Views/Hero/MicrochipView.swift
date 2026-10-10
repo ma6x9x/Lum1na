@@ -11,6 +11,8 @@ struct MicrochipView: View {
     var flare: Double
     /// Gentle breathing scale (1 when motion is off).
     var breathe: Double
+    /// Silk under the star. Caller passes the live silicon (A14, A12X, …).
+    var chipMark: String = "LUM1NA"
 
     private var shape: RoundedRectangle { RoundedRectangle(cornerRadius: size * 0.13, style: .continuous) }
 
@@ -29,12 +31,16 @@ struct MicrochipView: View {
                 .frame(width: 5, height: 5)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .padding(9)
-            Text("LUM1NA·A14")
+            Text(chipMark)
                 .font(.custom(TerminalFont.pixelFontName, size: 9, relativeTo: .caption2))
-                .tracking(2)
+                .tracking(1)
+                .padding(.trailing, -1)
                 .foregroundStyle(Palette.phosphorViolet.opacity(0.55))
-                .frame(maxHeight: .infinity, alignment: .bottom)
-                .padding(.bottom, 4)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                .padding(.horizontal, 8)
+                .padding(.bottom, 5)
                 .dynamicTypeSize(...DynamicTypeSize.large)
             StarCoreView(intensity: intensity + 0.4 * flare)
                 .frame(width: size * 1.02, height: size * 1.02)

@@ -9,49 +9,74 @@ struct HomeView: View {
     @Environment(\.luminaMotion) private var motion
 
     @State private var showSettings = false
-    @State private var showConsole = false
+    @State private var consoleExpanded = false
     @State private var heroFrame: CGRect = .zero
 
     var body: some View {
         ZStack {
             CircuitBoardView(heroFrame: heroFrame, snapshot: model.boardSnapshot)
             VStack(spacing: 8) {
-                HeaderView(onSettings: openSettings)
-                    .padding(.horizontal, 18)
+                HeaderView(
+                    showsDone: showSettings,
+                    onSettings: openSettings,
+                    onDone: closeSettings
+                )
+                .padding(.horizontal, 18)
+
                 CircuitHeroView()
-                    .frame(maxHeight: 300)
+                    .frame(maxHeight: heroCap)
                     .onGeometryChange(for: CGRect.self) { proxy in
                         proxy.frame(in: .global)
                     } action: { frame in
                         heroFrame = frame
                     }
-                ConsoleCardView(onExpand: openConsole)
+
+                if showSettings {
+                    SettingsSheetView()
+                        .frame(maxWidth: 560)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                } else {
+                    VStack(spacing: 8) {
+                        ConsoleCardView(expanded: consoleExpanded, onExpand: toggleConsole)
+                            .layoutPriority(consoleExpanded ? 1 : 0)
+                        if !consoleExpanded {
+                            Spacer(minLength: 4)
+                        }
+                        ActionButtonsView()
+                        DeviceProgressBar()
+                            .padding(.bottom, 6)
+                    }
                     .padding(.horizontal, 18)
-                Spacer(minLength: 4)
-                ActionButtonsView()
-                    .padding(.horizontal, 22)
-                DeviceProgressBar()
-                    .padding(.horizontal, 22)
-                    .padding(.bottom, 6)
+                    .frame(maxHeight: .infinity)
+                    .transition(.opacity)
+                }
             }
             .padding(.top, 4)
         }
-        .sheet(isPresented: $showSettings) {
-            SettingsSheetView()
-                .environment(settings)
-                .environment(model)
-                .environment(\.luminaMotion, motion)
-        }
-        .sheet(isPresented: $showConsole) {
-            ConsoleSheetView()
-                .environment(model)
-                .environment(settings)
-                .environment(\.luminaMotion, motion)
-        }
+        .animation(Motion.adaptive(Motion.smooth, motion: motion), value: showSettings)
+        .animation(Motion.adaptive(Motion.smooth, motion: motion), value: consoleExpanded)
     }
 
-    private func openSettings() { showSettings = true }
-    private func openConsole() { showConsole = true }
+    /// Hero stays put while settings is open so the board traces don't jump.
+    /// Expanding the log gives the console the space under a shorter hero.
+    private var heroCap: CGFloat {
+        if consoleExpanded { return 188 }
+        return 300
+    }
+
+    private func openSettings() {
+        consoleExpanded = false
+        showSettings = true
+    }
+
+    private func closeSettings() {
+        showSettings = false
+    }
+
+    private func toggleConsole() {
+        consoleExpanded.toggle()
+    }
 }
 
 #Preview("Home – Dark") {

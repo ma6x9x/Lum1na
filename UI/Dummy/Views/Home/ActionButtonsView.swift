@@ -15,6 +15,7 @@ struct ActionButtonsView: View {
                 Text(primaryTitle)
                     .font(.system(size: 22, weight: .semibold))
                     .tracking(3)
+                    .padding(.trailing, -3)
             }
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)

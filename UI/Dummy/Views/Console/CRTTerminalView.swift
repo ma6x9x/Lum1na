@@ -30,8 +30,13 @@ struct CRTTerminalView<Content: View>: View {
             .clipShape(screen)
             .overlay {
                 // Curved-glass edge: dark inner falloff plus a faint phosphor rim.
-                screen.strokeBorder(.black.opacity(0.8), lineWidth: 6).blur(radius: 6).clipShape(screen)
-                screen.strokeBorder(Palette.phosphor.opacity(0.18), lineWidth: 0.75)
+                // Decorative only — a stroked shape still hit-tests its fill, which
+                // was swallowing the expand control.
+                ZStack {
+                    screen.strokeBorder(.black.opacity(0.8), lineWidth: 6).blur(radius: 6).clipShape(screen)
+                    screen.strokeBorder(Palette.phosphor.opacity(0.18), lineWidth: 0.75)
+                }
+                .allowsHitTesting(false)
             }
             .padding(5)
             .background {

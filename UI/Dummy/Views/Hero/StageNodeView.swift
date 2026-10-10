@@ -42,6 +42,7 @@ struct StageNodeView: View {
             Text(stage.title.uppercased())
                 .font(.caption2.weight(.semibold))
                 .tracking(1.4)
+                .padding(.trailing, -1.4)
                 .foregroundStyle(.secondary)
                 .fixedSize()
                 .offset(y: labelBelow ? 18 : -18)

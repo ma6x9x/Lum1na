@@ -16,6 +16,7 @@ struct CircuitHeroView: View {
             TimelineView(.animation(minimumInterval: 1.0 / 30.0, paused: !moving)) { timeline in
                 let now = moving ? timeline.date : .distantPast
                 content(layout: layout, now: now)
+                    .frame(width: proxy.size.width, height: proxy.size.height)
             }
         }
         .sensoryFeedback(.success, trigger: model.isFinished) { _, now in now }
@@ -45,15 +46,24 @@ struct CircuitHeroView: View {
                         .animation(Motion.adaptive(Motion.lively, motion: motion), value: model.status(for: stage))
                     }
                 }
+                .frame(width: layout.bounds.width, height: layout.bounds.height)
             }
             MicrochipView(
                 size: layout.chipSize,
                 intensity: snapshot.starIntensity + running,
                 flare: flare(at: now),
-                breathe: 1 + 0.025 * sin(t * 1.55) * amp
+                breathe: 1 + 0.025 * sin(t * 1.55) * amp,
+                chipMark: Self.chipSilk
             )
             .position(layout.center)
         }
+    }
+
+    /// Package silk. `hw.machine` decides the token, so an iPad8,* reads A12X.
+    private static var chipSilk: String {
+        let chip = DeviceUtils.deviceCategory
+        guard chip != "Unknown" else { return "LUM1NA" }
+        return "LUM1NA·\(chip)"
     }
 
     /// 0…1…0 over 1.4 s after success.
