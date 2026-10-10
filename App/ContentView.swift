@@ -75,6 +75,7 @@ struct AllExploitsSheet: View {
 struct SettingsSheet: View {
     @ObservedObject var viewModel: ExploitManager
     @Environment(\.dismiss) var dismiss
+    @State private var showHour = false
 
     private func boardLeakLabel() -> String {
         let leaks = Lum1naBoard.shared().leaks ?? []
@@ -181,12 +182,21 @@ struct SettingsSheet: View {
                     }
 
                     Button {
+                        showHour = true
+                    } label: {
+                        Label("Logs from the last hour", systemImage: "clock")
+                    }
+
+                    Button {
                         PersistentLogStore.shared.clear()
                     } label: {
                         Label("Clear Disk Logs", systemImage: "trash")
                             .foregroundColor(.red)
                     }
                 }
+            }
+            .sheet(isPresented: $showHour) {
+                HourLogGallery()
             }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)

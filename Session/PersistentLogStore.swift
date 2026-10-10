@@ -217,6 +217,41 @@ public final class PersistentLogStore {
         return lines[last...].joined(separator: "\n")
     }
 
+    public struct HourLog: Identifiable, Hashable {
+        public let id: String
+        public let name: String
+        public let modified: Date
+        public let url: URL
+    }
+
+    /// Probe logs and the console file touched in the last hour, newest first.
+    /// Scanned only when the gallery opens, not on the home screen.
+    public func logsTouched(within interval: TimeInterval) -> [HourLog] {
+        let fm = FileManager.default
+        let cutoff = Date().addingTimeInterval(-interval)
+        guard let urls = try? fm.contentsOfDirectory(
+            at: docsURL,
+            includingPropertiesForKeys: [.contentModificationDateKey],
+            options: [.skipsHiddenFiles]
+        ) else { return [] }
+        var items: [HourLog] = []
+        for url in urls {
+            let name = url.lastPathComponent
+            let isLog = name.hasSuffix("_log.txt") || name == Self.consoleLogName
+                || name == Self.tapLogName
+            guard isLog else { continue }
+            let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
+                .contentModificationDate ?? .distantPast
+            guard modified >= cutoff else { continue }
+            items.append(HourLog(id: name, name: name, modified: modified, url: url))
+        }
+        return items.sorted { $0.modified > $1.modified }
+    }
+
+    public func readLog(at url: URL) -> String {
+        (try? String(contentsOf: url, encoding: .utf8)) ?? "(unreadable)"
+    }
+
     public func lastTapId() -> String? {
         guard let tapRaw = readTapLog() else { return nil }
         for line in tapRaw.split(separator: "\n").reversed() {
