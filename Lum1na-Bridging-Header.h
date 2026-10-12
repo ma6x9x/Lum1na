@@ -94,6 +94,8 @@
 #import "Exploit/P070ChainSequencer.h"
 #import "Exploit/P071AneOverflowMap.h"
 #import "Exploit/P072FileParserMap.h"
+#import "Exploit/P073KCacheAnalyze.h"
+#import "Exploit/P074KernelDump.h"
 #import "Exploit/Lum1naKreadTest.h"
 #import "Exploit/P06xLog.h"
 #import "Exploit/ColdForge.h"

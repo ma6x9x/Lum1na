@@ -81,6 +81,8 @@ public final class PersistentLogStore {
         "p043": "p043_write_class_map_log.txt",
         "p045": "p045_kmsg_recv_oracle_log.txt",
         "p052": "p052_nstream_extend_log.txt",
+        "p073": "p06x_p073_log.txt",
+        "p074": "p06x_p074_log.txt",
         "cskrw": consoleLogName,
         "cscalib": "racecalib_log.txt",
         "luminakrw": "lumina_krw_log.txt",
