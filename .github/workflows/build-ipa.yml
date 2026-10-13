@@ -475,9 +475,15 @@ jobs:
           # Embed entitlements next to the binary for the sign step
           cp "Lum1na.entitlements" "Payload/${PROJECT_NAME}.app/"
 
-          # Fake-sign for ldid/Sideloadly compatibility
-          ldid -S"Lum1na.entitlements" "Payload/${PROJECT_NAME}.app/${PROJECT_NAME}" \
-            2>/dev/null || echo "⚠️  ldid not present — skipping fake-sign (fine for Sideloadly)"
+          # Fake-sign for ldid/Sideloadly compatibility.
+          # MUST succeed: the rig install path (Filza/appinst on Dopamine)
+          # needs the ldid signature + embedded entitlements. If ldid is
+          # missing, install it - do not silently skip.
+          if ! command -v ldid >/dev/null 2>&1; then
+            brew install ldid
+          fi
+          ldid -S"Lum1na.entitlements" "Payload/${PROJECT_NAME}.app/${PROJECT_NAME}"
+          echo "✅ ldid fake-signed with Lum1na.entitlements"
 
           zip -r "${PROJECT_NAME}.ipa" "Payload"
           echo "✅ Packaged ${PROJECT_NAME}.ipa"
