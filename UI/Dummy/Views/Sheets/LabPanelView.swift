@@ -36,8 +36,6 @@ struct LabPanelView: View {
                         Text(DeviceUtils.isSupported ? "Yes" : "No")
                     }
                 }
-                .padding(14)
-                .glassSurface(RoundedRectangle(cornerRadius: 28, style: .continuous))
 
                 sectionHeader("EXPLOIT STATE")
                 VStack(spacing: 10) {
@@ -62,8 +60,6 @@ struct LabPanelView: View {
                         }
                     }
                 }
-                .padding(14)
-                .glassSurface(RoundedRectangle(cornerRadius: 28, style: .continuous))
 
                 sectionHeader("LAB / DEBUG")
                 VStack(spacing: 10) {
@@ -97,8 +93,6 @@ struct LabPanelView: View {
                     }
                     SettingsRowView(title: "Board leaks") { Text(boardLeakLabel()) }
                 }
-                .padding(14)
-                .glassSurface(RoundedRectangle(cornerRadius: 28, style: .continuous))
 
                 sectionHeader("RECOVERY LOG")
                 VStack(spacing: 10) {
@@ -123,8 +117,6 @@ struct LabPanelView: View {
                         PersistentLogStore.shared.clear()
                     }
                 }
-                .padding(14)
-                .glassSurface(RoundedRectangle(cornerRadius: 28, style: .continuous))
 
                 Text("Recovery packet is the previous session (board + last console session + TAP markers), captured at launch. Console Copy is this session only. Full Disk is everything.")
                     .font(.footnote)

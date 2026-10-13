@@ -17,7 +17,10 @@ struct HeroLayout: Equatable {
 
     init(in rect: CGRect) {
         bounds = rect
-        center = CGPoint(x: rect.midX, y: rect.height * 0.455)
+        // Must include rect.minY. The board passes the hero's offset frame;
+        // using height alone drew the buses at the top of the screen while
+        // the SwiftUI chip sat under the header.
+        center = CGPoint(x: rect.midX, y: rect.minY + rect.height * 0.44)
         chipSize = (min(rect.width, rect.height) * 0.40).rounded()
         nodeSize = 58
         let dx = rect.width * 0.36

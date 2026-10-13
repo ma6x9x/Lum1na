@@ -66,8 +66,6 @@ struct SettingsPanelView: View {
                 .buttonStyle(.plain)
                 .frame(maxWidth: .infinity)
             }
-            .padding(14)
-            .glassSurface(RoundedRectangle(cornerRadius: 28, style: .continuous))
 
             Text("Jailbreak runs the live chain. It does not report success until kreadbuf is proven.")
                 .font(.footnote)

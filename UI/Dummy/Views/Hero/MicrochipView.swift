@@ -20,10 +20,13 @@ struct MicrochipView: View {
         ZStack {
             shape
                 .fill(LinearGradient(
-                    colors: [Color(red: 0.11, green: 0.09, blue: 0.25), Color(red: 0.05, green: 0.045, blue: 0.13), Color(red: 0.035, green: 0.03, blue: 0.094)],
+                    colors: [
+                        Color(red: 0.11, green: 0.09, blue: 0.25).opacity(0.55),
+                        Color(red: 0.05, green: 0.045, blue: 0.13).opacity(0.42),
+                        Color(red: 0.035, green: 0.03, blue: 0.094).opacity(0.35)
+                    ],
                     startPoint: .topLeading, endPoint: .bottomTrailing
                 ))
-                .shadow(color: .black.opacity(0.6), radius: 14, y: 8)
             ChipDieView()
                 .padding(size * 0.12)
             Circle()
@@ -49,6 +52,7 @@ struct MicrochipView: View {
             flareBloom
         }
         .frame(width: size, height: size)
+        .glassSurface(shape, tint: Palette.violet.opacity(0.45), interactive: false)
         .overlay { shape.strokeBorder(Color(red: 0.67, green: 0.59, blue: 1).opacity(0.35), lineWidth: 1) }
         .fresnelRim(shape, intensity: 0.8, glowWidth: 8)
         .accessibilityHidden(true)

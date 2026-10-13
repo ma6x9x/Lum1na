@@ -1,15 +1,12 @@
 import SwiftUI
 
-/// Reusable retro terminal surface for the console card and sheet. In CRT
-/// style the content gets a phosphor glow (a tight and a wide accent-coloured
-/// blur of the glyphs), then the tube overlay, inside a curved bezel. Clean
-/// style keeps the dark screen and drops every effect.
+/// Reusable retro terminal surface for the console card and the fullscreen
+/// log panel. The tube itself stays dark (phosphor + scanlines); the outer
+/// plate is the liquid-glass slab so the board shows through the rim.
 struct CRTTerminalView<Content: View>: View {
     var style: ConsoleStyle
     var cornerRadius: CGFloat = 14
     @ViewBuilder var content: Content
-
-    @Environment(\.colorScheme) private var scheme
 
     private var crt: Bool { style == .crt }
 
@@ -38,21 +35,16 @@ struct CRTTerminalView<Content: View>: View {
                 }
                 .allowsHitTesting(false)
             }
-            .padding(5)
-            .background {
-                RoundedRectangle(cornerRadius: cornerRadius + 5, style: .continuous)
-                    .fill(LinearGradient(colors: bezelColors, startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .shadow(color: .black.opacity(scheme == .dark ? 0.45 : 0.18), radius: 12, y: 8)
-            }
-            .overlay {
-                RoundedRectangle(cornerRadius: cornerRadius + 5, style: .continuous)
-                    .strokeBorder(.white.opacity(scheme == .dark ? 0.08 : 0.7), lineWidth: 1)
-            }
-    }
-
-    private var bezelColors: [Color] {
-        scheme == .dark
-            ? [Color(red: 0.125, green: 0.125, blue: 0.23), Color(red: 0.043, green: 0.043, blue: 0.086), Color(red: 0.086, green: 0.086, blue: 0.165)]
-            : [Color(red: 0.81, green: 0.83, blue: 0.89), Color(red: 0.68, green: 0.7, blue: 0.79), Color(red: 0.78, green: 0.79, blue: 0.86)]
+            .padding(6)
+            .glassSurface(
+                RoundedRectangle(cornerRadius: cornerRadius + 6, style: .continuous),
+                tint: Palette.violet.opacity(0.55),
+                interactive: false
+            )
+            .fresnelRim(
+                RoundedRectangle(cornerRadius: cornerRadius + 6, style: .continuous),
+                intensity: 0.7,
+                glowWidth: 6
+            )
     }
 }

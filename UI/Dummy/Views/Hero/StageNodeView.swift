@@ -25,11 +25,11 @@ struct StageNodeView: View {
                 .frame(width: size, height: size)
                 .background {
                     shape.fill(LinearGradient(
-                        colors: [stage.color.opacity(fillTop), stage.color.opacity(lit ? 0.14 : 0.05)],
+                        colors: [stage.color.opacity(fillTop * 0.55), stage.color.opacity(lit ? 0.08 : 0.03)],
                         startPoint: .topLeading, endPoint: .bottomTrailing
                     ))
                 }
-                .glassSurface(shape, tint: lit ? stage.color.opacity(0.35) : nil)
+                .glassSurface(shape, tint: lit ? stage.color.opacity(0.45) : stage.color.opacity(0.18))
                 .overlay { shape.strokeBorder(stage.color.opacity(lit ? 0.85 : 0.4), lineWidth: 1) }
                 .shadow(color: stage.color.opacity(glow), radius: 10 + 8 * pulse)
             if status == .done {

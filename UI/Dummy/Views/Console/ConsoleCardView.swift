@@ -1,9 +1,8 @@
 import SwiftUI
 
-/// The live console card: a CRT terminal (or clean log) showing the latest
-/// entries bottom-anchored, with a status readout and an expand button.
+/// Compact home-board console: a glass CRT showing the latest lines,
+/// bottom-anchored. The expand control opens the fullscreen log panel.
 struct ConsoleCardView: View {
-    var expanded: Bool
     var onExpand: () -> Void
 
     @Environment(LuminaRunModel.self) private var model
@@ -13,41 +12,24 @@ struct ConsoleCardView: View {
         CRTTerminalView(style: settings.consoleStyle) {
             VStack(alignment: .leading, spacing: 4) {
                 header
-                log
-                    .overlay {
-                        PixelConfettiView(successDate: model.successDate)
-                            .allowsHitTesting(false)
-                    }
+                ViewThatFits(in: .vertical) {
+                    ConsoleLogView(compact: true)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                    ConsoleLogView(compact: true)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(height: logHeight, alignment: .bottom)
+                        .clipped()
+                }
+                .frame(height: logHeight)
+                .overlay {
+                    PixelConfettiView(successDate: model.successDate)
+                        .allowsHitTesting(false)
+                }
             }
             .padding(.horizontal, 11)
             .padding(.top, 6)
             .padding(.bottom, 8)
-            .frame(maxWidth: .infinity, maxHeight: expanded ? .infinity : nil, alignment: .top)
-        }
-        .frame(minHeight: expanded ? 240 : nil, maxHeight: expanded ? .infinity : nil)
-    }
-
-    @ViewBuilder
-    private var log: some View {
-        if expanded {
-            ScrollView {
-                ConsoleLogView(compact: false)
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-            }
-            .scrollIndicators(.hidden)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        } else {
-            // Top-aligned while it fits, bottom-anchored (newest visible) once it overflows.
-            ViewThatFits(in: .vertical) {
-                ConsoleLogView(compact: true)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxHeight: .infinity, alignment: .top)
-                ConsoleLogView(compact: true)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(height: logHeight, alignment: .bottom)
-                    .clipped()
-            }
-            .frame(height: logHeight)
         }
     }
 
@@ -62,17 +44,14 @@ struct ConsoleCardView: View {
                 .foregroundStyle(model.phase == .idle ? Palette.phosphorViolet : Palette.success)
                 .contentTransition(.opacity)
             Button(action: onExpand) {
-                Image(systemName: expanded
-                      ? "arrow.down.right.and.arrow.up.left"
-                      : "arrow.up.left.and.arrow.down.right")
+                Image(systemName: "arrow.up.left.and.arrow.down.right")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Palette.phosphorViolet)
                     .frame(width: 44, height: 32)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(expanded ? "Collapse console" : "Expand console")
-            .zIndex(1)
+            .accessibilityLabel("Expand console")
         }
         .font(TerminalFont.font(settings.consoleStyle, size: 15, relativeTo: .caption))
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
@@ -92,7 +71,7 @@ struct ConsoleCardView: View {
 
 #Preview("Console – Dark") {
     let model = LuminaRunModel()
-    return ConsoleCardView(expanded: false, onExpand: {})
+    return ConsoleCardView(onExpand: {})
         .environment(model)
         .environment(AppSettings())
         .environment(\.luminaMotion, MotionLevel.full)

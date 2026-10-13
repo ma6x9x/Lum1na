@@ -23,8 +23,6 @@ struct CatalogPanelView: View {
                     .disabled(viewModel.isRunning)
                 }
             }
-            .padding(14)
-            .glassSurface(RoundedRectangle(cornerRadius: 28, style: .continuous))
 
             Text("Every invoke writes a durable TAP marker before running. After a crash, the recovery transcript shows exactly which entry was last attempted.")
                 .font(.footnote)

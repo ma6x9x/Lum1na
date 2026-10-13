@@ -20,7 +20,9 @@ struct ActionButtonsView: View {
             .foregroundStyle(.white)
             .frame(maxWidth: .infinity)
             .frame(height: 62)
-            .background { buttonFill }
+            .glassSurface(Capsule(), tint: Palette.violet, interactive: true)
+            .overlay { buttonWash }
+            .fresnelRim(Capsule(), intensity: 0.85, glowWidth: 8)
             .overlay { buttonRim }
             .shadow(color: Palette.violet.opacity(model.phase == .running ? 0.35 : 0.85), radius: 16)
             .shadow(color: Palette.magenta.opacity(0.45), radius: 6)
@@ -31,32 +33,23 @@ struct ActionButtonsView: View {
         .accessibilityLabel(primaryTitle)
     }
 
-    private var buttonFill: some View {
-        let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
-        return ZStack {
-            shape.fill(.ultraThinMaterial)
-            shape.fill(
+    private var buttonWash: some View {
+        Capsule()
+            .fill(
                 LinearGradient(
                     colors: [
-                        Color(red: 0.55, green: 0.22, blue: 0.95).opacity(0.55),
-                        Color(red: 0.28, green: 0.08, blue: 0.55).opacity(0.72)
+                        Color(red: 0.55, green: 0.22, blue: 0.95).opacity(0.38),
+                        Color(red: 0.28, green: 0.08, blue: 0.55).opacity(0.42)
                     ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
             )
-            shape.fill(
-                LinearGradient(
-                    colors: [Color.white.opacity(0.22), .clear],
-                    startPoint: .top,
-                    endPoint: .center
-                )
-            )
-        }
+            .allowsHitTesting(false)
     }
 
     private var buttonRim: some View {
-        RoundedRectangle(cornerRadius: 18, style: .continuous)
+        Capsule()
             .strokeBorder(
                 LinearGradient(
                     colors: [
@@ -67,9 +60,9 @@ struct ActionButtonsView: View {
                     startPoint: .top,
                     endPoint: .bottom
                 ),
-                lineWidth: 1.5
+                lineWidth: 1.2
             )
-            .shadow(color: Palette.violet, radius: 8)
+            .allowsHitTesting(false)
     }
 
     private func primaryAction() {
