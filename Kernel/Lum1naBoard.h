@@ -7,7 +7,10 @@
 
 @interface Lum1naBoard : NSObject
 
-+ (instancetype)shared;
+/// Singleton. Annotated nonnull so Swift imports it as `Lum1naBoard`, not
+/// `Lum1naBoard?` — `let board = Lum1naBoard.shared()` in ExploitManager and
+/// the unit tests must type-check without unwrapping.
++ (nonnull instancetype)shared;
 + (NSString *)tap;
 /// Live kread32(kbase)==MH_MAGIC_64. Occupancy / IPS slide / heap leak never pass.
 + (NSString *)tapKreadTest NS_SWIFT_NAME(tapKreadTest());
