@@ -45,7 +45,7 @@ struct CatalogPanelView: View {
             .padding(.horizontal, 6)
     }
 
-    private func catalogRow(_ entry: ExploitEntry) -> some View {
+    private func catalogRow(_ entry: ExploitCatalogEntry) -> some View {
         HStack {
             Image(systemName: entry.stage.icon)
                 .foregroundColor(entry.stage.color)
