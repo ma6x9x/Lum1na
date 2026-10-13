@@ -1,14 +1,25 @@
 import SwiftUI
 
+/// Panels that can take over the home board. All of them render inside the
+/// same centered `BoardPanelView` card; only the circuit background (and the
+/// header) stay visible behind them.
+enum HomePanel {
+    case settings
+    case catalog
+    case lab
+}
+
 /// The main screen: a full-screen animated circuit board with the star-on-chip
 /// hero (~top half), then progress, the CRT console and the actions. The hero
 /// reports its global frame so the board's buses line up with the chip/nodes.
+/// Opening a panel hides everything except the board background and swaps in
+/// one centered panel card.
 struct HomeView: View {
     @Environment(LuminaRunModel.self) private var model
     @Environment(AppSettings.self) private var settings
     @Environment(\.luminaMotion) private var motion
 
-    @State private var showSettings = false
+    @State private var activePanel: HomePanel?
     @State private var consoleExpanded = false
     @State private var heroFrame: CGRect = .zero
 
@@ -17,26 +28,26 @@ struct HomeView: View {
             CircuitBoardView(heroFrame: heroFrame, snapshot: model.boardSnapshot)
             VStack(spacing: 8) {
                 HeaderView(
-                    showsDone: showSettings,
-                    onSettings: openSettings,
-                    onDone: closeSettings
+                    showsDone: activePanel != nil,
+                    onSettings: openPanel(.settings),
+                    onDone: closePanel
                 )
                 .padding(.horizontal, 18)
 
-                CircuitHeroView()
-                    .frame(maxHeight: heroCap)
-                    .onGeometryChange(for: CGRect.self) { proxy in
-                        proxy.frame(in: .global)
-                    } action: { frame in
-                        heroFrame = frame
-                    }
-
-                if showSettings {
-                    SettingsSheetView()
+                if let panel = activePanel {
+                    panelView(panel)
                         .frame(maxWidth: 560)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .transition(.opacity.combined(with: .scale(scale: 0.96)))
                 } else {
+                    CircuitHeroView()
+                        .frame(maxHeight: heroCap)
+                        .onGeometryChange(for: CGRect.self) { proxy in
+                            proxy.frame(in: .global)
+                        } action: { frame in
+                            heroFrame = frame
+                        }
+
                     VStack(spacing: 8) {
                         ConsoleCardView(expanded: consoleExpanded, onExpand: toggleConsole)
                             .layoutPriority(consoleExpanded ? 1 : 0)
@@ -54,24 +65,44 @@ struct HomeView: View {
             }
             .padding(.top, 4)
         }
-        .animation(Motion.adaptive(Motion.smooth, motion: motion), value: showSettings)
+        .animation(Motion.adaptive(Motion.smooth, motion: motion), value: activePanel)
         .animation(Motion.adaptive(Motion.smooth, motion: motion), value: consoleExpanded)
     }
 
-    /// Hero stays put while settings is open so the board traces don't jump.
+    @ViewBuilder
+    private func panelView(_ panel: HomePanel) -> some View {
+        switch panel {
+        case .settings:
+            BoardPanelView(title: "Settings") {
+                SettingsPanelView(onOpen: { openPanel($0)() })
+            }
+        case .catalog:
+            BoardPanelView(title: "All Exploits") {
+                CatalogPanelView(viewModel: ExploitManager.shared, onClose: closePanel)
+            }
+        case .lab:
+            BoardPanelView(title: "Lab") {
+                LabPanelView(viewModel: ExploitManager.shared, onClose: closePanel)
+            }
+        }
+    }
+
+    /// Hero stays put while no panel is open so the board traces don't jump.
     /// Expanding the log gives the console the space under a shorter hero.
     private var heroCap: CGFloat {
         if consoleExpanded { return 188 }
         return 300
     }
 
-    private func openSettings() {
-        consoleExpanded = false
-        showSettings = true
+    private func openPanel(_ panel: HomePanel) -> () -> Void {
+        {
+            consoleExpanded = false
+            activePanel = panel
+        }
     }
 
-    private func closeSettings() {
-        showSettings = false
+    private func closePanel() {
+        activePanel = nil
     }
 
     private func toggleConsole() {
