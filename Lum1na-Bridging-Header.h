@@ -107,6 +107,7 @@
 #import "Exploit/KRWChainController.h"
 #import "Exploit/KRWTheoryChains.h"
 #import "Exploit/DopaminePrimitives.h"
+#import "Exploit/Lum1naLibkrw.h"
 
 
 #endif
