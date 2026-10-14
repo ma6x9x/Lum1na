@@ -252,3 +252,42 @@ magic self-test; JAILBROKEN only on real post-respring jbroot evidence.
   strtol-parses the string (hunt will predict usecount 0x23c, matching
   LabOff A14 live). P044 stage statuses de-mojibaked to ASCII (the stage
   formatter path mangles non-ASCII; plain P06xLog lines render fine).
+ - **2026-10-14 EVENING SESSION (17:35-18:00 EDT): FIRST hasKread=YES + four
+  crash decodes + Full Chain HOLD fix.**
+  1. **MILESTONE: hasKread flipped YES for the first time** — 4th cs2core
+     establish on the rig (iPhone12,1 A13 22G100): kbase=0xfffffff018128000,
+     slide=0x11124000, 1103 ms, magic PASS -> commitSlide -> KRW self-test
+     gate PASSED. Build 98a2cb1. PATCHSET now passes the KRW gate.
+  2. **Hunt panic 3 (17:38:29) DECODED — app SIGABRT, not kernel panic.**
+     Faulting thread 6: pthread_kill -> abort -> __assert_rtn ->
+     cs2_surface_mlock.cold.1. Root cause: ClearSwordCore mlock table cap is
+     8 (wired mapping + 8 search mappings = 9 slots; verbatim munlock calls
+     are commented out), the tap ran 3.5 min, scanned all 8 mappings, began
+     a SECOND socket round, and the 9th mlock overflowed -> assert ->
+     SIGABRT. Explains the earlier "zero logs" cs2core deaths on hunt:
+     cs2_core_log.txt opened O_TRUNC per session, so every new tap erased
+     the previous crash's evidence. Fixes: (a) cs2_surface_mlock now logs
+     LOG_ERR("mlock table full ... untracked, continuing") and returns
+     instead of aborting — surface still created, scan continues, exploit
+     behavior unchanged; (b) cs2_core_log.txt opens O_APPEND so crash
+     evidence survives relaunches.
+  3. **Hunt panic 4 (17:38:29) DECODED — WLAN dext self-abort, not a kernel
+     panic.** AppleBCMWLAN dext watchdog fired (IO80211DeadlockPolice
+     handleDextWatchdogTimer -> panic -> abort) while the rest of the dext
+     deadlocked on IORecursiveConditionLockLock (interrupt thread ->
+     DispatchSync; command thread stuck in issueCommand/configureUpLinkOFDMA).
+     Same bootSessionUUID and second as panic 3 — collateral from the cs2core
+     spray window. Device did NOT reboot.
+  4. **"Full Chain says complete but no respring" ROOT-CAUSED and fixed.**
+     The chain's KERNEL stage never established the ClearSword core (lanes
+     were T1 ANE WRITE -> LightSword -> libkrw only), and board.hasKread
+     persists in the JSON across relaunches while the primitive is
+     process-local. So after the 17:35 manual cs2core flip, FULL CHAIN ran
+     with either (a) a persisted flag and a dead lane -> self-test SKIP ->
+     HOLD, or (b) T1 spray disturbing the still-live lane -> self-test FAIL
+     -> HOLD — while the KERNEL board legitimately showed COMPLETE on the
+     persisted hasKread (AGENTS.md design). Fixes in ExploitManager:
+     KERNEL stage gains B1 lane 4 (Lum1naKRW_EstablishFromCS2Core when
+     nothing else landed KRW), and PATCHSET re-establishes the cs2core lane
+     once when hasKread=YES but no lane is live in this process. The
+     AfterKread self-test still decides — HOLD means HOLD.
