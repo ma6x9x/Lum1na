@@ -210,6 +210,18 @@ magic self-test; JAILBROKEN only on real post-respring jbroot evidence.
   first time. Also fixed: [RECOVER] banner printed a double-encoded
   em-dash (mojibake) — now ASCII "--".
 
+- **2026-10-14 17:35 CONFIRMED on the rig (build 98a2cb1): the gate fix
+  flipped hasKread.** cs2core established a 4th time (kbase
+  0xfffffff018128000, slide 0x11124000, 1103 ms, magic PASS) and the new
+  upstream-criteria gate PASSED: "board committed hasKread via the
+  ClearSword core lane" -> hasKread=YES hasKwrite=YES kslide=0x11124000
+  kbase=0xfffffff018128000. "PATCHSET (JAILBREAK) now passes the KRW
+  gate." First hasKread=YES in Lum1na. AfterKread pipeline next in the
+  SAME session — the ClearSword primitive is process-local (leaked
+  control/rw sockets die with the process), so the pipeline tap must run
+  before any force-quit; respring will kill the app, and disk TAP logs
+  are the record.
+
 - **2026-10-14 HUNT DEVICE (iPhone13,2 A14 23F77 iOS 26.5) SESSION.**
   Four results, one parse bug (fixed), one display bug (fixed):
   1. **P044 aio84530 heap leak WORKS on A14 26.5**: stage 1
