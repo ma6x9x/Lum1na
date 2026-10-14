@@ -96,6 +96,7 @@ Numbering collisions to keep:
 
 - Active: `iPhone13,*` + **23F77** → table tag `A14_23F77`.
 - Twin: `iPad8,*` + **23G71** → `A12X_23G71`.
+- 12 mini: `iPhone13,*` + **21D*** (17.3.x, Dopamine rootless) → `A14_21D50` — ladder-only row (link base + info.c 23.1-branch values, VAs 0); KRW via libkrw, not the T1/43748 chains.
 - Detect with `kern.osversion`, never `UIDevice` `"26.5"`.
 - Do not paste T8101 VAs onto T8020.
 - `A14_23F77_*` names in probes follow `LabOff()` via redirects (queue size 0x410 vs 0x408).

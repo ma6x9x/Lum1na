@@ -259,3 +259,84 @@ magic self-test; JAILBROKEN only on real post-respring jbroot evidence.
   strtol-parses the string (hunt will predict usecount 0x23c, matching
   LabOff A14 live). P044 stage statuses de-mojibaked to ASCII (the stage
   formatter path mangles non-ASCII; plain P06xLog lines render fine).
+
+## 2026-10-14 — A14_21D50 (iPhone 12 mini, iOS 17.3 / 21D50 / darwin 23.3.0) SCAFFOLD
+
+User's 12 mini is jailbroken with Dopamine 3.x rootless (/var/jb, libkrw
+provider live). This is the FIRST device where the post-KRW pipeline can
+run with real kernel read/write from day one. Shipped in this commit:
+
+1. `LabSkuA14_21D50` enum + detection (`iPhone13,*` + `21D*` prefix —
+   covers 21D50/21D51). `A14_other` still the fallback.
+2. `gA14_21D50` LabOff row — same honesty shape as the rig row: link base
+   0xfffffff007004000 only (proven live on 22G100 + 23F77; on-device
+   confirm = libkrw kbase minus static_base must be page-aligned), ladder
+   `socket_usecount 0x24c` + `iosurface_md 0x40` (info.c darwin>=23.1
+   <23.4 branch), every VA 0 = unproven. Read/write comes from libkrw,
+   NOT the T1/43748 chains. No 26.5 VAs pasted onto 17.3.
+3. `PROC_ROW_D23` struct row — the darwin-23 exception: svuid/svgid
+   0x3C/0x40 (24.4 moved to 0x38/0x3C), proc_ro.csflags 0x1C and
+   proc_ro.ucred 0x20 WITHOUT the +0x8 p_original_ppid shift. kernproc 0
+   = underived (Ghidra pass on 21D50 kernelcache queued).
+4. cs2core gate: `major <= 21` now VIABLE — 43520 patched only in
+   18.7.2/26.1, so 21D50 fires the ClearSword VFS race as an independent
+   KRW lane (real test of the verbatim core on a pre-patch train).
+
+### 12 mini test plan — krwlib-first (tap order)
+
+1. **ident** — confirm `iPhone13,1` → sku `A14_21D50`, table tag matches,
+   ladder fields shown. Pure read, no risk.
+2. **krwlib tap** — dlopen libkrw provider → `krw_initializer` → kbase →
+   `kread32(kbase) == 0xfeedfacf`. EXPECT ESTABLISHED on Dopamine. Log
+   kbase + derived slide; slide must be page-aligned (validates
+   static_base for 21D50 — if slide is misaligned, static_base is wrong
+   and nothing static-VA may proceed).
+3. **board tap** — commitSlide from the established kbase → hasKread YES
+   (first device where the KRW self-test gate passes legitimately).
+4. **Full Chain** — staging → gate (passes) → inject → elevate. Elevate
+   uses PROC_ROW_D23; kernproc=0 keeps it honest-HOLD, so expect clean
+   progress through KRW + a logged kernproc-HOLD, not uid0. After the
+   chain, with kread live, run the kernproc derivation (Ghidra 21D50 or
+   on-device backward le_prev walk) as the next task.
+5. **cs2core tap** (independent lane) — gate now passes on 21D50; the
+   verbatim 43520 core should fire for real. Watch: on rootless Dopamine
+   the sandbox profile is already relaxed, so this is a clean first
+   measurement of the core on a non-rig device.
+6. **CAUTION — opainject / launchdhook**: Dopamine already hooks launchd.
+   Our launchdhook stage may double-inject. Do not run it on the 12 mini
+   until the inject path is verified against a rootless bootstrap.
+   pmap_cs / AMFI pokes stay skipped (sel 0 = unproven on this SKU) —
+   and Dopamine already relaxes AMFI/pmap, so they are unnecessary here.
+
+### p093 / cscali / cskrw results from the hunt device (user pasted)
+
+- **p093 intel (BUILD p093-intel-v1, 19:42:13 EDT)**: table render is
+  correct — PROVEN rows (23F77 + 22G100 static_base, 22G100 kbase/slide
+  live, P063/P053/P069/P065 pins), LADDER rows, DarkSword LEAD DEFERRED
+  (honest). LabOff live cross-check passed: usecount=0x23c matches the
+  darwin>=25 ladder. The on-device ladder predict printed
+  `osrelease major: -1` → that build predates the strtol fix already in
+  this repo (previous entry) — rebuild/reinstall the app and the next
+  p093 run should predict 0x23c on 26.5.
+- **cscali phys_oob calib v8**: classification harness is healthy —
+  H-control 3000/3000, ID sweep offsets=1024 ok=30713 ALL CORRECT, 7
+  ZERO-fails, zero WRONG/FOREIGN/PARTIAL. The pwritev swap path
+  classifies cleanly; calibration is not the blocker.
+- **cskrw ClearSword KRW V23**: race fires reliably (RACE HIT #1 at try
+  0; 375 OOB reads) but **unique Q0 = 1** — every read returned the same
+  qword 0xe4d7f1286bce05fd across 5 mappings x 25 pages. Two blockers:
+  1. `SO_NECP_ATTRIBUTES setsockopt failed: Protocol not available (42)`
+     — the NECP PCB-tagging path is DEAD on 26.5, so PCB identity cannot
+     be confirmed even when a read lands.
+  2. Constant Q0 says the OOB window is reading the same neighbor content
+     every time — the sprayed inpcb pages are not appearing in the scanned
+     window (5 mappings x 25 pages x 3 loops is a small window against
+     321k-socket churn).
+  Fix order: re-tag PCBs with a path that exists on 26.5 — set an 8-byte
+  ICMP6_FILTER marker via setsockopt(IPPROTO_ICMPV6) (not NECP-gated) and
+  confirm identity by matching the marker at inpcb+0x148 (icmp6filt ladder
+  value already in the intel DB). If Q0 stays constant after denser spray,
+  the window itself is the problem. If ClearSword stays PCB-blind, the
+  probe's own pivot advice (64788) applies — but rapier stays PARKED until
+  the IOGPU freelist-encoding corruption (far ...a8/...48, 18:52+18:57
+  panics) is understood.
