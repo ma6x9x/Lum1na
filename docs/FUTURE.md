@@ -177,3 +177,66 @@ magic self-test; JAILBROKEN only on real post-respring jbroot evidence.
   lane on the A13 rig. Which tap ran at 16:44 is the open attribution
   question; 16:44 console capture needed. No more rig taps until the repo
   app is rebuilt (usecount 0x254 + lane cascade) and panic 2 is pinned.
+
+- **2026-10-14 PANIC 2 ATTRIBUTED: Rapier (CONFIRMED, console evidence).**
+  The 16:44 console capture shows `TAP rapier 16:44:02`
+  (rapier-v1.0-orderedstart mag=0 hold=0 45s, HIT pc=cd8/d00, calib ok
+  conn=24071) then the panic at 16:44:29 — 27 s into the 45 s race window.
+  Root cause of the run itself: the rig A13_22G100 table has sel36=0
+  (unproven; Ident prints "QueueCreate sel=0 ... sel36=0") and Rapier
+  fired anyway. Fix: Rapier.runWithLog now refuses when LabOff()->sel36
+  == 0, logging the panic reference. Rule re-stated: a probe whose core
+  offset is unproven on the runtime SKU must HOLD, not fire. Rapier stays
+  untappable on the A13 rig until sel36 is proven for this SKU.
+
+- **2026-10-14 COMMITSLIDE GATE ROOT CAUSE (fixed same day).** Three rig
+  boots established ClearSword core KRW (slides 0x15444000 / 0x19a80000 /
+  0x1d58c000; 1400 / 2218 / 878 ms; magic self-test PASS each time) and
+  three times board.commitSlide refused with "kread kbase+0x1c=0x1b00000000
+  (not a kernel VA)". The gate was our invention and unfalsifiable: in a
+  Mach-O 64 kernel header, kbase+0x1c is reserved(u32) | first_LC.cmd(u32)
+  << 32 — header data (0x1b00000000 on every device), never a pointer.
+  Upstream has no such check; ClearSword poc.c identifies kbase by
+  cs2_early_kread64(kbase)==0x100000cfeedfacf (magic+cputype) and
+  cs2_early_kread64(kbase+8) in {0x200000000 arm64, 0xc00000002 arm64e
+  iOS16+, 0xcc0000002 arm64e iOS19+}. The primitive SURVIVES the run:
+  cs2_sockets_leak_forever() deliberately leaks the control/rw sockets and
+  the provider's own post-run self-test passed (the ESTABLISHED line reads
+  magic through it). Fix: commitSlide (Lum1naBoard) and ak_krwSelfTest
+  (Lum1naAfterKread) now use the upstream criteria through the lane
+  cascade. Expected next rig run: commitSlide OK kbase=0x... magic=
+  0x100000cfeedfacf typeinfo=0x200000000 -> hasKread flips -> the
+  AfterKread pipeline (AMFI/pmap/opainject/dpkg/respring) fires for the
+  first time. Also fixed: [RECOVER] banner printed a double-encoded
+  em-dash (mojibake) — now ASCII "--".
+
+- **2026-10-14 HUNT DEVICE (iPhone13,2 A14 23F77 iOS 26.5) SESSION.**
+  Four results, one parse bug (fixed), one display bug (fixed):
+  1. **P044 aio84530 heap leak WORKS on A14 26.5**: stage 1
+     `leak OK anchor=0xffffffe1a7988700 (heap, NOT slide)` — first live
+     kernel-heap anchor on the hunt device. Anchor is session-local (heap
+     VA, not a table offset), so no intel row; the leak lane is now
+     PROVEN for A14_23F77 fill seeding.
+  2. **P044 fire then death**: small predict OK, 254 addchain fired,
+     CoreML prediction FAILED (-1, same as rig), then the app died in the
+     kmsg harvest step (collect line never printed). No panic .ips yet —
+     recovery packet needed. First A14 in-window death AFTER a successful
+     leak; do not stack taps on hunt.
+  3. **T4 krw4 dual-wrap on hunt reached real geometry**: victim/spy
+     type=0x80 (rig never got past 0x0/0x11), alias LIVE spyConfirmed=1,
+     detach victim kr=0x0, unpin ok, spy MD still wired, last-wire detach
+     ok, blit = GPU OOM -> GART died with the last MD. REPRODUCES the
+     18:45 seal on the hunt device: alias GART is not independent. T4
+     stays sealed; dual-wrap type-0x80 geometry is now PROVEN reachable
+     on A14_23F77.
+  4. **cs2core DIED 3/3 on hunt with ZERO core logs** (16:57:12,
+     17:01:50, 17:08:26 taps; next session 3-5 min later each time, no
+     [cs2] line ever printed — death before or during spray setup; app
+     jetsam vs panic unknown until a recovery packet lands). Catalog
+     description now carries the warning. Do not re-tap cs2core on hunt
+     without a fresh boot + recovery-packet capture.
+  Fixes shipped with this entry: P093 ladder parse read kern.osrelease (a
+  string node) into an int and returned -1 on every device — now
+  strtol-parses the string (hunt will predict usecount 0x23c, matching
+  LabOff A14 live). P044 stage statuses de-mojibaked to ASCII (the stage
+  formatter path mangles non-ASCII; plain P06xLog lines render fine).
