@@ -19,13 +19,6 @@ struct SettingsPanelView: View {
                 SettingsRowView(title: "System") {
                     Text(DeviceUtils.osversion)
                 }
-                SettingsRowView(title: "Appearance") {
-                    Picker("Appearance", selection: $settings.appearance) {
-                        ForEach(AppearanceMode.allCases) { Text($0.label).tag($0) }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                }
                 SettingsRowView(title: "Motion") {
                     Picker("Motion", selection: $settings.motion) {
                         ForEach(MotionMode.allCases) { Text($0.label).tag($0) }

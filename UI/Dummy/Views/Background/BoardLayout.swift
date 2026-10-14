@@ -64,9 +64,12 @@ struct BoardLayout {
                 let d = ao * 1.55
                 let p2 = CGPoint(x: p1.x + (n.dx + t.dx * sg) * d, y: p1.y + (n.dy + t.dy * sg) * d)
                 let far: CGFloat = n.dx > 0 ? w - p2.x : n.dx < 0 ? p2.x : n.dy > 0 ? h - p2.y : p2.y
+                // Fans that don't reach the edge die as a via, never as a
+                // floating stub — a stub ending beside a pad reads as a
+                // "wire that missed the pad" (2026-10-14 UI pass).
                 var ext = far + 6
                 var endsInVia = false
-                if rng.unit() < 0.3 {
+                if rng.unit() < 0.42 {
                     ext = far * (0.3 + rng.unit() * 0.45)
                     endsInVia = true
                 }
@@ -78,15 +81,21 @@ struct BoardLayout {
             }
         }
 
-        // Main buses: chip corner → 45° → stage node.
+        // Main buses: chip corner → 45° → the pad's rim. Both ends stop at
+        // the glass edge (chip side +2, pad side nodeSize/2+1) instead of
+        // running under the translucent glass — before, the last ~29 pt
+        // vanished under each pad (and ~4 pt under the chip) so the pads
+        // read as unconnected stubs (2026-10-14 UI pass). Energy pulses are
+        // seeded from these same traces, so they plug into the pad too.
         for stage in RunStage.allCases {
             let node = hero.nodeCenters[stage.rawValue]
             let sx = CGFloat(stage.corner.x)
             let sy = CGFloat(stage.corner.y)
-            let c0 = CGPoint(x: c.x + sx * (half - 4), y: c.y + sy * (half - 4))
+            let c0 = CGPoint(x: c.x + sx * (half + 2), y: c.y + sy * (half + 2))
             let dist = abs(node.y - c0.y)
             let p1 = CGPoint(x: c0.x + sx * dist, y: node.y)
-            buses.append(BoardTrace(points: [c0, p1, node]))
+            let rim = CGPoint(x: node.x - sx * (hero.nodeSize / 2 + 1), y: node.y)
+            buses.append(BoardTrace(points: [c0, p1, rim]))
         }
 
         // IC footprints in free space.

@@ -15,7 +15,10 @@ struct RootView: View {
             .environment(settings)
             .environment(model)
             .environment(\.luminaMotion, effectiveMotion)
-            .preferredColorScheme(settings.appearance.preferredColorScheme)
+            // LUM1NA is a dark-first board UI — always dark, regardless of the
+            // system appearance (2026-10-14). BoardColors/Palette scheme paths
+            // then always take the dark branch.
+            .preferredColorScheme(.dark)
             .tint(Palette.violet)
             .onAppear {
                 // Post-respring truth: a jbroot dpkg either exists or it

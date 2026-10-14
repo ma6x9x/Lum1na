@@ -252,42 +252,42 @@ magic self-test; JAILBROKEN only on real post-respring jbroot evidence.
   strtol-parses the string (hunt will predict usecount 0x23c, matching
   LabOff A14 live). P044 stage statuses de-mojibaked to ASCII (the stage
   formatter path mangles non-ASCII; plain P06xLog lines render fine).
- - **2026-10-14 EVENING SESSION (17:35-18:00 EDT): FIRST hasKread=YES + four
-  crash decodes + Full Chain HOLD fix.**
-  1. **MILESTONE: hasKread flipped YES for the first time** — 4th cs2core
-     establish on the rig (iPhone12,1 A13 22G100): kbase=0xfffffff018128000,
-     slide=0x11124000, 1103 ms, magic PASS -> commitSlide -> KRW self-test
-     gate PASSED. Build 98a2cb1. PATCHSET now passes the KRW gate.
-  2. **Hunt panic 3 (17:38:29) DECODED — app SIGABRT, not kernel panic.**
-     Faulting thread 6: pthread_kill -> abort -> __assert_rtn ->
-     cs2_surface_mlock.cold.1. Root cause: ClearSwordCore mlock table cap is
-     8 (wired mapping + 8 search mappings = 9 slots; verbatim munlock calls
-     are commented out), the tap ran 3.5 min, scanned all 8 mappings, began
-     a SECOND socket round, and the 9th mlock overflowed -> assert ->
-     SIGABRT. Explains the earlier "zero logs" cs2core deaths on hunt:
-     cs2_core_log.txt opened O_TRUNC per session, so every new tap erased
-     the previous crash's evidence. Fixes: (a) cs2_surface_mlock now logs
-     LOG_ERR("mlock table full ... untracked, continuing") and returns
-     instead of aborting — surface still created, scan continues, exploit
-     behavior unchanged; (b) cs2_core_log.txt opens O_APPEND so crash
-     evidence survives relaunches.
-  3. **Hunt panic 4 (17:38:29) DECODED — WLAN dext self-abort, not a kernel
-     panic.** AppleBCMWLAN dext watchdog fired (IO80211DeadlockPolice
-     handleDextWatchdogTimer -> panic -> abort) while the rest of the dext
-     deadlocked on IORecursiveConditionLockLock (interrupt thread ->
-     DispatchSync; command thread stuck in issueCommand/configureUpLinkOFDMA).
-     Same bootSessionUUID and second as panic 3 — collateral from the cs2core
-     spray window. Device did NOT reboot.
-  4. **"Full Chain says complete but no respring" ROOT-CAUSED and fixed.**
-     The chain's KERNEL stage never established the ClearSword core (lanes
-     were T1 ANE WRITE -> LightSword -> libkrw only), and board.hasKread
-     persists in the JSON across relaunches while the primitive is
-     process-local. So after the 17:35 manual cs2core flip, FULL CHAIN ran
-     with either (a) a persisted flag and a dead lane -> self-test SKIP ->
-     HOLD, or (b) T1 spray disturbing the still-live lane -> self-test FAIL
-     -> HOLD — while the KERNEL board legitimately showed COMPLETE on the
-     persisted hasKread (AGENTS.md design). Fixes in ExploitManager:
-     KERNEL stage gains B1 lane 4 (Lum1naKRW_EstablishFromCS2Core when
-     nothing else landed KRW), and PATCHSET re-establishes the cs2core lane
-     once when hasKread=YES but no lane is live in this process. The
-     AfterKread self-test still decides — HOLD means HOLD.
+ - **2026-10-14 LATE SESSION (17:50-18:05 EDT): DarkSword/P7 intel + rig
+  Full Chain transcript decode + UI pass.**
+  - **Rig Full Chain transcript (17:50:20, build d4af433) DECODED:** first
+    FIRE HOLD (hasKread NO) -> manual cs2core tap 17:50:46 -> commitSlide OK
+    (4-5 s establish, not the hunt 3.5-min spray) -> second FIRE 17:51:20:
+    KRW test PASS (magic + typeinfo) -> pipeline FIRED but every execution
+    step was sandbox-denied: AMFI IOServiceOpen kr=0xe00002e2 (needs
+    AppleMobileFileIntegrityUserClient entitlement / unsandbox), posix_spawn
+    opainject rc=1 EPERM, jbctl rc=1 EPERM, /usr/bin/killall absent in
+    container. CONCLUSION: "COMPLETE but no respring" = honest pipeline ran
+    to its sandbox wall. NEXT LINK in the chain is the unsandbox step
+    (kwrite: platform-application + task ports, Dopamine post-KRW order),
+    which needs kernel WRITE in-process, then jbroot install (not just
+    Documents staging) before opainject/jbctl can execute. That is exactly
+    the "Dopamine next after kreadbuf" path already printed by the krw TAP.
+  - **DarkSword P7 intel (iVerify 2026-10-08 + Google TAG + TheRealClarity
+    ClearSword writeup):** P7 is a payload variant (keychain/wallet theft,
+    two-way C2), NOT a new kernel exploit. The kernel stage of the whole
+    family is CVE-2025-43520 (VFS cluster_write/read_contig UPL
+    phys-contig TOCTOU) = our ClearSword core, PATCHED in 18.7.2 / 26.1.
+    Hunt device (iPhone13,2 A14 26.5 = build 23F77) is therefore PATCHED:
+    verbatim core runs the full spray but cannot win the race; the 17:38
+    SIGABRT was the mlock-table overflow (fixed in 1b0e437), not the race
+    firing. Rig (A13 22G100 = 18.6.2) remains the only ClearSword-viable
+    device. 26.5 KRW needs a NEW bug — active candidates stay P044
+    aio84530 (heap anchors PROVEN twice on hunt 17:06/17:21, fill lane
+    works) and the ANE CheckandPrewire OOB (T1), both unpatched per our
+    probes. Kev1nLevin offsets table (A17 18.4) confirms per-SKU ladder
+    offsets: usecount 0x254 (A13 rig) vs 0x228, icmp6filt 0x150 vs 0x138 —
+    our LabOff table already carries the A14 values.
+  - **UI pass shipped:** always dark (Appearance picker removed, RootView
+    pins .dark); main buses now stop at each pad's rim (nodeSize/2+1) and
+    at the chip rim (half+2) instead of running ~29 pt under the glass, so
+    the three-line bus visibly plugs into the pad and energy pulses seed
+    from the same trimmed traces; fan traces that miss the edge always die
+    as vias (0.3 -> 0.42 probability), killing the floating stubs that read
+    as "wire missed the pad"; pads nudged slightly up and outward
+    (0.36/0.29 -> 0.375/0.315 spread, buses follow since they derive from
+    the same nodeCenters).

@@ -23,8 +23,12 @@ struct HeroLayout: Equatable {
         center = CGPoint(x: rect.midX, y: rect.minY + rect.height * 0.44)
         chipSize = (min(rect.width, rect.height) * 0.40).rounded()
         nodeSize = 58
-        let dx = rect.width * 0.36
-        let dy = rect.height * 0.29
+        // Pads sit slightly up and outward vs the old 0.36/0.29 spread so the
+        // corner labels clear the board edges and the pads lean away from the
+        // chip (2026-10-14 UI pass). The board's buses/keep-outs derive from
+        // these same centres, so everything follows.
+        let dx = rect.width * 0.375
+        let dy = rect.height * 0.315
         let c = center
         nodeCenters = RunStage.allCases.map { stage in
             CGPoint(x: c.x + CGFloat(stage.corner.x) * dx, y: c.y + CGFloat(stage.corner.y) * dy)
