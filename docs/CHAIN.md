@@ -122,6 +122,7 @@ Dopamine 3.0.10 BaseBin names + Relaxin/RootHide (ElleKit as CydiaSubstrate, `Re
 
 KRW self-test (must pass before inject): `kread32(kbase) == MH_MAGIC_64` and `kbase+0x1c` is a kernel VA. Heap leaks and blit `0xA5` fail this test.
 
+0. **elevate** (`Kernel/Lum1naElevate.m`, Dopamine order): proc_self via backward `p_list.le_prev` walk from `kernproc` → uid0/gid0 → clear `P_SUGID` → MAC label slot1 `~0` (unsandbox, /var verify) → env fixups → `proc_ro.csflags |= CS_PLATFORM_BINARY` (csops verify). Struct offsets: `Kernel/Lum1naStructOffsets.m` (darwin-24.4+ ladder, per-SKU row). HOLDs honestly while `kernproc == 0` (VA underived — Ghidra task queued); the rest of the pipeline then degrades to pre-elevate behavior (AMFI/inject sandbox-denied, expected EPERM). Without this step the 17:50 rig run is what you get: KRW gate PASSED, `posix_spawn opainject rc=1 EPERM`, no respring.
 1. `pmap_cs_allow_invalid` `*(pmap+0xca)=1`
 2. AMFI UC loadTrustCache sel 2/7 of `Documents/basebin/basebin.tc`
 3. trustcache `launchdhook` / `systemhook` / `dyldhook` / `watchdoghook` / `forkfix`
@@ -131,7 +132,7 @@ KRW self-test (must pass before inject): `kread32(kbase) == MH_MAGIC_64` and `kb
 
 A14 is **PPL**, not momentarius. Drop files into the app container, then re-tap **afterkread** after `hasKread`. Persist / tempRoot / boot-time auto-rejailbreak stay later (novel Lum1na, not a Dopamine copy). See All stages → After-kread plan.
 
-Full Chain order: SANDBOX BadQuery → KERNEL LightSword → AfterKread. P044 stays All-stages. Auto chain skips P051/P053/P054. Parked All-stages: ColdForge, Rapier, p055, p058 JPEG open, p056/p061 AVE reach, Anvil open-only, P064AVE84607Racer remaining-fire, P065–P072 (invoke solo).
+Full Chain order: SANDBOX BadQuery → KERNEL LightSword → DAEMON P054 bounded (1 thread, 2s, 50 files — the 4×500×30s storm stays dead) → PATCHSET (elevate → pmap_cs → AMFI → opainject → dpkg → respring). P044 stays All-stages. Auto chain skips P051/P053. Parked All-stages: ColdForge, Rapier, p055, p058 JPEG open, p056/p061 AVE reach, Anvil open-only, P064AVE84607Racer remaining-fire, P065–P072 (invoke solo).
 
 ## Not in this repo
 

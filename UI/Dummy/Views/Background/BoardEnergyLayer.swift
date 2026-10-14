@@ -68,6 +68,17 @@ struct BoardEnergyLayer: View {
                 context.stroke(bus.path, with: .color(color.opacity(0.9 * k)), style: style)
                 style.lineWidth = 0.8
                 context.stroke(bus.path, with: .color(.white.opacity(0.5 * k)), style: style)
+                // Plug glow: the bus terminates at the pad rim (BoardLayout
+                // trims it there), so a small solder-dot bloom marks the
+                // joint. Static when motion is off; breathes with the bus.
+                let tip = bus.point(at: bus.length)
+                let tipR = 5.0 + 2.0 * k
+                context.fill(Path(ellipseIn: CGRect(x: tip.x - tipR, y: tip.y - tipR, width: tipR * 2, height: tipR * 2)),
+                             with: .radialGradient(
+                                Gradient(colors: [color.opacity(0.7 * k), color.opacity(0)]),
+                                center: tip, startRadius: 0, endRadius: tipR))
+                context.fill(Path(ellipseIn: CGRect(x: tip.x - 1.6, y: tip.y - 1.6, width: 3.2, height: 3.2)),
+                             with: .color(.white.opacity(0.75 * k)))
             } else {
                 var style = round
                 style.lineWidth = 1.4

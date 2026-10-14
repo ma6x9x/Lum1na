@@ -1,5 +1,6 @@
 #import "Lum1naAfterKread.h"
 #import "Lum1naBoard.h"
+#import "Lum1naElevate.h"
 #import "LabLocalTime.h"
 #import "LabRuntimeOffsets.h"
 #import "Lum1naSocketKRW.h"
@@ -671,11 +672,17 @@ static void ak_tryInstallPkgman(NSMutableString *s) {
         return body.length ? body : s;
     }
 
-    ak_log(s, @"FIRING: KRW test PASS — Dopamine-shaped AMFI/pmap_cs + inject + Sileo + respring");
+    ak_log(s, @"FIRING: KRW test PASS — Dopamine-shaped elevate + AMFI/pmap_cs + inject + Sileo + respring");
     [[Lum1naBoard shared] recordEvent:@"afterkread"
                                  kind:@"fire"
                                detail:@"hasKread=YES"
                                source:@"afterkread"];
+
+    /* Dopamine order: elevatePrivileges FIRST (uid0 -> unsandbox ->
+       CS_PLATFORM_BINARY), then pmap/AMFI/inject. The rig 17:51 run proved
+       every spawn below dies EPERM without it. Elevate holds honestly when
+       the per-SKU kernproc VA is still underived. */
+    [s appendString:[Lum1naElevate runElevate]];
 
     uint32_t selCopy = off->amfi_sel_copy;
     uint32_t selManifest = off->amfi_sel_manifest;

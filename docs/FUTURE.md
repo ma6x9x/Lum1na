@@ -44,6 +44,8 @@ Dopamine 3.0.10 does not run on A14 23F77. Relaxin is a RootHide/ElleKit jailbre
 4. `opainject 1 launchdhook` then `jbctl respring`
 
 Wired (2026-10-09): the JAILBREAK / FULL CHAIN flow drives this pipeline end to end via `Bootstrap/Lum1naBootstrap.swift` + the `Lum1naAfterKread` STAGE/FIRE split. Staging always runs (BaseBin.tar + debs into Documents); the gate, pmap_cs, AMFI trustcache, opainject, `dpkg -i`, and respring fire **only** on a passing self-test. Post-respring state is detected from the filesystem (jbroot dpkg + Sileo/Zebra bundles) and surfaces as `JAILBROKEN` in the device bar — detection, not a claim.
+
+Wired (2026-10-14): **elevate step 0** added to AfterKread FIRE (`Kernel/Lum1naElevate.m`, Dopamine order: uid0 → P_SUGID → MAC label → env → CS_PLATFORM), driven by the new per-SKU struct-offset table `Kernel/Lum1naStructOffsets.m` (darwin-24.4+ ladder; P7-leak values cross-validated against Dopamine info.c, P7 VAs rejected via Ghidra). Root cause of the 17:50 rig run (KRW gate PASSED but `posix_spawn opainject rc=1 EPERM`, no respring) was this missing step. `kernproc` is 0 for every SKU until per-SKU Ghidra derivation lands, so elevate logs an honest HOLD and the pipeline degrades to pre-elevate behavior instead of writing to a wrong VA. Next: derive `kernproc`/allproc on 23F77 (cache already open in Ghidra), 22G100, 23G71.
 5. A14 PPL — AMFI UC from this process after `hasKread`
 6. Persist / tempRoot / boot-time auto-rejailbreak stay later — that is the novel Lum1na layer, after this injection basis works
 
@@ -252,42 +254,3 @@ magic self-test; JAILBROKEN only on real post-respring jbroot evidence.
   strtol-parses the string (hunt will predict usecount 0x23c, matching
   LabOff A14 live). P044 stage statuses de-mojibaked to ASCII (the stage
   formatter path mangles non-ASCII; plain P06xLog lines render fine).
- - **2026-10-14 LATE SESSION (17:50-18:05 EDT): DarkSword/P7 intel + rig
-  Full Chain transcript decode + UI pass.**
-  - **Rig Full Chain transcript (17:50:20, build d4af433) DECODED:** first
-    FIRE HOLD (hasKread NO) -> manual cs2core tap 17:50:46 -> commitSlide OK
-    (4-5 s establish, not the hunt 3.5-min spray) -> second FIRE 17:51:20:
-    KRW test PASS (magic + typeinfo) -> pipeline FIRED but every execution
-    step was sandbox-denied: AMFI IOServiceOpen kr=0xe00002e2 (needs
-    AppleMobileFileIntegrityUserClient entitlement / unsandbox), posix_spawn
-    opainject rc=1 EPERM, jbctl rc=1 EPERM, /usr/bin/killall absent in
-    container. CONCLUSION: "COMPLETE but no respring" = honest pipeline ran
-    to its sandbox wall. NEXT LINK in the chain is the unsandbox step
-    (kwrite: platform-application + task ports, Dopamine post-KRW order),
-    which needs kernel WRITE in-process, then jbroot install (not just
-    Documents staging) before opainject/jbctl can execute. That is exactly
-    the "Dopamine next after kreadbuf" path already printed by the krw TAP.
-  - **DarkSword P7 intel (iVerify 2026-10-08 + Google TAG + TheRealClarity
-    ClearSword writeup):** P7 is a payload variant (keychain/wallet theft,
-    two-way C2), NOT a new kernel exploit. The kernel stage of the whole
-    family is CVE-2025-43520 (VFS cluster_write/read_contig UPL
-    phys-contig TOCTOU) = our ClearSword core, PATCHED in 18.7.2 / 26.1.
-    Hunt device (iPhone13,2 A14 26.5 = build 23F77) is therefore PATCHED:
-    verbatim core runs the full spray but cannot win the race; the 17:38
-    SIGABRT was the mlock-table overflow (fixed in 1b0e437), not the race
-    firing. Rig (A13 22G100 = 18.6.2) remains the only ClearSword-viable
-    device. 26.5 KRW needs a NEW bug — active candidates stay P044
-    aio84530 (heap anchors PROVEN twice on hunt 17:06/17:21, fill lane
-    works) and the ANE CheckandPrewire OOB (T1), both unpatched per our
-    probes. Kev1nLevin offsets table (A17 18.4) confirms per-SKU ladder
-    offsets: usecount 0x254 (A13 rig) vs 0x228, icmp6filt 0x150 vs 0x138 —
-    our LabOff table already carries the A14 values.
-  - **UI pass shipped:** always dark (Appearance picker removed, RootView
-    pins .dark); main buses now stop at each pad's rim (nodeSize/2+1) and
-    at the chip rim (half+2) instead of running ~29 pt under the glass, so
-    the three-line bus visibly plugs into the pad and energy pulses seed
-    from the same trimmed traces; fan traces that miss the edge always die
-    as vias (0.3 -> 0.42 probability), killing the floating stubs that read
-    as "wire missed the pad"; pads nudged slightly up and outward
-    (0.36/0.29 -> 0.375/0.315 spread, buses follow since they derive from
-    the same nodeCenters).

@@ -58,7 +58,7 @@ Stale names (do **not** resurrect): FusionChain, KernelMap/LabOffsets.swift dupl
    Only import headers that exist. NSClassFromString does not need a bridge import, but `LabOff()` / `LabDeviceProfile` do.
 
 9. **Auto chain vs catalog**  
-   JAILBREAK must not invoke process-killing probes. P051, P053, and unbounded P054 (4×500×30s unlink) jetsam'd the app. SANDBOX and DAEMON pads are HOLD. All-stages p054 is bounded (2s / 1 thread). Do not restore the storm loop.
+   JAILBREAK must not invoke process-killing probes. P051, P053, and unbounded P054 (4×500×30s unlink) jetsam'd the app — those stay out. The DAEMON pad fires the **bounded** P054 tap (1 thread, 2s, 50 files). Do not restore the storm loop.
 
 10. **`.deb` is an `ar` archive**  
    `sileo.deb` / `zebra.deb` will be **linked** if the synchronized root treats them as static libs (`ld: archive member 'debian-binary' not a mach-o file`). Keep `Resources/pkgman`, `Resources/basebin`, `Resources/tweaks` as `explicitFolders` and the two debs as `explicitFileTypes = file`. Do not add a Makefile — the IPA gate is `xcodebuild` in `build-ipa.yml`.
@@ -133,4 +133,4 @@ The `objective-c-xcode.yml` workflow is historically red. **Lum1na Build** (IPA)
 
 ## Honesty
 
-Kernel read/write is **not** obtained. `Lum1naKRW` is a placeholder. One failed tap does not close a CVE class (`docs/FUTURE.md`, lab notes 89). Lab panic app is `~/Desktop/P007OpenOnly`. This repo is the public shell + catalog.
+Kernel read/write is **not** obtained on 26.5 (hunt). The old `Lum1naKRW` placeholder class is gone — the KERNEL stage runs KRWChainController → LightSword → libkrw → cs2core, and only a passing self-test sets `hasKread` (rig 18.6.2 landed it via cs2core 2026-10-14). One failed tap does not close a CVE class (`docs/FUTURE.md`, lab notes 89). Lab panic app is `~/Desktop/P007OpenOnly`. This repo is the public shell + catalog.

@@ -23,13 +23,19 @@ struct CircuitBoardView: View {
         ZStack {
             Palette.boardBase(for: scheme)
             if let layout {
-                BoardStaticLayer(layout: layout, generation: generation, isDark: scheme == .dark)
-                    .equatable()
-                if animated {
-                    energy(layout)
+                Group {
+                    BoardStaticLayer(layout: layout, generation: generation, isDark: scheme == .dark)
+                        .equatable()
+                    if animated {
+                        energy(layout)
+                    }
                 }
+                .transition(.opacity)
             }
         }
+        // Subtle: the board fades in once the hero frame is known (it is
+        // gated nil until then), instead of hard-cutting into place.
+        .animation(Motion.adaptive(.easeInOut(duration: 0.45), motion: motion), value: layout != nil)
         .animation(motion.allowsContinuousMotion ? nil : .easeInOut(duration: 0.35), value: litKey)
         .ignoresSafeArea()
         .onGeometryChange(for: CGRect.self) { proxy in
@@ -77,6 +83,15 @@ struct CircuitBoardView: View {
 
     private func rebuild() {
         guard boardFrame.width > 1, boardFrame.height > 1 else { return }
+        // First-paint glitch fix: on home, heroFrame starts as .zero and the
+        // fallback rect used to draw a full board at a guessed height, then
+        // visibly snap once the real hero frame arrived. Draw base-only until
+        // the hero reports, then let the board fade in already aligned.
+        // (Sheets pass heroFrame == nil and keep the fallback estimate.)
+        if heroFrame != nil && (heroFrame?.width ?? 0) <= 1 {
+            layout = nil
+            return
+        }
         layout = BoardLayout(size: boardFrame.size, hero: HeroLayout(in: localHeroRect))
         generation += 1
     }

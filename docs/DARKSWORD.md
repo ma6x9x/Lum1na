@@ -58,11 +58,19 @@ structs: proc_p_ucred 0x28  proc_p_pid 0x60   proc_p_task 0x08
          task_map 0x28  task_itk_space ...
 ```
 
-Status for Lum1na: LEADS ONLY. These are another kit's claims. The
-kernel_base matching our own static base is encouraging; every VA and
-struct offset still needs our own Ghidra proof on the 23F77 kernelcache
-before it enters the LabOff table. Cross-check queue: proc_p_csflags 0x24
-and ucred_cr_uid 0x18 against the Dopamine info.c ladder we already use.
+Status for Lum1na: struct offsets CROSS-VALIDATED, VAs REJECTED.
+`proc_p_ucred 0x28`, `proc_p_csflags 0x24`, `ucred_cr_uid 0x18`,
+`ucred_cr_ruid 0x1c` all AGREE with the Dopamine libjailbreak
+darwin-24.4+ ladder (info.c) — those exact values now live in
+`Kernel/Lum1naStructOffsets.m` (with the rest of the ladder: svuid 0x20,
+groups 0x28, rgid/svgid 0x68/0x6c, label 0x78, proc pid 0x60, flag 0x25c).
+The VAs did NOT survive our own proof: `proc_find 0xfffffff00a2bbd44`
+resolves to no function on the 23F77 kernelcache (Ghidra), so
+`kernproc 0xfffffff007d2c258` is treated as unproven too and the
+`kernproc` slot stays 0 until we derive it ourselves. `kernel_base`
+matching LabStaticBase was real but is the one thing we never needed
+from them. P7's stabilization hint (icmp6filt/inpcb object conversion)
+is noted in `Exploit/LightSword.h`; no probe bodies changed.
 
 ## 3. Delivery + LAB markers (templating inventory)
 
