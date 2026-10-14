@@ -157,3 +157,23 @@ magic self-test; JAILBROKEN only on real post-respring jbroot evidence.
   prediction for THIS device's kern.osrelease against LabOff() live
   (would have caught the usecount=0 rig bug). P091 `darksword` and
   P092 `liter8` static maps added; docs/DARKSWORD.md + docs/LITER8.md.
+
+- **2026-10-14 RIG PANICS (2 kernel data aborts, both with Lum1na as the
+  panicked task):** Panic 1 (16:40:11, boot slide 0x1544c000): SAME boot as
+  the 16:29 cs2core run (kbase 0xfffffff01c448000 exact match; x1 even held
+  kbase+0x1c, our version-string read target). Lum1na pid 321 RELAUNCH
+  (1 thread, 0 pages) hit the abort at text+0xFA2848 dereferencing heap VA
+  0xffffffdc07557110, 11 min after the usecount=0 wrong-offset corruption.
+  This is the predicted so_list.le_next aftermath class: the reboot I
+  advised would have prevented it if done before the device kept working.
+  Panic 2 (16:44:29, NEW boot, slide 0x19a88000): DIFFERENT failure. Lum1na
+  pid 416 ACTIVE (11 threads, 18702 pages, stackshot ok) mid-tap; pc
+  IOGPUFamily+0xBE78 (kext 104.6.1 @ 0xfffffff023695200), AGXG12P 328.5 in
+  backtrace; far 0x00200000000000a8 through x16=0x0020000000000000 with
+  x17=0xcda1ffe048734b10 = FAILED PAC AUTH on kernel heap pointer
+  0xffffffe048734b10 (raw in x0). A GPU-driver PAC-auth failure during an
+  active tap is NOT the socket bug (different boot, different subsystem).
+  Suspects: a GPU/ANE lane (p061/p066/p069/p055/ANE254) or a 23F77-pinned
+  lane on the A13 rig. Which tap ran at 16:44 is the open attribution
+  question; 16:44 console capture needed. No more rig taps until the repo
+  app is rebuilt (usecount 0x254 + lane cascade) and panic 2 is pinned.
