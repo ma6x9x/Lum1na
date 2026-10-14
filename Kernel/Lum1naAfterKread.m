@@ -431,27 +431,29 @@ static BOOL ak_krwSelfTest(NSMutableString *s) {
         ak_log(s, @"[-] KRW test SKIP — kbase=0");
         return NO;
     }
-    uint32_t magic = ctx ? Lum1naSocketKRW_KRead32(ctx, kbase)
-                         : (Lum1naLibkrw_IsLive() ? Lum1naLibkrw_KRead32(kbase)
-                                                  : Lum1naCS2Core_KRead32(kbase));
+    /* Lane cascade: a stamped/dead krwContext must not block a live
+       ClearSword core lane (2026-10-14 rig). The kread result decides. */
+    uint32_t magic = ctx ? Lum1naSocketKRW_KRead32(ctx, kbase) : 0;
+    if (magic != MH_MAGIC_64 && Lum1naLibkrw_IsLive()) magic = Lum1naLibkrw_KRead32(kbase);
+    if (magic != MH_MAGIC_64 && Lum1naCS2Core_IsLive()) magic = Lum1naCS2Core_KRead32(kbase);
     ak_log(s, @"[*] KRW test kread32(kbase=0x%llx)=0x%08x (want MH_MAGIC_64 0xfeedfacf)",
            (unsigned long long)kbase, magic);
     if (magic != MH_MAGIC_64) {
         ak_log(s, @"[-] KRW test FAIL — kbase is not a Mach-O. hasKread is a lie; refuse inject.");
         return NO;
     }
-    uint64_t vptr = ctx ? Lum1naSocketKRW_KRead64(ctx, kbase + 0x1c)
-                        : (Lum1naLibkrw_IsLive() ? Lum1naLibkrw_KRead64(kbase + 0x1c)
-                                                 : Lum1naCS2Core_KRead64(kbase + 0x1c));
+    uint64_t vptr = ctx ? Lum1naSocketKRW_KRead64(ctx, kbase + 0x1c) : 0;
+    if (vptr < 0xFFFFFF8000000000ULL && Lum1naLibkrw_IsLive()) vptr = Lum1naLibkrw_KRead64(kbase + 0x1c);
+    if (vptr < 0xFFFFFF8000000000ULL && Lum1naCS2Core_IsLive()) vptr = Lum1naCS2Core_KRead64(kbase + 0x1c);
     ak_log(s, @"[*] KRW test kread64(kbase+0x1c)=0x%llx", (unsigned long long)vptr);
     if (vptr < 0xFFFFFF8000000000ULL) {
         ak_log(s, @"[-] KRW test FAIL — kbase+0x1c is not a kernel VA");
         return NO;
     }
     uint8_t buf[16] = {0};
-    BOOL haveVersion = ctx ? Lum1naSocketKRW_KReadBuf(ctx, vptr, buf, sizeof(buf))
-                           : (Lum1naLibkrw_IsLive() ? Lum1naLibkrw_KReadBuf(vptr, buf, sizeof(buf))
-                                                    : Lum1naCS2Core_KReadBuf(vptr, buf, sizeof(buf)));
+    BOOL haveVersion = ctx ? Lum1naSocketKRW_KReadBuf(ctx, vptr, buf, sizeof(buf)) : NO;
+    if (!haveVersion && Lum1naLibkrw_IsLive()) haveVersion = Lum1naLibkrw_KReadBuf(vptr, buf, sizeof(buf));
+    if (!haveVersion && Lum1naCS2Core_IsLive()) haveVersion = Lum1naCS2Core_KReadBuf(vptr, buf, sizeof(buf));
     if (haveVersion) {
         ak_log(s, @"[*] KRW test version bytes %02x %02x %02x %02x %02x %02x %02x %02x",
                buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]);
@@ -696,8 +698,9 @@ static void ak_tryInstallPkgman(NSMutableString *s) {
         ak_log(s, @"[*] pmap_cs poke *(0x%llx)=1 (pmap+0x%x)", (unsigned long long)addr, pmapOff);
         bool ok = b.krwContext
             ? Lum1naSocketKRW_KWrite8((Lum1naSocketKRWContext *)b.krwContext, addr, 1)
-            : (Lum1naLibkrw_IsLive() ? Lum1naLibkrw_KWrite8(addr, 1)
-                                     : Lum1naCS2Core_KWrite8(addr, 1));
+            : NO;
+        if (!ok && Lum1naLibkrw_IsLive()) ok = Lum1naLibkrw_KWrite8(addr, 1);
+        if (!ok && Lum1naCS2Core_IsLive()) ok = Lum1naCS2Core_KWrite8(addr, 1);
         ak_log(s, @"[%@] pmap_cs KWrite8 (%@)", ok ? @"+" : @"-",
                b.krwContext ? @"socketkrw" : @"libkrw");
     } else {

@@ -363,11 +363,18 @@ static inline void boardSet(NSMutableDictionary *d, NSString *key, id val) {
         // Live kread of kbase+0x1c must look like a kernel VA (pointer, not Darwin version text).
         uint64_t version_ptr = kbase + 0x1c;
         uint64_t version_str;
+        /* Lane cascade (2026-10-14 rig): P044/ANE254 stamp board.krwContext
+           with placeholder contexts; a dead SocketKRW ctx must not block a
+           live ClearSword core lane. The kread result decides, not the flag. */
         if (_krwContext) {
             version_str = Lum1naSocketKRW_kread64(_krwContext, version_ptr);
-        } else if (Lum1naLibkrw_IsLive()) {
-            version_str = Lum1naLibkrw_KRead64(version_ptr);
         } else {
+            version_str = 0;
+        }
+        if (version_str < 0xFFFFFF8000000000ULL && Lum1naLibkrw_IsLive()) {
+            version_str = Lum1naLibkrw_KRead64(version_ptr);
+        }
+        if (version_str < 0xFFFFFF8000000000ULL && Lum1naCS2Core_IsLive()) {
             version_str = Lum1naCS2Core_KRead64(version_ptr);
         }
         if (version_str < 0xFFFFFF8000000000ULL) {

@@ -128,3 +128,21 @@ magic self-test; JAILBROKEN only on real post-respring jbroot evidence.
   (0x4001/0x7fff/0x5000) accepted and lock survived. The kernel catches all
   shapes; 64749 +0xc3 is not reachable via these surface params. NOT KRW,
   diagnostic only. (Log used box-drawing chars — ASCII-only rule reminder.)
+
+- **2026-10-14 RIG PROOF (Beta 1, `cs2core` tap):** the verbatim ClearSword core
+  ran the full chain on the rig (iPhone12,1 A13 22G100, 18.6.2): 22528-socket
+  spray, first-mapping hit (pcb_start_offset 0x400), target corrupted at
+  0xffffffe0cf174948, control_socket idx 0x1f7f, success_read_count 59,
+  kbase 0xfffffff01c448000, slide 0x15444000, magic self-test PASS in
+  1400 ms. First real KRW establishment in Lum1na. commitSlide refused on the
+  same tap: board.krwContext was a stale/dead SocketKRW placeholder, so the
+  kread of kbase+0x1c returned 0 through the socket lane and the ClearSword
+  lane was never consulted. Fix: lane cascade in Lum1naBoard.commitSlide and
+  Lum1naAfterKread (socket ctx -> libkrw -> cs2core, kread result decides, not
+  the flag). Also: gA13_22G100 socket_usecount filled with the info.c ladder
+  value 0x254 (darwin>=23.4; rig 24.6.0) -- the earlier 0 left so_count reads
+  at socket+0, which bumped a refcount at the wrong offset and corrupted one
+  live so_list.le_next; RIG MUST REBOOT before the next cs2core tap. Log sink
+  format fixes (%@ -> %s, time via UTF8String) in Lum1naCS2Core.m. hasKread
+  still NO until a rebooted rig re-taps and commitSlide passes; that is the
+  honesty line, and it is one reboot away.
