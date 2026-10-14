@@ -146,3 +146,14 @@ magic self-test; JAILBROKEN only on real post-respring jbroot evidence.
   format fixes (%@ -> %s, time via UTF8String) in Lum1naCS2Core.m. hasKread
   still NO until a rebooted rig re-taps and commitSlide passes; that is the
   honesty line, and it is one reboot away.
+
+- **2026-10-14 INTEL DB (p093 `intel` tap, repo + P007):** merged offset
+  database `Exploit/LabIntelOffsets.{h,m}` — PROVEN rows (our runs: LabOff
+  tables, cs2core rig kbase/slide, P053/P063/P065/P069 pins), LADDER rows
+  (Dopamine libjailbreak info.c branches, incl. socket.usecount 0x24c /
+  0x254 / 0x23c per darwin), LEAD rows (DarkSword chain_loader_26.js
+  __A14_A18_OFFSETS, unproven). Reference only: LabOff() stays the only
+  resolver; the DB never feeds kread/kwrite. P093 cross-checks the ladder
+  prediction for THIS device's kern.osrelease against LabOff() live
+  (would have caught the usecount=0 rig bug). P091 `darksword` and
+  P092 `liter8` static maps added; docs/DARKSWORD.md + docs/LITER8.md.
