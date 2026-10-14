@@ -98,6 +98,7 @@ public final class PersistentLogStore {
         "board": "lum1na_board.json",
         "afterkread": "p06x_afterkread_log.txt",
         "krwlib": "p06x_krwlib_log.txt",
+        "cs2core": "cs2_core_log.txt",
         "dopaminecompat": "dopaminecompat_log.txt",
         "KERNEL": consoleLogName,
         "SANDBOX": consoleLogName,

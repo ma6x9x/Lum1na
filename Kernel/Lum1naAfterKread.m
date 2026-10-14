@@ -4,6 +4,7 @@
 #import "LabRuntimeOffsets.h"
 #import "Lum1naSocketKRW.h"
 #import "Lum1naLibkrw.h"
+#import "Lum1naCS2Core.h"
 #import "P06xLog.h"
 
 #import <IOKit/IOKitLib.h>
@@ -415,20 +416,24 @@ static BOOL ak_krwSelfTest(NSMutableString *s) {
     Lum1naBoard *b = [Lum1naBoard shared];
     Lum1naSocketKRWContext *ctx = (Lum1naSocketKRWContext *)b.krwContext;
     /* B1 harness path: on the rig the board committed via libkrw (no SocketKRW ctx). */
-    if (!b.hasKread || (!ctx && !Lum1naLibkrw_IsLive())) {
-        ak_log(s, @"[-] KRW test SKIP — hasKread=%@ ctx=%p libkrw=%@",
+    if (!b.hasKread || (!ctx && !Lum1naLibkrw_IsLive() && !Lum1naCS2Core_IsLive())) {
+        ak_log(s, @"[-] KRW test SKIP — hasKread=%@ ctx=%p libkrw=%@ cs2core=%@",
                b.hasKread ? @"YES" : @"NO", ctx,
-               Lum1naLibkrw_IsLive() ? @"live" : @"dead");
+               Lum1naLibkrw_IsLive() ? @"live" : @"dead",
+               Lum1naCS2Core_IsLive() ? @"live" : @"dead");
         ak_printKRWSteps(s);
         return NO;
     }
-    uint64_t kbase = b.kbase ? b.kbase : (ctx ? ctx->kbase : Lum1naLibkrw_Kbase());
+    uint64_t kbase = b.kbase ? b.kbase
+                             : (ctx ? ctx->kbase
+                                    : (Lum1naLibkrw_IsLive() ? Lum1naLibkrw_Kbase() : Lum1naCS2Core_Kbase()));
     if (!kbase) {
         ak_log(s, @"[-] KRW test SKIP — kbase=0");
         return NO;
     }
     uint32_t magic = ctx ? Lum1naSocketKRW_KRead32(ctx, kbase)
-                         : Lum1naLibkrw_KRead32(kbase);
+                         : (Lum1naLibkrw_IsLive() ? Lum1naLibkrw_KRead32(kbase)
+                                                  : Lum1naCS2Core_KRead32(kbase));
     ak_log(s, @"[*] KRW test kread32(kbase=0x%llx)=0x%08x (want MH_MAGIC_64 0xfeedfacf)",
            (unsigned long long)kbase, magic);
     if (magic != MH_MAGIC_64) {
@@ -436,7 +441,8 @@ static BOOL ak_krwSelfTest(NSMutableString *s) {
         return NO;
     }
     uint64_t vptr = ctx ? Lum1naSocketKRW_KRead64(ctx, kbase + 0x1c)
-                        : Lum1naLibkrw_KRead64(kbase + 0x1c);
+                        : (Lum1naLibkrw_IsLive() ? Lum1naLibkrw_KRead64(kbase + 0x1c)
+                                                 : Lum1naCS2Core_KRead64(kbase + 0x1c));
     ak_log(s, @"[*] KRW test kread64(kbase+0x1c)=0x%llx", (unsigned long long)vptr);
     if (vptr < 0xFFFFFF8000000000ULL) {
         ak_log(s, @"[-] KRW test FAIL — kbase+0x1c is not a kernel VA");
@@ -444,7 +450,8 @@ static BOOL ak_krwSelfTest(NSMutableString *s) {
     }
     uint8_t buf[16] = {0};
     BOOL haveVersion = ctx ? Lum1naSocketKRW_KReadBuf(ctx, vptr, buf, sizeof(buf))
-                           : Lum1naLibkrw_KReadBuf(vptr, buf, sizeof(buf));
+                           : (Lum1naLibkrw_IsLive() ? Lum1naLibkrw_KReadBuf(vptr, buf, sizeof(buf))
+                                                    : Lum1naCS2Core_KReadBuf(vptr, buf, sizeof(buf)));
     if (haveVersion) {
         ak_log(s, @"[*] KRW test version bytes %02x %02x %02x %02x %02x %02x %02x %02x",
                buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7]);
@@ -684,12 +691,13 @@ static void ak_tryInstallPkgman(NSMutableString *s) {
     if (!pmapOffProven && pmapVA) {
         ak_log(s, @"[*] pmap_cs poke SKIPPED — pmap_cs_allow_off unproven on this SKU "
                    @"(A13_22G100 rig table is link-base-only; rig is already PPL-bypassed by Dopamine)");
-    } else if (pmapVA && (b.krwContext || Lum1naLibkrw_IsLive())) {
+    } else if (pmapVA && (b.krwContext || Lum1naLibkrw_IsLive() || Lum1naCS2Core_IsLive())) {
         uint64_t addr = pmapVA + pmapOff;
         ak_log(s, @"[*] pmap_cs poke *(0x%llx)=1 (pmap+0x%x)", (unsigned long long)addr, pmapOff);
         bool ok = b.krwContext
             ? Lum1naSocketKRW_KWrite8((Lum1naSocketKRWContext *)b.krwContext, addr, 1)
-            : Lum1naLibkrw_KWrite8(addr, 1);
+            : (Lum1naLibkrw_IsLive() ? Lum1naLibkrw_KWrite8(addr, 1)
+                                     : Lum1naCS2Core_KWrite8(addr, 1));
         ak_log(s, @"[%@] pmap_cs KWrite8 (%@)", ok ? @"+" : @"-",
                b.krwContext ? @"socketkrw" : @"libkrw");
     } else {

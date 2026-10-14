@@ -72,3 +72,59 @@ Star is the motherboard hub (no center ring). Traces light to KERNEL / SANDBOX /
 - **p074 consume v3:** All-real y=inf matches neither hypothesis (staging sum 6.59e4 / surface bytes 1.15e14); All-bogus also predicts OK (no abort/fallback timing signature); D1 scan 0 touched of 385. Discriminator inconclusive, arm-B needs Ghidra. Sharpest new lever: rig-accepts vs hunt-rejects means the 0x2/0x9 reject is SKU/ANE-firmware-specific, not model-intrinsic - the rig is the live control for that decode.
 - **p022GC v41:** in-window no-file registration at 0x180000000 ACCEPTED, residency prot=5/5 depth=1 (v39 was prot=0/0), read still faults -> accepted but not instantiated. Container fd prot=RW -> EPERM MAC deny on any fd path (Ghidra mac_file_check_mmap 0xa5d79d8). Zero stores. Probe only.
 - **p057 v6 on rig:** interpose hook never routes on this UC (hook_n=0, dyld4) -> synthetic path only; sel0/1 decl 0x28/0x100 kr=0x5 nonfill=0 kptrs=0 - no deserialize proof; need a real ACM on this AppleKeyStore conn. sel5 sweep / 163-sel / 0x800 stay parked.
+
+## B1 unlock: verbatim ClearSword core lane (2026-10-13)
+
+Beta 1 path #2 for real KRW, wired and CI-gated. The rig (iPhone12,1 A13 22G100,
+Dopamine-jailbroken) runs Dopamine 3.0.10 whose ClearSword exploit provably works
+on exactly this device/OS, so the core ships verbatim instead of re-derived:
+
+- `Exploit/ClearSwordCore/` — upstream `exploit/*.c|*.h` copied byte-for-byte from
+  Dopamine 3.0.11 (opa334, credited), then mechanically prefixed (`cs2_*`) to
+  coexist with the lab's own ports. NO NECP sockopt addition (that was a lab
+  invention), NO churn thread, NO VM cyclers: the five lab-port divergences that
+  starved the OOB window are undone — 22,528-socket spray, per-mapping
+  `surface_mlock` prefetch-wiring, full 8 x 128 MiB scan with unbounded outer
+  retry, `highiest_success_idx + 100` read retries, upstream identification
+  (`executable_name` memmem + filter-default marker) and the upstream iOS 17+
+  textPtr ladder (pcbinfo → ipi_zone → kt_zv_name).
+- Shim (`ClearSwordCore/common.h`): `koffsetof`/`kconstant` bridge to the
+  libjailbreak info.c ladder; `socket.usecount` + `staticBase` come from the
+  runtime table `LabOff()` (rig darwin 24.6: 0x254 / 0xfffffff007004000; iOS 26
+  usecount 0x23c stays per-SKU). `walk_backtrace` (libjailbreak) stubbed.
+- Lab-safety edits (marked `lab:` in source): time budget `cs2_expired()` guards
+  on pe_v1's outer/seek loops + bounded kernel_base walk; pe_v1 failure is
+  propagated (upstream ignored it); free-thread join before free on the cleanup
+  path; worker mach_vm_map failure releases race_sync instead of leaving the
+  main thread spinning; `return NULL` for the Xcode-16 int-to-pointer error.
+- `Exploit/Lum1naCS2Core.{h,m}` — provider lane #2, contract identical to
+  `Lum1naLibkrw`: Establish (run + kread8(kbase)==0x100000cfeedfacf self-test) →
+  IsLive/Kbase/Kslide/KRead*/KWrite*. Durable log `cs2_core_log.txt`.
+- Dispatch: `Lum1naBoard.commitSlide` and `Lum1naAfterKread` self-test/pmap
+  lanes now pick SocketKRW → libkrw → ClearSword core. `KRWBridge` gained
+  `Lum1naKRW_EstablishFromCS2Core` (slide = kbase − LabStaticBase()).
+- Catalog tap `cs2core` ("B1 ClearSword core") → hasKread → PATCHSET gate opens.
+  JAILBREAK does NOT auto-run the spray; it stays a deliberate one-tap per
+  force-quit, same honesty shape as `krwlib`.
+- `LabRuntimeOffsets.h` made C-safe (`__OBJC__` guard) with `LabSku` moved in as
+  a plain C enum shared with `LabDeviceProfile.h` — pure C can now include the
+  ladder without ObjC headers.
+
+Success bar unchanged: hasKread flips only via `board.commitSlide` after the
+magic self-test; JAILBROKEN only on real post-respring jbroot evidence.
+
+## Rig session 2026-10-13 (afternoon, iPhone12,1 A13 22G100)
+
+- **p083 staging:** 23/24 post-predict gap ids resolved via IOSurfaceLookup in
+  OUR registry (16 KB espresso staging, ids 778-800). LUM1 0x4C554D31 fill of all
+  hits → y2 == y_gate → NO EFFECT ON Y: staging surfaces are command/program-side,
+  not the value source. Phase J re-lookup: ANE rewrote the first 2-byte fp header
+  (u32@0 → 4c555ef8-shape) but LUM1 intact beyond → untouched by predict. The
+  y-control hop stays the forged OUTPUT-record-sid route (Chain 2). Conversion bar
+  untouched; hasKread=NO (this lane).
+- **p019v2 iopl 64749 diagnostic:** every mismatch shape rejected on A13 22G100 —
+  AllocSize < BPR*Height, multi-plane total > AllocSize, memory-entry vm_map size
+  mismatch (kr=0x4), mlock 2-page overflow (errno 12). Non-page-aligned allocs
+  (0x4001/0x7fff/0x5000) accepted and lock survived. The kernel catches all
+  shapes; 64749 +0xc3 is not reachable via these surface params. NOT KRW,
+  diagnostic only. (Log used box-drawing chars — ASCII-only rule reminder.)

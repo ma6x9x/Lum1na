@@ -35,6 +35,8 @@
 
 // Your exploit headers - UPDATED
 #import "Exploit/KRWBridge.h"
+#import "Exploit/Lum1naCS2Core.h"
+#import "Exploit/Lum1naCS2CoreController.h"
 #import "Exploit/P044ExploitController.h"
 #import "Exploit/ANE254InputController.h"
 #import "Exploit/P027MetalCallback.h"
