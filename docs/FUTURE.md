@@ -260,130 +260,90 @@ magic self-test; JAILBROKEN only on real post-respring jbroot evidence.
   LabOff A14 live). P044 stage statuses de-mojibaked to ASCII (the stage
   formatter path mangles non-ASCII; plain P06xLog lines render fine).
 
-## 2026-10-14 — A14_21D50 (iPhone 12 mini, iOS 17.3 / 21D50 / darwin 23.3.0) SCAFFOLD
+- **2026-10-14 EVENING THREE-DEVICE SESSION (12 mini / rig / hunt).**
+  1. **12 mini (iPhone13,1 A14 21D50 17.3) — first real KRW through our
+     pipeline, and the device was STOCK** (user correction: not
+     Dopamine-jailbroken at test time, which makes the result stronger).
+     cs2core fired on 21D50: control_socket idx 0x22a6, kbase
+     0xfffffff00d56c000, slide 0x6568000 (page-aligned — static_base
+     0xfffffff007004000 confirmed). Board hasKread/hasKwrite legitimately
+     YES via the self-test gate. AfterKread FIRE reached staging + KRW
+     self-test PASS + basebin.tc v1 loaded, then `posix_spawn opainject
+     rc=1 (EPERM)` — sandbox wall. On a stock device there is no jbserver
+     and no /var/jb, so krwlib "no provider found" is the correct honest
+     result, not a bug. 509ms tap.
+  2. **Rig (iPhone12,1 A13 22G100 18.6.2 Dopamine):** cs2core KRW stable
+     across boots (slide changes per boot; board tracks it). The honesty
+     gate caught a STALE slide: board said hasKread but kread32(kbase)=0 →
+     "hasKread is a lie; refuse inject" → HOLD. krwlib on rig loads the
+     provider but kbase rc=0 val=0 — root cause now PROVEN from source:
+     libkrw wraps `jbclient_initialize_primitives()` whose first line is
+     `if (getuid() != 0) return -1` (Dopamine libjailbreak/src/main.c) —
+     sysinfo/physrw are Root-domain (euid==0 only). Our mobile app cannot
+     pass; fixable only by becoming euid 0, which our own KRW enables.
+  3. **Hunt (iPhone13,2 A14 23F77 26.5):** T1 leak OK (14 heap leaks on
+     board), 254 addchain CoreML prediction FAILED (-1) again, LightSword
+     spyConfirmed=1 but GART died with last MD (PARKED), Rapier panicked
+     twice (18:52:24, 18:57:20) — stays parked. cs2core gate correctly
+     skipped 26.5 (CVE-2025-43520 patched). See next entry for a new
+     delayed panic.
+  4. **krwlib on 12 mini: no code change.** On stock there is no provider
+     to load; the search-path list already covers /var/jb Dopamine
+     locations (verified against Dopamine Packages/libkrw-provider
+     Makefile: installs to /var/jb/usr/lib/libkrw/libkrw-dopamine.dylib —
+     first entry in our dlopen list).
+  5. **Source-mined Beta 1 blueprint: docs/TIEIN.md** — Dopamine trust
+     ladder (SYSTEMWIDE/PLATFORM/ROOT=euid0/DOPAMINE domains), the
+     process_checkin setuid recipe (proc+svuid/svgid writes + ucred
+     update), darwin23 ucred_rw mirror caveat, trustcache add is
+     kwrite-only on an existing jb-tc (grow needs kalloc/kcall), Nugget's
+     host-side SysContainerDomain traversal write into /var. Device
+     ladders: rig = our KRW → self-elevate (uid0) → Dopamine Root domain
+     unlocks → libkrw/opainject/dpkg live; 12 mini stock = P094 kernproc →
+     P095 ucred ladder → elevate → unsandbox (MAC label slot) → exec-trust
+     decision (static tc per lab notes 12/13/14 vs thread-hijack).
 
-User's 12 mini is jailbroken with Dopamine 3.x rootless (/var/jb, libkrw
-provider live). This is the FIRST device where the post-KRW pipeline can
-run with real kernel read/write from day one. Shipped in this commit:
+- **2026-10-14 20:30:21 HUNT DELAYED PANIC — `[data.kalloc.3072]: element
+  modified after free (off:0, val:0x000000c000000174, sz:3072,
+  ptr:0xffffffe0d4826800)`** (`panic-full-2026-10-14-203021.0002.ips`).
+  Decode: T8101 xnu-12377.122.4, kernel slide 0xcca0000, text exec base
+  0xfffffff016a4c000. Boot 20:13:31 → panic 20:30:21 (~17 min after boot).
+  **Lum1na was alive at panic time (pid 587, uid 501): 38.4s user CPU,
+  569,633 page faults — spray-probe profile, not idle.** Victim that
+  tripped the poison check: `symptomsd` (pid 134) allocating from the
+  recycled DATA kalloc.3072 element. Element content = (c0..d3 tag,
+  0x100000001) pairs with 0xb9-0x1de values — shape consistent with a
+  kmsg/port-descriptor table (symptomsd is a heavy kmsg consumer; our
+  aio84530 lane touches this family — matches lab notes 106 P088
+  kalloc-3072 triage and 135 P044 gzalloc-unified family). Backtrace =
+  syscall path into zalloc poison check; panic caller 0xfffffff017289350
+  = static text 0x83d350, reporter frame 0x83563c (map in Ghidra when
+  convenient). Attribution:
+  corruption landed in THIS boot session (kernel RAM does not survive
+  the 20:13 reboot), i.e. a tap in the 20:13-20:30 window, then delayed
+  payment minutes later — the remaining-fire pattern, NOT cross-boot
+  persistence. Action: hunt fire lanes stay PARKED (existing warnings
+  hold); one tap per boot on hunt; capture which tap ran 20:13-20:30 for
+  the notes. Second panic 12 minutes later, same device, NEW boot
+  (session EFBE32BD, boot ~20:30:4x, kernel slide 0x21360000, text exec
+  base 0xfffffff02b10c000, same kernel UUID D5612296):
 
-1. `LabSkuA14_21D50` enum + detection (`iPhone13,*` + `21D*` prefix —
-   covers 21D50/21D51). `A14_other` still the fallback.
-2. `gA14_21D50` LabOff row — same honesty shape as the rig row: link base
-   0xfffffff007004000 only (proven live on 22G100 + 23F77; on-device
-   confirm = libkrw kbase minus static_base must be page-aligned), ladder
-   `socket_usecount 0x24c` + `iosurface_md 0x40` (info.c darwin>=23.1
-   <23.4 branch), every VA 0 = unproven. Read/write comes from libkrw,
-   NOT the T1/43748 chains. No 26.5 VAs pasted onto 17.3.
-3. `PROC_ROW_D23` struct row — the darwin-23 exception: svuid/svgid
-   0x3C/0x40 (24.4 moved to 0x38/0x3C), proc_ro.csflags 0x1C and
-   proc_ro.ucred 0x20 WITHOUT the +0x8 p_original_ppid shift. kernproc 0
-   = underived (Ghidra pass on 21D50 kernelcache queued).
-4. cs2core gate: `major <= 21` now VIABLE — 43520 patched only in
-   18.7.2/26.1, so 21D50 fires the ClearSword VFS race as an independent
-   KRW lane (real test of the verbatim core on a pre-patch train).
-
-### 12 mini test plan — krwlib-first (tap order)
-
-1. **ident** — confirm `iPhone13,1` → sku `A14_21D50`, table tag matches,
-   ladder fields shown. Pure read, no risk.
-2. **krwlib tap** — dlopen libkrw provider → `krw_initializer` → kbase →
-   `kread32(kbase) == 0xfeedfacf`. EXPECT ESTABLISHED on Dopamine. Log
-   kbase + derived slide; slide must be page-aligned (validates
-   static_base for 21D50 — if slide is misaligned, static_base is wrong
-   and nothing static-VA may proceed).
-3. **board tap** — commitSlide from the established kbase → hasKread YES
-   (first device where the KRW self-test gate passes legitimately).
-4. **Full Chain** — staging → gate (passes) → inject → elevate. Elevate
-   uses PROC_ROW_D23; kernproc=0 keeps it honest-HOLD, so expect clean
-   progress through KRW + a logged kernproc-HOLD, not uid0. After the
-   chain, with kread live, run the kernproc derivation (Ghidra 21D50 or
-   on-device backward le_prev walk) as the next task.
-5. **cs2core tap** (independent lane) — gate now passes on 21D50; the
-   verbatim 43520 core should fire for real. Watch: on rootless Dopamine
-   the sandbox profile is already relaxed, so this is a clean first
-   measurement of the core on a non-rig device.
-6. **CAUTION — opainject / launchdhook**: Dopamine already hooks launchd.
-   Our launchdhook stage may double-inject. Do not run it on the 12 mini
-   until the inject path is verified against a rootless bootstrap.
-   pmap_cs / AMFI pokes stay skipped (sel 0 = unproven on this SKU) —
-   and Dopamine already relaxes AMFI/pmap, so they are unnecessary here.
-
-### p093 / cscali / cskrw results from the hunt device (user pasted)
-
-- **p093 intel (BUILD p093-intel-v1, 19:42:13 EDT)**: table render is
-  correct — PROVEN rows (23F77 + 22G100 static_base, 22G100 kbase/slide
-  live, P063/P053/P069/P065 pins), LADDER rows, DarkSword LEAD DEFERRED
-  (honest). LabOff live cross-check passed: usecount=0x23c matches the
-  darwin>=25 ladder. The on-device ladder predict printed
-  `osrelease major: -1` → that build predates the strtol fix already in
-  this repo (previous entry) — rebuild/reinstall the app and the next
-  p093 run should predict 0x23c on 26.5.
-- **cscali phys_oob calib v8**: classification harness is healthy —
-  H-control 3000/3000, ID sweep offsets=1024 ok=30713 ALL CORRECT, 7
-  ZERO-fails, zero WRONG/FOREIGN/PARTIAL. The pwritev swap path
-  classifies cleanly; calibration is not the blocker.
-- **cskrw ClearSword KRW V23**: race fires reliably (RACE HIT #1 at try
-  0; 375 OOB reads) but **unique Q0 = 1** — every read returned the same
-  qword 0xe4d7f1286bce05fd across 5 mappings x 25 pages. Two blockers:
-  1. `SO_NECP_ATTRIBUTES setsockopt failed: Protocol not available (42)`
-     — the NECP PCB-tagging path is DEAD on 26.5, so PCB identity cannot
-     be confirmed even when a read lands.
-  2. Constant Q0 says the OOB window is reading the same neighbor content
-     every time — the sprayed inpcb pages are not appearing in the scanned
-     window (5 mappings x 25 pages x 3 loops is a small window against
-     321k-socket churn).
-  Fix order: re-tag PCBs with a path that exists on 26.5 — set an 8-byte
-  ICMP6_FILTER marker via setsockopt(IPPROTO_ICMPV6) (not NECP-gated) and
-  confirm identity by matching the marker at inpcb+0x148 (icmp6filt ladder
-  value already in the intel DB). If Q0 stays constant after denser spray,
-  the window itself is the problem. If ClearSword stays PCB-blind, the
-  probe's own pivot advice (64788) applies — but rapier stays PARKED until
-  the IOGPU freelist-encoding corruption (far ...a8/...48, 18:52+18:57
-  panics) is understood.
-
-## 2026-10-14 — DOPAMINE 3.0.11 SUPPORT MATRIX (verified from the local tree)
-
-Read every exploit Info.plist (DPSupportedRanges/Devices) + the dispatch
-code (DOExploit.m, momentarius.c). thisCPU maps the whole Vortex/Tempest
-family (A12/A12X/A12Z) to "A12", and momentarius.c dispatches
-CPUFAMILY_ARM_VORTEX_TEMPEST -> momentarius_init_A12() — so A12X is
-covered in code, not just the plist.
-
-| Exploit      | Type   | Range                          | Devices |
-|--------------|--------|--------------------------------|---------|
-| badRecovery  | PAC    | 15.0-15.4.1 (betas)            | any     |
-| multicast_bc | Kernel | 15.0-15.1.1 (betas)            | not A8/A9 |
-| dmaFail      | PPL    | 15.0-16.5.1                    | any     |
-| weightBufs   | Kernel | 15.2-15.5                      | arm64e  |
-| kfd landa    | Kernel | 15.0-15.8.6, 16.0-16.6.1       | any     |
-| ClearSword   | Kernel | 15.0-18.7.1 AND 19.0-26.0.1    | contiguousMapping |
-| DarkSword    | Kernel | 15.0-18.7.1 AND 19.0-26.0.1    | contiguousMapping |
-| Titan        | PPL    | 16.1-17.3.1                    | A14-A17 |
-| momentarius  | PPL    | 15.0-26.0.1                    | A12, A13 (incl. A12X in code) |
-
-Fleet consequences:
-
-- **12 mini (A14, 21D50)**: jailbroken by Titan. Matches our A14_21D50
-  scaffold; libkrw door ready.
-- **iPhone 11 rig (A13, 22G100)**: jailbroken by momentarius. ClearSword
-  also covers 22G100 — which is why our cs2core verbatim core fired there.
-- **XR (A12, 18.7.2)**: momentarius range 15.0-26.0.1 INCLUDES 18.7.2 and
-  the code path handles A12 — **the XR should be jailbreakable with
-  3.0.11; "not able to be jailbroken" appears outdated.** If the user
-  retries and it lands, the XR gets libkrw -> krwlib lane. Shipped this
-  commit: honest gXR_22H LabOff row (link base + darwin-24.x ladder
-  usecount 0x254, VAs 0) + PROC_ROW("XR_22H311") + selector case — the
-  pipeline is wire-ready before the device is. cs2core honest-skips 22H
-  (43520 patched in exactly 18.7.2 — the same reason ClearSword/DarkSword
-  ranges jump 18.7.1 -> 19.0).
-- **iPad Pro A12X on 26.6**: NO Dopamine exploit covers it (momentarius
-  ends 26.0.1; ClearSword/DarkSword end 26.0.1). If the device can be
-  downgraded/restored to <=26.0.1 (blobs permitting), momentarius should
-  take it (A12X in code) and the twin becomes a libkrw device. On 26.6
-  stock it waits for OUR 26.x primitive; the 23G71 table (Ghidra'd VAs,
-  fill_cap=1, owns_replaceable=1) and probe gates (A14_23F77 ||
-  A12X_23G71 accepted) are already wired.
-- **iPhone 12 hunt (A14, 26.5 / 23F77)**: no Dopamine exploit covers A14
-  past 17.3.1 — Titan ends there and ClearSword/DarkSword end 26.0.1.
-  Confirms the hunt KRW path is OURS to build: ANE T1/43748 grooming fix
-  (write primitive proven) is the closest lever.
+- **2026-10-14 20:42:43 HUNT PANIC #2 — Kernel data abort INSIDE Lum1na
+  (pid 648)** (`panic-full-2026-10-14-204243.0002.ips`). esr 0x96000047
+  (lower-EL data abort, write, translation fault L1) at pc
+  0xfffffff029aa41fc (static __TEXT 0x17401fc; companion frames cluster
+  at static 0x1739xxx-0x174cxxx — one driver region), FAR
+  0xffffffe112900000 == x9, page-aligned, x25 = FAR−0xc00, x20/x26 =
+  0xc0 — a 0xc0-stride entry walk whose write landed on an unmapped or
+  dead translation. Panicked task = Lum1na itself (16 threads, 3.27s
+  user CPU, 12k page faults — light profile vs panic #1's pid 587 at
+  38.4s/569k). Panic-path static frames match panic #1 (0x530e4 entry,
+  0x83563c reporter; #2 caller 0x8434d4). Interpretation: the dual-wrap
+  / foreign-out write family firing synchronously through a dead
+  mapping — the same "alias GART is not independent / GART died with
+  the last MD" finding from the 18:4x session, now as a kernel data
+  abort instead of GPU OOM. The 0xc0 stride matches the out-entry shape
+  family (lab notes 120-125). Action: treat 20:30/20:42 as one incident
+  pair — hunt write lanes (dual-wrap, foreign-out, 254 addchain fire)
+  stay PARKED on 26.5; one tap per fresh boot; log which tap ran for
+  attribution.
