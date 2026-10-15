@@ -23,6 +23,7 @@ Re-resolve `main` at the start of a task. Do not trust this file’s remembered 
 | `Lum1na-Bridging-Header.h` | iOS-safe Mach/IOKit + probe headers |
 | `docs/FUTURE.md`, `docs/development.md`, `docs/IPSW_DIFFS.md` | Status / experiment log / IPSW size+CString maps |
 | `docs/CASESTUDIES.md` | vschko/CaseStudies intel map + panic #1–#3 re-attribution (43748) |
+| `docs/EXTERNAL_INTEL.md` | airlift (MIT, ATAirlock), varik bounty workflow, AltDaemon/Nyxian |
 
 The project uses `PBXFileSystemSynchronizedRootGroup`. New files under the root are picked up automatically. Do not hand-edit pbx file lists unless you are changing **exceptions**.
 

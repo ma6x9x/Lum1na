@@ -457,3 +457,18 @@ magic self-test; JAILBROKEN only on real post-respring jbroot evidence.
 - Rig unlock: tap P094 (A13 anchor 0x35CC000 head16) -> kernproc-proven row
   -> re-run PATCHSET. No code change needed (honest-gate design held).
 - post-run state honest: "HOLD — no jbroot dpkg. Files present ≠ injection."
+
+### 2026-10-15 — external intel pass (airlift/varik/AltDaemon/Nyxian)
+
+- airlift (MIT): ATAirlock double-move path validation, paired-Mac file
+  plant into /var/mobile app containers. OPEN TASK: check -[ATAirlock
+  processCompletedAsset:] identifier validation on the 23F77 dyld cache.
+  If the unchecked shape predates 27.0, airlift is a jailbreak-free
+  staging channel on the hunt device. NOT a KRW door; do not claim 26.5
+  support until run.
+- varik.dev bounty workflow folded into the ios-xnu-hunt skill:
+  Target Flags section in report template, flag-aware rubric money notes,
+  tooling (ghidra-rpc/vphone-cli/ipsw) in rea.md, money loop + prompting
+  ops in SKILL.md, new reference/patterns.md audit checklist.
+- AltDaemon (rigs only, AGPL ports) and Nyxian (jailed IDE, signing
+  keep-alive + on-device iteration) noted as distribution options.

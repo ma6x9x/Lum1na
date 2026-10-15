@@ -101,3 +101,24 @@ CVE-2026-39868, M2Scaler diag, others): used as technical REFERENCES for
 recipes and fix-version mapping. **No code copied** — all probe
 implementations in this repo are ours. The repo ships no LICENSE file, so
 attribution-only credit is given here. See docs/CASESTUDIES.md.
+
+## 0xjohnnydev — airlift — MIT
+
+Paired-Mac AirTraffic/ATAirlock path-validation PoC (iOS 27.0). Used as a
+technical reference only (bug shape, verified scope); no code copied. The
+MIT license text must accompany any future port of its host tool into
+this repo. See docs/EXTERNAL_INTEL.md.
+
+## Varik Matevosyan (@D4RK7ET) — varik.dev bounty workflow — write-up
+
+"Getting into Apple Security Bounty" (2026-10-15): Target Flags,
+first-party reachability, report-as-crash-then-maximize, tooling
+(ghidra-rpc, vphone-cli, ipsw), prompting ops. Folded into the private
+ios-xnu-hunt skill; nothing shipped in this repo.
+
+## AltDaemon / Nyxian — ecosystem tools (no code used)
+
+AltDaemon (emp0ry/AltDaemonModern, AGPL-3.0; Riley Testut's AltDaemon
+concept): jb-side signature refresh — operational install on rigs at most.
+Nyxian (closed listing): jailed on-device IDE — distribution/harness
+option. Neither is vendored here.
