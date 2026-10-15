@@ -565,3 +565,62 @@ magic self-test; JAILBROKEN only on real post-respring jbroot evidence.
   mini's tfp0 then replicated on 23F77.
 - No probe bodies touched (OOB bodies stay per AGENTS.md rule); the T1
   door is wired in the chain, P045 rework waits for an explicit ask.
+
+### 2026-10-15 evening — 26.5 A14 (iPhone 12 / 23F77): controlled OOB ×2, GART catch-22, zalloc panic
+
+- **P099 CONTROLLED OOB CONFIRMED twice on 23F77** (12:48:10 victim=2044,
+  15:39:49 victim=2045, both `first_diff=0x0000`): the groomed inline-victim
+  shape puts the 43748 addchain records at record index 0 of the adjacent
+  kalloc.3072 chunk — 48 victim payloads overwritten with clean
+  `{surfaceId, symbol, 0x100000001}` 16-byte records. The ANE OOB is now
+  steerable on 26.5. This is the live KRW conversion entry for 26.5.
+- **PANIC 2026-10-15 15:25:51 (panic-full .ips, iPhone13,2 23F77, slide
+  0x1e8f4000)**: `[data.kalloc.3072]: element modified after free (off:0,
+  val:0x000000c00000017e, sz:3072, ptr:0xffffffe0cfece800)` — the dumped
+  element IS P099's record stream (symbols c0→d3 ascending, verbatim dump in
+  the panic log). The 12:48 fire wrote into FREED victims; the element sat in
+  a magazine freelist; ~26 s after the 15:25:25 p044chain tap a later
+  **Lumina syscall alloc** drew it ("Panicked task … pid 1351: Lum1na",
+  backtrace innermost 0xfffffff0070570e4 → zalloc check 0xfffffff007841350,
+  exec slide 0x216a4000). Re-proves the parked interleaved-spray nugget:
+  freed kalloc.3072 victims are lethal on darwin 25 — every fire into a freed
+  element plants a future kernel panic in an innocent allocator.
+- **Fix applied (P099 groom)**: interleaved hole free — only EVEN holes are
+  recv'd/freed; ODD holes stay LIVE. Live victims are recv-able and observable,
+  and the Beta-2 steering write must target a live element we own. Verdict
+  text now carries the panic lesson. P044's punch-all has the same hazard when
+  the 254 addchain ever fires on F77 (prediction currently fails — nothing
+  written) — needs the same discipline before it is trusted in the chain.
+- **LightSword stalepage (CVE-2026-64788) is DEAD on 26.5** — dual-wrap alias
+  CONFIRMED (spyConfirmed=1, detach victim OK, unpin OK, "spy MD still wires
+  after unpin — last GART live, not free"), but detaching the spy (the last
+  wire) kills the GART: blit read = GPU OOM. `alias GART is not independent`:
+  the wire pins the victim pages alive (no reuse), freeing the pages kills the
+  only wire. Catch-22 proven at the log level — the stalepage window cannot
+  contain kernel data on 26.5. Older trains unaffected.
+- **Conversion machinery hardened for whichever lane lands the pair**:
+  SocketKRW gained `Lum1naSocketKRW_Neutralize` (zero rw->filter through the
+  smashed control channel BEFORE pcb teardown — Ghidra 23F77: rip6_detach /
+  dgram teardown `kfree_type(icmp6_filter, *(inpcb+0x148))` when non-NULL);
+  KRead/KWrite refuse after neutralize; Disarm neutralizes first. LightSword
+  failure paths (rw-fd / Arm / verify / kbase-walk / commitSlide) now run
+  `ls_teardown_defuse`: rw filter := NULL, then control filter := its
+  pre-smash attach filter (saved in the hit struct) via the still-live GPU
+  wire, then release. Success path needs no cleanup: Phase 11's refcount bump
+  keeps both pcbs alive forever (sofree never hits zero → pr_detach never
+  runs → no kfree_type on the smashed fields).
+- **P043 (43724) v8 verdict**: all sweeps stay EINVAL(22). Ghidra: the wall
+  is `mac_file_check_mmap` FUN_fffffff00a5d79d8 — a MAC policy aggregator
+  (policy list DAT_fffffff007b6eb50, per-policy ops+0x20 → +0x120
+  file_check_mmap; error ladder EAGAIN > EINVAL > ESRCH > ENOENT > EACCES >
+  EPERM; panics "increased max protections" if a policy raises maxprot).
+  So class 7 / action 0x12 routes through the MAC layer — the identity wall
+  is cs/MAC on the vnode, not sf_flags or fd-open mode; the handler
+  normalizes the denial to EINVAL. Policy chase recipe (DB has no names
+  there): read DAT_fffffff007b6eb50 entries, each entry+0x20 = ops table,
+  ops+0x120 = that policy's mmap check. iOS candidates: AMFI + Sandbox.
+- **P069 (43684)**: mapping path exercised once on 23F77 — upl_validation
+  ABSENT; increment is IOMD+0x68, not +0x34. Catalog note only.
+- Honest state: KRW on 26.5 A14 still NOT obtained. The conversion is wired
+  and now safe to arm; the missing piece is the Beta-2 LIVE-element steering
+  write (mach-msg OOL/port pointer swap) built on the confirmed P099 shape.
