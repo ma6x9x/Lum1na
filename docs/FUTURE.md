@@ -779,3 +779,37 @@ Device log + `panic-full-2026-10-15-172914.0002.ips` (SHA-256 589fa3f1…, kept 
   the test wants. Runbook: Safari → http://192.168.1.2:8081/index.html; watch serve log +
   `lab_log.txt` for the fetch cascade, `PE ALIVE`, then `KRW_OK/KRW_FAIL kb= slide=`.
 - hasKread stays NO; Beta-1 stays Beta-1.
+
+### 2026-10-15 ~18:05 — p7 DarkSword web lane: instrumented device test on 23F77 — NOT REPRODUCIBLE; lane closed pending a new bug
+
+- **Setup**: p7lab bundle served from the Mac (LaunchAgent `:8081`), device Safari via
+  Bonjour `http://Kolbys-iMac.local:8081` (bare-IP host is rewritten by the loader's
+  `preferPublicHttps`; old `192.168.1.2` was also stale after DHCP moved the Mac to .236).
+  Band override (`__LAB_BAND__`) feeds the loader a ghostwave/RESEARCH_HIGH research band
+  that defeats its hardcoded ">26.3 patched" classifier — research-grade only.
+- **Instrumentation made permanent** (both copies synced, parse-checked): stage1's 27-site
+  telemetry redirected from the kit C2 (`mcp9.net` / `127.0.0.1:8081`) to the local lab log
+  sink via the worker's `host`; `L=` grow-path discriminator added to `pv_oobread`; new
+  `pv_warmup_done` beacon; worker progress beacons (aarw 50-try cadence, fallback result
+  JSON); FALLBACK1 now calls `triggerStage1()` (full orchestrated sequence) instead of
+  `establishPrimitives()` alone — the earlier "bare Error" was `TryAgainError` after 150
+  silent catches in the worker's own try-loop.
+- **Lane 1 — CVE-2025-43529 (aar/w UAF pair)**: 150/150 trigger tries, no 15.57 marker
+  pair, across 4 runs → not reproducible.
+- **Lane 2 — bug303879 (InBounds-OOB → fakeobj → scribble → LFH pair)**: the trigger
+  executes but the stores never leave the array. Post-warmup beacon: `L=128` after 20000
+  iterations AND after **140000 iterations (FTL tier pushed)** — JSC grew the array through
+  the normal path; the bounds-check/grow elimination never engages at DFG or FTL on this
+  build. Downstream all correctly dead: markers/spray `no_hits`, fakeobj stays
+  `number:NaN`, contig/double pair never adjacent, LFH pair confusion 8/8 fail, kit's own
+  `pv_layer1_check` honestly rejects the NaN-garbage addrof (`dom=7ff8 real=false`).
+  Documented false positive: `pv_scribble_upgraded` passes on garbage addrof — weak check,
+  never evidence by itself.
+- **Verdict**: the web lane (kit-as-shipped, both CVE shapes) is **dead on
+  iPhone13,2 / iOS 26.5 / 23F77**. One WebContent tab crash mid-run (18:01:40) was
+  survivable and is not a panic. This does not claim the CVEs are fake — only that these
+  trigger shapes do not produce the required JIT corruption on this device/build.
+- **What stands**: the instrumented lab yields a one-reload verdict on any future
+  build/device. Next options: a different 26.5 WebKit/JSC bug (out of kit scope), or the
+  kit's `ios18` path on an actual 18.x device.
+- hasKread stays NO; Beta-1 stays Beta-1; ANE/kalloc.3072 lane stays STOPPED (see above).
