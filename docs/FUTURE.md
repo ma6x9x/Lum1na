@@ -494,3 +494,21 @@ magic self-test; JAILBROKEN only on real post-respring jbroot evidence.
   was __DATA base; the 16-byte queue shape could never match LIST_HEAD).
   Combined with the cs2core bulk lane, the rig now derives kernproc at
   runtime with static anchors to validate against. P007 copy mirrored.
+
+### 2026-10-15 — rig panic #4: cs2core residue, NOT P094 (fix shipped)
+
+- panic-full-2026-10-15-143657.0002.ips, bug_type 210:
+  zone bound checks — 32 B write overflows 16 B object in
+  kalloc.type.var1.16 @zalloc.c:1322. 32 = sizeof(icmp6_filter).
+- Attribution: DEFERRED ClearSword corruption. cs2core corrupts
+  inp->icmp6filter during KRW setup; ~40 s later the kernel touched the
+  poisoned slot and Apple's zone bound checks caught it. P094 Path 2 is
+  read-only; kernel reads cannot cause a write-overflow panic. Scan
+  window was verified correct (kbase+0x364FCB8 == live allproc head).
+- Lesson: cs2core lane has a ~40 s / one-tap reliability horizon on the
+  rig. Order: relaunch -> cs2core -> IMMEDIATELY the one probe you need
+  -> PATCHSET. No idle browsing between taps.
+- P094 hardened: anchor ping (3 direct kreads, MATCH/MISMATCH evidence
+  line) runs BEFORE the bulk sweep; A13 sweep cap cut 2 MB -> 512 KB.
+  Next run settles window-vs-validation in milliseconds instead of
+  silently sweeping under a dying kernel. P007 copy mirrored.
