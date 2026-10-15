@@ -657,3 +657,57 @@ magic self-test; JAILBROKEN only on real post-respring jbroot evidence.
   + Zebra installed by the bootstrap. Controlled-OOB confirmations, deputy
   survivors, and page-read oracles are lab evidence, not milestones. hasKread
   stays NO on 26.5; KRW still not obtained.
+
+### 2026-10-15 ~16:50 — FomoPeek RE intel: DarkSwordStrategy confirms our kit lineage + sanitized bundle rebuilt CLEAN
+
+Source: SlowMist/OKX joint disclosure (2026-09-21) + gm7.org full text + Threadlinqs TL-2026-2591 +
+fullchain.sh finding. One card per skill discipline.
+
+- **What shipped**: FomoPeek 1.1 (build 105, 09-09) / 1.2 (build 110, 09-12) App Store builds carried
+  two non-business frameworks, `apptrace` (C2 comms) + `libapptracecore` (kernel attack + acquisition).
+  1.3 (111, 09-17) removed both. ~$579,984 USDT traced to attacker address 0x6d37f2C5...5975f4BB.
+- **The 8 strategy classes** (`libapptracecore`, all inherit `exploit::IExploitStrategy` /
+  `KernelMachTaskExploitStrategyBase`, per-device support predicates, coverage windows tile
+  iOS 12.0–18.7.2 + 26.0–26.1). Public reporting names exactly two: **CicutaVirosaStrategy**
+  (iOS 12–14 era, single run >2 min — matches the KOL "stay 5–7 min on a real device" promo)
+  and **DarkSwordStrategy (16.7–18.7.2 + 26.0–26.1)**. The other six are unnamed in public text.
+- **Lineage confirmed**: DarkSwordStrategy IS the leaked DarkSword tool (SlowMist 03-25 warning,
+  im23pds tweet) — the same codebase as our lab kit `research/p7-darksword-rce/` (WebKit RCE →
+  sbx0 → sbx1 gpuFcall/PAC → pe_main inpcb corruption → kernel_base/slide → kread/kwrite via
+  control-socket lane). Their declared window stops at 26.1; our kit's `rce_worker_26.5_fixed.js`
+  + `sbx1_26.6.js` extend to 26.5/26.6 — exactly the hunt device build (23F77).
+- **Native-layer strings (libapptracecore)**: tfp0 ("Creating safe tfp0" / "Updated port for tfp0!"),
+  kread/kwrite ("found kread_sem_index"), exploit surfaces **IOSurfaceRootUserClient,
+  IOSurfaceClient, IOAccelCommandQueue2, IOAccelSharedUserClient2** (our ColdForge/84530/43748
+  family), PPL ("HSP4 patch exists./Applied HSP4 patch."), ucred (`KernelUcredStealer`,
+  `RORestrictedUcredPatcher`, `RO2RestrictedUcredPatcher`, WeirdCsTrick), sandbox
+  (`SandboxExtPatcher` → com.apple.app-sandbox.read-write), offset providers
+  `kernel::OffsetProvideriOS12/13/14/15/15_2` + runtime computation with explicit **iOS 26** branch.
+  Keychain parsers KeychainV3/V9/V11 + AppleKeyStore client = the theft half (we never copy).
+- **C2/IOC**: deadbox `bitbucket[.]org/discordseven/text/raw/main/xxhVOn` (48B AES-128-CBC,
+  key bc2c72b2…, IV 71ec8e39… → api-a95f0ed200f.assisaint[.]com); endpoints /api/device/{apps,
+  config,report} + /api/upload/zip; collect_configs = 19 wallet/notes apps. All STRIPPED from our
+  lane; host strings rewritten to 127.0.0.1:8081 / 192.168.1.2:8081.
+- **Sample hashes (for later native RE)**: FomoPeek-1.2.ipa SHA-256
+  48f9d5623af1518e774d57c41e6e0b915a7e9f896909bf596a9b27de5022911e; libapptracecore
+  f0b3be01e8597f7f35ca36c009f68e7004527fe4a01d4349a01e211ca16de1e2; apptrace
+  764663ff5c8bd1bdf33bbd1ec352ce262a4fe79695456f2612dc27c35840ab9d. Mirror (ipadump.com) is
+  UDID-gated; MalwareBazaar/VT/archive.org do not yet host it. Native-side deep RE pending sample;
+  otool/strings first, Ghidra import second (REA MCP stays read-only).
+- **p7lab bundle rebuilt CLEAN (16:44–16:47)**: previous rce_loader.js PARSE FAIL was self-inflicted —
+  the marker-blank pass turned `window.__LAB_X__` into dangling `window.` expressions. Rebuild keeps
+  all `__LAB_*` markers as legitimate globals set by config.js (RECOMMENDED_WORKER →
+  rce_worker_26.5_fixed.js, DELIVERY_HOST, DEVICE_UUID), URL rewrites + strip list + Cloudflare-beacon
+  removal unchanged. pe_main amputation re-applied (both `__peStages` arrays emptied; kernel machinery
+  pe_init/pe_v1/pe_v2 preserved; `__labKrwReport` scope-proof beacon + KRW self-test
+  `early_kread64(kernel_base)===0x100000cfeedfacf…` wired at the mpd bridge). **All 8 chain-critical
+  files JSC PARSE OK** (rce_loader, worker 26.5_fixed, sbx0_main_26, sbx1_main_26, pe_main, config,
+  chain_loader_26, loader). Zero-external audit: CLEAN (36 files). serve_p7lab.py recreated (old copy
+  was lost in the rebuild — localhost-only smoke log, no device beacons, was lost with it).
+- **Server live**: :8081, sink verified (`LAB SERVER RESTART OK`). Device runbook unchanged: Safari →
+  http://192.168.1.2:8081/index.html on the hunt device; watch fetch cascade then `PE ALIVE` +
+  `KRW_OK/KRW_FAIL kb= slide=` beacons.
+- **Honesty**: kernel r/w on 26.5 A14 is still not obtained by us or by anyone public; FomoPeek's
+  declared window (26.0–26.1) does not prove 26.5. The marker test is a DARKSWORD.md §5 step-3
+  experiment, not a KRW claim. hasKread stays NO; Beta-1 stays Beta-1 until jbroot + Sileo/Zebra
+  from our bootstrap.
