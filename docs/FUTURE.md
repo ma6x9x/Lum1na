@@ -813,3 +813,28 @@ Device log + `panic-full-2026-10-15-172914.0002.ips` (SHA-256 589fa3f1…, kept 
   build/device. Next options: a different 26.5 WebKit/JSC bug (out of kit scope), or the
   kit's `ios18` path on an actual 18.x device.
 - hasKread stays NO; Beta-1 stays Beta-1; ANE/kalloc.3072 lane stays STOPPED (see above).
+
+### 2026-10-15 ~18:10 — census repro across reboot + pre-panic log evidence; OPS: iOS 27.0.1 nag must be blocked
+
+- **OPS WARNING**: `followupd` approved an **"Update to iOS 27.0.1"** banner (pending since
+  Oct 13). Installing it kills the 23F77 lab target — pins, SKU gate, and the web-lane
+  verdict above all become moot. Automatic Updates must be turned OFF; the device stays on
+  26.5 / 23F77. Any 27.x testing is a fresh-lab decision, not an in-place update.
+- **Census reproduced across reboot (18:05:42)**: IOSurfaceRootUserClient type 0 open
+  `kr=0x0` again — FomoPeek surface 1 open is a stable 23F77 property, not a
+  panic-transient. IOSurface dlopen/create/getBase ok; `IOAccelerator` still absent →
+  census v2 service list (AGXAccelerator / IOGPU / AppleAGXDevice) stands. Cosmetic:
+  first-open line printed garbled hex (`conn=0x22432b¿dN`) + one blank line (P06xLog
+  notify interleave); double-open pair carried two distinct live conns.
+- **Pre-panic timeline**: device log shows `ANECompilerService` compiling a
+  `254in_1out_addchain` mlmodelc clone 15 s before the 17:28:42 Full Chain fire, panic
+  zalloc catch at 17:29:07–14, then a clean gap to 17:30:51 (reboot). Consistent with the
+  chain's own prewire/compile step ("XVRC27" clone name still to match against the
+  note-139 dump-tool output).
+- Curiosity: `applekeystored` was sandbox-denied writing an xattr on the bundled
+  `basebin/Relaxin.roothide` payload — harmless, file untouched; basebin survives
+  install as expected. (The `modelmanagerd` "UAFAssetSet…" errors are Unified Asset
+  Framework naming, not memory-safety signal.)
+- Note: P075's built-in honesty line still names the web lane as "KRW producer
+  candidate" — stale per the verdict above; next app build updates the string.
+- hasKread stays NO; Beta-1 stays Beta-1; ANE lane STOPPED; web lane CLOSED (card above).
