@@ -95,3 +95,25 @@ CFRunLoop ≤45 s. This is a heap leak, NOT a slide oracle.
 5. `hasKread` stays NO until a door yields `kread32(kbase)==0xfeedfacf`.
    Board, AfterKread, basebin ingest all HOLD until then.
 6. 39868 needs root `/dev/dtrace` — parked.
+
+### Rig validation (iPhone 11, A13_22G100 — KRW PASS 2026-10-15 12:00 EDT)
+
+The 18.6.2 rig now has **real kread+kwrite** (hasKread=YES hasKwrite=YES,
+kslide=0x12f30000, kbase=0xfffffff019f34000; kread32(kbase)=0xfeedfacf and
+kread64(kbase+8)=0xc00000002 self-tests PASS). That makes the vschko leaks
+**value-verifiable on the rig** before any 26.5 write-door work:
+
+- p063: tap on the rig, then kread at the leaked aio_workq_entry KVA —
+  plausible kevent/AIO struct bytes = the "GEN1 leak" is a REAL kernel
+  pointer, not a coincidence.
+- P097: tap on the rig (lock/unlock once), kread the leaked
+  gRegistryRoot instance — IORegistryEntry-shaped memory confirms it.
+- P099 groomed shape: rig kwrite can pre-fill victim payloads with known
+  bytes, making the OOB diff deterministic (not just magic-0xa5 scan).
+
+AfterKread FIRE on the rig held honestly at every gate (pmap row missing;
+AMFI UC 0xe00002e2 → TC skip; spawns EPERM because elevate held on
+kernproc-underived). **Rig unlock path: tap P094 (kernproc derive,
+A13_22G100 anchor 0x35CC000 head16) → board kernproc-proven row →
+re-run PATCHSET — elevate then does uid0 → unsandbox → CS_PLATFORM and
+the opainject/jbctl spawns stop dying EPERM.**

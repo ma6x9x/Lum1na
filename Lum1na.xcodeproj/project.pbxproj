@@ -95,6 +95,7 @@
 				"Resources/pkgman/zebra.deb" = file;
 			};
 			explicitFolders = (
+				Resources/ane,
 				Resources/basebin,
 				Resources/pkgman,
 				Resources/tweaks,

@@ -135,4 +135,4 @@ The `objective-c-xcode.yml` workflow is historically red. **Lum1na Build** (IPA)
 
 ## Honesty
 
-Kernel read/write is **not** obtained on 26.5 (hunt). The old `Lum1naKRW` placeholder class is gone — the KERNEL stage runs KRWChainController → LightSword → libkrw → cs2core, and only a passing self-test sets `hasKread` (rig 18.6.2 landed it via cs2core 2026-10-14). One failed tap does not close a CVE class (`docs/FUTURE.md`, lab notes 89). Lab panic app is `~/Desktop/P007OpenOnly`. This repo is the public shell + catalog.
+Kernel read/write is **not** obtained on 26.5 (hunt). The old `Lum1naKRW` placeholder class is gone — the KERNEL stage runs KRWChainController → LightSword → libkrw → cs2core, and only a passing self-test sets `hasKread` (rig 18.6.2 landed it via cs2core 2026-10-14; re-proven 10-15 with the AfterKread FIRE reaching spawn stage — every post-KRW gate held honestly, rig unlock = P094 tap then re-run PATCHSET). One failed tap does not close a CVE class (`docs/FUTURE.md`, lab notes 89). Lab panic app is `~/Desktop/P007OpenOnly`. This repo is the public shell + catalog.

@@ -443,3 +443,17 @@ magic self-test; JAILBROKEN only on real post-respring jbroot evidence.
   before it is a real write primitive. Board/AfterKread stay HOLD.
 - 39868 (DTrace DOF) parked: needs UID-0 /dev/dtrace on stock iOS.
   Details: docs/CASESTUDIES.md.
+
+### 2026-10-15 12:00 EDT — A13_22G100 rig: KRW PASS + AfterKread FIRE holds
+
+- P054 bounded tap (1 thread, 2s, 50 files): no panic. PATCHSET stage ran
+  staging + AfterKread on the rig.
+- KRW self-test PASS: hasKread=YES hasKwrite=YES leaks=5, kslide=0x12f30000,
+  kbase=0xfffffff019f34000, kread32(kbase)=0xfeedfacf, kread64(+8)=0xc00000002.
+- FIRE held honestly: pmap poke waits for leaks[] kind=pmap row; AMFI UC open
+  0xe00002e2 -> loadTrustCache skip (selectors unproven on SKU); basebin.tc
+  loaded (v1, 28 entries) but opainject/jbctl posix_spawn rc=1 EPERM —
+  elevate held on kernproc-underived for A13_22G100.
+- Rig unlock: tap P094 (A13 anchor 0x35CC000 head16) -> kernproc-proven row
+  -> re-run PATCHSET. No code change needed (honest-gate design held).
+- post-run state honest: "HOLD — no jbroot dpkg. Files present ≠ injection."
