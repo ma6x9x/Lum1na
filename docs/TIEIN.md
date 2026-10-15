@@ -159,3 +159,39 @@ FIRE; one failed tap ≠ CVE closed.
 | `launchdhook/src/boomerang.c` | primitives hand-off to spawned processes (registered ports) |
 | `Packages/libkrw-provider/src/main.c` | libkrw = thin jbclient wrapper |
 | Nugget `src/restore/restore.py` | /var traversal write (host-side) |
+---
+
+## 2026-10-14 addendum — who feeds whom (offsets & primitives)
+
+**Direction matters.** Our borrowed pieces flow Dopamine → Lum1na; our own
+pieces do not flow into Dopamine or Nugget today, with ONE real exception
+(a libkrw provider, below).
+
+- **Struct offsets**: borrowed from Dopamine `libjailbreak/src/info.c`
+  (MIT, (c) Lars Fröder) → our `PROC_ROW` tables. Validated live (rig
+  P090 census, 23F77 census 2026-10-14). Nugget has NO kernel offsets —
+  it is host-side restore mechanics only.
+- **Kernel VAs** (allproc/kernproc/kbase deltas): ours, per-SKU, from our
+  own Ghidra passes on the exact decrypted build. Dopamine's ladder is
+  per-darwin-version and derives its anchors at runtime on device; our
+  build-constant VAs do not upstream into it. 2026-10-14 T8101
+  xnu-12377.122.4 derivations (allproc 0xFFFFFFF00A900770, delta
+  0x38FC770; kernprocvar 0xFFFFFFF007B6EB30; proc_list_add semantics:
+  one-pointer doubly-linked head, le_prev of first == &head) are in
+  `LabIntelTab` status GHIDRA and validated by p094 once a lane is live.
+- **Primitives**: on a Dopamine-jailbroken device our probes CONSUME
+  Dopamine's primitives through the libkrw plugin ABI
+  (`P007KreadLane.m`, P090 glue). On stock devices we use OUR OWN
+  primitives (cs2core proven on the 12 mini A14 17.3; 26.5 A14 pending).
+- **The real feed-back path**: once a KRW primitive of ours passes the
+  self-test gate, it can be wrapped as a **libkrw provider dylib**
+  (export `krw_initializer`) — every libkrw consumer in the Dopamine
+  ecosystem (bootstrap, dpkg/Sileo flows, jbctl) would then use OUR
+  primitive. That is the only mechanism by which our primitives feed
+  Dopamine's stack. Nugget cannot consume kernel primitives at all
+  (host-side); nothing of ours feeds it unless we ship Nugget tweaks.
+- **26.5 A14 (23F77) status**: Dopamine has no exploit for this SKU/build
+  (basebin covers 26.0-26.0.1 A12/A13 only), so Beta 1 on the hunt device
+  stands entirely on OUR lane + the static anchors above. Hunt write
+  lanes stay PARKED after panics #1-#3 (see FUTURE.md — all three land in
+  AppleH11ANEInterface 0x17401fc wild-write, wedge→harvest family).

@@ -347,3 +347,83 @@ magic self-test; JAILBROKEN only on real post-respring jbroot evidence.
   pair — hunt write lanes (dual-wrap, foreign-out, 254 addchain fire)
   stay PARKED on 26.5; one tap per fresh boot; log which tap ran for
   attribution.
+- **2026-10-14 21:52:08 HUNT PANIC #3 — AppleH11ANEInterface wild write,
+  same static site as #2** (`panic-full-2026-10-14-215208.0002.ips`, hunt
+  iPhone13,2 23F77, boot 2DACCFC7, slide 0x131f4000, text exec base
+  0xfffffff01cfa0000). pc 0xfffffff01b9381fc = **static 0x17401fc — the
+  exact pc of panic #2**; esr 0x96000047 write/translation L1; FAR
+  0xffffffe98435c000 = x9, inside zalloc DATA submap (0xffffffe9826e0000
+  base); x25 = FAR−0xc00 (object base 0xffffffe98435b400), x20/x26 = 0xc0
+  stride — write at element +0xc00 of a 0xc0-stride walk. GZAlloc verdict:
+  "**wild deref, missing or invalid metadata**", zid:0 <unknown>. Panicked
+  task pid 368 **P007OpenOnly** (4220 pages, 15 threads). Backtrace kernel
+  extension = **com.apple.driver.AppleH11ANEInterface(9.511.3)**
+  @0xfffffff01b8ca3c0 (static rel 0x16C63C0..0x17B4F17); ANE-resident
+  frames (static rel): crash 0x17401fc / ret 0x1740214 (same fn),
+  callers 0x173FB2C, 0x173B020, 0x173633C, 0x172DDF0, 0x172DAF4,
+  0x172D4FC, below 0x16D70D4; dispatch from 0x1d73a478/0x1d73aad0
+  (IOService/IOUserClient path). ATTRIBUTION NOW SOLID: this is the ANE
+  driver writing through a repurposed/dead object during the wedge→harvest
+  sequence p087 v10 documents — NOT cs2 (cs2 ran 21:37 and its PCB domain
+  panic would not recur at the identical static pc across boots/tap
+  orders; #1/#2/#3 share the same site). Ghidra (xnu-12377.122.4 T8101
+  project): ANE kext region around static 0x17401fc is NOT function-
+  analyzed — needs a manual "Create Function" at the blob containing
+  0xfffffff0087441fc to name the harvest fn; the ANE_AddClientForProgram
+  fn (0x16EF624) IS analyzed and sits in the same kext. CC8-landing note
+  (user): AGX cc8 panics are a different cluster; #1-#3 all land in ANE.
+  Action: ANE/AVE hunt lanes stay PARKED on 23F77; the wedge finding
+  (p087 v10: EncodeFrame accepted, ZERO completions in 30s even with one
+  frame — session wedged from creation) means the trap needs no window:
+  harvest runs downstream of any wedged session. Next Ghidra step: name
+  0x17401fc fn + the 0xc0 array writer, then design a read-only probe
+  that detects the wedge without feeding the harvest.
+
+- **2026-10-14 21:37-21:46 hunt census + cs2 attempt (23F77)**:
+  - **P090 census on 23F77 — LabKernelOffsets DB VALIDATED against the
+    live resolver** (log p090_momentarius_log.txt): darwin 25.5 row prints
+    proc.pid 0x60, proc_list 0x0/0x8, proc_ro 0x18, proc_ro.csflags 0x24,
+    proc_ro.ucred 0x28, **proc_ro.task_tokens 0x0** (26.5 removed it —
+    matches info.c:602 + our PROC_ROW_D25), ucred ladder
+    0x18/0x1c/0x20/0x28/0x68/0x6c/label 0x78, task_token audit_token 0x8.
+    **CORRECTION APPLIED BOTH REPOS: proc_flag 0x25C → 0x454** (DB +
+    proc_iterate/proc_list_add decompile flag words at 0x458/0x45c/0x464).
+  - **cs2-verbatim-v1 on 23F77**: RAN (non-A18 path): 0x5800 socket ports
+    sprayed, pc_object 0xfd03, pc_address 0x4552a8000, 8×128MiB scan
+    started (mappings 0-7 logged, then budget window). No verdict in the
+    captured log; ~15 min later panic #3 fired at the ANE site (attribution
+    above says NOT cs2, but the window overlaps — honest note: cs2 on
+    26.5 A14 remains UNPROVEN, not refuted; one failed run ≠ class closed,
+    lab notes 89 discipline).
+  - `P007OpenOnly.diskwrites_resource` (bug 145, ~16.5 min runtime):
+    app exceeded disk-write budget — per-line F_FULLFSYNC probe logs are
+    the cost; keep one-tap-per-boot discipline (limits churn), no body
+    changes. runningboardd/wifid 214117 = bug_type 409 system snapshots,
+    not our crashes.
+
+- **2026-10-14 26.5 A14 STATIC ANCHORS DERIVED (Ghidra, xnu-12377.122.4
+  T8101, kbase static 0xfffffff007004000)** — Beta-1 groundwork for the
+  hunt device; recorded in `LabIntelTab` as status GHIDRA:
+  - **allproc head = 0xFFFFFFF00A900770** (delta from kbase **0x38FC770**).
+    Proof: `proc_iterate` (kern_proc.c, identified via its assert string)
+    walks `p = *(p)` from DAT_0a900770 with pid at p[0xc] = +0x60 and a
+    second head DAT_0a900778 (zombproc, param_1 bit1); 14 xrefs include
+    WRITEs from the fork/exit insert-remove path.
+  - **proc_list_add (kern_fork) decompile-verbatim**: `elm->le_next =
+    head; old_first->le_prev = &elm->le_next; head = elm; elm->le_prev =
+    &head` → darwin-25 allproc is a **classic doubly-linked LIST with a
+    one-pointer head** (le_prev of first member == &head) — p094 head8
+    scan semantics; also proves le_next +0x0 / le_prev +0x8 / p_ppid +0x20
+    (parent==kernproc → ppid 0) / proc_ro +0x18 with proc_ro->proc
+    backref at ro+0x0.
+  - **kernproc variable = 0xFFFFFFF007B6EB30** (`struct proc *kernproc`,
+    static-init to &proc0; `in.c:471` assert "so != NULL || p ==
+    kernproc" compares against DAT_7b6eb30; proc_list_add's
+    `parent == kernproc` branch confirms; runtime value = &proc0).
+    All kernproc xrefs are READs — static initializer only, no runtime
+    writer.
+  - p094 Path 2 extended per-tag (A13 22G100 0x35CC000 head16 / A14 23F77
+    0x38FC770 head8); Path 3 gained zombproc + kernprocvar (deref→
+    validate pid 0) semantics. Rows: allproc/zombproc/kernprocvar
+    family "Ghidra T8101 12377". LabOff stays the only resolution source
+    (AGENTS.md) — these are validation rows until a live lane CONFIRMs.

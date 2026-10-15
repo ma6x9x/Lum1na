@@ -91,6 +91,8 @@
 #import "Exploit/P091DarkSwordChainMap.h"
 #import "Exploit/P092Liter8PatchMap.h"
 #import "Exploit/P093IntelCrossCheck.h"
+#import "Exploit/P094KernprocDerive.h"
+#import "Exploit/P095UcredLadder.h"
 #import "Exploit/P065FacetAOracle.h"
 #import "Exploit/P066AveEncTypeMap.h"
 #import "Exploit/P067AvdReach.h"

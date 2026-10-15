@@ -42,4 +42,8 @@
 - (NSString *)jsonDump;
 - (void)resetLeaks;
 
+/// Latest UNSLID kernproc VA recorded by P094 (kind "kernproc-proven").
+/// Static __DATA address: build-constant, valid across boots. 0 = none.
+- (uint64_t)provenKernproc;
+
 @end

@@ -26,6 +26,7 @@
     .proc_flag      = 0x25C, \
     .pro_ro_csflags = 0x24, \
     .pro_ro_ucred   = 0x28, \
+    .pro_ro_task_tokens = 0x48, \
     .ucred_uid      = 0x18, \
     .ucred_ruid     = 0x1C, \
     .ucred_svuid    = 0x20, \
@@ -53,6 +54,7 @@
     .proc_flag      = 0x25C, \
     .pro_ro_csflags = 0x1C, \
     .pro_ro_ucred   = 0x20, \
+    .pro_ro_task_tokens = 0x40, \
     .ucred_uid      = 0x18, \
     .ucred_ruid     = 0x1C, \
     .ucred_svuid    = 0x20, \
@@ -64,8 +66,31 @@
 }
 
 static const LabProcOffTab gProcOffTabs[] = {
-    /* A14 hunt (26.5, darwin 25.5): Dopamine 24.4+ ladder + P7 leak agree. */
-    PROC_ROW("A14_23F77", 0),
+    /* A14 hunt (26.5, darwin 25.5): Dopamine 24.4+ ladder + P7 leak agree.
+       26.5 REMOVED proc_ro.task_tokens (info.c:602) — audit fix must skip. */
+#define PROC_ROW_D25(TAG, KERNPROC) { \
+    .tag = TAG, \
+    .proc_list_next = 0x0, \
+    .proc_list_prev = 0x8, \
+    .proc_proc_ro   = 0x18, \
+    .proc_svuid     = 0x38, \
+    .proc_svgid     = 0x3C, \
+    .proc_pid       = 0x60, \
+    .proc_fd        = 0xD0, \
+    .proc_flag      = 0x454, /* 26.5 DB-confirmed (P090 23F77 census 2026-10-14) */ \
+    .pro_ro_csflags = 0x24, \
+    .pro_ro_ucred   = 0x28, \
+    .pro_ro_task_tokens = 0, \
+    .ucred_uid      = 0x18, \
+    .ucred_ruid     = 0x1C, \
+    .ucred_svuid    = 0x20, \
+    .ucred_groups   = 0x28, \
+    .ucred_rgid     = 0x68, \
+    .ucred_svgid    = 0x6C, \
+    .ucred_label    = 0x78, \
+    .kernproc       = KERNPROC, \
+}
+    PROC_ROW_D25("A14_23F77", 0),
     /* A13 rig (18.6.2, darwin 24.6): same 24.4+ ladder. */
     PROC_ROW("A13_22G100", 0),
     /* A12X iPad twin (23G71): same ladder, untested on T8020. */

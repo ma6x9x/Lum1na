@@ -49,6 +49,8 @@ public final class PersistentLogStore {
         "darksword": "p091_darksword_map_log.txt",
         "liter8": "p092_liter8_patch_log.txt",
         "intel": "p093_intel_log.txt",
+        "p094": "p094_kernproc_log.txt",
+        "p095": "p095_ucred_log.txt",
         "kreadtest": "lum1na_kread_test_log.txt",
         "ident": "device_ident_log.txt",
         "lightsword": "p06x_lightsword_log.txt",

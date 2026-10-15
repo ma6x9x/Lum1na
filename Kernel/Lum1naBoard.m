@@ -218,6 +218,23 @@ static inline void boardSet(NSMutableDictionary *d, NSString *key, id val) {
 - (BOOL)hasKwrite { return _hasKwrite; }
 - (NSArray *)leaks { NSArray *l = _d[@"leaks"]; return [l isKindOfClass:[NSArray class]] ? l : @[]; }
 
+- (uint64_t)provenKernproc {
+    NSArray *l = self.leaks;
+    uint64_t best = 0;
+    NSString *bestSeen = nil;
+    for (NSDictionary *e in l) {
+        if (![e isKindOfClass:[NSDictionary class]]) continue;
+        if (![e[@"kind"] isEqualToString:@"kernproc-proven"]) continue;
+        const char *s = [e[@"va"] description].UTF8String;
+        if (!s) continue;
+        uint64_t va = strtoull(s, NULL, 16);
+        if (!va) continue;
+        NSString *seen = [e[@"lastSeen"] isKindOfClass:[NSString class]] ? e[@"lastSeen"] : @"";
+        if (!best || [seen compare:bestSeen] == NSOrderedDescending) { best = va; bestSeen = seen; }
+    }
+    return best;
+}
+
 - (void)recordHeapLeak:(uint64_t)va source:(NSString *)source {
     [self recordCandidate:va kind:@"heap" source:source];
 }

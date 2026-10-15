@@ -41,6 +41,7 @@ typedef struct {
     // struct proc_ro (exists iOS 15.2+; shifted +0x8 on darwin 24.4.0+)
     uint32_t pro_ro_csflags;  // 0x1C + 0x8 = 0x24
     uint32_t pro_ro_ucred;    // 0x20 + 0x8 = 0x28
+    uint32_t pro_ro_task_tokens; // 0x40 base, +0x8 = 0x48 (24.4+), REMOVED 26.5 = 0
 
     // struct ucred (cr_posix layout, stable since iOS 15)
     uint32_t ucred_uid;       // cr_posix + 0x00 = 0x18
@@ -59,8 +60,13 @@ typedef struct {
 
 const LabProcOffTab * _Nullable LabProcOff(void);
 
-// Constants (Dopamine kernel.h / codesign.h)
+// Constants (Dopamine kernel.h / codesign.h / util.c proc_ucred_update_content)
 #define LAB_P_SUGID             0x00000100u
 #define LAB_CS_PLATFORM_BINARY  0x04000000u
+#define LAB_TASK_TOKEN_AUDIT    0x8u        // task_token_ro_data.audit_token
+#define LAB_TT_UID_OFF          4           // auditToken+4  = uid
+#define LAB_TT_GID_OFF          8           // auditToken+8  = gid
+#define LAB_TT_RUID_OFF         12          // auditToken+12 = ruid
+#define LAB_TT_RGID_OFF         16          // auditToken+16 = rgid
 
 NS_ASSUME_NONNULL_END
