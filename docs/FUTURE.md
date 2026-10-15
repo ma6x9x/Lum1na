@@ -826,11 +826,20 @@ Device log + `panic-full-2026-10-15-172914.0002.ips` (SHA-256 589fa3f1…, kept 
   census v2 service list (AGXAccelerator / IOGPU / AppleAGXDevice) stands. Cosmetic:
   first-open line printed garbled hex (`conn=0x22432b¿dN`) + one blank line (P06xLog
   notify interleave); double-open pair carried two distinct live conns.
-- **Pre-panic timeline**: device log shows `ANECompilerService` compiling a
-  `254in_1out_addchain` mlmodelc clone 15 s before the 17:28:42 Full Chain fire, panic
-  zalloc catch at 17:29:07–14, then a clean gap to 17:30:51 (reboot). Consistent with the
-  chain's own prewire/compile step ("XVRC27" clone name still to match against the
-  note-139 dump-tool output).
+- **Pre-panic timeline (completed by a second log paste)**: `ANECompilerService`
+  compiled a `254in_1out_addchain` mlmodelc clone at 17:28:27, then Lum1na's ANE
+  prewire attempts fired: **17:28:28** and **17:28:46** both hit
+  `ANE_ProgramCheckandPrewireBuffers_gated: MemoryMapRequest for 255 buffers,
+  result: 0xe00002c2` (kIOReturnVMError) with Lum1na programs open (229376 /
+  344064 B wired); at **17:28:47.24** the GPU command buffer aborted
+  (`kIOGPUCommandBufferCallbackErrorOutOfMemory`) with kernel faults
+  `IOGPUMemory::prepare_memory_slow … prepare detached resource`; panic zalloc
+  catch ~20–27 s later, then a clean gap to 17:30:51 (reboot). **Refinement of
+  the panic-#5 analysis**: the freed kalloc.3072 element most plausibly
+  originates in the *failed* 255-buffer prewire teardown path (255 × 12 B ≈ 3072
+  — hypothesis, needs dump-tool/Ghidra confirmation), not a successful prewire.
+  Any future groom design must target the map-failure window explicitly. ("XVRC27"
+  clone name still to match against the note-139 dump-tool output.)
 - Curiosity: `applekeystored` was sandbox-denied writing an xattr on the bundled
   `basebin/Relaxin.roothide` payload — harmless, file untouched; basebin survives
   install as expected. (The `modelmanagerd` "UAFAssetSet…" errors are Unified Asset
