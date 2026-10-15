@@ -8,7 +8,7 @@ on:
 env:
   PROJECT_NAME: Lum1na
   SCHEME_NAME: Lum1na
-  DEPLOYMENT_TARGET: 18.0
+  DEPLOYMENT_TARGET: 17.0
 
 jobs:
   # ============================================

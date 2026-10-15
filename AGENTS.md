@@ -1,6 +1,6 @@
 # AGENTS.md — keep Lum1na compiling
 
-Read this before editing. The IPA job (`.github/workflows/build-ipa.yml`) is the source of truth: **macos-15, Xcode 16.4, iOS 18.0 deployment, unsigned `iphoneos`**. If that job is red, the change is not done.
+Read this before editing. The IPA job (`.github/workflows/build-ipa.yml`) is the source of truth: **macos-15, Xcode 16.4, iOS 17.0 deployment (12 mini 17.3 is the lowest fleet OS; UI/Dummy needs 17+ APIs), unsigned `iphoneos`**. If that job is red, the change is not done.
 
 Re-resolve `main` at the start of a task. Do not trust this file’s remembered file list if it disagrees with the tree.
 
