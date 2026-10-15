@@ -23,7 +23,7 @@
     .proc_svgid     = 0x3C, \
     .proc_pid       = 0x60, \
     .proc_fd        = 0xD0, \
-    .proc_flag      = 0x25C, \
+    .proc_flag      = 0x454, /* info.c:390 — darwin >= 22.4.0 (iOS 16.4+); 0x25C is the pre-16.4/16.4-beta row */ \
     .pro_ro_csflags = 0x24, \
     .pro_ro_ucred   = 0x28, \
     .pro_ro_task_tokens = 0x48, \
@@ -51,7 +51,7 @@
     .proc_svgid     = 0x40, \
     .proc_pid       = 0x60, \
     .proc_fd        = 0xD0, \
-    .proc_flag      = 0x25C, \
+    .proc_flag      = 0x454, /* info.c:390 — 17.3.x = darwin 23.3, >= 22.4.0 branch */ \
     .pro_ro_csflags = 0x1C, \
     .pro_ro_ucred   = 0x20, \
     .pro_ro_task_tokens = 0x40, \

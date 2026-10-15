@@ -512,3 +512,39 @@ magic self-test; JAILBROKEN only on real post-respring jbroot evidence.
   line) runs BEFORE the bulk sweep; A13 sweep cap cut 2 MB -> 512 KB.
   Next run settles window-vs-validation in milliseconds instead of
   silently sweeping under a dying kernel. P007 copy mirrored.
+
+### 2026-10-15 — P094 LIST_INSERT_HEAD fix + chain rewiring (rig "all paths missed" root cause)
+
+- ROOT CAUSE of the rig's repeated P094 "all paths missed": xnu
+  proc_list_add is LIST_INSERT_HEAD(&allproc, p) verbatim (our own Ghidra
+  fork-register decompile on both A13 22G100 and T8101 23F77). The head's
+  FIRST member is the NEWEST proc; proc0 (pid 0, static, le_next=NULL)
+  sits at the TAIL. P094 v1 assumed pid==0 AT the head and walked le_prev
+  from self (TOWARD the head, away from proc0) — it could never match.
+  Fixed: forward le_next walk to the pid-0 tail; head-shape validation is
+  now first->le_prev == &head + valid proc at ANY pid; anchor ping
+  short-circuits the sweep with a 3-kread fast path (fits the cs2core
+  ~40 s horizon). Path 3 is SKU-filtered (wrong-SKU VAs can no longer
+  false-CONFIRM). A13 LabIntel row renamed kernproc -> kernprocvar
+  (0xFFFFFFF007ADE3A8 is a SLOT; isKv derefs once). BUILD tag
+  p094-kernproc-v2-listhead. P007 mirror regenerated from official.
+- proc_flag ladder fix (Lum1naStructOffsets): 0x25C -> 0x454 on the
+  16.4+ rows (PROC_ROW A13/A12X/XR and PROC_ROW_D23 mini 17.3) per
+  Dopamine info.c:390 (darwin >= 22.4.0). 0x25C was the pre-16.4 row.
+  This is the P_SUGID bit elevate sets — wrong offset meant elevate's
+  setuid prep silently wrote the wrong word on the rig.
+- JAILBREAK chain rewiring (ExploitManager.executeKernelStage):
+  SKU-aware. Hunt 26.5: T1 ANE 43748 then LightSword -> cs2core -> libkrw.
+  Rig/mini/XR: skip T1 (43748 is a 26.5 door), lanes cs2core -> libkrw ->
+  LightSword. After lanes, if hasKread && provenKernproc==0 the chain
+  auto-fires P094 (read-only) so PATCHSET elevate stops HOLDing.
+- Intel mined into LabIntelTab (~35 rows): Dopamine info.c 26.0+/26.4+/
+  27.0+ struct ladder (LADDER), 24A435 A19 audit anchors (GHIDRA-EXT:
+  ave2 signed-product loop 0xfffffff00886b170, iomd dmaReferences
+  workers, decmpfs zlib guard, avd mvhevc index — reference-only until an
+  A19 device exists, honesty rule), ncxcy lockdownd 26.5 userspace map
+  (LEAD — host-side pairing logic bugs, NOT in-app KRW), vschko m2scaler
+  get_iosaDiag sel=8 leak (PROVEN-EXT; hunt 26.5 affected, fixed 26.6).
+- Honesty: lockdownd chain is USB/pairing/host-side (needs a Mac);
+  documented as a Stage-0 entry/re-trigger vector, not an in-app door.
+  KRW on 26.5 A14 is still NOT obtained.

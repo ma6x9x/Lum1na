@@ -122,3 +122,22 @@ AltDaemon (emp0ry/AltDaemonModern, AGPL-3.0; Riley Testut's AltDaemon
 concept): jb-side signature refresh — operational install on rigs at most.
 Nyxian (closed listing): jailed on-device IDE — distribution/harness
 option. Neither is vendored here.
+
+## ncxcy — iOS-26.5-lockdownd-vulns — research repo (no license file)
+
+Ten userspace logic bugs in lockdownd on iOS 26.5 (startsession expiry
+skip, SSL verify disable + rootcertificate anchor, IsHostTrusted
+IgnoreUntrustedList, ACL mask 0x1E604, hostid path traversal, BFU/AFU
+keybag leak, post-session SCPreferences writes, bonjour MAC naming, braa
+vtable cluster + PAC analysis). Used as a technical reference only
+(host-side pairing surface; Stage-0 entry/re-trigger notes). No code
+copied; attribution-only credit.
+
+## GOLDMINE 24A435-audit — external static audit (author unverified)
+
+iOS 27.0 GM (iPhone17,5, A19 Pro class) kernelcache audit: AppleAVE2
+signed-product loop, IOMD dmaReferences map workers, MV-HEVC signed
+index, decmpfs zlib guard, AVE UC dispatch / EncType guard anchors.
+Reference-only rows (GHIDRA-EXT) until an A19 device exists; honest
+verdict preserved ("no app-reachable memory-corruption vuln proven").
+No code copied.
