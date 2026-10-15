@@ -482,3 +482,15 @@ magic self-test; JAILBROKEN only on real post-respring jbroot evidence.
   P007 lab lane mirrored with a chunked kread32 bulk adapter.
 - docs/DEVICES.md: per-device lane matrix + completion bars. Nugget is
   explicitly NOT a 26.5 door (SparseRestore dead since 26.2 betas).
+
+### 2026-10-15 — A13 22G100 Ghidra pass (T8030 xnu-11417.140.69)
+
+- kernproc slot 0xfffffff007ade3a8 (in.c:0x476 assert + skywalk 0x37b
+  + fork1 ppid readback — three independent compares).
+- allproc 0xfffffff00a653cb8 8-byte LIST_HEAD, zombproc 0xfffffff00a653cc0
+  (fork-register + exit1 LIST_INSERT_HEAD verbatim), initproc slot
+  0xfffffff00a6542c0. Rows tagged Ghidra A13_22G100 in LabIntelTab.
+- P094 Path 2 A13 scan fixed: delta 0x364FCB8 + head16=NO (P090 0x35CC000
+  was __DATA base; the 16-byte queue shape could never match LIST_HEAD).
+  Combined with the cs2core bulk lane, the rig now derives kernproc at
+  runtime with static anchors to validate against. P007 copy mirrored.

@@ -6,7 +6,7 @@ honest — it flips only on a passing magic self-test on THAT device.
 
 | Device | SKU / build | KRW lane | State | Beta-1 path |
 |---|---|---|---|---|
-| iPhone 11 | iPhone12,1 A13 / 22G100 (18.6.2) | cs2core (ClearSword core, Dopamine 3.0.11 verbatim); libkrw when Dopamine is active | **KRW PASS** (2026-10-15 12:00, kslide 0x12f30000) | P094 (Path 2 ungated 10-15 via cs2core bulk lane) → kernproc-proven row → PATCHSET: elevate uid0 → unsandbox → CS_PLATFORM → pmap_cs → AMFI TC → opainject launchdhook → Sileo → Zebra → respring |
+| iPhone 11 | iPhone12,1 A13 / 22G100 (18.6.2) | cs2core (ClearSword core, Dopamine 3.0.11 verbatim); libkrw when Dopamine is active | **KRW PASS** (2026-10-15 12:00, kslide 0x12f30000) | P094 (Path 2 ungated 10-15 via cs2core bulk lane; anchors Ghidra-proven same day: kernproc 0x…7ade3a8, allproc 0x…a653cb8 8-byte LIST_HEAD, zombproc 0x…a653cc0, initproc 0x…a6542c0) → kernproc-proven row → PATCHSET: elevate uid0 → unsandbox → CS_PLATFORM → pmap_cs → AMFI TC → opainject launchdhook → Sileo → Zebra → respring |
 | iPhone 12 mini | iPhone13,1 A14 / 17.3 | cs2core (proven) | KRW YES | Same PATCHSET pipeline; struct rows for 17.3 need the per-SKU Ghidra pass if P094 Path 2 misses (no scan delta pinned yet) |
 | iPhone 12 | iPhone13,2 A14 / 23F77 (26.5 GM) | none yet | **hasKread=NO** | Four live doors (docs/CASESTUDIES.md): p063 84530 heap leak (LIVE-PROVEN), P099 43748 groomed write-door candidate, P097 65371 gRegistryRoot leak, P098 M2Scaler diag. hasKread stays NO until a door yields `kread32(kbase)==0xfeedfacf` |
 
