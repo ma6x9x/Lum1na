@@ -624,3 +624,36 @@ magic self-test; JAILBROKEN only on real post-respring jbroot evidence.
 - Honest state: KRW on 26.5 A14 still NOT obtained. The conversion is wired
   and now safe to arm; the missing piece is the Beta-2 LIVE-element steering
   write (mach-msg OOL/port pointer swap) built on the confirmed P099 shape.
+
+### 2026-10-15 16:07–16:11 — 26.5 A14 tap batch on the fixed IPA: OOB #3, catch-22 re-proven ×3, ColdForge deputy survivors
+
+- **The sideloaded IPA is the fixed build** — the P099 banner carries the
+  interleaved verdict text and `holes-freed=1024 (interleaved: odd holes kept
+  LIVE)` on-device, so 04a4c87 is what is running on the hunt device.
+- **P099 v2 interleaved first live tap**: groom freed 1024/2048 (odd kept
+  LIVE — the 15:25:51 panic fix is live). CONTROLLED OOB #3 confirmed
+  (victim=2044, first_diff=0x0000, 48 payloads, records
+  {surfaceId, symbol, 0x100000001}; surfaceIds vary per run). No panic in the
+  window. Still Beta-1: detection only, the steering write is not built.
+- **LightSword v2.1 re-tap**: spyConfirmed=1 → kill-shot miss again
+  ("alias GART is not independent"). Failed PRE-smash (stale acquire), so the
+  new teardown-defuse paths were never exercised — abort was clean, no crash,
+  no dangling sockets.
+- **LightSwordABC — second angle on the catch-22**: [B] detach-once = 0xe00002d5
+  Busy (prior LightSword session left a wire); [C] detach+replace → blit
+  first=0x00 (detach unmaps GART — blit is NOT a dangling-page read); [D]
+  vm_remap alias → "not GPU-shared" (cpuShared=0). Three independent proofs
+  that no alias/detach shape yields a post-detach GPU-visible read on 26.5.
+- **ColdForge v1.4 (deputy lab) 16/16 SURVIVED**: post-free sel36 deref
+  through freed IOGeneralMemoryDescriptor elements (cd8/d00 class) survived
+  every attempt — confused-deputy UAF candidates on 26.5. Reach=0:
+  IOSurfaceLookup(out) → NULL, consumers unreachable (p016 historic).
+  **[debt] 16 extra taggedRetains in flight** on held GMDs — stabilize/
+  teardown may free them late; a delayed zalloc-style panic after ColdForge
+  taps would fit that debt. Operator note stands: cd8/d00 = RECLAIM HIT —
+  file IPS + log if one lands, STOP tapping until then.
+- **Beta-1 calibration (user's framing)**: the project is Beta-1 until a
+  device is jailbroken from OUR app — post-respring evidence = jbroot + Sileo
+  + Zebra installed by the bootstrap. Controlled-OOB confirmations, deputy
+  survivors, and page-read oracles are lab evidence, not milestones. hasKread
+  stays NO on 26.5; KRW still not obtained.
