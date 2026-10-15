@@ -91,6 +91,7 @@ public final class PersistentLogStore {
         "p052": "p052_nstream_extend_log.txt",
         "p073": "p06x_p073_log.txt",
         "p074": "p06x_p074_log.txt",
+        "p075": "p06x_p075_log.txt",
         "cskrw": consoleLogName,
         "cscalib": "racecalib_log.txt",
         "luminakrw": "lumina_krw_log.txt",
