@@ -472,3 +472,13 @@ magic self-test; JAILBROKEN only on real post-respring jbroot evidence.
   ops in SKILL.md, new reference/patterns.md audit checklist.
 - AltDaemon (rigs only, AGPL ports) and Nyxian (jailed IDE, signing
   keep-alive + on-device iteration) noted as distribution options.
+
+### 2026-10-15 — cs2core bulk lane ungates P094 Path 2 (rig unlock)
+
+- Lum1naKreadLane: cs2core now satisfies Lum1naLaneBuffered + KReadBuf
+  (Lum1naCS2Core_KReadBuf existed; dispatcher never used it). P094 Path 2
+  __DATA allproc scan now runs on cs2core-only devices (rig 22G100,
+  12 mini 17.3) — runtime kernproc derivation WITHOUT the Ghidra pass.
+  P007 lab lane mirrored with a chunked kread32 bulk adapter.
+- docs/DEVICES.md: per-device lane matrix + completion bars. Nugget is
+  explicitly NOT a 26.5 door (SparseRestore dead since 26.2 betas).

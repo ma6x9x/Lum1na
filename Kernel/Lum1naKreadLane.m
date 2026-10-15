@@ -28,7 +28,7 @@ const char *Lum1naLaneName(void) {
 }
 
 bool Lum1naLaneBuffered(void) {
-    return LaneSocketCtx() != NULL || Lum1naLibkrw_IsLive();
+    return LaneSocketCtx() != NULL || Lum1naLibkrw_IsLive() || Lum1naCS2Core_IsLive();
 }
 
 #pragma mark - reads
@@ -74,5 +74,6 @@ ssize_t Lum1naLaneKReadBuf(uint64_t kaddr, void *buf, size_t len) {
     Lum1naSocketKRWContext *ctx = LaneSocketCtx();
     if (ctx) return Lum1naSocketKRW_KReadBuffered(ctx, kaddr, buf, len);
     if (Lum1naLibkrw_IsLive()) return Lum1naLibkrw_KReadBuf(kaddr, buf, len) ? (ssize_t)len : (ssize_t)-1;
+    if (Lum1naCS2Core_IsLive()) return Lum1naCS2Core_KReadBuf(kaddr, buf, len) ? (ssize_t)len : (ssize_t)-1;
     return -1;
 }
