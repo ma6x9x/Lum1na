@@ -548,3 +548,20 @@ magic self-test; JAILBROKEN only on real post-respring jbroot evidence.
 - Honesty: lockdownd chain is USB/pairing/host-side (needs a Mac);
   documented as a Stage-0 entry/re-trigger vector, not an in-app door.
   KRW on 26.5 A14 is still NOT obtained.
+
+### 2026-10-15 — P045 notes-export nugget: interleaved hole spray (parked)
+
+- From the Sept 2026 p043-re notes export ("THE PANIC LOG IS A GOLDMINE"):
+  the 43748 OOB panic (`data.kalloc.3072 element modified after free`,
+  slot 0xC0) happened because P045 freed ALL holes — the OOB neighbor was
+  a freed kmsg. Fix when the OOB experiment reopens: INTERLEAVED spray,
+  free only even holes (A1 B1 A2 B2 ... free A's, keep B's live) so the
+  OOB lands on a live neighbor ~50% of the time; silent corruption is
+  observable by recv-ing the kmsg. KASLR comes free from that panic log
+  (slide 0x0d0c4000 on that boot; unslide the backtrace LRs).
+- Consistent verdict preserved: FKT dumps say 64788 is a KRW dead end on
+  26.5 and 43748 OOB is the best/only path; missing piece = a Shape L
+  victim in kalloc.3072, to be identified by scanning 21D50 with the 12
+  mini's tfp0 then replicated on 23F77.
+- No probe bodies touched (OOB bodies stay per AGENTS.md rule); the T1
+  door is wired in the chain, P045 rework waits for an explicit ask.
