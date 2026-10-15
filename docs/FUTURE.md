@@ -749,3 +749,33 @@ novel on modern iOS, as a dependency pre- and post-jailbreak.
   hostile sample.
 - **Honesty**: no SwiftPeek logic enters the exploit bodies (rule: race/UAF bodies untouched);
   PeekInspector is additive UI+console only. hasKread unchanged.
+
+### 2026-10-15 ~17:35 — panic #5 (23F77): P044 v46 freed-element debt fired, ANE lane STOP; P075 first live census; p7 lane GO
+
+Device log + `panic-full-2026-10-15-172914.0002.ips` (SHA-256 589fa3f1…, kept private — signature only here).
+
+- **Panic**: `panic(cpu 4): [data.kalloc.3072]: element modified after free (off:0,
+  val:0x000000c00000017e, sz:3072, ptr:0xffffffe0d971a800)` — 25–28 s after the 17:28:42 Full
+  Chain, inside Lum1na's own syscall path (pid 805). Dumped element = the ANE prewire record
+  stream `{surfaceId=0x17e, symbol=0xc0, 1, 1} {0xc4, 0xc1, 1, 1} …` — the P044 v46 fire's
+  records (surfaceId ≠ the P099 tap's 0x17b), 48 records, exactly the 15:25:51 proof shape.
+  Latency confirmed again: plant → ~25–30 s → zalloc catch.
+- **What it proves**: the v46 interleaved groom ("odd holes kept LIVE") still fired into an
+  element that was or became free — adjacent-element liveness at fire time is **not verifiable
+  pre-fire on 23F77**. Occupancy MISS (stage 3 hits=0) + freed-element panic in the same session
+  = groom redesign required, not a retry. ptr sits in the segregated `.DATA` zone; conversion
+  HOLD unchanged (records still cannot carry pointer bits).
+- **Operator rule (extended)**: an IPS for this class has landed → **STOP all kalloc.3072 /
+  ANE fires (P044, P099, T1 chain, remaining-fire variants)** until a new groom design with
+  verified-live adjacency exists. LightSword stays parked on its own kill-shot miss. Next
+  progress on this class is Ghidra/design work, not taps.
+- **P075 first live run (17:27:32)**: SKU gate pass; **IOSurfaceRootUserClient type 0
+  kr=0x0 — OPEN** (FomoPeek surface 1 live on 23F77); IOSurfaceCreate/GetBaseAddress dlsym ok;
+  **IOServiceMatching("IOAccelerator") = not found on 23F77** — census v2 must try
+  AGXAccelerator / IOGPU / AppleAGXDevice before the AddClient pairs; cosmetic line-interleave
+  in the double-open pair (P06xLog notify race), content unaffected.
+- **p7 lane unaffected — GO**: the panic came from Lum1na's own process taps; the Safari/GPU
+  web lane touches neither kalloc.3072 nor ANE, and a fresh post-reboot boot is the clean heap
+  the test wants. Runbook: Safari → http://192.168.1.2:8081/index.html; watch serve log +
+  `lab_log.txt` for the fetch cascade, `PE ALIVE`, then `KRW_OK/KRW_FAIL kb= slide=`.
+- hasKread stays NO; Beta-1 stays Beta-1.
