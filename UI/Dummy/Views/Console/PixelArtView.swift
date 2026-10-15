@@ -64,8 +64,8 @@ struct PixelArtView: View {
         switch ch {
         case "█":
             let color = r < 5
-                ? Color.white.mix(with: Palette.cyan, by: min(1, Double(r) / 4))
-                : Palette.cyan.mix(with: Color(red: 0.55, green: 0.42, blue: 1), by: Double(r - 5) / 2)
+                ? luminaMix(Color.white, Palette.cyan, by: min(1, Double(r) / 4))
+                : luminaMix(Palette.cyan, Color(red: 0.55, green: 0.42, blue: 1), by: Double(r - 5) / 2)
             return (color, 1)
         case "1":
             return (Palette.starRamp(Double(r) / 6), 1)

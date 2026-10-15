@@ -38,7 +38,7 @@ enum Palette {
     /// Samples the magenta → violet → cyan ramp at `t` (0…1); used by pixel art.
     static func starRamp(_ t: Double) -> Color {
         let t = min(max(t, 0), 1)
-        return t < 0.5 ? magenta.mix(with: violet, by: t * 2) : violet.mix(with: cyan, by: (t - 0.5) * 2)
+        return t < 0.5 ? luminaMix(magenta, violet, by: t * 2) : luminaMix(violet, cyan, by: (t - 0.5) * 2)
     }
 
     /// Near-black navy PCB base (dark) / pale silver-ice (light).

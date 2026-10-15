@@ -46,7 +46,7 @@ struct GlassSurface<S: InsettableShape>: ViewModifier {
     private var solidFill: Color {
         let base = scheme == .dark ? Color(white: 0.12) : Color(white: 0.96)
         guard let tint else { return base }
-        return base.mix(with: tint, by: 0.22)
+        return luminaMix(base, tint, by: 0.22)
     }
 }
 
