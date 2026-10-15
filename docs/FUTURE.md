@@ -340,3 +340,50 @@ run with real kernel read/write from day one. Shipped in this commit:
   probe's own pivot advice (64788) applies — but rapier stays PARKED until
   the IOGPU freelist-encoding corruption (far ...a8/...48, 18:52+18:57
   panics) is understood.
+
+## 2026-10-14 — DOPAMINE 3.0.11 SUPPORT MATRIX (verified from the local tree)
+
+Read every exploit Info.plist (DPSupportedRanges/Devices) + the dispatch
+code (DOExploit.m, momentarius.c). thisCPU maps the whole Vortex/Tempest
+family (A12/A12X/A12Z) to "A12", and momentarius.c dispatches
+CPUFAMILY_ARM_VORTEX_TEMPEST -> momentarius_init_A12() — so A12X is
+covered in code, not just the plist.
+
+| Exploit      | Type   | Range                          | Devices |
+|--------------|--------|--------------------------------|---------|
+| badRecovery  | PAC    | 15.0-15.4.1 (betas)            | any     |
+| multicast_bc | Kernel | 15.0-15.1.1 (betas)            | not A8/A9 |
+| dmaFail      | PPL    | 15.0-16.5.1                    | any     |
+| weightBufs   | Kernel | 15.2-15.5                      | arm64e  |
+| kfd landa    | Kernel | 15.0-15.8.6, 16.0-16.6.1       | any     |
+| ClearSword   | Kernel | 15.0-18.7.1 AND 19.0-26.0.1    | contiguousMapping |
+| DarkSword    | Kernel | 15.0-18.7.1 AND 19.0-26.0.1    | contiguousMapping |
+| Titan        | PPL    | 16.1-17.3.1                    | A14-A17 |
+| momentarius  | PPL    | 15.0-26.0.1                    | A12, A13 (incl. A12X in code) |
+
+Fleet consequences:
+
+- **12 mini (A14, 21D50)**: jailbroken by Titan. Matches our A14_21D50
+  scaffold; libkrw door ready.
+- **iPhone 11 rig (A13, 22G100)**: jailbroken by momentarius. ClearSword
+  also covers 22G100 — which is why our cs2core verbatim core fired there.
+- **XR (A12, 18.7.2)**: momentarius range 15.0-26.0.1 INCLUDES 18.7.2 and
+  the code path handles A12 — **the XR should be jailbreakable with
+  3.0.11; "not able to be jailbroken" appears outdated.** If the user
+  retries and it lands, the XR gets libkrw -> krwlib lane. Shipped this
+  commit: honest gXR_22H LabOff row (link base + darwin-24.x ladder
+  usecount 0x254, VAs 0) + PROC_ROW("XR_22H311") + selector case — the
+  pipeline is wire-ready before the device is. cs2core honest-skips 22H
+  (43520 patched in exactly 18.7.2 — the same reason ClearSword/DarkSword
+  ranges jump 18.7.1 -> 19.0).
+- **iPad Pro A12X on 26.6**: NO Dopamine exploit covers it (momentarius
+  ends 26.0.1; ClearSword/DarkSword end 26.0.1). If the device can be
+  downgraded/restored to <=26.0.1 (blobs permitting), momentarius should
+  take it (A12X in code) and the twin becomes a libkrw device. On 26.6
+  stock it waits for OUR 26.x primitive; the 23G71 table (Ghidra'd VAs,
+  fill_cap=1, owns_replaceable=1) and probe gates (A14_23F77 ||
+  A12X_23G71 accepted) are already wired.
+- **iPhone 12 hunt (A14, 26.5 / 23F77)**: no Dopamine exploit covers A14
+  past 17.3.1 — Titan ends there and ClearSword/DarkSword end 26.0.1.
+  Confirms the hunt KRW path is OURS to build: ANE T1/43748 grooming fix
+  (write primitive proven) is the closest lever.

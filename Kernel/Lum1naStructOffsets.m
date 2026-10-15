@@ -70,6 +70,9 @@ static const LabProcOffTab gProcOffTabs[] = {
     PROC_ROW("A13_22G100", 0),
     /* A12X iPad twin (23G71): same ladder, untested on T8020. */
     PROC_ROW("A12X_23G71", 0),
+    /* XR (iPhone11,*) 18.7.x = darwin 24.x: same 24.4+ ladder as the rig.
+       kernproc 0 = underived (T8010 22Hxxx Ghidra pass queued). */
+    PROC_ROW("XR_22H311", 0),
     /* A14 12 mini (17.3.x, Dopamine rootless): the single darwin-23 row.
        kernproc 0 = underived: Ghidra pass on the 21D50 kernelcache queued;
        once libkrw kread is live on device, the backward le_prev walk from
