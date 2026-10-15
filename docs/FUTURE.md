@@ -427,3 +427,19 @@ magic self-test; JAILBROKEN only on real post-respring jbroot evidence.
     validate pid 0) semantics. Rows: allproc/zombproc/kernprocvar
     family "Ghidra T8101 12377". LabOff stays the only resolution source
     (AGENTS.md) — these are validation rows until a live lane CONFIRMs.
+
+## 2026-10-15 — vschko/CaseStudies cross-ref + panic re-attribution
+
+- Panics #1–#3 on the hunt 26.5 RE-ATTRIBUTED to CVE-2026-43748 ungroomed
+  (x25 = FAR−0xc00, stride 0xc0, GZAlloc wild deref). ANE lane UNPARK for
+  groomed standalone taps only (P099). "wedge→harvest" attribution retired;
+  AVE P087 zero-completions finding stands.
+- P096 canceled — p063 already implements 84530 AND live-proved it today
+  (aio_workq_entry 0xffffffe16d5aaa40, filter −3, post-completion stable).
+- New probes: P097 (65371 gRegistryRoot instance leak — heap, not slide),
+  P098 (M2ScalerCSC sel-8 iosaDiag, honest shape), P099 (43748 groomed,
+  espresso/CoreML primary per P046 MIL-CLOSED note, inline-mach groom).
+- 43748 lane: write-door candidate B. Needs victim-adjacent chunk shaping
+  before it is a real write primitive. Board/AfterKread stay HOLD.
+- 39868 (DTrace DOF) parked: needs UID-0 /dev/dtrace on stock iOS.
+  Details: docs/CASESTUDIES.md.

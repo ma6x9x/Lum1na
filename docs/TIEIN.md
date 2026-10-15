@@ -192,6 +192,11 @@ pieces do not flow into Dopamine or Nugget today, with ONE real exception
   (host-side); nothing of ours feeds it unless we ship Nugget tweaks.
 - **26.5 A14 (23F77) status**: Dopamine has no exploit for this SKU/build
   (basebin covers 26.0-26.0.1 A12/A13 only), so Beta 1 on the hunt device
-  stands entirely on OUR lane + the static anchors above. Hunt write
-  lanes stay PARKED after panics #1-#3 (see FUTURE.md — all three land in
-  AppleH11ANEInterface 0x17401fc wild-write, wedge→harvest family).
+  stands entirely on OUR lane + the static anchors above. Panics #1-#3
+  RE-ATTRIBUTED 2026-10-15 to CVE-2026-43748 ungroomed (ANE prewire
+  cross-chunk at record 0xc0) — ANE lane UNPARK for groomed standalone
+  taps only (P099); see docs/CASESTUDIES.md.
+- **vschko/CaseStudies** (public write-ups, no license): technical
+  reference for 84530/43748/65371 recipes + fix versions. No code copied;
+  the DarkSword-kit "43748 fill" the writeup documents is the same lane
+  our ANE254 chain targets. Credit: docs/CREDITS.md.

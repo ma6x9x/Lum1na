@@ -94,3 +94,10 @@ log, not in credits.
 ClearSword (cs2) primitives, all P0xx probes, the LabOff/LabIntel tables,
 Lum1naBoard, the elevate pipeline: authored in this repo
 (ma6x9x/Lum1na). No exploit bodies are taken from any upstream above.
+## vschko — CaseStudies write-ups (no license file)
+
+Public write-ups (CVE-2026-84530, CVE-2026-43748, CVE-2026-65371,
+CVE-2026-39868, M2Scaler diag, others): used as technical REFERENCES for
+recipes and fix-version mapping. **No code copied** — all probe
+implementations in this repo are ours. The repo ships no LICENSE file, so
+attribution-only credit is given here. See docs/CASESTUDIES.md.
