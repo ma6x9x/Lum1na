@@ -830,7 +830,8 @@ Device log + `panic-full-2026-10-15-172914.0002.ips` (SHA-256 589fa3f1…, kept 
   compiled a `254in_1out_addchain` mlmodelc clone at 17:28:27, then Lum1na's ANE
   prewire attempts fired: **17:28:28** and **17:28:46** both hit
   `ANE_ProgramCheckandPrewireBuffers_gated: MemoryMapRequest for 255 buffers,
-  result: 0xe00002c2` (kIOReturnVMError) with Lum1na programs open (229376 /
+  result: 0xe00002c2` (**kIOReturnBadArgument** — code-name corrected in the P070
+  card below; VMError is 0xe00002c8) with Lum1na programs open (229376 /
   344064 B wired); at **17:28:47.24** the GPU command buffer aborted
   (`kIOGPUCommandBufferCallbackErrorOutOfMemory`) with kernel faults
   `IOGPUMemory::prepare_memory_slow … prepare detached resource`; panic zalloc
@@ -847,3 +848,37 @@ Device log + `panic-full-2026-10-15-172914.0002.ips` (SHA-256 589fa3f1…, kept 
 - Note: P075's built-in honesty line still names the web lane as "KRW producer
   candidate" — stale per the verdict above; next app build updates the string.
 - hasKread stays NO; Beta-1 stays Beta-1; ANE lane STOPPED; web lane CLOSED (card above).
+
+### P070 chain-sequencer v1 — reach census, 2-run repro (2026-10-15 18:15/18:16 EDT, note 142)
+- First P070 evidence. Census + reach map only: no fire, no kwrite, one door TAP
+  per force-quit. Two sessions 36 s apart (force-quit between) → same-boot repro
+  of the reach map. IDENT identical both runs; **QueueCreate dual-oracle still LEFT**.
+- Reach (IOServiceOpen, unprivileged, no fire): type=1 opens succeed on
+  **H11ANEIn**, **H1xANELoadBalancer**, **IOGPU**; type=0 there returns
+  `0xe00002c7` (**Unsupported** — a type gate, not an entitlement wall; matches
+  the CHAIN.md P032/P044 record). **AppleKeyStore** and **AppleJPEGDriver** open
+  type=0 (door C's AKS conn reachable). **AppleAVD** = `0xe00002c1`
+  NotPrivileged both types; **AppleAVE2Driver** = `0xe00002e2` NotPermitted
+  both. `agx` / `AppleH11ANEInterface` / `AppleAVE2` names not found. kr pattern
+  deterministic across relaunch.
+- **Code names verified against xnu IOReturn.h** (apple-oss-distributions,
+  fetched this session): 0xe00002be NoResources · 0xe00002c1 NotPrivileged ·
+  0xe00002c2 **BadArgument** · 0xe00002c7 Unsupported · 0xe00002c8 VMError ·
+  0xe00002e2 NotPermitted. **Correction**: the panic-#5 255-buffer prewire
+  failures (17:28:28 / 17:28:46, card above) were **kIOReturnBadArgument**, not
+  VMError — argument/validity rejection of the map request, not VM pressure;
+  the 17:28:47 GPU OOM command-buffer abort stands separately. The
+  failed-teardown → freed kalloc.3072 hypothesis is unchanged (and slightly
+  stronger: BadArgument fires after the record array is built). Three legacy
+  debug strings in the repo label codes wrongly (`P032ANEOpenSmoke.m` /
+  `LabIOGPUQueue.m`: 2c1 "Aborted"; `P010QueueLeak.m`: 2c7 "NotPrivileged") —
+  cosmetic cleanup candidate, not done.
+- Doors A–E unchanged with their nexts (A: shape-1 reclaim; B: named Shape L
+  copyout dest; C: needs a WRITE-door pair; D: named client/flow reclaim;
+  E: named +0x34 consumer). Nothing is one-tap-from-KRW. Persist VAs parked
+  (AMFI UC 0xFFFFFFF008B673F8 … pmap_load_trust_cache 0xFFFFFFF00A60D8D0),
+  AfterKread HOLD until commitSlide.
+- State: hasKread NO / kslide 0 / kbase 0 (both sessions). Next per the TAP's
+  own order: one door (P065 / P063 / P044) → force-quit; KREAD tap only after a
+  door yields kread32. OPS standing: **disable iOS auto-update on the device**
+  (27.0.1 nag, card above) — still unconfirmed done.
