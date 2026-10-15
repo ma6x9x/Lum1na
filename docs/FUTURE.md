@@ -711,3 +711,41 @@ fullchain.sh finding. One card per skill discipline.
   declared window (26.0–26.1) does not prove 26.5. The marker test is a DARKSWORD.md §5 step-3
   experiment, not a KRW claim. hasKread stays NO; Beta-1 stays Beta-1 until jbroot + Sileo/Zebra
   from our bootstrap.
+
+### 2026-10-15 ~17:10 — SwiftPeek × Lum1na: pre→post jailbreak continuity plan (user directive)
+
+User: FomoPeek name-tie-in with **SwiftPeek** (`~/Projects/lumina/lumina-repo/SwiftPeek`, Theos
+tweak + SPKit support library, docs/DEPENDENCY_PLAN.md). Use it / its logic to make the chain more
+novel on modern iOS, as a dependency pre- and post-jailbreak.
+
+- **Feasibility, honest split**:
+  - *Pre-jailbreak*: NO exploit primitive comes from SwiftPeek (UI discovery is not kernel
+    access — the KRW producer stays the DarkSword web lane + catalog doors). What IS usable now:
+    the shipped SPKit pieces (runtime hygiene / sync-fsync trace / overlay hosting) already mirror
+    our own PersistentLogStore discipline, and the SwiftUI discovery logic can run **in-process**.
+  - *Post-jailbreak*: this is the goldmine. Lum1na's AfterKread pipeline already stages
+    `Resources/tweaks/` and runs `dpkg -i` — SwiftPeek ships there as a `.deb` beside Sileo/Zebra.
+    Per DEPENDENCY_PLAN shape 3 (`Depends:` shared dylib), SwiftPeek becomes the SwiftUI-era tweak
+    support library (SPHostingViewsIn / SPSwiftTypeName / SPKOverlayWindow / control discovery),
+    which no mainstream jailbreak ships out of the box today. That is the novelty claim.
+- **Pre→post continuity (implemented this commit)**: `UI/PeekInspector.swift` + Settings
+  "Peek UI Tree" — the in-app twin: walks Lum1na's own windows, finds UIHosting* views, names the
+  SwiftUI rootView + one mirror level via public API only, logs through ExploitManager console.
+  Same discovery shape as SwiftPeek's SPAttach/SPHostingViewsIn; pre-jailbreak it peeks our app,
+  post-jailbreak the injected SwiftPeek peeks any app. API-identical-in-spirit so the code is
+  transferable without rewiring.
+- **Tasks queued (post-Beta-1, ordered by DEPENDENCY_PLAN dogfooding)**:
+  1. Build SwiftPeek `.deb` on the Theos toolchain targeting 26.x and drop it into
+     `Resources/tweaks/` (explicitFolder) — AfterKread installs it automatically; no pipeline
+     changes needed.
+  2. iOS 26 field re-dump: SwiftPeek's offline catalogs (MA-*.txt) are iOS 17.3-era; Liquid Glass
+     changed Music/SpringBoard internals. First job after first jailbreak: re-run the dump tools
+     on the hunt device at 26.5.
+  3. Kill-switch exercise (SPKKillSwitchEngaged) on a lower-risk target before SpringBoard.
+  4. Shape 3 (`Depends:`) only when third-party consumers or cross-tweak coordination force it —
+     per the plan's own packaging table.
+- **Naming**: FomoPeek / SwiftPeek / Lum1na-peek family branding stays cosmetic; the P075 census
+  ("Peek" of the IOKit surface map) is coincidental naming alignment, not shared code with the
+  hostile sample.
+- **Honesty**: no SwiftPeek logic enters the exploit bodies (rule: race/UAF bodies untouched);
+  PeekInspector is additive UI+console only. hasKread unchanged.

@@ -145,6 +145,14 @@ struct SettingsSheet: View {
                         Label("Copy TAP Log (p011)", systemImage: "hand.tap")
                     }
                     Button {
+                        dismiss()
+                        viewModel.log("=== peek session (in-app SwiftPeek twin) ===")
+                        PeekInspector.dump { viewModel.log($0) }
+                        viewModel.log("=== peek done ===")
+                    } label: {
+                        Label("Peek UI Tree", systemImage: "sparkle.magnifyingglass")
+                    }
+                    Button {
                         UIPasteboard.general.string = viewModel.exportFullDebugLog()
                     } label: {
                         Label("Copy Console Buffer", systemImage: "terminal")
