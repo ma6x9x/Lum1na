@@ -129,6 +129,7 @@ typedef CFTypeRef (*al_iosCreate_t)(CFDictionaryRef properties);
 
 + (NSString *)runLearn {
     size_t kinfoLen = 0;
+    NSString *docs = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
     L(@"=== p100 session %@ BUILD %s ===", LabLocalMilitaryNow() ?: @"?", P100_BUILD);
     L(@"AutoLearn: READ-ONLY learner. No kwrite, no IOConnect selector calls, hasKread unchanged.");
     L(@"%@", [LabDeviceProfile identBlock] ?: @"ident ?");

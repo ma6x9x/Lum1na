@@ -306,6 +306,18 @@ jobs:
           rm -f Exploit/AVERace.m Exploit/AVERace.h 2>/dev/null || true
           echo "✅ Removed AVERace"
 
+      # The lab app (P007OpenOnly/) carries its own .xcodeproj. Under the
+      # path="." synchronized root Xcode discovers it as an implicit
+      # subproject and merges its products into Lum1na.app ("Multiple
+      # commands produce Info.plist/mlmodelc/ContentView.stringsdata").
+      # membershipExceptions cannot stop subproject discovery, so the shell
+      # build simply removes the lab tree first. The build-debug job runs in
+      # a separate checkout and is unaffected.
+      - name: Remove Lab App Tree (implicit-subproject guard)
+        run: |
+          rm -rf P007OpenOnly
+          echo "✅ Removed P007OpenOnly from the shell-build tree"
+
       # ============================================
       # Entitlements — covers every user client + service we touch:
       #   ANE:     AppleH11ANEInterface (P059 selector 2 direct path)
