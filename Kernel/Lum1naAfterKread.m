@@ -681,8 +681,13 @@ static void ak_tryInstallPkgman(NSMutableString *s) {
     /* Dopamine order: elevatePrivileges FIRST (uid0 -> unsandbox ->
        CS_PLATFORM_BINARY), then pmap/AMFI/inject. The rig 17:51 run proved
        every spawn below dies EPERM without it. Elevate holds honestly when
-       the per-SKU kernproc VA is still underived. */
-    [s appendString:[Lum1naElevate runElevate]];
+       the per-SKU kernproc VA is still underived. Stream the elevate block
+       through ak_log so HOLD/FAIL lines reach console + disk (the returned
+       body prefers P06xLogDump, which never saw these lines). */
+    NSString *elev = [Lum1naElevate runElevate];
+    for (NSString *ln in [elev componentsSeparatedByString:@"\n"]) {
+        if (ln.length) ak_log(s, @"%@", ln);
+    }
 
     uint32_t selCopy = off->amfi_sel_copy;
     uint32_t selManifest = off->amfi_sel_manifest;

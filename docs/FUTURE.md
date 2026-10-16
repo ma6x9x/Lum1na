@@ -882,3 +882,33 @@ Device log + `panic-full-2026-10-15-172914.0002.ips` (SHA-256 589fa3f1…, kept 
   own order: one door (P065 / P063 / P044) → force-quit; KREAD tap only after a
   door yields kread32. OPS standing: **disable iOS auto-update on the device**
   (27.0.1 nag, card above) — still unconfirmed done.
+
+### A13 reference rig — FIRST hasKread=YES in project (Dopamine ClearSword core, public); P094 kernproc PROVEN; p095 walk bug + elevate visibility fixed (2026-10-15 evening, note 143)
+- **Honesty**: the rig KRW is the **public Dopamine 3.0.11 ClearSword core**
+  (Beta 1 path #2, verbatim) — it validates the post-KRW machinery, it is not a
+  novel exploit. **Hunt (A14, 23F77) still hasKread NO**; ANE lane STOPPED; web
+  lane CLOSED; doors A–E unchanged.
+- **Milestone**: cs2core established KRW 3× on iPhone12,1 / 22G100 (slides
+  0xec18000 then 0x79a4000; magic self-test kread32=0xfeedfacf /
+  kread64=0xc00000002 PASS each time; commitSlide OK → hasKread=YES
+  hasKwrite=YES). **P094 PROVEN** (read-only): sysctl anchor honestly masked
+  (e_paddr=0), allproc head scan matched, kernproc-proven unslid
+  0xffffffe624f996d8 recorded; LEADs kernprocvar + allproc CONFIRMED, zombproc
+  honestly REFUTED; board leaks 6→9. Allproc is newest-first, **proc0 is the
+  TAIL**.
+- **p095 bug fixed**: its board fallback walked `le_next` FORWARD from proc0 —
+  NULL at the tail — so it HOLDed with the stale "run p094 first" message
+  minutes after p094 recorded the value. Fallback now walks `le_prev` backward
+  (oldest→newest, same shape as Lum1naElevate) with exhausted-walk diagnostics.
+- **AfterKread elevate visibility fixed**: `fire()` ran Lum1naElevate but
+  appended its block to a string the `P06xLogDump` return path drops — every
+  elevate HOLD/FAIL was invisible (explains FIRING → pmap line → EPERM with
+  nothing between). Elevate lines now stream via `ak_log`. The installed rig
+  IPA likely also predates the elevate lane — rebuild + reinstall required.
+- Expected next wall (prediction): with elevate working, opainject spawn gets
+  past EPERM, but exec may still SIGKILL on AMFI code signing — basebin.tc
+  loads but the A13 AMFI loadTrustCache selectors are unproven. rc=0-then-die
+  is progress, not failure; the follow-up is the A13 trustcache lane (Ghidra
+  selectors, not guessed).
+- State: rig hasKread YES (public core); Hunt hasKread NO / Beta-1. OPS
+  standing: **disable iOS auto-update** — still unconfirmed done.
