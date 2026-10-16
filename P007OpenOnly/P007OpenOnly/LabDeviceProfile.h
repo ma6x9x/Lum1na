@@ -1,0 +1,65 @@
+//
+//  LabDeviceProfile.h
+//  Lum1na
+//
+//  Device profiling and patch oracle utilities
+//
+
+#ifndef LabDeviceProfile_h
+#define LabDeviceProfile_h
+
+#import <Foundation/Foundation.h>
+#import "LabRuntimeOffsets.h"
+
+// LabSku now lives in LabRuntimeOffsets.h as a plain C enum (shared with
+// the pure-C ClearSwordCore). Import that header for the type.
+
+LabSku LabDeviceProfile_sku(void);
+const char *LabDeviceProfile_sku_string(LabSku sku);
+
+@interface LabDeviceProfile : NSObject
+
+// Core detection — SKU is hw.machine + kern.osversion (not UIDevice 26.5)
++ (NSString *)machine;
++ (NSString *)osversion;
++ (NSString *)skuString;
++ (NSString *)skuName;
++ (LabSku)detectedSku;
++ (LabSku)sku;
++ (BOOL)isTargetSku;
++ (BOOL)isA14_23F77;
+- (BOOL)isA14_23F77;
++ (NSString *)kernelVersion;
+
+// Patch Oracle utilities (for P046 and other exploits)
++ (NSString *)stopUnlessA14_23F77:(NSString *)reason;
++ (NSString *)gateMode;   /* SKU-gate mode for this build (LAB_DEBUG_APP disables) */
++ (NSString *)identBlock;
++ (NSString *)patchOracleMap;
+
+// P009 Support (added for P009ReplaceBackingSmoke)
++ (BOOL)isExactOraclePair;
++ (uint32_t)queueCreateSel;
++ (uint32_t)queueDestroySel;
++ (uint32_t)queueSubmitSel;
++ (uint32_t)queueCreateSize;
++ (uint32_t)queueLeakOff;
++ (uint32_t)sysmemMdOff;
++ (uint32_t)sel36;
++ (NSArray<NSNumber *> *)queueCreateSizeSweep;
+
++ (NSString *)banner;
++ (NSString *)expectP009PathB;
++ (NSString *)expectQueueCreate;
++ (NSString *)expectP010LastRef;
++ (NSString *)expectNecpReach;
++ (NSString *)expectAVEOpen;
++ (NSString *)expect64788;
++ (NSString *)oracleTable;
++ (NSString *)proveMatrix;
++ (NSString *)slideDestMap;
++ (NSString *)writeClassMap;
+
+@end
+
+#endif /* LabDeviceProfile_h */
