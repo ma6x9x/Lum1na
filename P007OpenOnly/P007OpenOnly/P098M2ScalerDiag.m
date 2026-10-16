@@ -19,7 +19,7 @@
 #import <mach/vm_map.h>
 #import <mach/vm_region.h>
 
-#define P098_BUILD @"p098-m2scaler-v1"
+#define P098_BUILD @"p098-m2scaler-v1b-peekfix"
 
 /* dlsym prototypes (local per P059/P032 convention) */
 typedef CFMutableDictionaryRef (*IOServiceMatching_t)(const char *);
