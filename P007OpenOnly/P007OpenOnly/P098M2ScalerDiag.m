@@ -150,7 +150,9 @@ static BOOL p098_addr_exec_p(const void *addr, char *out, size_t outn) {
             for (int i = 0; i < 8; i++) {
                 char prot[64];
                 BOOL callOK = p098_addr_exec_p(peek[i].p, prot, sizeof(prot));
-                L(@"[peek] %-26s %s %s", peek[i].n,
+                /* v1b: %@ for the callability field — it is an NSString*; the
+                   old %s printed its isa bytes (the ¿d'˚ mojibake on 23F77). */
+                L(@"[peek] %-26s %@ %s", peek[i].n,
                   callOK ? @"FUNC(r-x) callable" : @"DATA(not callable)", prot);
             }
             L(@"[peek] key CFStrings: width='%@' height='%@' bpe='%@' bpr='%@' alloc='%@'",

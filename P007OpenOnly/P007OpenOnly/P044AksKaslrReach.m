@@ -154,7 +154,7 @@
 #import <math.h>
 #import <objc/message.h>
 
-#define P044_BUILD @"p044-v61b-milphase1"
+#define P044_BUILD @"p044-v61c-prefiresnap"
 
 #define INPUT_COUNT 191
 #define PAYLOAD_SIZE 0xb80
@@ -2055,6 +2055,44 @@ static void *watch_worker(void *arg) {
     NSString *fireMode = @"not-attempted";
     int fireRc = -1;
     BOOL predOK = NO;
+
+    /* v61c: re-snapshot the lane target IMMEDIATELY pre-fire. The arm-time
+       snapshot (PHASE 3c) predates B's baseline/concurrent predicts and the
+       spray — anything writing the target band in that gap pollutes the 6f
+       diff (the 16:57 EMBERFORGE candidate: 2 B at offset 0 = 0x000060ca
+       could have been our own B/CoreML staging, not the request path — the
+       arm snapshot was taken BEFORE B's baseline predict ran). Re-validate
+       (alias + size) and re-snap here so the 6f oracle measures only the
+       fire window. B concurrent stays t-1ms by design (consume-forge). */
+    if (g_foreignOutSid != 0 && p044_sfLookup) {
+        CFTypeRef fPre = p044_sfLookup(g_foreignOutSid);
+        if (!fPre) {
+            [out appendFormat:@"  [v61c] PRE-FIRE: sid %u no longer resolves — lane dropped\n",
+                g_foreignOutSid];
+            g_foreignOutSid = 0;
+        } else {
+            BOOL oursPre = NO;
+            for (uint32_t k = 0; k < g_nSurf && !oursPre; k++)
+                if (g_surfs[k] && CFEqual(g_surfs[k], fPre)) oursPre = YES;
+            size_t fszPre = p044_sfAllocSz ? p044_sfAllocSz(fPre) : 0;
+            if (oursPre || (fszPre != 0 && fszPre != P044_REQ_OUT_BYTES)) {
+                [out appendFormat:@"  [v61c] PRE-FIRE: sid %u aliased/size %zu — lane dropped\n",
+                    g_foreignOutSid, fszPre];
+                CFRelease(fPre);
+                g_foreignOutSid = 0;
+            } else {
+                if (p044_sfLock(fPre, 1, NULL) == 0) {
+                    uint8_t *bPre = (uint8_t *)p044_sfBase(fPre);
+                    if (bPre) { memcpy(g_foreignSnap, bPre, sizeof(g_foreignSnap)); g_foreignSnapValid = 1; }
+                    p044_sfUnlock(fPre, 1, NULL);
+                }
+                g_foreignUsePre = p044_sfUseCount ? p044_sfUseCount(fPre) : 0;
+                CFRelease(fPre);
+                [out appendFormat:@"  [v61c] PRE-FIRE SNAPSHOT REFRESHED: sid=%u useCount=%u\n",
+                    g_foreignOutSid, g_foreignUsePre];
+            }
+        }
+    }
 
     if (g_aneModelOk && g_aneReqOk) {
         fireMode = @"client-evaluate";
