@@ -26,7 +26,7 @@
 #import <sys/time.h>
 #import <mach/mach.h>
 
-#define P100_BUILD "p100-autolearn-v2-iogpu-skip"
+#define P100_BUILD "p100-autolearn-v3-censusgate"
 
 static NSMutableString *g_al_buf = NULL;
 static int g_al_fd = -1;
@@ -211,10 +211,24 @@ typedef CFTypeRef (*al_iosCreate_t)(CFDictionaryRef properties);
     }
 
     /* ---- 4. IOKit door census (opens only) ---- */
+    /* v3: the door census is GATED behind Documents/p100_census.txt. The
+       17:32 tap died right after the census with no crash report; v2's IOGPU
+       removal did not stop it — AGX/ANE/AVE/AVD doors share the open/close
+       delayed-teardown pattern (P027). The census is telemetry; the LEARN
+       PACKET is the deliverable. Default tap = ident + smoke + verdict +
+       packet with ZERO door opens. To run the census anyway: write ONE char
+       into Documents/p100_census.txt, force-quit, tap. */
+    BOOL p100CensusWanted = [[NSFileManager defaultManager] fileExistsAtPath:
+        [[NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject]
+            stringByAppendingPathComponent:@"p100_census.txt"]];
     L(@"=== IOKIT DOOR CENSUS (opens only, no selectors) ===");
     void *iokit = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_LAZY);
     NSDictionary *doors = nil;
-    if (!iokit) {
+    if (!p100CensusWanted) {
+        doors = @{ @"census": @"gated-off" };
+        L(@"[-] census GATED OFF (write ONE char into Documents/p100_census.txt to arm)");
+        L(@"[-] reason: delayed teardown deaths after door close on 23F77 (P027 pattern)");
+    } else if (!iokit) {
         L(@"[-] dlopen IOKit failed: %s — census skipped (honest).", dlerror());
     } else {
         al_IOServiceMatching_t        pMatch  = (al_IOServiceMatching_t)dlsym(iokit, "IOServiceMatching");

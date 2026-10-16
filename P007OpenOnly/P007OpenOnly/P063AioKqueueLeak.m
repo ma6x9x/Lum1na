@@ -31,7 +31,7 @@ extern int proc_pidfdinfo(int pid, int fd, int flavor, void *buffer, int buffers
 #define PROC_PIDFDKQUEUE_EXTINFO 9
 #endif
 
-#define P063_BUILD @"p063-aio84530-v2"
+#define P063_BUILD @"p063-aio84530-v3-dumpcap"
 
 struct audit_kevent_qos_s {
     uint64_t ident;
@@ -213,7 +213,12 @@ static void p063_dump_kqext(void (^L)(NSString *), int kq, NSMutableArray<NSNumb
     pthread_t th;
     pthread_create(&th, NULL, p063_aio_submit, (void *)submit_ctx);
 
-    for (int i = 0; i < 100; i++) {
+    /* v3: stop polling once the leak is captured. v2 polled the full 100
+       iterations (~10 ms apart) while the aio_read thread was still blocked
+       on the FIFO — the same 2-knote block repeated 100+ times in the log
+       (17:37 tap). The AIO knote's sdata is stable across samples, so 3
+       captures prove the leak; the rest is spam. */
+    for (int i = 0; i < 100 && hits.count < 3; i++) {
         p063_dump_kqext(L, kq, hits);
         usleep(10000);
     }

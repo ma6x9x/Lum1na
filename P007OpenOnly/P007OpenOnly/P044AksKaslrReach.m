@@ -154,7 +154,7 @@
 #import <math.h>
 #import <objc/message.h>
 
-#define P044_BUILD @"p044-v61c-prefiresnap"
+#define P044_BUILD @"p044-v61d-census4k"
 
 #define INPUT_COUNT 191
 #define PAYLOAD_SIZE 0xb80
@@ -1867,7 +1867,13 @@ static void *watch_worker(void *arg) {
                 foreignHits++;
                 size_t sz = p044_sfAllocSz ? p044_sfAllocSz(f) : 0;
                 [out appendFormat:@"  [for] sid=%u size=%zu\n", sid, sz];
-                if (nFirst < 8) forFirst[nFirst++] = sid;
+                /* v61d: stillness candidates restricted to 0x4000-sized hits.
+                   The Oct-16 17:25 tap wasted the pick on sid=18 (131072 B
+                   staging, first hit, stable) and v57 then dropped it at
+                   PHASE 3c — the 16:57 EMBERFORGE re-test never armed. Only
+                   0x4000-sized targets can pass the v57 size gate, so only
+                   they are worth the 1.2 s stillness window. */
+                if (sz == P044_REQ_OUT_BYTES && nFirst < 8) forFirst[nFirst++] = sid;
             }
             CFRelease(f);
         }
