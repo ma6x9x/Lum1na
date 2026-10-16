@@ -15,6 +15,9 @@
 #import <errno.h>
 #import "LabLocalTime.h"
 #import "LabDeviceProfile.h"
+#import <mach/mach.h>
+#import <mach/vm_map.h>
+#import <mach/vm_region.h>
 
 #define P098_BUILD @"p098-m2scaler-v1"
 
@@ -51,6 +54,33 @@ static BOOL p098_kernelish(uint64_t v) {
            (v >= 0xFFFFFFF000000000ULL);
 }
 
+/* SwiftPeek-style symbol peek (in-process, honest). Resolved via dlsym so we
+   never #import <mach/mach_vm.h> (AGENTS landmine #2; local-prototype shape
+   per P069). Returns YES only when the pointer sits in an r-x page — i.e. it
+   is plausibly callable. DATA symbols (kIOSurface* CFString globals) are not:
+   calling one is exactly what SIGKILLed the rig at 225909
+   (CODESIGNING Invalid Page, kIOSurfaceWidth+0, tap+1588). */
+static BOOL p098_addr_exec_p(const void *addr, char *out, size_t outn) {
+    if (!addr) { snprintf(out, outn, "nil"); return NO; }
+    typedef kern_return_t (*mach_vm_region_f)(vm_map_t, uint64_t *, uint64_t *,
+                                              vm_region_flavor_t, vm_region_info_t,
+                                              mach_msg_type_number_t *, mach_port_t *);
+    mach_vm_region_f vmreg = (mach_vm_region_f)dlsym(RTLD_DEFAULT, "mach_vm_region");
+    if (!vmreg) { snprintf(out, outn, "mach_vm_region dlsym miss"); return NO; }
+    uint64_t a = (uint64_t)addr, sz = 0;   /* arm64: vm_address_t == uint64_t */
+    vm_region_basic_info_data_64_t bi;
+    mach_msg_type_number_t cnt = VM_REGION_BASIC_INFO_COUNT_64;
+    mach_port_t unused = MACH_PORT_NULL;
+    kern_return_t kr = vmreg(mach_task_self(), &a, &sz, VM_REGION_BASIC_INFO_64,
+                             (vm_region_info_t)&bi, &cnt, &unused);
+    if (kr != KERN_SUCCESS) { snprintf(out, outn, "kr=0x%x", kr); return NO; }
+    snprintf(out, outn, "@%p prot=%c%c%c", addr,
+             (bi.protection & VM_PROT_READ)    ? 'r' : '-',
+             (bi.protection & VM_PROT_WRITE)   ? 'w' : '-',
+             (bi.protection & VM_PROT_EXECUTE) ? 'x' : '-');
+    return (bi.protection & VM_PROT_EXECUTE) != 0;
+}
+
 @implementation P098M2ScalerDiag
 
 + (NSString *)tap {
@@ -82,12 +112,16 @@ static BOOL p098_kernelish(uint64_t v) {
         if (!iosurf) iosurf = RTLD_DEFAULT;
         void *(*pSurfCreate)(CFDictionaryRef) = dlsym(iosurf, "IOSurfaceCreate");
         size_t (*pSurfAllocSize)(void *) = dlsym(iosurf, "IOSurfaceGetAllocSize");
-        void (*pSurfRelease)(void *) = dlsym(iosurf, "CFRelease");
-        CFStringRef (*pKeyWidth)(void) = dlsym(iosurf, "kIOSurfaceWidth");
-        CFStringRef (*pKeyHeight)(void) = dlsym(iosurf, "kIOSurfaceHeight");
-        CFStringRef (*pKeyBPE)(void) = dlsym(iosurf, "kIOSurfaceBytesPerElement");
-        CFStringRef (*pKeyBPR)(void) = dlsym(iosurf, "kIOSurfaceBytesPerRow");
-        CFStringRef (*pKeyAlloc)(void) = dlsym(iosurf, "kIOSurfaceAllocSize");
+        void (*pSurfRelease)(void *) = dlsym(RTLD_DEFAULT, "CFRelease");
+        /* kIOSurface* are DATA symbols (CFStringRef globals), NOT functions.
+           They were typed as function pointers and CALLED — that jumped into
+           IOSurface's data section, page not executable, CODESIGNING Invalid
+           Page SIGKILL (rig .ips 225909). Used as data below. */
+        CFStringRef pKeyWidth  = dlsym(iosurf, "kIOSurfaceWidth");
+        CFStringRef pKeyHeight = dlsym(iosurf, "kIOSurfaceHeight");
+        CFStringRef pKeyBPE    = dlsym(iosurf, "kIOSurfaceBytesPerElement");
+        CFStringRef pKeyBPR    = dlsym(iosurf, "kIOSurfaceBytesPerRow");
+        CFStringRef pKeyAlloc  = dlsym(iosurf, "kIOSurfaceAllocSize");
 
         if (!pMatching || !pGet || !pOpen || !pCallStruct) {
             L(@"[-] IOKit dlsym incomplete - honest miss.");
@@ -96,6 +130,32 @@ static BOOL p098_kernelish(uint64_t v) {
         if (!pSurfCreate || !pKeyWidth || !pKeyHeight || !pKeyBPE || !pKeyBPR || !pKeyAlloc) {
             L(@"[-] IOSurface dlsym incomplete - honest miss.");
             goto finish;
+        }
+
+        /* SwiftPeek-style peek: show the conversion in the console instead of
+           dying on it. FUNC symbols sit in r-x pages; the kIOSurface* keys do
+           not — and as toll-free-bridged CFStrings they convert to NSString
+           and print their real values ("IOSurfaceWidth" etc). */
+        {
+            struct { const char *n; const void *p; } peek[] = {
+                { "IOSurfaceCreate",  pSurfCreate },
+                { "IOSurfaceGetAllocSize", pSurfAllocSize },
+                { "CFRelease",        pSurfRelease },
+                { "kIOSurfaceWidth",  pKeyWidth },
+                { "kIOSurfaceHeight", pKeyHeight },
+                { "kIOSurfaceBytesPerElement", pKeyBPE },
+                { "kIOSurfaceBytesPerRow",     pKeyBPR },
+                { "kIOSurfaceAllocSize",       pKeyAlloc },
+            };
+            for (int i = 0; i < 8; i++) {
+                char prot[64];
+                BOOL callOK = p098_addr_exec_p(peek[i].p, prot, sizeof(prot));
+                L(@"[peek] %-26s %s %s", peek[i].n,
+                  callOK ? @"FUNC(r-x) callable" : @"DATA(not callable)", prot);
+            }
+            L(@"[peek] key CFStrings: width='%@' height='%@' bpe='%@' bpr='%@' alloc='%@'",
+              (__bridge id)pKeyWidth, (__bridge id)pKeyHeight, (__bridge id)pKeyBPE,
+              (__bridge id)pKeyBPR, (__bridge id)pKeyAlloc);
         }
 
         /* Scoped body: ARC forbids jumping over ObjC declarations in scope
@@ -125,11 +185,11 @@ static BOOL p098_kernelish(uint64_t v) {
 
         // One IOSurface so a queueAndExecute-style log entry exists to read.
         NSDictionary *props = @{
-            (__bridge id)pKeyWidth(): @256,
-            (__bridge id)pKeyHeight(): @1,
-            (__bridge id)pKeyBPE(): @4,
-            (__bridge id)pKeyBPR(): @1024,
-            (__bridge id)pKeyAlloc(): @1024
+            (__bridge id)pKeyWidth:  @256,
+            (__bridge id)pKeyHeight: @1,
+            (__bridge id)pKeyBPE:    @4,
+            (__bridge id)pKeyBPR:    @1024,
+            (__bridge id)pKeyAlloc:  @1024
         };
         void *surf = pSurfCreate((__bridge CFDictionaryRef)props);
         L(@"[*] IOSurfaceCreate -> %@ alloc=%zu", surf ? @"OK" : @"FAIL",
