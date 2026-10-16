@@ -587,7 +587,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
-            CODE_SIGN_ENTITLEMENTS="P007OpenOnly/P007OpenOnly.entitlements" \
+            CODE_SIGN_ENTITLEMENTS="P007OpenOnly/P007OpenOnly/P007OpenOnly.entitlements" \
             IPHONEOS_DEPLOYMENT_TARGET="18.0" \
             build 2>&1 | tee "$RUNNER_TEMP/build-debug.log"
           RC=${PIPESTATUS[0]}
@@ -620,11 +620,11 @@ jobs:
           # Free-account entitlements live with the sources — proven on the
           # rig. Embed next to the binary for the sign step + ldid fake-sign
           # so Filza/appinst/Sideloadly accept it.
-          cp "P007OpenOnly/P007OpenOnly.entitlements" "Payload/P007OpenOnly.app/"
+          cp "P007OpenOnly/P007OpenOnly/P007OpenOnly.entitlements" "Payload/P007OpenOnly.app/"
           if ! command -v ldid >/dev/null 2>&1; then
             brew install ldid
           fi
-          ldid -S"P007OpenOnly/P007OpenOnly.entitlements" "Payload/P007OpenOnly.app/P007OpenOnly"
+          ldid -S"P007OpenOnly/P007OpenOnly/P007OpenOnly.entitlements" "Payload/P007OpenOnly.app/P007OpenOnly"
           echo "✅ ldid fake-signed with P007OpenOnly.entitlements (game-center + get-task-allow)"
 
           zip -r "Lum1na-Debug.ipa" "Payload"
