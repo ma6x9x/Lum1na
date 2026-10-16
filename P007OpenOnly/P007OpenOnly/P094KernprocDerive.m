@@ -12,6 +12,7 @@
 #import "LabRuntimeOffsets.h"
 #import "P007Board.h"
 #import "P007KreadLane.h"
+#import "P095UcredLadder.h"
 #import "Lum1naStructOffsets.h"
 
 #import <fcntl.h>
@@ -37,7 +38,7 @@ typedef struct { void *e_paddr; } P094_eproc_head_min;
 typedef struct { P094_extern_proc_min kp_proc; P094_eproc_head_min kp_eproc; } P094_kinfo_proc_min;
 #endif
 
-#define P094_BUILD @"p094-kernproc-v2-listhead"
+#define P094_BUILD @"p094-kernproc-v3-p095fold"
 
 /* XPACI-based unsign, ClearSwordCore/poc.c. Identity on arm64.
    Same local-prototype convention as P069 mach_vm_map. */
@@ -443,6 +444,17 @@ static uint64_t p094_walk_to_kernproc(uint64_t startProc, const LabProcOffTab *p
         }
 
 finish:
+        /* v3 fold: P095 (ucred ladder) rides this tap. Both phases are
+           READ-ONLY, so one boot does kernproc + ladder instead of two
+           (was: P090 -> P094 -> P095 -> P100 on a shared boot; now
+           P090 -> P094 -> P100). P095's body is untouched - it keeps its
+           own p095_ucred_log.txt and its own SKIP discipline (no lane ->
+           honest skip; no kernproc -> the board walk it already does). */
+        L(@"--- PHASE p095 (folded): ucred ladder, READ-ONLY ---");
+        {
+            NSString *ladder = [P095UcredLadder tap];
+            if (ladder.length) L(@"%@", ladder);
+        }
         L(@"=== p094 end ===");
         NSString *ret = g_p094_buf ?: @"";
         if (g_p094_fd >= 0) { fcntl(g_p094_fd, F_FULLFSYNC); close(g_p094_fd); g_p094_fd = -1; }

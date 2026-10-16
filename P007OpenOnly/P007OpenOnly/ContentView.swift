@@ -107,8 +107,8 @@ struct ContentView: View {
                         moreRow("P099. 43748 ANE prewire GROOMED (espresso/CoreML primary, 254-in addchain; STANDALONE ONLY — real OOB, never in chain)", "p099")
                         moreRow("P098. M2ScalerCSC iosaDiag census (sel 8, honest input shape, READ-ONLY)", "p098")
                         moreRow("P097. console-sec gRegistryRoot leak (CVE-2026-65371, READ-ONLY — lock/unlock once while it waits)", "p097")
-                        moreRow("P094. kernproc derive (READ-ONLY, sysctl anchor + allproc walk, unlocks elevate)", "p094")
-                        moreRow("P095. ucred ladder (READ-ONLY, proves every elevate write target)", "p095")
+                        moreRow("P094. kernproc derive + ucred ladder (READ-ONLY, sysctl anchor + allproc walk; v3 fold runs P095's ladder in the same tap — one boot, unlocks elevate)", "p094")
+                        moreRow("P095. ucred ladder standalone (READ-ONLY; also runs inside P094 since v3 — use for a ladder re-check without re-deriving)", "p095")
                         moreRow("P100. AutoLearn (READ-ONLY learner — unknown devices, chip tag + door census + LEARN PACKET)", "p100")
                         moreRow("P090. momentarius census v1 (offsets DB vs live kernel + kbase sanity + allproc scan, READ-ONLY, rig)", "p090")
                         moreRow("P088. 43748 forged OUTPUT-record write hop v8 (prewire OOB confirmed at the pc: entry 192 = +0xC00; err=-1 = downstream reject, content check is the signal; ourBand census per D2 hit)", "p088")
@@ -150,23 +150,10 @@ struct ContentView: View {
                         moreRow("P071 65408 ANE overflow MAP (DeviceOpen only, not 43748)", "p071")
                         moreRow("P072 file-parser census (dlopen + 1x1 PNG, not ACE)", "p072")
                     }
-                    Section("HT149041 iOS 26.7 leftovers (23F77 live)") {
-                        moreRow("P070. five KRW doors + AMFI persist HOLD", "p070")
-                        moreRow("P065. 64788 Facet A 1x65535 + Trap2 sel=3", "p065")
-                        moreRow("P064. full 26.7 CVE map (print only)", "ht149041")
-                        moreRow("P063. 84530 AIO kn_sdata HEAP (not kslide)", "aio84530")
-                        moreRow("P066. 84607 EncType MAP (no Close-vs-async)", "p066")
-                        moreRow("P067. 65407 AVD IOServiceOpen reach", "p067")
-                        moreRow("P068. 43689 chroot/seteuid errno MAP", "p068")
-                        moreRow("P069. 43684 dmaCommand + makeMapping MAP", "p069")
-                        moreRow("P071. 65408 ANE overflow MAP (DeviceOpen, no huge n)", "p071")
-                        moreRow("P072. file-parser chain slot (census, not first KRW)", "p072")
-                        moreRow("P053. 84507/84561 NECP race/dfree MAP", "p053")
-                        moreRow("P055. 43684 IOMD/UPL occupancy", "p055")
-                        moreRow("P054. 28968 APFS reap MAP (unlink occupancy)", "p054")
-                        moreRow("P039. 84607 AVE PARK (sandbox wall, no Close-vs-async fire)", "p039")
-                        moreRow("P045. 84523 VNOP census (remaining-fire CLOSED)", "p045")
-                    }
+                    /* v61b dedupe: the "HT149041 iOS 26.7 leftovers" section
+                       rendered 15 rows that ALL exist elsewhere (P070/P063-P072/
+                       P053/P055/P054 in NEW; P039 in Parked; P045 in Prove) -
+                       every id now renders exactly once. */
                     Section("ClearSword KRW (phys_oob → PCB)") {
                         moreRow("CS2. VERBATIM Dopamine core (A13 22G100 KRW — one tap)", "cs2")
                         moreRow("INTEL. merged offset DB + ladder cross-check (read-only)", "intel")
@@ -192,19 +179,7 @@ struct ContentView: View {
                         moreRow("71. P032 ANE OPEN only", "p032")
                         moreRow("72. P033 CoreML 1-in/1-out", "p033")
                         moreRow("73. P034 kmsg 0x820 occupancy", "p034")
-                        moreRow("P083. ANE staging hunt + injection + y attribution", "p083")
-                        moreRow("P082. ANE kernel-sid fetch map + staging IOSurfaceLookup", "p082")
-                        moreRow("P081. ANE foreign-sid probe (bias isolation + cross-process fetch gate)", "p081")
-                        moreRow("P080. 43748 y-craft 127-in LIVE sids (input loop passes; read+write doors)", "p080")
-                        moreRow("P079. 43748 y-craft pad (3in/126ops ANE-scheduled + engagement gate)", "p079")
-                        moreRow("P078. 43748 y-craft 3-in (all-valid records reach output; write door)", "p078")
-                        moreRow("P077. 43748 y-craft (crafted y = output record sid; write door)", "p077")
-                        moreRow("P075. 43748 KRW v2 SAFE (pre-load sid_C groom; read+write doors)", "p075")
-                        moreRow("P074. 43748 consume (128-in addchain, gate pass)", "p074")
-                        moreRow("P044. 43748 v57 sidreval + v58 sweep (notes 129/130: v56 armed the direct lane BOTH runs — full 63-record spill of forged sids 848..909 + OUT-ENTRY [266][0][1][2]; bar half one PASSED with client-chosen sids via our own request; status still 0x2/0x9 = size variable closed, foreign target never mapped useCount 0→0). v57 re-validates the out-sid lane AFTER all surfaces are created (CFEqual vs staged + size 0x4000 + re-snapshot) — staged sids 161..878 overlap census band 162–610. v58: write N to /var/mobile/Documents/p044_req_in.txt before tapping — one file = one deliberate fire at N inputs; sweep 193/196/200/224/255, (N−192) = records past kalloc.3072; find max N that completes without panic + capture kernel log each run", "p044")
-                        moreRow("P073. 43748 second-table conversion (v46 parity)", "p073")
-                        moreRow("P046. leftover MAP v2 (print only)", "p046")
-                        moreRow("P045. APFS VNOP coverage census v16", "p045")
+                        moreRow("P044. 43748 v61 addchain-191 B1 (on-device ANECCompile of the handwritten 191-in MIL, count=192 exactly in-bounds; OUTPUT-SID lane + census stillness + out-entry scan; override file p044_model.txt = model NAME, p044_req_in.txt = N inputs — one file = one deliberate fire; notes 149/127/130)", "p044")
                     }
                     Section("64788 ABI extras") {
                         moreRow("F½ 4. P009 detach only (no OOL)", "p009detach")

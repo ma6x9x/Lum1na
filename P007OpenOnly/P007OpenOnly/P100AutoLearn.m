@@ -26,7 +26,7 @@
 #import <sys/time.h>
 #import <mach/mach.h>
 
-#define P100_BUILD "p100-autolearn-v1"
+#define P100_BUILD "p100-autolearn-v2-iogpu-skip"
 
 static NSMutableString *g_al_buf = NULL;
 static int g_al_fd = -1;
@@ -228,10 +228,18 @@ typedef CFTypeRef (*al_iosCreate_t)(CFDictionaryRef properties);
             L(@"[-] IOKit symbols incomplete — census skipped (honest).");
         } else {
             const char *names[] = {
-                "IOSurfaceRoot", "IOGPU", "AGXAccelerator", "AppleH11ANEInterface",
+                "IOSurfaceRoot", "AGXAccelerator", "AppleH11ANEInterface",
                 "H11ANEIn", "H1xANELoadBalancer", "AppleKeyStore", "AppleJPEGDriver",
                 "AppleAVE2Driver", "AppleAVD",
             };
+            /* v2: IOGPU REMOVED from the census. p027 (rig .ips, note 147)
+               documented the class: IOGPU open/close tears down an async
+               dispatch thread ~1-2s after the tap
+               (IOGPUNotificationQueueDispatchAvailableCompletionNotifications+120,
+               SIGSEGV at 0x10) - reproduced twice, NOT callback-exec evidence,
+               and uncatchable from userspace. A census that kills the app
+               before printing the LEARN PACKET defeats its own purpose.
+               IOGPU door behavior is already characterized (P027/P042). */
             NSMutableDictionary *d = [NSMutableDictionary dictionary];
             for (size_t i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
                 CFDictionaryRef match = pMatch(names[i]);
