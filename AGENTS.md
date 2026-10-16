@@ -132,6 +132,8 @@ xcodebuild -project Lum1na.xcodeproj -scheme Lum1na \
 
 The `objective-c-xcode.yml` workflow is historically red. **Lum1na Build** (IPA) is the gate.
 
+Paid-for CI landmines (2026-10-15): a synchronized root swallows a nested `.xcodeproj` as an implicit subproject — the Lum1na build can't exclude it via `membershipExceptions`, so `Build IPA` runs `rm -rf P007OpenOnly` before xcodebuild (the debug job builds from its own checkout). `LuminaKRW.m` and every lab file must import ClearSword headers as `ClearSword/...` (bare `common.h` only resolves inside `ClearSword/`). Entitlements for the debug job live at `P007OpenOnly/P007OpenOnly/P007OpenOnly.entitlements` — one level deeper than the project dir.
+
 ## Kernel board
 
 `Kernel/Lum1naBoard` → Documents/`lum1na_board.json`. Heap leaks from probes go here. `hasKread` stays false until a known kernel string kread works. Do not set slide from heap−staticBase. Post-KRW slots: `Lum1naAfterKread` (HOLD). See `docs/BOARD.md`.
