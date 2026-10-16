@@ -11,7 +11,7 @@
 //
 
 #import "Lum1naStructOffsets.h"
-#import "../Exploit/LabRuntimeOffsets.h"
+#import "LabRuntimeOffsets.h"
 #include <string.h>
 
 #define PROC_ROW(TAG, KERNPROC) { \

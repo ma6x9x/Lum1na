@@ -79,6 +79,7 @@
 				"Tests",
 				"UITests",
 				"UITests/Lum1naUITests.swift",
+				"P007OpenOnly",
 			);
 			target = E6DAA27F305DD93E00B0914F /* Lum1na */;
 		};

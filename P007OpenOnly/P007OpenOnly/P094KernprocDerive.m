@@ -12,7 +12,7 @@
 #import "LabRuntimeOffsets.h"
 #import "P007Board.h"
 #import "P007KreadLane.h"
-#import "../Kernel/Lum1naStructOffsets.h"
+#import "Lum1naStructOffsets.h"
 
 #import <fcntl.h>
 #import <string.h>
