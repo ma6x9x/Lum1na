@@ -242,8 +242,26 @@ const LabOffTab *LabOffForSku(LabSku sku) {
             /* A13 non-rig: no verified offsets — runtime discovery only (HOLD).
                .iosurface_md=0x40 / .static_base come from the rig's K-Dump,
                not from this repo. */
-        default:
             return NULL;
+        default:
+            /* UNKNOWN SKU (e.g., iPhone18,2 / T8150 / 24A435): fall back to the
+               A14 selector/pin statics the probes already use through
+               LabDeviceProfile — WITHOUT implying kernel VAs (static_base=0,
+               tag says fallback; LabStaticBase() keeps its compile-time
+               default). This is what killed P010 sel=8 on the 17PM:
+               A14_23F77_IOGPU_NEW_RESOURCE_SEL expands to LabOff()->...
+               = NULL+0x4c on a NULL table. The real T8150 row lands after a
+               Ghidra pass on the 24A435 kernelcache. */
+            {
+                static LabOffTab gUnknownFB;
+                static dispatch_once_t onceToken;
+                dispatch_once(&onceToken, ^{
+                    gUnknownFB = gA14_23F77;
+                    gUnknownFB.tag = "A14_FALLBACK_unknown";
+                    gUnknownFB.static_base = 0;
+                });
+                return &gUnknownFB;
+            }
     }
 }
 
