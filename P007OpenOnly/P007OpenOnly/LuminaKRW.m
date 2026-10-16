@@ -5,8 +5,8 @@
 // FIX 3: Scan entire 128MB mapping (was limited to 25 offsets)
 
 #import "LuminaKRW.h"
-#import "common.h"
-#import "lumina_offsets.h"
+#import "ClearSword/common.h"
+#import "ClearSword/lumina_offsets.h"
 
 #include <dlfcn.h>
 #include <errno.h>
