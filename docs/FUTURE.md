@@ -912,3 +912,49 @@ Device log + `panic-full-2026-10-15-172914.0002.ips` (SHA-256 589fa3f1…, kept 
   selectors, not guessed).
 - State: rig hasKread YES (public core); Hunt hasKread NO / Beta-1. OPS
   standing: **disable iOS auto-update** — still unconfirmed done.
+
+### Lum1na-Debug (P007 lab app) pushed to the repo + CI builds both IPAs (2026-10-15 late evening, note 144)
+- The `P007OpenOnly` lab rig app (home-screen name **Lum1na-Debug**, bundle
+  `ma6x9x.P007OpenOnly` so on-device container/logs survive reinstall) now
+  lives in the repo at `P007OpenOnly/` with its own xcodeproj + shared scheme.
+  New workflow job `build-debug` in `build-ipa.yml` produces
+  **Lum1na-Debug-unsigned-ipa** alongside the Lum1na shell IPA — the only
+  build path while the free dev account blocks local signing.
+- **Offsets/VA/SKU sync**: its `LabRuntimeOffsets`, `LabDeviceProfile`, and
+  `A14_23F77` / `A12X_23G71` pin headers were stale Desktop copies — replaced
+  with the repo's current tables (A13_22G100 rig row, A14_21D50, XR_22H311,
+  LabOffForSku/LabKernSlide/LabStaticBase/LabPmapCsAllowOff, amfi_external +
+  amfi_loadtc VA fields). Repo headers keep the legacy `+sku` selector so all
+  lab probe call sites compile unchanged. Rule recorded in AGENTS.md: tables
+  are edited in `Exploit/` and re-copied into `P007OpenOnly/` — never diverge.
+- **Unknown-device testing** (the point of the app): IDENT always prints
+  (`hw.machine` + `kern.osversion`), "runtime profile always wins"; unknown
+  SKUs get `LabSkuUnknown` / `_other` rows, kernel-VA probes HOLD honestly
+  when `LabOff()` returns NULL, and IOKit/spray/CoreML primitives still fire —
+  so a new device/OS can be probed for sticking primitives without a known
+  offset row.
+- CI note: pbxproj pins deployment target 18.5 (Desktop SDK); CI Xcode 16.4
+  ships the 18.4 SDK, so the job overrides `IPHONEOS_DEPLOYMENT_TARGET=18.0`
+  on the command line. Entitlements stay the free-account set the rig already
+  proves works: `com.apple.developer.game-center` + `get-task-allow`.
+- **SKU-gate bypass (compile-scoped)**: `LAB_DEBUG_APP=1` is defined only in
+  the Lum1na-Debug pbxproj — `LabDeviceProfile stopUnlessA14_23F77:` returns
+  nil in debug builds (primitives run on unknown machines) while the main
+  Lum1na app keeps the gate. `+gateMode` prints which mode the build is in.
+  Honest cost stated in code: kernel-VA probes still HOLD when `LabOff()` has
+  no row — the bypass unblocks primitives, not kernel writes.
+- **P100 AutoLearn v1 — the learner** (heuristic inference + oracle
+  validation, not a trained model): deep IDENT sysctl sweep with honest
+  denied-markers; **chip tag parsed from `kern.version`
+  (`RELEASE_ARM64_Txxxx`)** with SoC-family map (this alone fixes
+  "chip Unknown" IDENT rows); darwin-major → iOS family inference; ABI
+  fingerprint (kinfo_proc len); IOKit door census (opens only, no selectors,
+  type 0 + 1 on 10 services); IOSurface create smoke; classifier verdict
+  (KNOWN / NEAREST-recognized-no-row / UNKNOWN class); **LEARN PACKET**
+  block for copy-back + a JSON line appended to
+  `Documents/lum1na_learn.json` (UIFileSharingEnabled → Finder/Files) +
+  board recordEvent. One tap on any new device/OS emits everything we need
+  to decide a new LabOff row.
+- Same session: the lab copy of P095 got the le_prev backward-walk fix
+  (repo commit 523367f shape) — lab board had `provenKernproc` but walked
+  `le_next` from the allproc tail, same silent-HOLD bug.

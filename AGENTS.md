@@ -25,6 +25,7 @@ Re-resolve `main` at the start of a task. Do not trust this file’s remembered 
 | `docs/CASESTUDIES.md` | vschko/CaseStudies intel map + panic #1–#3 re-attribution (43748) |
 | `docs/EXTERNAL_INTEL.md` | airlift (MIT, ATAirlock), varik bounty workflow, AltDaemon/Nyxian |
 | `docs/DEVICES.md` | Per-device lane matrix (rig / 12 mini / hunt 26.5) + completion bars |
+| `P007OpenOnly/` | **Lum1na-Debug** lab rig app (own xcodeproj, CI job `build-debug` → `Lum1na-Debug-unsigned-ipa`): P005–P099 primitives, ANE mlmodels. Runs on UNKNOWN devices: IDENT always prints, kernel-VA probes HOLD when `LabOff()` has no row. Entitlements = free-account set (game-center + get-task-allow), keep. Its `LabRuntimeOffsets` / `LabDeviceProfile` / pin headers are synced copies of `Exploit/` — **edit `Exploit/` and re-copy**, never diverge |
 
 The project uses `PBXFileSystemSynchronizedRootGroup`. New files under the root are picked up automatically. Do not hand-edit pbx file lists unless you are changing **exceptions**.
 
