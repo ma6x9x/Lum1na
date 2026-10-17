@@ -2230,7 +2230,7 @@ static void *watch_worker(void *arg) {
                     [out appendFormat:@"  [v64] FILE-TARGET sid %u RESOLVES at 3a.5: rt=%u useCount=%u snap8=%02x%02x%02x%02x %02x%02x%02x%02x (guest tile = LE 1d 4b repeating)%@\n",
                         g_foreignOutSid, frt, fuc,
                         f8[0], f8[1], f8[2], f8[3], f8[4], f8[5], f8[6], f8[7],
-                        (frt == g_foreignOutSid) ? @" — round-trip OK" : @" — rt MISMATCH (alias): lane drops");
+                        (frt == g_foreignOutSid) ? @" — round-trip OK" : @" — rt MISMATCH (alias): lane drops"];
                     CFRelease(ft);
                 }
             }
