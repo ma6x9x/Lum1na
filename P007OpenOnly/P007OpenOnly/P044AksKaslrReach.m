@@ -156,7 +156,7 @@
 #import <math.h>
 #import <objc/message.h>
 
-#define P044_BUILD @"p044-v66-keepalive"
+#define P044_BUILD @"p044-v67-audiotel"
 
 #define INPUT_COUNT 191
 #define PAYLOAD_SIZE 0xb80
@@ -520,6 +520,10 @@ static id g_guestHoldAudio = nil; /* v66: silent looping AVAudioPlayer —
    guest's LIVE mid-tap request surfaces (545..736) cross-task, while
    rounds 1-2 NULL'd with the guest backgrounded+SUSPENDED — suspension
    (or ANE-lane teardown at cleanup) is the boundary, not surface class. */
+static double g_guestAudioStartT = 0; /* v67: wall clock at audio start —
+   the observe tap logs playhead (currentTime) vs this; playhead == wall
+   means the player RAN the whole window (process provably unsuspended);
+   playhead frozen means the audio died (suspension model still open) */
 
 /* v48.1 _ANEClient lane state (file scope so cleanup can always release) */
 static id g_aneModelObj = nil;
@@ -543,10 +547,16 @@ static void p044_guest_audio_start(NSMutableString *out)
     if (g_guestHoldAudio) return; /* already playing */
     NSError *err = nil;
     AVAudioSession *sess = [AVAudioSession sharedInstance];
-    [sess setCategory:AVAudioSessionCategoryPlayback
-              withOptions:AVAudioSessionCategoryOptionMixWithOthers
-                    error:&err];
+    /* v67: NO MixWithOthers — the session OWNS audio (visible Now Playing)
+       so the keep-alive is observable by eye as well as by telemetry */
+    [sess setCategory:AVAudioSessionCategoryPlayback error:&err];
+    if (err) {
+        [out appendFormat:@"  [v67] SESSION CATEGORY ERROR: %@\n", err.localizedDescription];
+    }
     [sess setActive:YES error:&err];
+    if (err) {
+        [out appendFormat:@"  [v67] SESSION ACTIVE ERROR: %@\n", err.localizedDescription];
+    }
     /* 1 s of unsigned 8-bit silence (0x80 midpoint), 8 kHz mono PCM WAV */
     const uint32_t dataLen = 8000;
     NSMutableData *wav = [NSMutableData dataWithCapacity:44 + dataLen];
@@ -586,9 +596,10 @@ static void p044_guest_audio_start(NSMutableString *out)
     [p prepareToPlay];
     if ([p play]) {
         g_guestHoldAudio = p;
-        [out appendString:@"  [v66] SILENT BACKGROUND AUDIO ON (looping silence, volume 0.01) — this process stays UNSUSPENDED while backgrounded\n"];
+        g_guestAudioStartT = [NSDate timeIntervalSinceReferenceDate];
+        [out appendString:@"  [v67] SILENT BACKGROUND AUDIO ON (looping silence, volume 0.01, session OWNS audio — check Now Playing) — this process stays UNSUSPENDED while backgrounded; the OBSERVE tap logs playhead-vs-wall telemetry\n"];
     } else {
-        [out appendString:@"  [v66] AUDIO PLAY FAILED (process may suspend when backgrounded — keep the app foreground instead)\n"];
+        [out appendString:@"  [v67] AUDIO PLAY FAILED (process may suspend when backgrounded — keep the app foreground instead)\n"];
     }
 }
 
@@ -596,13 +607,27 @@ static void p044_guest_audio_stop(NSMutableString *out)
 {
     if (!g_guestHoldAudio) return;
     AVAudioPlayer *p = (AVAudioPlayer *)g_guestHoldAudio;
+    /* v67 telemetry: playhead vs wall since audio start. playhead advanced
+       the whole window = the player RAN in real time = the process stayed
+       UNSUSPENDED (backgrounded). playhead frozen near zero = the audio
+       died (probably at backgrounding) = suspension model still open. */
+    double playhead = p.currentTime;
+    BOOL playing = p.isPlaying;
+    double wall = (g_guestAudioStartT > 0)
+        ? ([NSDate timeIntervalSinceReferenceDate] - g_guestAudioStartT) : 0;
+    [out appendFormat:@"  [v67] AUDIO TELEMETRY: isPlaying=%d playhead=%.1fs wall=%.1fs — %@\n",
+        playing, playhead, wall,
+        (wall > 5.0 && playhead > wall - 3.0)
+            ? @"playhead ran the WHOLE window — process was UNSUSPENDED backgrounded (registry-lifetime boundary wins)"
+            : @"playhead FROZE — audio died before observe (suspension model still open)"];
     [p stop];
     g_guestHoldAudio = nil;
+    g_guestAudioStartT = 0;
     NSError *err = nil;
     [[AVAudioSession sharedInstance] setActive:NO
                      withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation
                                            error:&err];
-    [out appendString:@"  [v66] BACKGROUND AUDIO OFF (process may suspend again)\n"];
+    [out appendString:@"  [v67] BACKGROUND AUDIO OFF (process may suspend again)\n"];
 }
 
 static void cls_reset(void) {
