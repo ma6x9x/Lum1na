@@ -158,7 +158,7 @@
 #import <math.h>
 #import <objc/message.h>
 
-#define P044_BUILD @"p044-v68-enginekeepalive"
+#define P044_BUILD @"p044-v69-inflight"
 
 #define INPUT_COUNT 191
 #define PAYLOAD_SIZE 0xb80
@@ -338,6 +338,21 @@ static void p044_write_bin(NSString *name, const uint8_t *bytes, size_t len) {
             if (w <= 0) break;
             off += (size_t)w;
         }
+        fcntl(fd, F_FULLFSYNC);
+        close(fd);
+    }
+}
+
+/* v69: one-line Documents file (sid publish). Same durability as the log. */
+static void p044_write_text(NSString *name, NSString *text) {
+    if (!name || !text) return;
+    NSString *docs = NSSearchPathForDirectoriesInDomains(
+        NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+    NSString *path = [docs stringByAppendingPathComponent:name];
+    int fd = open(path.fileSystemRepresentation, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    if (fd >= 0) {
+        const char *s = text.UTF8String;
+        if (s) write(fd, s, strlen(s));
         fcntl(fd, F_FULLFSYNC);
         close(fd);
     }
@@ -1255,6 +1270,16 @@ static int p044_ane_build_request(NSMutableString *out) {
             CFRelease(s);
         }
         g_p044_outSid = sid; /* v61: output entry lands at symbolIndex 191 (0xbf) with the 191-in request */
+        if (g_guestHoldANE) {
+            /* v69: publish while the whole request set is still alive.
+               Round 6: process unsuspended 251s (maxGap 2.1s, rendered 248.9s)
+               and sid 621 still did not resolve AFTER cleanup released the
+               other surfaces. The mid-tap band did resolve. */
+            p044_write_text(@"p044_live_sid.txt",
+                [NSString stringWithFormat:@"%u\n", sid]);
+            [out appendFormat:@"  [v69] LIVE SID %u written to Documents/p044_live_sid.txt (request surfaces still alive)\n", sid];
+            p044_write_log(out);
+        }
         if (g_forgeCount < FORGE_MAX) g_forgeSids[g_forgeCount++] = sid;
         id obj = ((id (*)(id, SEL, CFTypeRef))objc_msgSend)(surfCls, wrapSel, s);
         if (!obj) {
@@ -3214,6 +3239,19 @@ static void *watch_worker(void *arg) {
         g_watchScanned = NULL;
     }
     g_watchDrain = NULL;
+    /* v69: in-flight window. Round 6 closed the post-release hold: the
+       guest stayed unsuspended (maxGap 2.1s, rendered 248.9/251.1s) and
+       the standalone still could not resolve the held output. Mid-tap
+       bands resolve while these surfaces exist. Sleep here, ports already
+       destroyed, every request surface still retained. The standalone
+       census has to land before this returns. */
+    if (g_guestHoldANE && g_p044_outSid && g_nSurf) {
+        [out appendFormat:@"  [v69] IN-FLIGHT WINDOW OPEN sid=%u surfaces=%u for 180s — fire the standalone now\n",
+            g_p044_outSid, g_nSurf];
+        p044_write_log(out);
+        for (int sec = 0; sec < 180; sec++) sleep(1);
+        [out appendString:@"  [v69] IN-FLIGHT WINDOW CLOSED\n"];
+    }
     /* v64: guest ANE-hold — steal the request OUTPUT surface out of the
        release array BEFORE the loop. Stealing the reference (g_surfs slot
        NULLed, no CFRelease) keeps the kernel IOSurface alive with the
@@ -3260,7 +3298,7 @@ static void *watch_worker(void *arg) {
         [out appendString:@"  _ANEClient lane released\n"];
     }
     if (g_guestHold) {
-        [out appendFormat:@"\n=== v68 GUEST ANE HOLD (engine keepalive): sid=%u (request OUTPUT surface — ANE consumer-mapped; held, NOT released; lane + AVAudioEngine keep this process ALIVE backgrounded) ===\n",
+        [out appendFormat:@"\n=== v69 GUEST ANE HOLD (in-flight window already closed): sid=%u (request OUTPUT surface still held; the standalone census had to land DURING the 180s window above) ===\n",
             g_guestHoldSid];
         if (p044_sfLock(g_guestHold, 1, NULL) == 0) {
             uint8_t *b = (uint8_t *)p044_sfBase(g_guestHold);
