@@ -139,7 +139,9 @@
 
 #import <Foundation/Foundation.h>
 #import <CoreML/CoreML.h>
-#import <AVFoundation/AVAudioPlayer.h>
+#import <AVFoundation/AVAudioEngine.h>
+#import <AVFoundation/AVAudioMixerNode.h>
+#import <AVFoundation/AVAudioPlayerNode.h>
 #import <AVFoundation/AVAudioSession.h>
 #import <fcntl.h>
 #import <mach/mach.h>
@@ -156,7 +158,7 @@
 #import <math.h>
 #import <objc/message.h>
 
-#define P044_BUILD @"p044-v67-audiotel"
+#define P044_BUILD @"p044-v68-enginekeepalive"
 
 #define INPUT_COUNT 191
 #define PAYLOAD_SIZE 0xb80
@@ -514,16 +516,29 @@ static int       g_guestHoldANE; /* v64: guest ANE-hold — hold the request
    OUTPUT surface (consumer-mapped, shared-registry candidate) instead of
    a plain task-owned tile (round-1 control, note 166: plain holds do NOT
    resolve cross-process; ANE-mapped is the open class) */
-static id g_guestHoldAudio = nil; /* v66: silent looping AVAudioPlayer —
-   keeps this process UNSUSPENDED while backgrounded. The 11:58 accidental
-   simultaneous run (note 169): the standalone's census resolved the
-   guest's LIVE mid-tap request surfaces (545..736) cross-task, while
-   rounds 1-2 NULL'd with the guest backgrounded+SUSPENDED — suspension
-   (or ANE-lane teardown at cleanup) is the boundary, not surface class. */
-static double g_guestAudioStartT = 0; /* v67: wall clock at audio start —
-   the observe tap logs playhead (currentTime) vs this; playhead == wall
-   means the player RAN the whole window (process provably unsuspended);
-   playhead frozen means the audio died (suspension model still open) */
+/* v68 keep-alive (StikDebug BackgroundAudioManager shape). v67's
+   AVAudioPlayer on a 1 s WAV froze at playhead=0.9s / wall=249.9s —
+   the file queue died at the first loop during the app switch, so the
+   background-audio assertion never stuck and the guest suspended.
+   An AVAudioEngine IO callback is what actually holds the process. */
+static AVAudioEngine *g_guestAudioEngine = nil;
+static AVAudioPlayerNode *g_guestAudioPlayer = nil;
+static AVAudioPCMBuffer *g_guestAudioBuf = nil;
+static AVAudioFormat *g_guestAudioFmt = nil;
+static NSTimer *g_guestAudioTimer = nil;
+static id g_guestAudioObsInt = nil;
+static id g_guestAudioObsReset = nil;
+static int g_guestAudioWanted = 0;
+static double g_guestAudioStartT = 0;
+static double g_guestAudioPrevTickT = 0; /* wall of the previous health tick.
+   The suspension oracle is the MAX gap between ticks (plus the gap from
+   the last tick to the observe tap). A suspended process cannot fire the
+   timer, so that gap grows for the whole background window. One tick on
+   resume cannot hide it. */
+static double g_guestAudioMaxGap = 0;
+static int g_guestAudioTicks = 0;
+static int64_t g_guestAudioSample0 = -1;
+static double g_guestAudioRenderedS = 0;
 
 /* v48.1 _ANEClient lane state (file scope so cleanup can always release) */
 static id g_aneModelObj = nil;
@@ -532,102 +547,203 @@ static id g_aneReq = nil;
 static int g_aneModelOk = 0;
 static int g_aneReqOk = 0;
 
-/* v66: silent looping background audio (UIBackgroundModes: audio). Rounds
-   1-2 looked the hold up cross-task while this process was backgrounded
-   and SUSPENDED — lookup NULL. The 11:58 accidental simultaneous run
-   (note 169) proved LIVE mid-tap guest surfaces DO resolve cross-task
-   (standalone census resolved the guest's request sids 545..800).
-   Audio keeps this process unsuspended while the user switches to the
-   standalone app and fires, so the held OUTPUT surface stays registered
-   through the whole round. Volume 0.01 (not 0 — zero-volume playback can
-   be optimized out of the background entitlement), 8-bit silence, loops
-   forever. Stopped at the OBSERVE tap. */
-static void p044_guest_audio_start(NSMutableString *out)
+/* v68: StikDebug's graph. playback+mixWithOthers, 1 s zero PCM buffer
+   scheduled .loops on an AVAudioPlayerNode, engine.start. The IO callback
+   is the assertion. A 2 s main-runloop health tick reclaims the session
+   after an interruption; maxGap between ticks is the suspension oracle
+   (a frozen process cannot fire the timer). Stopped at the OBSERVE tap. */
+static void p044_guest_audio_recover(void);
+static int p044_guest_audio_build(NSMutableString *out);
+
+static void p044_guest_audio_note_render(void)
 {
-    if (g_guestHoldAudio) return; /* already playing */
+    AVAudioPlayerNode *p = g_guestAudioPlayer;
+    AVAudioFormat *fmt = g_guestAudioFmt;
+    if (!p || !fmt || fmt.sampleRate <= 0) return;
+    AVAudioTime *t = p.lastRenderTime;
+    if (!t || ![t isSampleTimeValid]) return;
+    if (g_guestAudioSample0 < 0) g_guestAudioSample0 = t.sampleTime;
+    double s = (double)(t.sampleTime - g_guestAudioSample0) / fmt.sampleRate;
+    if (s > g_guestAudioRenderedS) g_guestAudioRenderedS = s;
+}
+
+static void p044_guest_audio_recover(void)
+{
+    if (!g_guestAudioWanted || !g_guestAudioEngine || !g_guestAudioPlayer) return;
+    double now = [NSDate timeIntervalSinceReferenceDate];
+    if (g_guestAudioTicks > 0 && g_guestAudioPrevTickT > 0) {
+        double gap = now - g_guestAudioPrevTickT;
+        if (gap > g_guestAudioMaxGap) g_guestAudioMaxGap = gap;
+    }
+    g_guestAudioTicks++;
+    g_guestAudioPrevTickT = now;
+    p044_guest_audio_note_render();
+    if ([g_guestAudioEngine isRunning] && [g_guestAudioPlayer isPlaying]) return;
+    NSError *err = nil;
+    [[AVAudioSession sharedInstance] setActive:YES error:&err];
+    if (![g_guestAudioEngine isRunning])
+        [g_guestAudioEngine startAndReturnError:&err];
+    if (![g_guestAudioPlayer isPlaying])
+        [g_guestAudioPlayer play];
+}
+
+static void p044_guest_audio_install(void)
+{
+    NSNotificationCenter *nc = [NSNotificationCenter defaultCenter];
+    if (!g_guestAudioObsInt) {
+        g_guestAudioObsInt = [nc addObserverForName:AVAudioSessionInterruptionNotification
+                                             object:nil
+                                              queue:[NSOperationQueue mainQueue]
+                                         usingBlock:^(NSNotification *note) {
+            NSNumber *ty = note.userInfo[AVAudioSessionInterruptionTypeKey];
+            if (ty && ty.unsignedIntegerValue == AVAudioSessionInterruptionTypeEnded)
+                p044_guest_audio_recover();
+        }];
+    }
+    if (!g_guestAudioObsReset) {
+        g_guestAudioObsReset = [nc addObserverForName:AVAudioSessionMediaServicesWereResetNotification
+                                               object:nil
+                                                queue:[NSOperationQueue mainQueue]
+                                           usingBlock:^(NSNotification *note) {
+            (void)note;
+            if (!g_guestAudioWanted) return;
+            p044_guest_audio_build(nil);
+        }];
+    }
+    if (g_guestAudioTimer) return;
+    void (^arm)(void) = ^{
+        if (g_guestAudioTimer || !g_guestAudioWanted) return;
+        g_guestAudioTimer = [NSTimer timerWithTimeInterval:2.0 repeats:YES block:^(NSTimer *timer) {
+            (void)timer;
+            p044_guest_audio_recover();
+        }];
+        [[NSRunLoop mainRunLoop] addTimer:g_guestAudioTimer forMode:NSRunLoopCommonModes];
+    };
+    if ([NSThread isMainThread]) arm();
+    else dispatch_async(dispatch_get_main_queue(), arm);
+}
+
+static int p044_guest_audio_build(NSMutableString *out)
+{
     NSError *err = nil;
     AVAudioSession *sess = [AVAudioSession sharedInstance];
-    /* v67: NO MixWithOthers — the session OWNS audio (visible Now Playing)
-       so the keep-alive is observable by eye as well as by telemetry */
-    [sess setCategory:AVAudioSessionCategoryPlayback error:&err];
-    if (err) {
-        [out appendFormat:@"  [v67] SESSION CATEGORY ERROR: %@\n", err.localizedDescription];
-    }
+    [sess setCategory:AVAudioSessionCategoryPlayback
+          withOptions:AVAudioSessionCategoryOptionMixWithOthers
+                error:&err];
+    if (err && out)
+        [out appendFormat:@"  [v68] SESSION CATEGORY ERROR: %@\n", err.localizedDescription];
+    err = nil;
     [sess setActive:YES error:&err];
-    if (err) {
-        [out appendFormat:@"  [v67] SESSION ACTIVE ERROR: %@\n", err.localizedDescription];
+    if (err && out)
+        [out appendFormat:@"  [v68] SESSION ACTIVE ERROR: %@\n", err.localizedDescription];
+
+    if (g_guestAudioPlayer) [g_guestAudioPlayer stop];
+    if (g_guestAudioEngine) [g_guestAudioEngine stop];
+    g_guestAudioEngine = [[AVAudioEngine alloc] init];
+    g_guestAudioPlayer = [[AVAudioPlayerNode alloc] init];
+    [g_guestAudioEngine attachNode:g_guestAudioPlayer];
+    g_guestAudioFmt = [g_guestAudioEngine.mainMixerNode outputFormatForBus:0];
+    if (!g_guestAudioFmt || g_guestAudioFmt.sampleRate < 8000.0 || g_guestAudioFmt.channelCount < 1)
+        g_guestAudioFmt = [[AVAudioFormat alloc] initStandardFormatWithSampleRate:44100 channels:2];
+    [g_guestAudioEngine connect:g_guestAudioPlayer to:g_guestAudioEngine.mainMixerNode format:g_guestAudioFmt];
+    AVAudioFrameCount frames = (AVAudioFrameCount)g_guestAudioFmt.sampleRate;
+    if (frames < 1) frames = 44100;
+    g_guestAudioBuf = [[AVAudioPCMBuffer alloc] initWithPCMFormat:g_guestAudioFmt frameCapacity:frames];
+    if (!g_guestAudioBuf) {
+        if (out) [out appendString:@"  [v68] AUDIO ENGINE FAILED: silence buffer\n"];
+        return 0;
     }
-    /* 1 s of unsigned 8-bit silence (0x80 midpoint), 8 kHz mono PCM WAV */
-    const uint32_t dataLen = 8000;
-    NSMutableData *wav = [NSMutableData dataWithCapacity:44 + dataLen];
-    uint32_t riffLen = 36 + dataLen;
-    [wav appendBytes:"RIFF" length:4];
-    [wav appendBytes:&riffLen length:4];
-    [wav appendBytes:"WAVE" length:4];
-    [wav appendBytes:"fmt " length:4];
-    uint32_t fmtSz = 16;
-    uint16_t audioFmt = 1, channels = 1, blockAlign = 1, bits = 8;
-    uint32_t sampleRate = 8000, byteRate = 8000;
-    [wav appendBytes:&fmtSz length:4];
-    [wav appendBytes:&audioFmt length:2];
-    [wav appendBytes:&channels length:2];
-    [wav appendBytes:&sampleRate length:4];
-    [wav appendBytes:&byteRate length:4];
-    [wav appendBytes:&blockAlign length:2];
-    [wav appendBytes:&bits length:2];
-    [wav appendBytes:"data" length:4];
-    [wav appendBytes:&dataLen length:4];
-    static uint8_t sil[8000];
-    memset(sil, 0x80, sizeof(sil));
-    [wav appendBytes:sil length:dataLen];
-    NSString *tmp = [NSTemporaryDirectory()
-        stringByAppendingPathComponent:@"p044_silence.wav"];
-    [wav writeToFile:tmp atomically:YES];
-    NSURL *u = [NSURL fileURLWithPath:tmp];
-    AVAudioPlayer *p = [[AVAudioPlayer alloc]
-        initWithContentsOfURL:u error:&err];
-    if (!p) {
-        [out appendFormat:@"  [v66] AUDIO START FAILED: %@\n",
-            err ? err.localizedDescription : (NSString *)@"init failed"];
+    g_guestAudioBuf.frameLength = frames; /* zero-filled; gain stays 1. Silence is the samples. */
+    [g_guestAudioPlayer scheduleBuffer:g_guestAudioBuf
+                               atTime:nil
+                              options:AVAudioPlayerNodeBufferLoops
+                   completionHandler:nil];
+    err = nil;
+    if (![g_guestAudioEngine startAndReturnError:&err]) {
+        if (out) [out appendFormat:@"  [v68] AUDIO ENGINE START FAILED: %@\n",
+            err ? err.localizedDescription : (NSString *)@"start failed"];
+        return 0;
+    }
+    [g_guestAudioPlayer play];
+    g_guestAudioSample0 = -1;
+    return [g_guestAudioEngine isRunning];
+}
+
+static void p044_guest_audio_start(NSMutableString *out)
+{
+    if (g_guestAudioWanted && g_guestAudioEngine && [g_guestAudioEngine isRunning] &&
+        g_guestAudioPlayer && [g_guestAudioPlayer isPlaying]) {
+        double wall = (g_guestAudioStartT > 0)
+            ? ([NSDate timeIntervalSinceReferenceDate] - g_guestAudioStartT) : 0;
+        [out appendFormat:@"  [v68] AUDIO ENGINE STILL RUNNING (wall=%.0fs ticks=%d maxGap=%.1fs rendered=%.1fs) — background now; OBSERVE logs maxGap\n",
+            wall, g_guestAudioTicks, g_guestAudioMaxGap, g_guestAudioRenderedS];
         return;
     }
-    p.numberOfLoops = -1;
-    p.volume = 0.01;
-    [p prepareToPlay];
-    if ([p play]) {
-        g_guestHoldAudio = p;
+    g_guestAudioWanted = 1;
+    if (g_guestAudioStartT == 0)
         g_guestAudioStartT = [NSDate timeIntervalSinceReferenceDate];
-        [out appendString:@"  [v67] SILENT BACKGROUND AUDIO ON (looping silence, volume 0.01, session OWNS audio — check Now Playing) — this process stays UNSUSPENDED while backgrounded; the OBSERVE tap logs playhead-vs-wall telemetry\n"];
-    } else {
-        [out appendString:@"  [v67] AUDIO PLAY FAILED (process may suspend when backgrounded — keep the app foreground instead)\n"];
+    if (!p044_guest_audio_build(out)) {
+        [out appendString:@"  [v68] AUDIO PLAY FAILED (process may suspend when backgrounded)\n"];
+        return;
     }
+    p044_guest_audio_install();
+    [out appendString:@"  [v68] AUDIO ENGINE ON (AVAudioEngine looping silence, mixWithOthers, 2s health) — the IO callback keeps this process unsuspended once backgrounded\n"];
 }
 
 static void p044_guest_audio_stop(NSMutableString *out)
 {
-    if (!g_guestHoldAudio) return;
-    AVAudioPlayer *p = (AVAudioPlayer *)g_guestHoldAudio;
-    /* v67 telemetry: playhead vs wall since audio start. playhead advanced
-       the whole window = the player RAN in real time = the process stayed
-       UNSUSPENDED (backgrounded). playhead frozen near zero = the audio
-       died (probably at backgrounding) = suspension model still open. */
-    double playhead = p.currentTime;
-    BOOL playing = p.isPlaying;
-    double wall = (g_guestAudioStartT > 0)
-        ? ([NSDate timeIntervalSinceReferenceDate] - g_guestAudioStartT) : 0;
-    [out appendFormat:@"  [v67] AUDIO TELEMETRY: isPlaying=%d playhead=%.1fs wall=%.1fs — %@\n",
-        playing, playhead, wall,
-        (wall > 5.0 && playhead > wall - 3.0)
-            ? @"playhead ran the WHOLE window — process was UNSUSPENDED backgrounded (registry-lifetime boundary wins)"
-            : @"playhead FROZE — audio died before observe (suspension model still open)"];
-    [p stop];
-    g_guestHoldAudio = nil;
+    if (!g_guestAudioWanted && !g_guestAudioEngine) return;
+    p044_guest_audio_note_render();
+    double now = [NSDate timeIntervalSinceReferenceDate];
+    double wall = (g_guestAudioStartT > 0) ? (now - g_guestAudioStartT) : 0;
+    /* Fold the gap from the last tick into this tap. Opening the app to
+       observe can fire one resume tick first; maxGap already captured that
+       stall inside recover(). If the tick has not fired yet, this measures it. */
+    if (g_guestAudioTicks > 0 && g_guestAudioPrevTickT > 0) {
+        double gap = now - g_guestAudioPrevTickT;
+        if (gap > g_guestAudioMaxGap) g_guestAudioMaxGap = gap;
+    }
+    int engineOn = (g_guestAudioEngine && [g_guestAudioEngine isRunning]) ? 1 : 0;
+    int playing = (g_guestAudioPlayer && [g_guestAudioPlayer isPlaying]) ? 1 : 0;
+    /* Timer period is 2 s. maxGap stays under a few seconds only if the
+       process was scheduled for the whole window. */
+    BOOL ran = (wall > 5.0 && g_guestAudioTicks >= 3 &&
+                g_guestAudioMaxGap > 0 && g_guestAudioMaxGap < 8.0);
+    [out appendFormat:@"  [v68] AUDIO TELEMETRY: engine=%d playing=%d ticks=%d maxGap=%.1fs rendered=%.1fs wall=%.1fs — %@\n",
+        engineOn, playing, g_guestAudioTicks, g_guestAudioMaxGap, g_guestAudioRenderedS, wall,
+        ran ? @"health timer ran the WHOLE window — process was UNSUSPENDED backgrounded"
+            : @"health timer FROZE — process was suspended (audio assertion did not hold)"];
+    g_guestAudioWanted = 0;
+    if (g_guestAudioTimer) {
+        [g_guestAudioTimer invalidate];
+        g_guestAudioTimer = nil;
+    }
+    NSNotificationCenter *nc = [NSNotificationCenter defaultCenter];
+    if (g_guestAudioObsInt) {
+        [nc removeObserver:g_guestAudioObsInt];
+        g_guestAudioObsInt = nil;
+    }
+    if (g_guestAudioObsReset) {
+        [nc removeObserver:g_guestAudioObsReset];
+        g_guestAudioObsReset = nil;
+    }
+    if (g_guestAudioPlayer) [g_guestAudioPlayer stop];
+    if (g_guestAudioEngine) [g_guestAudioEngine stop];
+    g_guestAudioPlayer = nil;
+    g_guestAudioEngine = nil;
+    g_guestAudioBuf = nil;
+    g_guestAudioFmt = nil;
     g_guestAudioStartT = 0;
+    g_guestAudioPrevTickT = 0;
+    g_guestAudioMaxGap = 0;
+    g_guestAudioTicks = 0;
+    g_guestAudioSample0 = -1;
+    g_guestAudioRenderedS = 0;
     NSError *err = nil;
     [[AVAudioSession sharedInstance] setActive:NO
-                     withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation
-                                           error:&err];
-    [out appendString:@"  [v67] BACKGROUND AUDIO OFF (process may suspend again)\n"];
+                                   withOptions:AVAudioSessionSetActiveOptionNotifyOthersOnDeactivation
+                                         error:&err];
+    [out appendString:@"  [v68] BACKGROUND AUDIO OFF (process may suspend again)\n"];
 }
 
 static void cls_reset(void) {
@@ -2105,6 +2221,9 @@ static void *watch_worker(void *arg) {
             if ([gmode hasPrefix:@"ane"]) {
                 g_guestHoldANE = 1;
                 [out appendString:@"  [v64] GUEST ANE-HOLD MODE: full fire runs this tap (~2 min). The request OUTPUT surface — consumer-mapped by the ANE — is HELD at cleanup instead of released; its sid prints at the END of this log. Keep the app alive; do not force-quit.\n"];
+                /* v68: arm the engine NOW, while foregrounded, so the IO
+                   callback is already running before the user backgrounds. */
+                p044_guest_audio_start(out);
             } else if ([gmode hasPrefix:@"census"]) {
                 /* v65 census-hold (note 168): hold an ANED-CLASS surface —
                    a steal of an IOSurfaceLookup reference. Round 1 (plain,
@@ -3141,7 +3260,7 @@ static void *watch_worker(void *arg) {
         [out appendString:@"  _ANEClient lane released\n"];
     }
     if (g_guestHold) {
-        [out appendFormat:@"\n=== v66 GUEST ANE HOLD (keepalive): sid=%u (request OUTPUT surface — ANE consumer-mapped; held, NOT released; lane + audio keep this process ALIVE backgrounded) ===\n",
+        [out appendFormat:@"\n=== v68 GUEST ANE HOLD (engine keepalive): sid=%u (request OUTPUT surface — ANE consumer-mapped; held, NOT released; lane + AVAudioEngine keep this process ALIVE backgrounded) ===\n",
             g_guestHoldSid];
         if (p044_sfLock(g_guestHold, 1, NULL) == 0) {
             uint8_t *b = (uint8_t *)p044_sfBase(g_guestHold);
@@ -3155,7 +3274,7 @@ static void *watch_worker(void *arg) {
             [out appendString:@"  pre-dump lock FAILED — surface dead at hold time; observe will say so.\n"];
         }
         p044_guest_audio_start(out);
-        [out appendString:@"  KEEP THIS APP BACKGROUND-ALIVE (no force-quit) — v66: silent background audio keeps it UNSUSPENDED while you switch away. Push this sid as p044_target.txt into the STANDALONE app's Documents (house_arrest) + p044_fill.txt=<pattern e.g. 5eaf,4b1d> + p044_req_in.txt=127 + p044_model.txt=XVRC27_127in_copyout, tap the STANDALONE (its fire aims HERE; decisive line: [v64] FILE-TARGET sid RESOLVES at 3a.5 rt=N), then return and tap with p044_guest.txt again (any content) to OBSERVE: p044_guest_after.bin showing the STANDALONE's chosen pattern at the base = CROSS-PROCESS CHOSEN-CONTENT WRITE into a GUEST-held surface (audio + lane released at observe).\n"];
+        [out appendString:@"  KEEP THIS APP BACKGROUND-ALIVE (no force-quit) — v68: the AVAudioEngine IO callback keeps it UNSUSPENDED while you switch away. Push this sid as p044_target.txt into the STANDALONE app's Documents (house_arrest) + p044_fill.txt=<pattern e.g. 5eaf,4b1d> + p044_req_in.txt=127 + p044_model.txt=XVRC27_127in_copyout, tap the STANDALONE (its fire aims HERE; decisive line: [v64] FILE-TARGET sid RESOLVES at 3a.5 rt=N), then return and tap with p044_guest.txt again (any content) to OBSERVE: p044_guest_after.bin showing the STANDALONE's chosen pattern at the base = CROSS-PROCESS CHOSEN-CONTENT WRITE into a GUEST-held surface (audio + lane released at observe). Decisive line: [v68] AUDIO TELEMETRY maxGap.\n"];
     }
     [out appendString:@"  cleanup done (witnesses joined)\n"];
 
