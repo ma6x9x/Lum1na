@@ -1,24 +1,25 @@
 //
 //  P082AneKernelSid.h
 //
-//  P082 — two follow-ups to p081's GLOBAL-fetch confirmation:
+//  P082 v2 — dump the object PHASE K already fetched.
 //
-//  1. PHASE K (kernel-sid fetch map): p081 run had first sid 177 — ids
-//     1..176 were consumed before our first create (kernel/IOMFB/boot
-//     surfaces). Feed x_126 = each of 1..24. no-abort => the ANE fetch
-//     resolves KERNEL-OWNED surface ids => the forged OUTPUT-record-sid
-//     hop (102 Chain 2) has kernel targets. nullptr => those ids dead.
-//     PANIC POSSIBLE (kernel surface mapped into ANE DART).
+//  In-bounds 127-in copyout (XVRC27_127in_copyout, 128 records, MemoryMap
+//  consumes). x_i = sid. Output = OUR surface / y MultiArray.
 //
-//  2. PHASE L (staging lookup): IOSurfaceLookup on post-predict gap ids
-//     (p081 Phase S: espresso staging churn, first 700-707). Lookup hit
-//     => the staging surface is visible in OUR registry => content
-//     injection into espresso staging is testable next. Lookup miss =>
-//     IOSurface API is per-task while the ANE fetch is global (even
-//     stronger evidence the ANE path bypasses the normal registry).
-//     Read-only peek at hit surfaces — no writes to anything foreign.
+//  Classification of the 512-byte window:
+//    bytes 0xfffffff0…  = leak of that IOMD (live global surface read)
+//    graphics / zeros   = another task's IOSurface
+//    fp16(sid) echo     = espresso VALUE path (P080 READ DOOR still dead)
 //
-
+//  kread32(kbase)==0xfeedfacf only if that backing is kernel TEXT.
+//  This TAP never flips hasKread from occupancy, fetch, or a kptr leak.
+//
+//  Dual binding:
+//    D-CM    CoreML MultiArray, record sid = int(x_i)  (the P082 fetch path)
+//    D-DIR   _ANEClient wrap of IOSurfaceGetID objects (pixel DMA, P044 v63)
+//    Lookup of sid 1 is NULL in our task — Direct cannot wrap kernel sids
+//    unless a post-fetch Lookup HIT appears.
+//
 #import <Foundation/Foundation.h>
 
 @interface P082AneKernelSid : NSObject

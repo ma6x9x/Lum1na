@@ -117,7 +117,7 @@ struct ContentView: View {
                         moreRow("P085. 84607 Close-vs-async racer (UNPARKED — kernel gap, videocodecd)", "p085")
                         moreRow("P084. pmap-tte PUAF port (65,537-map refcount wrap, 64 dangling PTEs, A14 untested)", "p084")
                         moreRow("P083. ANE staging hunt + injection + y attribution", "p083")
-                        moreRow("P082. ANE kernel-sid fetch map + staging IOSurfaceLookup", "p082")
+                        moreRow("P082. copyout dump of fetched sids (x_i=sid, OUR output; IOMD leak vs value echo)", "p082")
                         moreRow("P081. ANE foreign-sid probe (bias isolation + cross-process fetch gate)", "p081")
                         moreRow("P080. 43748 y-craft 127-in LIVE sids (input loop passes; read+write doors)", "p080")
                         moreRow("P079. 43748 y-craft pad (3in/126ops ANE-scheduled + engagement gate)", "p079")
