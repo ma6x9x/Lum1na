@@ -29,7 +29,7 @@ struct ContentView: View {
 
                 VStack(spacing: 8) {
                     HStack(spacing: 8) {
-                        hotButton("P044 grid fire", id: "p044")
+                        hotButton("P044 v71 DirectB", id: "p044")
                         hotButton("P084 PUAF", id: "p084")
                     }
                     HStack(spacing: 8) {

