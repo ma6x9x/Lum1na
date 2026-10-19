@@ -118,6 +118,7 @@ struct Lum1naOffsetTests {
         #expect(t.ane_alloc_type_desc == 0xFFFFFE0008C0D324)
         #expect(t.ane_table_size == 0x10B8)
         #expect(t.ane_record_off == 0x90)
+        #expect(t.ane_table_entries == 255)
         #expect(t.ane_fill_cap == 0)
         #expect(t.amfi_external == 0)
         #expect(t.amfi_loadtc == 0)

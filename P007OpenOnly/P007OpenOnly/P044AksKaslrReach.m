@@ -158,7 +158,7 @@
 #import <math.h>
 #import <objc/message.h>
 
-#define P044_BUILD @"p044-v73-820spray-gm192"
+#define P044_BUILD @"p044-v74-sku-cap"
 
 #define INPUT_COUNT 191
 /* v73: P034 class. kdata = msgh_size + 0x24. ANE table view is 0x820.
@@ -2679,8 +2679,11 @@ static void *watch_worker(void *arg) {
             [out appendFormat:@"EXPECT-BAD %s fill_cap=1. N=%u records=%u >= 0x80 -> 0xe00002c2 on this SKU. Probe still fires.\n",
              off->tag ? off->tag : "?", p044_req_in(), recs];
         } else if (off && off->ane_table_size && off->ane_table_size != 0x820u) {
-            [out appendFormat:@"EXPECT-BAD %s ane_table_size=0x%x (T8150 0x10b8, not A14 0x820). Probe still fires.\n",
-             off->tag ? off->tag : "?", off->ane_table_size];
+            uint32_t cap = LabAneInBoundsRecords(off);
+            [out appendFormat:@"EXPECT-BAD %s ane_table_size=0x%x rec_off=0x%x in-bounds=%u (T8150 0x10b8, not A14 0x820). Probe still fires.\n",
+             off->tag ? off->tag : "?", off->ane_table_size, off->ane_record_off, cap];
+            [out appendFormat:@"  T8150 geometry: records at +0x90, trailer +0x1080, 255 in-bounds. N+1=%u => OOB=%u. 254-in is in-bounds. Do not remaining-fire 256+ this TAP.\n",
+             recs, recs > cap ? recs - cap : 0u];
         } else if (!off) {
             [out appendString:@"EXPECT-BAD LabOff NULL (iPhone18,1/18,3 unknown). Probe still fires.\n"];
         }
@@ -3048,16 +3051,23 @@ static void *watch_worker(void *arg) {
     {
         uint32_t nIn = p044_req_in();
         uint32_t nRec = nIn + 1u; /* +1 output; CheckandPrewire concatenates */
-        uint32_t spill = (nRec > 192u) ? (nRec - 192u) : 0u;
-        [out appendFormat:@">>> ids[] = OUR staged sids, inputs 0..%u + 1 output -> %u records vs capacity 192; OOB records=%u (16B each at table+0xC00) <<<\n",
-            nIn ? nIn - 1u : 0u, nRec, spill];
-        [out appendString:@">>> CheckandPrewire: capacity 192, NO bound check, 16B stride INLINE in kalloc.3072 <<<\n"];
-        if (spill == 0) {
-            [out appendString:@">>> in-bounds (N+1 <= 192): panic NOT expected — if it panics anyway, the ips IS evidence <<<\n\n"];
-        } else if (spill == 1) {
-            [out appendString:@">>> 1-record OOB (N=192): first 16B at neighbor+0. Panic at 0x874c1fc = unmapped next page. Mapped neighbor = silent 16B store. HOLE_MODE=0 keeps kmsgs LIVE. <<<\n\n"];
+        const LabOffTab *capOff = LabOff();
+        uint32_t cap = LabAneInBoundsRecords(capOff);
+        if (!cap) cap = 192u;
+        uint32_t spill = (nRec > cap) ? (nRec - cap) : 0u;
+        [out appendFormat:@">>> ids[] = OUR staged sids, inputs 0..%u + 1 output -> %u records vs capacity %u; OOB records=%u <<<\n",
+            nIn ? nIn - 1u : 0u, nRec, cap, spill];
+        if (capOff && capOff->ane_table_size == 0x10b8u) {
+            [out appendString:@">>> T8150 CheckandPrewire: records at +0x90, trailer +0x1080, 255 in-bounds, alloc 0x10b8. 254-in is in-bounds. <<<\n"];
         } else {
-            [out appendFormat:@">>> %u-record OOB: spill starts at table+0xC00. Panic possible. <<<\n\n", spill];
+            [out appendString:@">>> CheckandPrewire: capacity 192, NO bound check, 16B stride INLINE in kalloc.3072 <<<\n"];
+        }
+        if (spill == 0) {
+            [out appendFormat:@">>> in-bounds (N+1 <= %u): panic NOT expected — if it panics anyway, the ips IS evidence <<<\n\n", cap];
+        } else if (spill == 1) {
+            [out appendFormat:@">>> 1-record OOB (N=%u): first 16B at neighbor+0. Mapped neighbor = silent 16B store. HOLE_MODE=0 keeps kmsgs LIVE. <<<\n\n", nIn];
+        } else {
+            [out appendFormat:@">>> %u-record OOB vs cap %u. Panic possible. <<<\n\n", spill, cap];
         }
     }
     p044_write_log(out);

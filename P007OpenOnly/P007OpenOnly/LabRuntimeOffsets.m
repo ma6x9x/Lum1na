@@ -236,6 +236,7 @@ static LabOffTab gT8150_24A435 = {
     .ane_memorymap_locked = T8150_24A435_ANE_MAPLOCKED,
     .ane_alloc_type_desc = T8150_24A435_ANE_MAPALLOC,
     .ane_table_size = T8150_24A435_ANE_ALLOC_SIZE,
+    .ane_table_entries = T8150_24A435_ANE_TABLE_ENTRIES,
     .ane_record_off = T8150_24A435_ANE_RECORD_OFF,
     .ane_fill_cap = 0,
     .amfi_sel_copy = 0,
@@ -337,4 +338,13 @@ uint32_t LabPmapCsAllowOff(void) {
         return 0; /* SPTM — no A14 pmap_cs +0xca paste */
     if (off && off->pmap_cs_allow_off) return off->pmap_cs_allow_off;
     return 0xcau;
+}
+
+uint32_t LabAneInBoundsRecords(const LabOffTab *off) {
+    if (!off) return 0;
+    if (off->ane_table_size == 0x820u)
+        return off->ane_next_chunk_index ? off->ane_next_chunk_index : 192u;
+    if (off->ane_table_size == 0x10b8u && off->ane_record_off == 0x90u)
+        return off->ane_table_entries ? off->ane_table_entries : 255u;
+    return off->ane_table_entries;
 }

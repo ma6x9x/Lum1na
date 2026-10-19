@@ -92,7 +92,7 @@ Numbering collisions to keep:
 - Catalog `p063` aliases `aio84530` (`CVE_2026_84530_KASLR`). Log is `p84530_aio_kqueue_log.txt`.
 - `p066` is one 128x128 EncType MAP. `p061` is dual H264+HEVC. Keep both.
 - `P069DmaCommandMap` uses a local `mach_vm_map` prototype. Do not `#import <mach/mach_vm.h>`.
-- JAILBREAK stays SANDBOX BadQuery + KERNEL T1 occupancy ledger + AfterKread HOLD. T1 does not remaining-fire 254. Do not auto-invoke P065–P072, LightSword last-wire, or CS2 hop-1 on hunt.
+- JAILBREAK stays SANDBOX BadQuery + KERNEL T1 occupancy ledger + AfterKread HOLD. T1 does not remaining-fire 254. T8150 in-bounds is 255 (trailer +0x1080); 254-in is in-bounds. Do not auto-invoke P065–P072, LightSword last-wire, or CS2 hop-1 on hunt. Trigon is logic (T7 CacheMode / SocketKRW.Arm), not CVE-2023-32434.
 
 `invokeController` order: instance `execute`, then `tap` (instance then class). `+tap` returning `NSString` is the P007 shape.
 

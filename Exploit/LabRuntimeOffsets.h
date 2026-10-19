@@ -111,5 +111,7 @@ void LabSetKernSlide(uint64_t slide);
 /* Shared FIELD/VA convention both SKUs. Do not paste T8101 text VAs onto T8020. */
 uint64_t LabStaticBase(void);
 uint32_t LabPmapCsAllowOff(void);
+/* Unbounded CheckandPrewire fill in-bounds record count (A14 3072-chunk 192; T8150 trailer 255). 0 if no ANE row. */
+uint32_t LabAneInBoundsRecords(const LabOffTab *off);
 
 #endif /* LabRuntimeOffsets_h */

@@ -8,13 +8,13 @@ Seven isolated TAPs. Reboot + force-quit between T1–T4 and T7 GPU map. `ui-bui
 
 | Button | Catalog | Theory |
 | --- | --- | --- |
-| **T1 ANE** | `krw` | Occupancy ledger (P099 CLASS on A14). Confirmed WRITE. conversion HOLD. JAILBREAK does not remaining-fire 254. |
+| **T1 ANE** | `krw` | Occupancy ledger (P099 CLASS on A14). Confirmed WRITE. conversion HOLD. JAILBREAK does not remaining-fire 254. Trigon logic: S1 occupancy write / T7 CacheMode, S2 IORVBAR reach, S3 SocketKRW.Arm. No CVE-2023-32434 copy. |
 | **T2 FACET** | `krw2` | 64788 1×65535 + Trap2 sel=3 oracle. |
 | **T3 SOCK** | `krw3` | 43748 then icmp6filt. Expected SKIP. |
 | **T4 LS** | `krw4` | Dual-wrap last-wire. 18:45 OOM sealed. |
 | **T5 PAC** | `krw5` | Dopamine `badRecovery` / 65330 map. kcall after kread. Does not fire hop-1. |
 | **T6 PPL** | `krw6` | Titan A14 / momentarius map. Always runs AfterKread; AMFI/opainject still HOLD without `hasKread`. |
-| **T7 PHYS** | `krw7` | IOKit registry + read-only `IOConnectMapMemory` for A14 IORVBAR `0x206050000`. No DMA/`+0x34` fire, no Titan write. |
+| **T7 PHYS** | `krw7` | IOKit registry + read-only `IOConnectMapMemory` for A14 IORVBAR `0x206050000`. STEP 4 PurpleGfxMem + CacheMode 0x100 (Trigon uncached-MMIO create). No DMA/`+0x34` fire, no Titan write. |
 
 Credit: opa334 / Lars Fröder — Dopamine 3.0.10 (`primitives_external.h`, `DOJailbreaker.m`, Titan, momentarius, `physrw_pte.c`, `trustcache.c`). Copied into Lum1na: `Exploit/DopaminePrimitives.h` (vtable contract only). Hop-1 / kfd / multicast_bytecopy bodies stay in the Dopamine tree.
 
@@ -101,7 +101,9 @@ Proved unslid pins (`kernelcache.release.iPhone18,2`):
 | MapAlloc | `0xfffffe0008c0d324` kalloc `0x10b8`, clear `0x10a0`, records at object `+0x90` |
 | IOGPU / NECP / AMFI / AVE | `0` until re-derived |
 
-Public Lum1na **SKIPS** T8101 `0x820`/254 fire, CS2 hop-1, and LightSword (IOGPU pins 0). Probe app (Lum1na-Debug) fires every TAP with `EXPECT-BAD`. A14 occupancy WRITE and A12X phys_oob READ stay independent first doors. T8150 ANE `0x10b8` is a new map, not a port of `0x820` occupancy. `hasKread` still requires `SocketKRW.Arm` then `kread32(kbase)==0xfeedfacf` on **this** SKU.
+Public Lum1na **SKIPS** T8101 `0x820`/254 fire, CS2 hop-1, and LightSword (IOGPU pins 0). Probe app (Lum1na-Debug) fires every TAP with `EXPECT-BAD`. A14 occupancy WRITE and A12X phys_oob READ stay independent first doors. T8150 ANE `0x10b8` is a new map, not a port of `0x820` occupancy.
+
+Trigon (Alfie 2026-10-17) is **logic**, not a drop-in: CVE-2023-32434 died 16.5.1, AGX cache write died 16.6, icmp6filt data-PAC is 27.2b3. On 24A435: records at `+0x90`, trailer `+0x1080`, **255 in-bounds**. 254-in is in-bounds. 16:21 N=192 was in-bounds. T7 STEP 4 is PurpleGfxMem + `IOSurfaceCacheMode` 0x100 (uncached MMIO create). `hasKread` still requires `SocketKRW.Arm` then `kread32(kbase)==0xfeedfacf` on **this** SKU.
 
 ## Open (one failed tap ≠ closed)
 

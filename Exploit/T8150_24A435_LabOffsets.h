@@ -20,5 +20,8 @@
 #define T8150_24A435_ANE_ALLOC_SIZE         0x10B8u
 #define T8150_24A435_ANE_ALLOC_CLEAR        0x10A0u
 #define T8150_24A435_ANE_RECORD_OFF         0x90u
+/* Trailer at +0x1080 (beta-4 decompile; 0x90+255*16). 254-in = 255 records = in-bounds. */
+#define T8150_24A435_ANE_TRAILER_OFF        0x1080u
+#define T8150_24A435_ANE_TABLE_ENTRIES      255u
 
 #endif /* T8150_24A435_LabOffsets_h */
