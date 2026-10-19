@@ -326,6 +326,8 @@ static NSURL *p073_model_url(NSString *name) {
         NSString *ret = g_p073_buf; g_p073_buf = nil; return ret;
     }
     p073_log(@"%@", [LabDeviceProfile identBlock]);
+    p073_log(@"%@", [LabDeviceProfile huntTapWarn:@"p073"] ?: @"");
+    [LabDeviceProfile stampLastTap:@"p073"];
 
     {
         const LabOffTab *off = LabOff();

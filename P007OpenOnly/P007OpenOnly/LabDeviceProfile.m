@@ -8,11 +8,13 @@
 #import "LabLocalTime.h"
 #import <sys/utsname.h>
 #import <sys/sysctl.h>
+#import <sys/time.h>
 #import <stdlib.h>
 #import <string.h>
 #import <notify.h>
 #import <os/proc.h>
 #import <UIKit/UIKit.h>
+#import <QuartzCore/QuartzCore.h>
 
 static NSString *lp_sysctl(const char *name) {
     size_t n = 0;
@@ -290,6 +292,24 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
 + (NSString *)writeClassMap { return @"W not found this factory. F≠W. 84607 AVE race class.\n"; }
 
 static id g_huntGroomActivity;
+static CADisplayLink *g_huntDisplayLink;
+
+static NSString *lp_docs_path(NSString *name) {
+    NSString *docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+    return [docs stringByAppendingPathComponent:name];
+}
+
+static time_t lp_boottime(void) {
+    struct timeval boot;
+    size_t n = sizeof(boot);
+    memset(&boot, 0, sizeof(boot));
+    if (sysctlbyname("kern.boottime", &boot, &n, NULL, 0) != 0) return 0;
+    return boot.tv_sec;
+}
+
++ (void)huntGroomTick:(CADisplayLink *)link {
+    (void)link;
+}
 
 + (void)beginHuntGroom {
     if (!g_huntGroomActivity) {
@@ -297,11 +317,47 @@ static id g_huntGroomActivity;
         g_huntGroomActivity = [[NSProcessInfo processInfo] beginActivityWithOptions:opts
                                                                             reason:@"Lum1na hunt Game Mode groom"];
     }
-    void (^setIdle)(void) = ^{
+    void (^setIdleAndLink)(void) = ^{
         UIApplication.sharedApplication.idleTimerDisabled = YES;
+        if (!g_huntDisplayLink) {
+            g_huntDisplayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(huntGroomTick:)];
+            CAFrameRateRange r = {80.f, 120.f, 120.f};
+            g_huntDisplayLink.preferredFrameRateRange = r;
+            [g_huntDisplayLink addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+        }
     };
-    if ([NSThread isMainThread]) setIdle();
-    else dispatch_sync(dispatch_get_main_queue(), setIdle);
+    if ([NSThread isMainThread]) setIdleAndLink();
+    else dispatch_sync(dispatch_get_main_queue(), setIdleAndLink);
+}
+
++ (void)stampLastTap:(NSString *)tapId {
+    if (!tapId.length) return;
+    NSString *body = [NSString stringWithFormat:@"boot=%ld tap=%@ time=%@\n",
+                      (long)lp_boottime(), tapId, LabLocalMilitaryNow() ?: @"?"];
+    [body writeToFile:lp_docs_path(@"p007_last_tap.txt") atomically:YES encoding:NSUTF8StringEncoding error:NULL];
+}
+
++ (NSString *)huntTapWarn:(NSString *)thisTap {
+    NSMutableString *w = [NSMutableString string];
+    NSString *raw = [NSString stringWithContentsOfFile:lp_docs_path(@"p007_last_tap.txt")
+                                              encoding:NSUTF8StringEncoding error:NULL];
+    time_t boot = lp_boottime();
+    time_t prevBoot = 0;
+    NSString *prevTap = nil;
+    if (raw.length) {
+        for (NSString *line in [raw componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]]) {
+            if ([line hasPrefix:@"boot="]) prevBoot = (time_t)[[line substringFromIndex:5] longLongValue];
+            else if ([line hasPrefix:@"tap="]) prevTap = [line substringFromIndex:4];
+        }
+    }
+    NSSet *occ = [NSSet setWithObjects:@"p044", @"p099", @"p073", @"p088", @"p082", @"p076", nil];
+    if (prevTap.length && prevBoot && boot && prevBoot == boot &&
+        thisTap.length && ![prevTap isEqualToString:thisTap] &&
+        ([occ containsObject:prevTap] || [occ containsObject:thisTap])) {
+        [w appendFormat:@"DIRTY_BOOT: last TAP this boot was %@ (boot=%ld). Isolation is 1 TAP per reboot. Reboot hunt 12 before this %@ fire.\n",
+         prevTap, (long)prevBoot, thisTap];
+    }
+    return w;
 }
 
 + (NSString *)gameModeLine {
@@ -312,6 +368,7 @@ static id g_huntGroomActivity;
     int gcB = [gc respondsToSelector:@selector(boolValue)] ? [gc boolValue] : 0;
     int lsB = [ls respondsToSelector:@selector(boolValue)] ? [ls boolValue] : 0;
     NSMutableString *n = [NSMutableString string];
+    uint64_t anyOn = 0;
     static const char *names[] = {
         "com.apple.gamepolicyd.game-mode-enabled",
         "com.apple.gamepolicyd.gamemode",
@@ -326,6 +383,7 @@ static id g_huntGroomActivity;
         if (notify_register_check(names[i], &token) == NOTIFY_STATUS_OK) {
             notify_get_state(token, &st);
             notify_cancel(token);
+            anyOn |= st;
             [n appendFormat:@" %s=%llu", names[i], (unsigned long long)st];
         }
     }
@@ -337,14 +395,24 @@ static id g_huntGroomActivity;
     };
     if ([NSThread isMainThread]) readIdle();
     else dispatch_sync(dispatch_get_main_queue(), readIdle);
+    long thermal = (long)pi.thermalState;
+    NSMutableString *hold = [NSMutableString string];
+    if (anyOn == 0) {
+        [hold appendString:@"GAME_MODE_HOLD: Darwin notify all 0. Plist eligibility is not engagement. Control Center Game Overlay -> Game Mode ON. Ident until any notify=1 before conversion TAP.\n"];
+    }
+    if (thermal != 0) {
+        [hold appendFormat:@"GAME_MODE_THERMAL: thermal=%ld. Reboot hunt 12 before conversion TAP.\n", thermal];
+    }
     return [NSString stringWithFormat:
             @"GAME_MODE_PLIST GCSupports=%d LSSupports=%d category=%@\n"
             @"GAME_MODE_NOTIFY%@\n"
-            @"GAME_MODE_GROOM activity=%d idle=%d thermal=%ld LPM=%d avail=%zu\n",
+            @"GAME_MODE_GROOM activity=%d idle=%d displaylink=%d thermal=%ld LPM=%d avail=%zu\n"
+            @"%@",
             gcB, lsB, cat,
             n.length ? n : @" none",
-            g_huntGroomActivity != nil, idle ? 1 : 0,
-            (long)pi.thermalState, pi.isLowPowerModeEnabled ? 1 : 0, avail];
+            g_huntGroomActivity != nil, idle ? 1 : 0, g_huntDisplayLink != nil,
+            thermal, pi.isLowPowerModeEnabled ? 1 : 0, avail,
+            hold];
 }
 
 + (NSString *)identBlock {
@@ -362,6 +430,7 @@ static id g_huntGroomActivity;
     [out appendFormat:@"QueueCreate    sel=%u size=0x%x leak=+0x%x destroy=%u submit=%u MD+0x%x sel36=%u\n",
          [self queueCreateSel], [self queueCreateSize], [self queueLeakOff],
          [self queueDestroySel], [self queueSubmitSel], [self sysmemMdOff], [self sel36]];
+    [out appendString:[self huntTapWarn:@"ident"]];
     switch ([self detectedSku]) {
         case LabSkuA14_23F77:
             [out appendString:@"TRACK: iPhone13 A14 23F77 ACTIVE. First door=43748 occupancy WRITE (P099). conversion then magic. hop-1 SKIP.\n"];

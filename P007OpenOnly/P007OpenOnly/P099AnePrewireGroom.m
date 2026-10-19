@@ -230,6 +230,8 @@ static kern_return_t p099_recv_payload(mach_port_t port, uint8_t *payloadOut) {
         L(@"One evaluation. STANDALONE ONLY - not in JAILBREAK chain.");
         L(@"Probe app: fire even on fill_cap / unknown SKU. Public Lum1na is the SKU gate.");
         L(@"%@", [LabDeviceProfile identBlock] ?: @"ident ?");
+        L(@"%@", [LabDeviceProfile huntTapWarn:@"p099"] ?: @"");
+        [LabDeviceProfile stampLastTap:@"p099"];
         if ([LabDeviceProfile aneFillCapped]) {
             L(@"EXPECT-BAD fill_cap=1. 254-in CheckandPrewire on this SKU -> 0xe00002c2. Probe still fires.");
         } else if (LabOff() && LabOff()->ane_table_size && LabOff()->ane_table_size != 0x820u) {

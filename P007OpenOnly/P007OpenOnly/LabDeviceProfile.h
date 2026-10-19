@@ -36,7 +36,9 @@ const char *LabDeviceProfile_sku_string(LabSku sku);
 + (NSString *)gateMode;   /* SKU-gate mode for this build (LAB_DEBUG_APP disables) */
 + (NSString *)identBlock;
 + (NSString *)gameModeLine; /* plist + Darwin notify + groom. Not a KRW door. */
-+ (void)beginHuntGroom;     /* idleTimer + latency-critical activity. No gamed XPC. */
++ (void)beginHuntGroom;     /* idleTimer + 120Hz CADisplayLink + latency-critical. No gamed XPC. */
++ (void)stampLastTap:(NSString *)tapId; /* Documents/p007_last_tap.txt + kern.boottime. */
++ (NSString *)huntTapWarn:(NSString *)thisTap; /* dirty-boot / thermal / GM-off. Probe still fires. */
 + (NSString *)beta1Matrix; /* SKU-honest first KRW door. iPad READ and iPhone WRITE stay independent. */
 + (BOOL)aneFillCapped;     /* LabOff()->ane_fill_cap: 1 on 23G71 (>=0x80 -> 0xe00002c2) */
 + (BOOL)aneTableIsA14_0x820; /* T8101 0x820. T8150 is 0x10b8. 0 if LabOff NULL. */
