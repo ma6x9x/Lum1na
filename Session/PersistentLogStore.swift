@@ -42,6 +42,8 @@ public final class PersistentLogStore {
         "p067": "p067_avd_reach_log.txt",
         "p068": "p068_chroot_priv_log.txt",
         "p069": "p069_dma_command_log.txt",
+        "p101": "p101_dma_command_fire_log.txt",
+        "p102": "p102_titan_write_log.txt",
         "p070": "p070_chain_sequencer_log.txt",
         "p071": "p071_ane_overflow_log.txt",
         "p072": "p072_file_parser_log.txt",

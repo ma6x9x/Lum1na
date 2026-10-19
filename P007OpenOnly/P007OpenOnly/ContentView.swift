@@ -117,6 +117,8 @@ struct ContentView: View {
                         moreRow("P097. console-sec gRegistryRoot leak (CVE-2026-65371, READ-ONLY — lock/unlock once while it waits)", "p097")
                         moreRow("P094. kernproc derive + ucred ladder (READ-ONLY, sysctl anchor + allproc walk; v3 fold runs P095's ladder in the same tap — one boot, unlocks elevate)", "p094")
                         moreRow("P095. ucred ladder standalone (READ-ONLY; also runs inside P094 since v3 — use for a ladder re-check without re-deriving)", "p095")
+                        moreRow("P102. Titan write TEST (MapMemory IORVBAR look-for + CacheMode canary; SKIPs MMIO without window; no titan.m ROP)", "p102")
+                        moreRow("P101. 43684 dmaCommand FIRE (bounded reuse IOMD+0x68; one setup + one reuse; isolate from T7)", "p101")
                         moreRow("P100. AutoLearn (READ-ONLY learner — unknown devices, chip tag + door census + LEARN PACKET)", "p100")
                         moreRow("P090. momentarius census v1 (offsets DB vs live kernel + kbase sanity + allproc scan, READ-ONLY, rig)", "p090")
                         moreRow("P088. 43748 forged OUTPUT-record write hop v8 (prewire OOB confirmed at the pc: entry 192 = +0xC00; err=-1 = downstream reject, content check is the signal; ourBand census per D2 hit)", "p088")
@@ -873,6 +875,20 @@ struct ContentView: View {
                     result = Self.readFreshLog(
                         named: "p095_ucred_log.txt",
                         missing: "p095 finished but log missing")
+                }
+            case "p101":
+                result = P101DmaCommandFire.tap()
+                if result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    result = Self.readFreshLog(
+                        named: "p101_dma_command_fire_log.txt",
+                        missing: "p101 finished but log missing")
+                }
+            case "p102":
+                result = P102TitanWriteTest.tap()
+                if result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    result = Self.readFreshLog(
+                        named: "p102_titan_write_log.txt",
+                        missing: "p102 finished but log missing")
                 }
             case "p100", "learn":
                 result = P100AutoLearn.tap()

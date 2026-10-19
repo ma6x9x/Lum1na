@@ -101,6 +101,8 @@
 #import "Exploit/P067AvdReach.h"
 #import "Exploit/P068ChrootPrivMap.h"
 #import "Exploit/P069DmaCommandMap.h"
+#import "Exploit/P101DmaCommandFire.h"
+#import "Exploit/P102TitanWriteTest.h"
 #import "Exploit/P070ChainSequencer.h"
 #import "Exploit/P071AneOverflowMap.h"
 #import "Exploit/P072FileParserMap.h"

@@ -36,6 +36,8 @@ Port path after a primitive is proven on P007: copy `+tap` + catalog id + log na
 | `p067` | `P067AvdReach` | `p067_avd_reach_log.txt` | IOServiceOpen only. |
 | `p068` | `P068ChrootPrivMap` | `p068_chroot_priv_log.txt` | errno MAP. |
 | `p069` | `P069DmaCommandMap` | `p069_dma_command_log.txt` | One map. Local `mach_vm_map` prototype. |
+| `p101` | `P101DmaCommandFire` | `p101_dma_command_fire_log.txt` | 43684 bounded reuse fire (IOMD+0x68). Isolate from T7. |
+| `p102` | `P102TitanWriteTest` | `p102_titan_write_log.txt` | Titan write TEST. SKIPs MMIO without IORVBAR window. |
 | `p070` | `P070ChainSequencer` | `p070_chain_sequencer_log.txt` | Five doors + AMFI HOLD. |
 | `p071` | `P071AneOverflowMap` | `p071_ane_overflow_log.txt` | DeviceOpen 0x68. Not 43748 fill. |
 | `p072` | `P072FileParserMap` | `p072_file_parser_log.txt` | dlopen + 1x1 PNG. Not ACE. |

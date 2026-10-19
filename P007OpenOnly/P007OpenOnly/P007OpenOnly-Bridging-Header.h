@@ -91,6 +91,8 @@
 #import "P094KernprocDerive.h"
 #import "P095UcredLadder.h"
 #import "P100AutoLearn.h"
+#import "P101DmaCommandFire.h"
+#import "P102TitanWriteTest.h"
 #import "P097ConsoleSecLeak.h"
 #import "P098M2ScalerDiag.h"
 #import "P099AnePrewireGroom.h"
