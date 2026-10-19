@@ -117,9 +117,9 @@ static BOOL p051_has(id obj, NSString *selName) {
     BOOL util_ok = NO;
     BOOL cache_sel = NO;
     BOOL using_gamed = NO;
-    BOOL benign_cb = NO;
-    BOOL load_cb = NO;
-    NSUInteger load_len = 0;
+    __block BOOL benign_cb = NO;
+    __block BOOL load_cb = NO;
+    __block NSUInteger load_len = 0;
 
     p051_log(log, @"[PHASE 1] GameCenter frameworks");
     void *gcf = dlopen("/System/Library/PrivateFrameworks/GameCenterFoundation.framework/GameCenterFoundation", RTLD_LAZY);
