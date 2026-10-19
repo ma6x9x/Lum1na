@@ -14,7 +14,7 @@ Seven isolated TAPs. Reboot + force-quit between T1–T4 and T7 GPU map. `ui-bui
 | **T4 LS** | `krw4` | Dual-wrap last-wire. 18:45 OOM sealed. |
 | **T5 PAC** | `krw5` | Dopamine `badRecovery` / 65330 map. kcall after kread. Does not fire hop-1. |
 | **T6 PPL** | `krw6` | Titan A14 / momentarius map. Always runs AfterKread; AMFI/opainject still HOLD without `hasKread`. |
-| **T7 PHYS** | `krw7` | IOKit registry + read-only `IOConnectMapMemory` for A14 IORVBAR `0x206050000`. STEP 4 PurpleGfxMem + CacheMode 0x100 (Trigon uncached-MMIO create). No DMA/`+0x34` fire, no Titan write. |
+| **T7 PHYS** | `krw7` | `phys-map-3`: DeviceTree `reg` + CacheMode 0x100 dump + P069 `mach_vm_map` of that surface + read-only MapMemory on IOGPU/DART/IOMFB/IOSurface/ANE/AES. Needle `0x206050000`. No DMA/`+0x34` fire, no hop-1, no Titan write. |
 
 Credit: opa334 / Lars Fröder — Dopamine 3.0.10 (`primitives_external.h`, `DOJailbreaker.m`, Titan, momentarius, `physrw_pte.c`, `trustcache.c`). Copied into Lum1na: `Exploit/DopaminePrimitives.h` (vtable contract only). Hop-1 / kfd / multicast_bytecopy bodies stay in the Dopamine tree.
 
