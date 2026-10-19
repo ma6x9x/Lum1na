@@ -142,7 +142,7 @@ struct ContentView: View {
                         moreRow("P057 AKS 65343 sel0/1 hex (not 163-sel, not hasKread)", "p057")
                         moreRow("P050 buflet UAF v3 (not 65349)", "p050")
                         moreRow("P019 64749 iopl MAP (size mismatch, not 65349)", "p019")
-                        moreRow("P051 gamed/AKS xattr (v3) — CLOSED", "p051")
+                        moreRow("P051 gamed census v6 (in-cache only, no WVEK/TrollRestore)", "p051")
                         moreRow("P052 nstream extend — CLOSED (EFBIG)", "p052")
                         moreRow("P053 NECP connect×close v2", "p053")
                         moreRow("P054 APFS reap list", "p054")
