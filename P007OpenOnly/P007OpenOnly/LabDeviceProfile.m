@@ -10,6 +10,9 @@
 #import <sys/sysctl.h>
 #import <stdlib.h>
 #import <string.h>
+#import <notify.h>
+#import <os/proc.h>
+#import <UIKit/UIKit.h>
 
 static NSString *lp_sysctl(const char *name) {
     size_t n = 0;
@@ -284,7 +287,66 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
 + (NSString *)slideDestMap { return @"43724 pager dest unnamed; #536=22\n"; }
 + (NSString *)writeClassMap { return @"W not found this factory. F≠W. 84607 AVE race class.\n"; }
 
+static id g_huntGroomActivity;
+
++ (void)beginHuntGroom {
+    if (!g_huntGroomActivity) {
+        NSActivityOptions opts = NSActivityUserInitiated | NSActivityLatencyCritical;
+        g_huntGroomActivity = [[NSProcessInfo processInfo] beginActivityWithOptions:opts
+                                                                            reason:@"Lum1na hunt Game Mode groom"];
+    }
+    void (^setIdle)(void) = ^{
+        UIApplication.sharedApplication.idleTimerDisabled = YES;
+    };
+    if ([NSThread isMainThread]) setIdle();
+    else dispatch_sync(dispatch_get_main_queue(), setIdle);
+}
+
++ (NSString *)gameModeLine {
+    NSDictionary *info = NSBundle.mainBundle.infoDictionary;
+    id gc = info[@"GCSupportsGameMode"];
+    id ls = info[@"LSSupportsGameMode"];
+    NSString *cat = info[@"LSApplicationCategoryType"] ?: @"-";
+    int gcB = [gc respondsToSelector:@selector(boolValue)] ? [gc boolValue] : 0;
+    int lsB = [ls respondsToSelector:@selector(boolValue)] ? [ls boolValue] : 0;
+    NSMutableString *n = [NSMutableString string];
+    static const char *names[] = {
+        "com.apple.gamepolicyd.game-mode-enabled",
+        "com.apple.gamepolicyd.gamemode",
+        "com.apple.gamepolicy.gameMode",
+        "com.apple.gamepolicyd.gameModeDidChange",
+        "com.apple.runningboard.gameMode",
+        NULL
+    };
+    for (int i = 0; names[i]; i++) {
+        int token = 0;
+        uint64_t st = 0;
+        if (notify_register_check(names[i], &token) == NOTIFY_STATUS_OK) {
+            notify_get_state(token, &st);
+            notify_cancel(token);
+            [n appendFormat:@" %s=%llu", names[i], (unsigned long long)st];
+        }
+    }
+    NSProcessInfo *pi = NSProcessInfo.processInfo;
+    size_t avail = os_proc_available_memory();
+    __block BOOL idle = NO;
+    void (^readIdle)(void) = ^{
+        idle = UIApplication.sharedApplication.idleTimerDisabled;
+    };
+    if ([NSThread isMainThread]) readIdle();
+    else dispatch_sync(dispatch_get_main_queue(), readIdle);
+    return [NSString stringWithFormat:
+            @"GAME_MODE_PLIST GCSupports=%d LSSupports=%d category=%@\n"
+            @"GAME_MODE_NOTIFY%@\n"
+            @"GAME_MODE_GROOM activity=%d idle=%d thermal=%ld LPM=%d avail=%zu\n",
+            gcB, lsB, cat,
+            n.length ? n : @" none",
+            g_huntGroomActivity != nil, idle ? 1 : 0,
+            (long)pi.thermalState, pi.isLowPowerModeEnabled ? 1 : 0, avail];
+}
+
 + (NSString *)identBlock {
+    [self beginHuntGroom];
     const LabOffTab *off = LabOff();
     NSMutableString *out = [NSMutableString string];
     struct utsname u;
@@ -340,6 +402,7 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
             break;
     }
     [out appendString:@"Runtime profile always wins.\n"];
+    [out appendString:[self gameModeLine]];
     return out;
 }
 

