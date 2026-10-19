@@ -180,10 +180,20 @@ static LabOffTab gA14_21D50 = {
     .static_base = 0xFFFFFFF007004000ULL,   /* link base; verify slide on device */
     .socket_usecount = 0x24c,               /* info.c ladder darwin>=23.1,<23.4 (17.3 = 23.3.0) */
     .iosurface_md = 0x40,                   /* ladder: pre-23.4 layout (23.4+ is 0x30) */
+    .sysmem_md = 0x80,                      /* FKT CLASS: 21D50 MD +0x80; 23F77 is +0x90 */
+    .queue_leak = 0x550,                    /* FKT CLASS: 21D50 word1 +0x550; 23F77 is +0x558 */
+    .queue_create_sel = 6,                  /* IOGPU ABI; 21D50 has no 0x410 size gate */
+    .queue_create_size = 0x408,             /* pairs with +0x550 layout; sweep still tries 0x410 */
+    .queue_destroy_sel = 7,
+    .submit_sel = 25,
+    .sel36 = 36,
+    .gmd_elemsz = 0xb0,                     /* FKT live zone esz; CLASS only */
     .amfi_sel_copy = 0,                     /* unproven — pokes skipped */
     .amfi_sel_manifest = 0,                 /* unproven — pokes skipped */
     .pmap_cs_allow_off = 0,                 /* unproven — pokes skipped */
     .owns_replaceable = 0,
+    .ane_table_size = 0,                    /* 43748 0x820 is 26.x; do not claim on 17.3 */
+    .ane_fill_cap = 0,
     .build_number = BUILD_21D50,
     .build_string = "21D50"
 };

@@ -3,7 +3,7 @@ import UIKit
 import Darwin
 
 struct ContentView: View {
-    @State private var text = "Hot: probe-open on every SKU including 17 Pro Max. Ident first. One TAP. EXPECT-BAD still fires."
+    @State private var text = "Hot: probe-open on every SKU including 12 mini iOS 17.3 and 17 Pro Max. Ident first. One TAP. EXPECT-BAD still fires."
     @State private var copiedFlash = false
     @State private var running = false
     @State private var showMore = false

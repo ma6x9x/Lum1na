@@ -569,9 +569,8 @@ jobs:
           sudo xcode-select -s "$XCODE/Contents/Developer"
           xcodebuild -version
 
-      # The pbxproj pins 18.5 (Desktop Xcode SDK). CI Xcode 16.4 ships the
-      # 18.4 SDK — override to 18.0 so the range check passes. The rig
-      # (18.6.x) and any 18.x/26.x device install a 18.0-target build fine.
+      # Pin 17.0 so Sideloadly can install on 12 mini (iOS 17.3 / 21D50)
+      # and every later lab SKU. Do not raise this above 17.0.
       - name: Build Unsigned IPA (Lum1na-Debug)
         run: |
           set -euo pipefail
@@ -588,7 +587,7 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             CODE_SIGN_ENTITLEMENTS="P007OpenOnly/P007OpenOnly/P007OpenOnly.entitlements" \
-            IPHONEOS_DEPLOYMENT_TARGET="18.0" \
+            IPHONEOS_DEPLOYMENT_TARGET="${DEPLOYMENT_TARGET}" \
             build 2>&1 | tee "$RUNNER_TEMP/build-debug.log"
           RC=${PIPESTATUS[0]}
           set -e

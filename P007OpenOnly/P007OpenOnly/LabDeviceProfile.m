@@ -173,31 +173,31 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
 
 + (uint32_t)queueCreateSel {
     const LabOffTab *o = LabOff();
-    return o ? o->queue_create_sel : 6u;
+    return (o && o->queue_create_sel) ? o->queue_create_sel : 6u;
 }
 + (uint32_t)queueDestroySel {
     const LabOffTab *o = LabOff();
-    return o ? o->queue_destroy_sel : 7u;
+    return (o && o->queue_destroy_sel) ? o->queue_destroy_sel : 7u;
 }
 + (uint32_t)queueSubmitSel {
     const LabOffTab *o = LabOff();
-    return o ? o->submit_sel : 25u;
+    return (o && o->submit_sel) ? o->submit_sel : 25u;
 }
 + (uint32_t)queueCreateSize {
     const LabOffTab *o = LabOff();
-    return o ? o->queue_create_size : 0x410u;
+    return (o && o->queue_create_size) ? o->queue_create_size : 0x410u;
 }
 + (uint32_t)queueLeakOff {
     const LabOffTab *o = LabOff();
-    return o ? o->queue_leak : 0x558u;
+    return (o && o->queue_leak) ? o->queue_leak : 0x558u;
 }
 + (uint32_t)sysmemMdOff {
     const LabOffTab *o = LabOff();
-    return o ? (uint32_t)o->sysmem_md : 0x90u;
+    return (o && o->sysmem_md) ? (uint32_t)o->sysmem_md : 0x90u;
 }
 + (uint32_t)sel36 {
     const LabOffTab *o = LabOff();
-    return o ? o->sel36 : 36u;
+    return (o && o->sel36) ? o->sel36 : 36u;
 }
 + (NSArray<NSNumber *> *)queueCreateSizeSweep {
     uint32_t sz = [self queueCreateSize];
@@ -254,7 +254,9 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
             [s appendString:@"  Hot: CS2, KREAD, CHAINS.\n"];
             break;
         case LabSkuA14_21D50:
-            [s appendString:@"A14 21D50 12 mini: Dopamine rootless / CS2. Twin CLASS/FIELD only. Keep 21D50 VAs off 23F77.\n"];
+            [s appendString:@"A14 21D50 12 mini iOS 17.3: Dopamine rootless. IPA min iOS 17.0. Twin CLASS/FIELD only.\n"];
+            [s appendString:@"  IOGPU MD+0x80 queue+0x550 size=0x408. 43748 0x820 absent. Keep 21D50 VAs off 23F77.\n"];
+            [s appendString:@"  Hot: Ident, P100, P010 size sweep, FKT CLASS. P044/P099 EXPECT-BAD (no 26.5 fill).\n"];
             break;
         case LabSkuT8150_24A435:
             [s appendString:@"T8150 24A435 iPhone18,2 17 Pro Max. static_base=0xfffffe0007004000. ANE table 0x10b8 record+0x90.\n"];
