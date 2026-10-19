@@ -51,7 +51,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P062_BUILD @"p062-neon-selftest-v1"
+#define P062_BUILD @"p062-neon-selftest-v2"
 
 /* 32 NEON 128-bit registers = 64 qwords. COUNT is 132 (528/4), not 64. */
 #define P062_NEON_QWORDS 64
@@ -296,8 +296,11 @@ static void *p062_exc_handler_fn(void *arg)
     p062_parse_exc_msg(mh, msgbuf);
 
     if (g_workerThread != MACH_PORT_NULL) {
+        /* brk #0 parks the pthread in exception-wait. Terminate often
+         * returns KERN_FAILURE (0x35). Do not pthread_join that worker. */
+        (void)thread_abort(g_workerThread);
         kern_return_t tr = thread_terminate(g_workerThread);
-        p062_log(@"[P1] worker thread_terminate kr=0x%x", tr);
+        p062_log(@"[P1] worker thread_abort+terminate kr=0x%x (0x35 = already dying; TAP will not join)", tr);
     }
     return NULL;
 }
@@ -454,21 +457,26 @@ static void p062_phase2(void)
         pthread_create(&excTh, NULL, p062_exc_handler_fn, NULL);
         usleep(50000);
 
-        pthread_create(&wTh, NULL, p062_worker_fn, NULL);
+        if (pthread_create(&wTh, NULL, p062_worker_fn, NULL) == 0) {
+            /* Worker sits in brk #0 until the exception reply. Joining it
+             * hangs the TAP (recover stops after handler terminate). */
+            pthread_detach(wTh);
+        }
 
         for (int i = 0; i < 100 && !g_excReceived; i++)
             usleep(50000);
 
         if (g_workerThread != MACH_PORT_NULL) {
-            thread_terminate(g_workerThread);
+            (void)thread_abort(g_workerThread);
+            (void)thread_terminate(g_workerThread);
         }
-        pthread_join(wTh, NULL);
 
         if (!g_excReceived && g_excPort != MACH_PORT_NULL) {
             mach_port_destroy(mach_task_self(), g_excPort);
             g_excPort = MACH_PORT_NULL;
         }
         pthread_join(excTh, NULL);
+        p062_log(@"[P1] handler joined; brk worker detached (no pthread_join)");
 
         p062_log(@"[P1] summary: excReceived=%d neonFlavorSeen=%d count=%u magicMatch=%d/%d",
                  g_excReceived, g_neonFlavorSeen, g_neonCountSeen,

