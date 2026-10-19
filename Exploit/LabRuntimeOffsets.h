@@ -20,7 +20,9 @@ typedef enum {
     LabSkuA12X_other,    /* iPad8,* but not 23G71 */
     LabSkuXR_22H311,     /* XR A12 18.7.x (22H*) — user device on 18.7.2; ladder-only row */
     LabSkuA13_22G100,    /* iPhone12,* + 22x build (18.6.x) — reference rig (Dopamine KRW) */
-    LabSkuA13_other      /* iPhone12,* but not 18.x */
+    LabSkuA13_other,     /* iPhone12,* but not 18.x */
+    LabSkuT8150_24A435,  /* iPhone18,2 + 24A435 — 17 Pro Max iOS 27.0 */
+    LabSkuT8150_other    /* iPhone18,2 + other 24A* — static_base only */
 } LabSku;
 
 // Build versions as C strings (const char *) - works in C structs
@@ -29,6 +31,7 @@ typedef enum {
 #define BUILD_22G100   "22G100"
 #define BUILD_21D50    "21D50"
 #define BUILD_22H311   "22H311"
+#define BUILD_24A435   "24A435"
 
 // MARK: - Offset Table Structure
 typedef struct {
@@ -86,11 +89,13 @@ typedef struct {
     // ANE 43748
     uint64_t ane_checkandprewire;
     uint64_t ane_memorymap;
+    uint64_t ane_memorymap_locked; /* T8150 MapLocked; 0 on T8101/T8020 until pinned */
     uint64_t ane_alloc_type_desc;
-    uint32_t ane_table_size;
+    uint32_t ane_table_size;       /* 0x820 A14; 0x10b8 T8150 MapAlloc */
     uint32_t ane_table_entries;
     uint32_t ane_trigger_inputs;
     uint32_t ane_next_chunk_index;
+    uint32_t ane_record_off;       /* T8150 records at object+0x90; 0 on A14 table+0 */
     uint32_t ane_fill_cap; /* 0 on 23F77 CheckandPrewire; 1 on 23G71 */
     
     // Build info - USE const char * NOT NSString *

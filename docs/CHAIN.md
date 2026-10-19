@@ -1,6 +1,6 @@
 # Chain map (public)
 
-This is not a claim of KRW. Pins are **unslid** per `LabOff()` (A14 23F77 T8101 / A12X 23G71 T8020).
+This is not a claim of KRW. Pins are **unslid** per `LabOff()` (A14 23F77 T8101 / A12X 23G71 T8020 / T8150 iPhone18,2 24A435).
 
 ## KRW theory buttons (home)
 
@@ -85,6 +85,23 @@ SKU is `hw.machine` + `kern.osversion`: iPad8,* + 23G71. Runtime `LabOff()` is t
 **Patched / capped (skip remaining-fire):** 64747 AVE mul FIXED; 64751 NECP flow UAF FIXED (`necp_client_add_flow FUN_fffffff009f965a8`) — P053 keeps PHASE 1 socket reach, skips PHASE 2 race; 43748 CheckandPrewire fill_cap (`FUN_fffffff008701990`, `>=0x80` → `0xe00002c2`) — P044 / p044chain SKIP 254 fire; CS hop-1 `cluster_*_contig` EINVAL 0x16 unless `UPL_PHYS_CONTIG` since 26.1 (`write FUN_fffffff009e6b2b0` / `read FUN_fffffff009e711f0`) — cscalib/cskrw SKIP.
 
 QueueCreate A12X `0x408` / leak `+0x550`. A14 `0x410` on this iPad is `0xe00002c2`. Catalog `dopaminecompat` is an honest CPU/OS vs End=26.0.1 diagnostic (Vortex/Tempest = A12 hardware). hop-1 is already dead on 26.6.
+
+## 24A435 T8150 iPhone18,2 (17 Pro Max) — tri-SKU gates
+
+SKU is `iPhone18,2` + `kern.osversion` `24A435`. `LabSkuT8150_24A435`. Sibling `24A*` on the same machine is `LabSkuT8150_other` (static_base only). `iPhone18,1` and `iPhone18,3` stay `LabSkuUnknown` (different kcaches).
+
+Proved unslid pins (`kernelcache.release.iPhone18,2`):
+
+| Field | Value |
+| --- | --- |
+| `static_base` | `0xfffffe0007004000` (T8150 PPL/SPTM map) |
+| CheckandPrewire | `0xfffffe0008c16a88` |
+| MapLocked | `0xfffffe0008c17190` |
+| MapRequest | `0xfffffe0008c19708` |
+| MapAlloc | `0xfffffe0008c0d324` kalloc `0x10b8`, clear `0x10a0`, records at object `+0x90` |
+| IOGPU / NECP / AMFI / AVE | `0` until re-derived |
+
+Public Lum1na **SKIPS** T8101 `0x820`/254 fire, CS2 hop-1, and LightSword (IOGPU pins 0). Probe app (Lum1na-Debug) fires every TAP with `EXPECT-BAD`. A14 occupancy WRITE and A12X phys_oob READ stay independent first doors. T8150 ANE `0x10b8` is a new map, not a port of `0x820` occupancy. `hasKread` still requires `SocketKRW.Arm` then `kread32(kbase)==0xfeedfacf` on **this** SKU.
 
 ## Open (one failed tap ≠ closed)
 

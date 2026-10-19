@@ -1822,7 +1822,13 @@ static void *watch_worker(void *arg) {
 #endif
     sync();
 
-    [out appendString:@"  Spray complete. Holes freed.\n"];
+#if P044_HOLE_MODE == 1
+    [out appendString:@"  Spray complete. Holes freed (HOLE_MODE=1).\n"];
+#elif P044_HOLE_MODE == 2
+    [out appendString:@"  Spray complete. Contiguous-run holes freed (HOLE_MODE=2).\n"];
+#else
+    [out appendString:@"  Spray complete. HOLE_MODE=0 live-kmsg (holes NOT recv'd).\n"];
+#endif
     *outDrain = drain;
     return pairs;
 }
@@ -2655,6 +2661,19 @@ static void *watch_worker(void *arg) {
     NSString *stop = [LabDeviceProfile stopUnlessA14_23F77:@"p044"];
     if (stop) { [out appendString:stop]; p044_write_log(out); return out; }
     [out appendString:[LabDeviceProfile identBlock]];
+    {
+        const LabOffTab *off = LabOff();
+        uint32_t recs = p044_req_in() + 1u;
+        if (off && off->ane_fill_cap && recs >= 0x80u) {
+            [out appendFormat:@"EXPECT-BAD %s fill_cap=1. N=%u records=%u >= 0x80 -> 0xe00002c2 on this SKU. Probe still fires.\n",
+             off->tag ? off->tag : "?", p044_req_in(), recs];
+        } else if (off && off->ane_table_size && off->ane_table_size != 0x820u) {
+            [out appendFormat:@"EXPECT-BAD %s ane_table_size=0x%x (T8150 0x10b8, not A14 0x820). Probe still fires.\n",
+             off->tag ? off->tag : "?", off->ane_table_size];
+        } else if (!off) {
+            [out appendString:@"EXPECT-BAD LabOff NULL (iPhone18,1/18,3 unknown). Probe still fires.\n"];
+        }
+    }
     p044_write_log(out);
 
     // 1. Find model (v61b: addchain-191 B1 = MIL-DIR lane FIRST. The bundle

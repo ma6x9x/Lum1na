@@ -83,7 +83,7 @@ static NSString *al_chip_family(NSString *tag) {
         @"T8120": @"A16-class",
         @"T8130": @"A17-class",
         @"T8140": @"A17 Pro/M3-class",
-        @"T8150": @"M4-class",
+        @"T8150": @"A19 Pro / 17 Pro Max (T8150)",
     };
     return map[tag] ?: @"UNKNOWN TAG (new SoC class — record verbatim)";
 }

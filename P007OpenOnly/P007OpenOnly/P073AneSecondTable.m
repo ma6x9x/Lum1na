@@ -44,7 +44,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P073_BUILD @"p073-second-table-v1"
+#define P073_BUILD @"p073-second-table-v2-probeopen"
 
 /* kmsg geometry — P034 contract: msgh_size 0x7FC -> kdata 0x820 (ANE class) */
 #define P073_MSG_SIZE     0x7FCu
@@ -327,11 +327,16 @@ static NSURL *p073_model_url(NSString *name) {
     }
     p073_log(@"%@", [LabDeviceProfile identBlock]);
 
-    if ([LabDeviceProfile sku] == LabSkuA12X_23G71) {
-        p073_log(@"SKIP — 23G71 CheckandPrewire fill_cap: >=0x80 -> 0xe00002c2. 254 fire is A14-only.");
-        p073_log(@"=== VERDICT === skip (fill_cap). hasKread=NO.");
-        if (g_p073_fd >= 0) { fcntl(g_p073_fd, F_FULLFSYNC); close(g_p073_fd); g_p073_fd = -1; }
-        NSString *ret = g_p073_buf; g_p073_buf = nil; return ret;
+    {
+        const LabOffTab *off = LabOff();
+        if (off && off->ane_fill_cap) {
+            p073_log(@"EXPECT-BAD fill_cap=1. 254-in CheckandPrewire on this SKU -> 0xe00002c2. Probe still fires.");
+        } else if (off && off->ane_table_size && off->ane_table_size != 0x820u) {
+            p073_log(@"EXPECT-BAD ane_table_size=0x%x (T8150 0x10b8 class, not A14 0x820). Probe still fires.",
+                     off->ane_table_size);
+        } else if (!off) {
+            p073_log(@"EXPECT-BAD LabOff NULL. Probe still fires.");
+        }
     }
 
     /* ---- anchor (informational; aio84530 heap leak recorded by P063) ---- */

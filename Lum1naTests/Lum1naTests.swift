@@ -52,6 +52,9 @@ struct Lum1naOffsetTests {
         #expect(t.aks_wvek_overflow == 0xFFFFFFF009BD96D4)
         #expect(t.static_base == 0xFFFFFFF007004000)
         #expect(t.pmap_cs_allow_off == 0xca)
+        #expect(t.ane_table_size == 0x820)
+        #expect(t.ane_record_off == 0)
+        #expect(t.ane_memorymap_locked == 0)
     }
 
     @Test func a12xTableIsT8020_23G71() {
@@ -99,6 +102,54 @@ struct Lum1naOffsetTests {
         #expect(a14.queue_leak != a12.queue_leak)
         #expect(a14.owns_replaceable != a12.owns_replaceable)
         #expect(a14.ane_fill_cap != a12.ane_fill_cap)
+        #expect(a14.ane_table_size == 0x820)
+        #expect(a12.ane_table_size == 0x820)
+    }
+
+    @Test func t8150_24A435Pins() {
+        let off = LabOffForSku(.T8150_24A435)
+        #expect(off != nil)
+        #expect(tag(off) == "T8150_24A435")
+        guard let t = off?.pointee else { return }
+        #expect(t.static_base == 0xFFFFFE0007004000)
+        #expect(t.ane_checkandprewire == 0xFFFFFE0008C16A88)
+        #expect(t.ane_memorymap_locked == 0xFFFFFE0008C17190)
+        #expect(t.ane_memorymap == 0xFFFFFE0008C19708)
+        #expect(t.ane_alloc_type_desc == 0xFFFFFE0008C0D324)
+        #expect(t.ane_table_size == 0x10B8)
+        #expect(t.ane_record_off == 0x90)
+        #expect(t.ane_fill_cap == 0)
+        #expect(t.amfi_external == 0)
+        #expect(t.amfi_loadtc == 0)
+        #expect(t.pmap_cs_allow == 0)
+        #expect(t.pmap_cs_allow_off == 0)
+        #expect(t.queue_create_size == 0)
+        #expect(t.ave_close == 0)
+    }
+
+    @Test func t8150_otherStaticBaseOnly() {
+        let off = LabOffForSku(.T8150_other)
+        #expect(off != nil)
+        #expect(tag(off) == "T8150_other")
+        guard let t = off?.pointee else { return }
+        #expect(t.static_base == 0xFFFFFE0007004000)
+        #expect(t.ane_checkandprewire == 0)
+        #expect(t.ane_memorymap == 0)
+        #expect(t.ane_memorymap_locked == 0)
+        #expect(t.ane_table_size == 0)
+        #expect(t.ane_record_off == 0)
+        #expect(t.amfi_external == 0)
+    }
+
+    @Test func t8150DoesNotPasteA14() {
+        let a14 = LabOffForSku(.A14_23F77)!.pointee
+        let t = LabOffForSku(.T8150_24A435)!.pointee
+        #expect(t.static_base != a14.static_base)
+        #expect(t.static_base != 0xFFFFFFF007004000)
+        #expect(t.ane_table_size != a14.ane_table_size)
+        #expect(t.ane_checkandprewire != a14.ane_checkandprewire)
+        #expect(t.amfi_loadtc == 0)
+        #expect(a14.amfi_loadtc != 0)
     }
 
     @Test func liveLabOffFollowsDetectedSku() {
@@ -113,6 +164,14 @@ struct Lum1naOffsetTests {
             #expect(tag(live).hasPrefix("A12X"))
             #expect(live?.pointee.queue_create_size == 0x408)
             #expect(live?.pointee.owns_replaceable == 1)
+        case .T8150_24A435:
+            #expect(tag(live) == "T8150_24A435")
+            #expect(live?.pointee.static_base == 0xFFFFFE0007004000)
+            #expect(live?.pointee.ane_table_size == 0x10B8)
+        case .T8150_other:
+            #expect(tag(live) == "T8150_other")
+            #expect(live?.pointee.static_base == 0xFFFFFE0007004000)
+            #expect(live?.pointee.ane_checkandprewire == 0)
         default:
             #expect(live == nil)
         }

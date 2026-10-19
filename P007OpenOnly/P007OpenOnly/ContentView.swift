@@ -3,7 +3,7 @@ import UIKit
 import Darwin
 
 struct ContentView: View {
-    @State private var text = "Hot: CONV (P073 second-table conversion bar) and KREAD (commitSlide). Ident first. One TAP."
+    @State private var text = "Hot: probe-open on every SKU including 17 Pro Max. Ident first. One TAP. EXPECT-BAD still fires."
     @State private var copiedFlash = false
     @State private var running = false
     @State private var showMore = false
@@ -39,6 +39,14 @@ struct ContentView: View {
                     HStack(spacing: 8) {
                         hotButton("P085 84607 racer", id: "p085")
                         hotButton("CHAINS", id: "p070")
+                    }
+                    HStack(spacing: 8) {
+                        hotButton("P099 254", id: "p099")
+                        hotButton("CONV", id: "conv")
+                    }
+                    HStack(spacing: 8) {
+                        hotButton("CS2", id: "cs2")
+                        hotButton("P073 2nd tbl", id: "p073")
                     }
                     HStack(spacing: 8) {
                         Button("Ident") { run("ident") }

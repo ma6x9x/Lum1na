@@ -27,6 +27,10 @@ func isA12X() -> Bool {
     labOffsetTag().hasPrefix("A12X")
 }
 
+func isT8150() -> Bool {
+    labOffsetTag().hasPrefix("T8150")
+}
+
 func labOffTable(for sku: LabSku) -> UnsafePointer<LabOffTab>? {
     LabOffForSku(sku)
 }

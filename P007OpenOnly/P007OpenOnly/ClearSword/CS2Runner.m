@@ -1,4 +1,6 @@
 #import "CS2Runner.h"
+#import "LabRuntimeOffsets.h"
+#import "LabDeviceProfile.h"
 
 // cs2 core (verbatim upstream, prefixed)
 #include "cs2/poc.h"   // cs2_run, cs2_pe*, cs2_context_t/cs2_ctx
@@ -47,12 +49,20 @@ static NSString *cs2_sysctl_string(NSString *name) {
 }
 
 static void cs2_write_banner(void) {
+    NSString *mach = cs2_sysctl_string(@"hw.machine");
+    NSString *osv = cs2_sysctl_string(@"kern.osversion");
+    const LabOffTab *off = LabOff();
     cs2_log("time %s", [[[NSDate date] description] UTF8String]);
-    cs2_log("=== cs2 session BUILD cs2-verbatim-v1 ===");
+    cs2_log("=== cs2 session BUILD cs2-verbatim-v2-honest ===");
     cs2_log("core: Dopamine 3.0.11 ClearSword exploit/ verbatim (opa334)");
-    cs2_log("machine=%@ osversion=%@", cs2_sysctl_string(@"hw.machine"), cs2_sysctl_string(@"kern.osversion"));
+    cs2_log("machine=%s osversion=%s sku=%s",
+            mach.UTF8String ?: "?", osv.UTF8String ?: "?",
+            (off && off->tag) ? off->tag : "NULL");
     cs2_log("ladder: socket_usecount=0x%x static_base=0x%llx (LabOff runtime table)",
-            LabOff()->socket_usecount, (unsigned long long)LabOff()->static_base);
+            off ? off->socket_usecount : 0,
+            (unsigned long long)(off ? off->static_base : 0));
+    cs2_log("HONESTY: hop-1 cluster_*_contig EINVAL since 26.1. phys_oob READ scan with kbase=0 is setup, not KRW.");
+    cs2_log("HONESTY: Probe app fires on every SKU. Public Lum1na SKIPS CS2 as first KRW on T8150/unknown.");
     cs2_log("budget: %d s. Panic = reboot; recovered log shows last step.", CS2_TIME_BUDGET_SEC);
     cs2_log("expect: 22528-socket spray -> pc mapping -> 8x128MiB mlocked scan");
     cs2_log("        -> pcb_start_offset / target corrupted -> kernel_base / kernel_slide");
@@ -92,14 +102,16 @@ static void cs2_write_banner(void) {
 
         cs2_log("=== KRW SELF-TEST ===");
         cs2_log("kernel_base=0x%llx kernel_slide=0x%llx", (unsigned long long)cs2_ctx.kernel_base, (unsigned long long)cs2_ctx.kernel_slide);
-        cs2_log("kread8@kbase=0x%llx magic 0x100000cfeedfacf: %@", (unsigned long long)hdr, magic_ok ? @"PASS" : @"FAIL");
-        cs2_log("dump[0..31]= %@", hx);
+        cs2_log("kread8@kbase=0x%llx magic 0x100000cfeedfacf: %s",
+                (unsigned long long)hdr, magic_ok ? "PASS" : "FAIL");
+        cs2_log("dump[0..31]= %s", hx.UTF8String ?: "");
         if (!magic_ok) {
             cs2_log("HONESTY: magic mismatch => kread NOT confirmed; hasKread stays NO.");
             ret = -2;
         }
     } else {
-        cs2_log("=== cs2 run FAILED ret=%d (see steps above; log: %@) ===", ret, [lp lastPathComponent]);
+        cs2_log("=== cs2 run FAILED ret=%d (see steps above; log: %s) ===",
+                ret, lp.lastPathComponent.UTF8String ?: "cs2_krw_log.txt");
         cs2_log("HONESTY: no kernel_base => no KRW claim. hasKread stays NO.");
     }
 

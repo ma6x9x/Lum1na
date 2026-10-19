@@ -36,6 +36,8 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
         case LabSkuA14_23F77:  return "A14_23F77";
         case LabSkuA14_21D50:  return "A14_21D50";
         case LabSkuA14_other:  return "A14_other";
+        case LabSkuT8150_24A435: return "T8150_24A435";
+        case LabSkuT8150_other:  return "T8150_other";
         default:               return "Unknown";
     }
 }
@@ -63,6 +65,8 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
         case LabSkuXR_22H311: return @"XR_22H311";
         case LabSkuA13_22G100: return @"A13_22G100";
         case LabSkuA13_other: return @"A13_other";
+        case LabSkuT8150_24A435: return @"T8150_24A435";
+        case LabSkuT8150_other: return @"T8150_other";
         default: return @"Unknown";
     }
 }
@@ -75,6 +79,9 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
     BOOL xr = [m hasPrefix:@"iPhone11,8"] || [m hasPrefix:@"iPhone11,2"]
            || [m hasPrefix:@"iPhone11,4"] || [m hasPrefix:@"iPhone11,6"];
     BOOL a13 = [m hasPrefix:@"iPhone12,"];
+    BOOL i182 = [m isEqualToString:@"iPhone18,2"];
+    if (i182 && [v isEqualToString:@"24A435"]) return LabSkuT8150_24A435;
+    if (i182 && [v hasPrefix:@"24A"]) return LabSkuT8150_other;
     if (a14 && [v isEqualToString:@"23F77"]) return LabSkuA14_23F77;
     if (a14 && [v hasPrefix:@"21D"]) return LabSkuA14_21D50; /* 17.3.x — 12 mini */
     if (a14) return LabSkuA14_other;
@@ -100,6 +107,8 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
         case LabSkuXR_22H311:  return @"XR A12 / 18.7.x — momentarius-ready";
         case LabSkuA13_22G100:    return @"iPhone12,* A13 / 22x build — reference rig";
         case LabSkuA13_other:  return @"iPhone12,* A13 / not 18.x";
+        case LabSkuT8150_24A435: return @"iPhone18,2 T8150 / 24A435 — 17 Pro Max iOS 27.0";
+        case LabSkuT8150_other:  return @"iPhone18,2 T8150 / 24A* sibling — static_base only";
         default:               return @"unknown";
     }
 }
@@ -201,15 +210,76 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
 + (NSString *)expectAVEOpen { return @"AVE Open; 84607 Close/async lock gap"; }
 + (NSString *)expect64788 { return @"64788 getter +0x90 naked; cd8 not KRW"; }
 + (NSString *)oracleTable { return @"oracle: LEFT=runtime sku; do not paste iPad VAs\n"; }
++ (BOOL)aneFillCapped {
+    const LabOffTab *o = LabOff();
+    return o && o->ane_fill_cap;
+}
++ (BOOL)aneTableIsA14_0x820 {
+    const LabOffTab *o = LabOff();
+    return o && o->ane_table_size == 0x820u;
+}
+
++ (NSString *)beta1Matrix {
+    NSMutableString *s = [NSMutableString string];
+    const LabOffTab *off = LabOff();
+    LabSku sku = [self detectedSku];
+    [s appendString:@"=== BETA-1 SKU MATRIX ===\n"];
+    [s appendFormat:@"sku=%@ table=%s fill_cap=%u owns_replaceable=%u\n",
+     [self skuString],
+     (off && off->tag) ? off->tag : "NULL",
+     off ? off->ane_fill_cap : 0u,
+     off ? off->owns_replaceable : 0u];
+    [s appendString:@"hasKread flips only after SocketKRW.Arm then kread32(kbase)==0xfeedfacf on THIS sku.\n"];
+    [s appendString:@"A12X phys_oob READ and A14 43748 WRITE are independent first doors. AfterKread HOLD.\n"];
+    [s appendString:@"Study/port from Dopamine: gPrimitives vtable + End/CPUFAMILY SKU gate + AfterKread pipeline. hop-1/kfd bodies stay in the Dopamine tree.\n"];
+    switch (sku) {
+        case LabSkuA14_23F77:
+            [s appendString:@"A14 23F77 first door: 43748 occupancy WRITE (P099 254-in HIT; P044 1-record OOB mapped-silent).\n"];
+            [s appendString:@"  conversion = desc_type_forged OR (body_forged AND kptr). Neighbor = live same-type ANE table or named Shape L.\n"];
+            [s appendString:@"  hop-1 cluster_*_contig SKIP (EINVAL since 26.1). CS2 fail-graceful. P044 254 remaining-fire CLOSED.\n"];
+            [s appendString:@"  Hot: P044 v73 0x820, P099, P057, KREAD, CHAINS.\n"];
+            break;
+        case LabSkuA12X_23G71:
+            [s appendString:@"A12X 23G71 first door: 64788 Facet A (live until 23G82) + aio84530 HEAP leak.\n"];
+            [s appendString:@"  43748 254-in SKIP (fill_cap >=0x80 -> 0xe00002c2). P044/P099/P088/P073 skip.\n"];
+            [s appendString:@"  hop-1 SKIP. CS2 phys_oob READ scan with kbase=0 is setup until pcb_start_offset + magic.\n"];
+            [s appendString:@"  LightSword detach expect 0xe00002e2 abort-after-first. Momentarius needs kreadbuf first.\n"];
+            [s appendString:@"  Hot: P065, aio84530, CS2 honesty, KREAD, CHAINS.\n"];
+            break;
+        case LabSkuA13_22G100:
+            [s appendString:@"A13 22G100 rig: CS2 KRW proven. Introspection harness. Separate from hunt A14/A12X.\n"];
+            [s appendString:@"  Hot: CS2, KREAD, CHAINS.\n"];
+            break;
+        case LabSkuA14_21D50:
+            [s appendString:@"A14 21D50 12 mini: Dopamine rootless / CS2. Twin CLASS/FIELD only. Keep 21D50 VAs off 23F77.\n"];
+            break;
+        case LabSkuT8150_24A435:
+            [s appendString:@"T8150 24A435 iPhone18,2 17 Pro Max. static_base=0xfffffe0007004000. ANE table 0x10b8 record+0x90.\n"];
+            [s appendString:@"  IOGPU/NECP/AMFI/AVE = 0. SPTM. Probe app fires every TAP (EXPECT-BAD allowed).\n"];
+            [s appendString:@"  Public Lum1na skips T8101 0x820/254 geometry. iPhone18,1 and 18,3 stay unknown.\n"];
+            break;
+        case LabSkuT8150_other:
+            [s appendString:@"T8150_other iPhone18,2 24A* sibling. static_base only. ANE VAs 0 until re-pinned.\n"];
+            [s appendString:@"  Probe app fires every TAP. Public Lum1na skips T8101 geometry.\n"];
+            break;
+        default:
+            [s appendString:@"Unknown SKU: Ident first. P100 AutoLearn. Probe app still fires. Public Lum1na STOPs.\n"];
+            break;
+    }
+    return s;
+}
+
 + (NSString *)proveMatrix {
-    return @"prove matrix 23F77:\n"
-           @"  hasKread=NO until commitSlide kread32(kbase)==MH_MAGIC_64\n"
-           @"  LIVE: P057 65343 KASLR sel0/1; P044 v28 occupancy+conversion bar; KREAD commitSlide test; 64788 Facet A P065 0x2be oracle; P062 NEON; P063 aio84530 HEAP; P064 HT149041 map; P066 EncType MAP; P067 AVD reach; P068 chroot MAP; P069 dma MAP; P070 five-door census; P071 65408 DeviceOpen; P072 file-parser census\n"
-           @"  ANE lab (p080-p083): y = fp16_quantize(exact_sum + x126) ties round up; kernel sids 1..24 fetch-resolve; espresso staging NOT the value source (u16@0 rewrite is the observable)\n"
-           @"  HT149041 leftovers MAP: 84507/84561 P053, 43684 P069/P055, 28968 P054, 84607 P066/P039 PARK remaining-fire, 84523 P045 census CLOSED remaining-fire, 43743 DoS, 65408 P071, 65407 P067, 43689 P068\n"
-           @"  CLOSED: 84523 sandbox (P057/P051/P052); P045 recv; LightSword last-wire GPU OOM; type-3 PACGA\n"
-           @"  PARKED: 28968 reap fire; 163-sel; 0x800; hop-1; AfterKread persist; 86950 CG; file-ACE payloads (P072 is census)\n"
-           @"  NOTE: Lum1na catalog p064 = AVE racer. HT149041 print map id = ht149041. P007 p064 = that map.\n";
+    NSMutableString *s = [NSMutableString string];
+    [s appendString:[self beta1Matrix]];
+    [s appendString:@"prove matrix:\n"
+                    @"  hasKread=NO until commitSlide kread32(kbase)==MH_MAGIC_64 on THIS sku\n"
+                    @"  LIVE A14: P057 65343 KASLR sel0/1; P044 occupancy+conversion bar; P099 254 occupancy; KREAD; 64788 Facet A P065 0x2be oracle; P063 aio84530 HEAP; P070 census\n"
+                    @"  LIVE A12X: P065 Facet A; P063 aio84530 HEAP; P057 sel0/1; CS2 phys_oob READ scan; P034 occupancy class; KREAD; P070 census. 254 SKIP.\n"
+                    @"  CLOSED: 84523 sandbox (P057/P051/P052); P045 recv; LightSword last-wire GPU OOM; type-3 PACGA; hop-1 since 26.1; 43748 254 on fill_cap\n"
+                    @"  PARKED: 28968 reap fire; 163-sel; 0x800; AfterKread persist; 86950 CG; file-ACE payloads (P072 is census)\n"
+                    @"  NOTE: Lum1na catalog p064 = AVE racer. HT149041 print map id = ht149041. P007 p064 = that map.\n"];
+    return s;
 }
 + (NSString *)slideDestMap { return @"43724 pager dest unnamed; #536=22\n"; }
 + (NSString *)writeClassMap { return @"W not found this factory. F≠W. 84607 AVE race class.\n"; }
@@ -230,13 +300,16 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
          [self queueDestroySel], [self queueSubmitSel], [self sysmemMdOff], [self sel36]];
     switch ([self detectedSku]) {
         case LabSkuA14_23F77:
-            [out appendString:@"TRACK: iPhone13 A14 23F77 ACTIVE. Dual-oracle LEFT.\n"];
+            [out appendString:@"TRACK: iPhone13 A14 23F77 ACTIVE. First door=43748 occupancy WRITE (P099). conversion then magic. hop-1 SKIP.\n"];
+            break;
+        case LabSkuA14_21D50:
+            [out appendString:@"TRACK: 12 mini 21D50. Twin CLASS/FIELD only. Keep 21D50 VAs off 23F77.\n"];
             break;
         case LabSkuA14_other:
             [out appendFormat:@"TRACK: A14 osversion=%@ NOT 23F77.\n", [self osversion]];
             break;
         case LabSkuA12X_23G71:
-            [out appendString:@"TRACK: iPad A12X 23G71. Do not paste T8020 VAs into A14.\n"];
+            [out appendString:@"TRACK: iPad A12X 23G71. Recommended=64788 Facet A + aio84530 HEAP. 254 EXPECT-BAD fill_cap (probe still fires). hop-1 EINVAL.\n"];
             break;
         case LabSkuA12X_other:
             [out appendFormat:@"TRACK: iPad A12X osversion=%@.\n", [self osversion]];
@@ -244,8 +317,26 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
         case LabSkuXR_22H311:
             [out appendString:@"TRACK: XR A12 18.7.x — momentarius-ready (ladder row).\n"];
             break;
+        case LabSkuA13_22G100:
+            [out appendString:@"TRACK: iPhone12 A13 22G100 rig. CS2 KRW proven. Separate from hunt A14/A12X.\n"];
+            break;
+        case LabSkuA13_other:
+            [out appendFormat:@"TRACK: iPhone12 A13 osversion=%@.\n", [self osversion]];
+            break;
+        case LabSkuT8150_24A435:
+            [out appendString:@"TRACK: iPhone18,2 T8150 24A435 17 Pro Max. static_base=0xfffffe0007004000. ANE 0x10b8. Probe-open. Public Lum1na skips 0x820 geometry.\n"];
+            break;
+        case LabSkuT8150_other:
+            [out appendFormat:@"TRACK: iPhone18,2 T8150 osversion=%@ sibling. static_base only. Probe-open.\n", [self osversion]];
+            break;
         default:
-            [out appendString:@"TRACK: unknown — paste Ident before panic tests.\n"];
+            if ([[self machine] hasPrefix:@"iPhone18,"]) {
+                [out appendFormat:@"TRACK: %@ / %@ — iPhone18,1 and 18,3 stay unknown (different kcaches). Probe-open. Public Lum1na STOPs.\n",
+                 [self machine], [self osversion]];
+            } else {
+                [out appendFormat:@"TRACK: unknown machine=%@ osversion=%@. Probe-open. Public Lum1na STOPs.\n",
+                 [self machine], [self osversion]];
+            }
             break;
     }
     [out appendString:@"Runtime profile always wins.\n"];

@@ -7,6 +7,7 @@
 
 #import "A14_23F77_LabOffsets.h"
 #import "A12X_23G71_LabOffsets.h"
+#import "T8150_24A435_LabOffsets.h"
 #import "LabRuntimeOffsets.h"
 #import "LabDeviceProfile.h"
 
@@ -214,6 +215,39 @@ static LabOffTab gA13_22G100 = {
     .build_string = "22G100"
 };
 
+/* T8150 iPhone18,2 24A435 — 17 Pro Max iOS 27.0. ANE pins only.
+   static_base is 0xfffffe0007004000 (T8150 map). IOGPU/NECP/AMFI/AVE = 0.
+   Table is kalloc 0x10b8 / clear 0x10a0 / records at +0x90 — not A14 0x820. */
+static LabOffTab gT8150_24A435 = {
+    .tag = "T8150_24A435",
+    .static_base = T8150_24A435_STATIC_BASE,
+    .ane_checkandprewire = T8150_24A435_ANE_CHECKANDPREWIRE,
+    .ane_memorymap = T8150_24A435_ANE_MAPREQUEST,
+    .ane_memorymap_locked = T8150_24A435_ANE_MAPLOCKED,
+    .ane_alloc_type_desc = T8150_24A435_ANE_MAPALLOC,
+    .ane_table_size = T8150_24A435_ANE_ALLOC_SIZE,
+    .ane_record_off = T8150_24A435_ANE_RECORD_OFF,
+    .ane_fill_cap = 0,
+    .amfi_sel_copy = 0,
+    .amfi_sel_manifest = 0,
+    .pmap_cs_allow_off = 0,
+    .owns_replaceable = 0,
+    .build_number = BUILD_24A435,
+    .build_string = "24A435"
+};
+
+/* iPhone18,2 sibling 24A* — static_base only. ANE VAs stay 0. */
+static LabOffTab gT8150_other = {
+    .tag = "T8150_other",
+    .static_base = T8150_24A435_STATIC_BASE,
+    .amfi_sel_copy = 0,
+    .amfi_sel_manifest = 0,
+    .pmap_cs_allow_off = 0,
+    .owns_replaceable = 0,
+    .build_number = "24A",
+    .build_string = "24A*"
+};
+
 // MARK: - Runtime Slide Storage
 static uint64_t gCurrentKernSlide = 0;
 
@@ -243,15 +277,15 @@ const LabOffTab *LabOffForSku(LabSku sku) {
                .iosurface_md=0x40 / .static_base come from the rig's K-Dump,
                not from this repo. */
             return NULL;
+        case LabSkuT8150_24A435:
+            return &gT8150_24A435;
+        case LabSkuT8150_other:
+            return &gT8150_other;
         default:
-            /* UNKNOWN SKU (e.g., iPhone18,2 / T8150 / 24A435): fall back to the
-               A14 selector/pin statics the probes already use through
-               LabDeviceProfile — WITHOUT implying kernel VAs (static_base=0,
-               tag says fallback; LabStaticBase() keeps its compile-time
-               default). This is what killed P010 sel=8 on the 17PM:
-               A14_23F77_IOGPU_NEW_RESOURCE_SEL expands to LabOff()->...
-               = NULL+0x4c on a NULL table. The real T8150 row lands after a
-               Ghidra pass on the 24A435 kernelcache. */
+            /* True unknown (iPhone18,1 / iPhone18,3 and anything else).
+               iPhone18,2 + 24A435 is gT8150_24A435; sibling 24A* is gT8150_other.
+               Fallback keeps A14 selector statics so probes do not NULL-deref,
+               with static_base=0 so LabStaticBase() does not paste T8101. */
             {
                 static LabOffTab gUnknownFB;
                 static dispatch_once_t onceToken;
@@ -280,11 +314,17 @@ void LabSetKernSlide(uint64_t slide) {
 uint64_t LabStaticBase(void) {
     const LabOffTab *off = LabOff();
     if (off && off->static_base) return off->static_base;
+    if (off && off->tag && strncmp(off->tag, "T8150", 5) == 0)
+        return T8150_24A435_STATIC_BASE;
+    if (off && off->tag && strstr(off->tag, "FALLBACK"))
+        return 0;
     return 0xFFFFFFF007004000ULL;
 }
 
 uint32_t LabPmapCsAllowOff(void) {
     const LabOffTab *off = LabOff();
+    if (off && off->tag && strncmp(off->tag, "T8150", 5) == 0)
+        return 0; /* SPTM — no A14 pmap_cs +0xca paste */
     if (off && off->pmap_cs_allow_off) return off->pmap_cs_allow_off;
     return 0xcau;
 }

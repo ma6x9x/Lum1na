@@ -60,7 +60,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P074_BUILD @"p074-consume-v3"
+#define P074_BUILD @"p074-consume-v4-probeopen"
 
 #define P074_MAX_REC     127u          /* gate is 0x80; 128-in failed twice */
 #define P074_REC_BYTES   (P074_MAX_REC * 0x10u)   /* 0x7F0 < 0xC00 in-bounds */
@@ -310,11 +310,16 @@ static double p074_predict(MLModel *model, MLDictionaryFeatureProvider *fp,
     }
     p074_log(@"%@", [LabDeviceProfile identBlock]);
 
-    if ([LabDeviceProfile sku] == LabSkuA12X_23G71) {
-        p074_log(@"SKIP — 23G71 gate shape unverified; consume run is A14-23F77-only this build.");
-        p074_log(@"=== VERDICT === skip. hasKread=NO.");
-        if (g_p074_fd >= 0) { fcntl(g_p074_fd, F_FULLFSYNC); close(g_p074_fd); g_p074_fd = -1; }
-        NSString *ret = g_p074_buf; g_p074_buf = nil; return ret;
+    {
+        const LabOffTab *off = LabOff();
+        if (off && off->ane_fill_cap) {
+            p074_log(@"EXPECT-BAD fill_cap=1. Consume geometry is A14 0x820. Probe still fires.");
+        } else if (off && off->ane_table_size && off->ane_table_size != 0x820u) {
+            p074_log(@"EXPECT-BAD ane_table_size=0x%x (not A14 0x820). Probe still fires.",
+                     off->ane_table_size);
+        } else if (!off) {
+            p074_log(@"EXPECT-BAD LabOff NULL. Probe still fires.");
+        }
     }
 
     /* ---- surfaces: 3 windows x 127 (+ margin), marker 0x53 ---- */

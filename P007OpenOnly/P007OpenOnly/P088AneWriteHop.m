@@ -693,6 +693,17 @@ static NSString *p088_yfmt(double y) {
         NSString *ret = g_p088_buf; g_p088_buf = nil; return ret;
     }
     p088_log(@"%@", [LabDeviceProfile identBlock]);
+    {
+        const LabOffTab *off = LabOff();
+        if (off && off->ane_fill_cap) {
+            p088_log(@"EXPECT-BAD fill_cap=1. 254 addchain -> 0xe00002c2 on this SKU. Probe still fires.");
+        } else if (off && off->ane_table_size && off->ane_table_size != 0x820u) {
+            p088_log(@"EXPECT-BAD ane_table_size=0x%x (T8150 0x10b8, not A14 0x820). Probe still fires.",
+                     off->ane_table_size);
+        } else if (!off) {
+            p088_log(@"EXPECT-BAD LabOff NULL. Probe still fires.");
+        }
+    }
 
     if (!p088_resolve_iosurface()) {
         p088_log(@"[-] IOSurface dlsym FAILED - abort");

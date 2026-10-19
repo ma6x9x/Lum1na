@@ -31,7 +31,7 @@
 #import "LabLocalTime.h"
 #import "LabDeviceProfile.h"
 
-#define P099_BUILD @"p099-aneprewire-v4-sidresolve"
+#define P099_BUILD @"p099-aneprewire-v5-probeopen"
 
 #define P099_INPUT_COUNT 254
 #define P099_OUTPUT_COUNT 1
@@ -221,10 +221,23 @@ static kern_return_t p099_recv_payload(mach_port_t port, uint8_t *payloadOut) {
         L(@"overrun element slack; record 192+ = NEXT element. Consume aim: A rec");
         L(@"192+k -> B object slot k; A out -> B slot 62 = B input 62 (127-in B).");
         L(@"v4 resolves record sids via IOSurfaceLookup (LIVE = our own staging).");
-        L(@"P046 pins: fill_cap=0 on F77; late cmp at count_off +0x810;");
+        {
+            const LabOffTab *off = LabOff();
+            L(@"P046 pins: fill_cap=%u on %s; late cmp at count_off +0x810;",
+              off ? off->ane_fill_cap : 0u, (off && off->tag) ? off->tag : "?");
+        }
         L(@"table 0x820, next-chunk 0xc0; n>=0xc1 reaches NEXT 3072.");
         L(@"One evaluation. STANDALONE ONLY - not in JAILBREAK chain.");
+        L(@"Probe app: fire even on fill_cap / unknown SKU. Public Lum1na is the SKU gate.");
         L(@"%@", [LabDeviceProfile identBlock] ?: @"ident ?");
+        if ([LabDeviceProfile aneFillCapped]) {
+            L(@"EXPECT-BAD fill_cap=1. 254-in CheckandPrewire on this SKU -> 0xe00002c2. Probe still fires.");
+        } else if (LabOff() && LabOff()->ane_table_size && LabOff()->ane_table_size != 0x820u) {
+            L(@"EXPECT-BAD ane_table_size=0x%x (T8150 0x10b8, not A14 0x820). Probe still fires.",
+              LabOff()->ane_table_size);
+        } else if (!LabOff()) {
+            L(@"EXPECT-BAD LabOff NULL (iPhone18,1/18,3 unknown). Probe still fires.");
+        }
 
         NSBundle *b = [NSBundle mainBundle];
 

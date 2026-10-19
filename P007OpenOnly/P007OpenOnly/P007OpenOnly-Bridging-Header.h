@@ -1,4 +1,5 @@
 #import "LabLocalTime.h"
+#import "LabDeviceProfile.h"
 #import "DeviceIdentProbe.h"
 #import "AVEOpenSmoke.h"
 #import "AVEVTSmoke.h"
