@@ -13,7 +13,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P086_BUILD @"p086-iomd-dma-fingerprint-v1"
+#define P086_BUILD @"p086-iomd-dma-fingerprint-v2"
 
 static NSMutableString *g_log = nil;
 static int g_fd = -1;
@@ -49,7 +49,12 @@ static void L(NSString *s) {
     }
     L([LabDeviceProfile identBlock]);
 
-    const char *svcs[3] = { "IOSurfaceAcceleratorClient", "IOGPU", "AppleAVE2" };
+    /* v2 (2026-10-19): these are IOServiceMatching REGISTRY CLASS names,
+       not kext bundle ids. p038 proved AppleM2ScalerCSCDriver opens type 0
+       and 1 on 23F77 (kr=0x0); P066 proved AppleAVE2Driver matches. The old
+       IOSurfaceAcceleratorClient / AppleAVE2 strings never matched, which
+       pinned fingerprint_hits=0 structurally instead of empirically. */
+    const char *svcs[3] = { "AppleM2ScalerCSCDriver", "IOGPU", "AppleAVE2Driver" };
     int fingerprints = 0;
 
     for (int v = 0; v < 3; v++) {

