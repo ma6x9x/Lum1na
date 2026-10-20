@@ -8,6 +8,14 @@
 //  iPhone18,1 and iPhone18,3 stay LabSkuUnknown (different kcaches).
 //  Sibling 24A* on iPhone18,2 is LabSkuT8150_other (static_base only).
 //
+//  Live panic-full 2026-10-19 18:45:55 (watchdog, not kread):
+//    Fileset KC UUID 5CE4B53C-D756-700C-65DE-72837093EB53
+//    Kernel UUID A5A62616-FA9C-337E-9C97-41BB2D427C63
+//    SPTM-820.0.22 UUID 325C14BC-3EFA-33A3-9E5C-7A7049E321CD
+//    TXM UUID 9F80F5EC-09C8-3E9F-A196-13A6250C04E0
+//    iBoot mBoot-20457.2.37  socId 8150 rev 11
+//    text exec base 0xfffffe004b0b4000 = STATIC_BASE + 0x440b0000 (that boot only).
+//
 
 #ifndef T8150_24A435_LabOffsets_h
 #define T8150_24A435_LabOffsets_h
