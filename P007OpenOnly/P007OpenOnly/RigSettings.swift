@@ -103,6 +103,7 @@ struct RigSettingsView: View {
                           allowsMultipleSelection: false) { result in
                 importPairing(result)
             }
+            .sheet(isPresented: $showConsole) { DeviceConsoleSheet() }
             .onAppear { refreshPairingStatus() }
         }
     }
