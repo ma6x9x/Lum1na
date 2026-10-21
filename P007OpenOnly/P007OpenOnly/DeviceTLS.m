@@ -1,5 +1,6 @@
 // DeviceTLS.m — Secure Transport STARTTLS bridge (see .h).
 #import "DeviceTLS.h"
+#import <dlfcn.h>
 
 static OSStatus dRead(SSLConnectionRef ctx, void *data, size_t *len) {
     int fd = (int)(intptr_t)ctx;
@@ -72,8 +73,13 @@ static OSStatus dWrite(SSLConnectionRef ctx, const void *data, size_t *len) {
     SecKeyRef keyRef = SecKeyCreateWithData((__bridge CFDataRef)key, (__bridge CFDictionaryRef)attrs, &e);
     if (!keyRef) TFAIL(@"sec: bad private key");
 #if TARGET_OS_IPHONE
+    // the 4-arg variant exists in libSecurity on iOS but is header-less — dlsym it
+    typedef OSStatus (*SecIdentityCreateWithCertificate_t)(CFAllocatorRef, SecCertificateRef, SecKeyRef, SecIdentityRef *);
+    static SecIdentityCreateWithCertificate_t s_icwc = NULL;
+    if (!s_icwc) s_icwc = (SecIdentityCreateWithCertificate_t)dlsym(RTLD_DEFAULT, "SecIdentityCreateWithCertificate");
+    if (!s_icwc) TFAIL(@"ios: SecIdentityCreateWithCertificate symbol missing");
     SecIdentityRef identity = NULL;
-    OSStatus st = SecIdentityCreateWithCertificate(kCFAllocatorDefault, certRef, keyRef, &identity);
+    OSStatus st = s_icwc(kCFAllocatorDefault, certRef, keyRef, &identity);
     if (st != errSecSuccess || !identity) TFAIL(@"sec: identity create failed");
 #else
     SecIdentityRef identity = NULL;
