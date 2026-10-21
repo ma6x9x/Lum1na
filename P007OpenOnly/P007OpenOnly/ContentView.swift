@@ -114,7 +114,7 @@ struct ContentView: View {
                     Section("NEW") {
                         moreRow("P103. M2Scaler user_* census (opens-only; sel 8/11 semantics + boundary denials; NO transforms)", "p103")
                         moreRow("P106. JPEG teardown ORACLE (sel5 +0x30=0 two-call; JpegRequest view ktflag 0x64; 2 requests NO fuzz)", "p106")
-                        moreRow("P107. AVE2 wrap-dims ORACLE (VT 16384x16384 vs control; MulDimsBitDepth no-checks static; PANIC POSSIBLE — fresh boot)", "p107")
+                        moreRow("P107. AVE2 wrap-dims create/prepare-ONLY (v1's encode is p035-law FORBIDDEN; kext +0xdc cite = static; p035 already swept this ceiling)", "p107")
                         moreRow("P105. IOSurface gates census (framework-level; global-warn/lookup/protection-bits/pool oracle; NO iopl — 64749 closed)", "p105")
                         moreRow("P104. AppleSEPKeyStore census (163-sel; sels 7/17/31 handle-0 gate expect 0xfffffffa; benign shapes; watch aks klog lines)", "p104")
                         moreRow("P099. 43748 ANE prewire GROOMED (espresso/CoreML primary, 254-in addchain; STANDALONE ONLY — real OOB, never in chain)", "p099")

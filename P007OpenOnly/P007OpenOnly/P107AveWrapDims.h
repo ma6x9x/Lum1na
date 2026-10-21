@@ -10,9 +10,9 @@
 //  with frame content (the advisory 65410/84616 family's shape).
 //  128x128 (p066's tap) stays in-range by design.
 //
-//  This tap: VTCompressionSessionCreate at 16384x16384 (the wrap dims —
-//  w*h*10 > 2^31) vs 16384x8192 (control, no wrap). ONE encode attempt on
-//  the wrap session only; NO fuzz; PANIC POSSIBLE (fresh boot, isolate).
+//  This tap v2: create/prepare ONLY (the p035-v2 LAW: no EncodeFrame —
+//  p035 already swept this ceiling; the kernel alloc cite is STATIC at
+//  kext +0xdc). 16384x16384 vs control; NO encode, NO fuzz.
 //  hasKread unchanged.
 //
 

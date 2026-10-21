@@ -68,6 +68,11 @@ static void L(NSString *s) {
             opens++;
             L([NSString stringWithFormat:@"[%s] type=%d conn=0x%x (OPEN)", svcs[v], t, conn]);
             int hit = 0;
+            /* v2: sels <= 0x23 log ALL verdicts regardless of kr — the
+               handle-0 gate verdicts (0xfffffffa / 0xfffffffd / 0xffffffff)
+               are NEITHER 0 nor 0xe00002c2, so v1 printed nothing for
+               sels {7,17,31} (the 2026-10-21 run's gate_verdict_hits=0 was
+               a LOGGING GAP, not a negative result). */
             for (uint32_t sel = 0; sel <= 0xa2; sel++) {
                 /* shape A: 4 zero scalars (benign; MIG-style scalar entry) */
                 uint64_t sc[4] = {0, 0, 0, 0};
@@ -94,6 +99,13 @@ static void L(NSString *s) {
                 if (verdict.length) {
                     L([NSString stringWithFormat:@"  sel=%u scalar=0x%x struct=0x%x %@",
                        sel, k1, k2, verdict]);
+                }
+                /* v2: sels <= 0x23 always get a full line (skip where the
+                   OPEN-ish/DENIAL line already printed the krs) */
+                if (sel <= 0x23 && !verdict.length && k1 != 0 && k2 != 0) {
+                    L([NSString stringWithFormat:@"  sel=%u scalar=0x%x struct=0x%x",
+                       sel, k1, k2]);
+                    hit++; verdict_hits++;
                 }
                 /* log the NON-denial, non-block winners (the ungated minority) */
                 if (!verdict.length && (k1 == 0 || k2 == 0) && sel <= 0x23) {

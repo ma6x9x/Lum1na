@@ -76,18 +76,24 @@ static void p107_session(NSString *tag, int32_t w, int32_t h, BOOL doEncode) {
     g_fd = open([[docs stringByAppendingPathComponent:@"p107_ave_wrap_dims_log.txt"] UTF8String],
                 O_CREAT | O_WRONLY | O_TRUNC, 0644);
 
-    L([NSString stringWithFormat:@"=== p107 session %@ BUILD %@ ===",
+    L([NSString stringWithFormat:@"=== p107 session %@ BUILD %@ (v2 NO-ENCODE) ===",
         LabLocalMilitaryNow(), P107_BUILD]);
-    L(@"AVE2 wrap-dims oracle (note 233). CalcBufSizeOfCodedData 0x8216170 + MulDimsBitDepth 0x8240968 (no checks) + caller *10.");
-    L(@"PANIC POSSIBLE — fresh boot, isolated. 2 session shapes, 1 encode attempt max. NO fuzz.");
+    L(@"AVE2 wrap-dims create/prepare-ONLY oracle (note 233; the p035-v2 LAW: no EncodeFrame).");
+    L(@"Redundancy note: p035 already swept this host-side ceiling (14 shapes). This tap v2 exists only");
+    L(@"  to re-confirm on-demand; the kernel alloc cite = STATIC at kext +0xdc. hasKread=NO.");
     NSString *stop = [LabDeviceProfile stopUnlessA14_23F77:@"p107"];
     if (stop) { L(stop); if (g_fd >= 0) { fcntl(g_fd, F_FULLFSYNC); close(g_fd); } return g_log; }
     L([LabDeviceProfile identBlock]);
 
+    /* p035 v2 LAW (2026-10-21 wave): "Do not tap EncodeFrame next — Panic ≠
+       KRW." P035 already swept THIS host-side ceiling (14 shapes incl. the
+       wrap dims, all SessionCreate 0 + Prepare 0). So this tap v2 =
+       create/prepare ONLY; the kernel alloc cite lives at kext +0xdc =
+       the STATIC queue (note 234's #3 GOLDMINE-B twin). */
     /* control: 16384*8192*10 = 1.34e9 < 2^31 — in-range, no wrap */
     p107_session(@"control", 16384, 8192, NO);
     /* wrap candidate: 16384*16384*10 = 2.68e9 > 2^31 — int32 wrap */
-    p107_session(@"wrap", 16384, 16384, YES);
+    p107_session(@"wrap", 16384, 16384, NO);
 
     L(@"=== VERDICT: if the wrap session CREATE+ENCODE status = 0 while the driver's");
     L(@"  alloc wrapped small, that is the undersized-buffer class (IPS afterwards = the fix-side evidence).");
