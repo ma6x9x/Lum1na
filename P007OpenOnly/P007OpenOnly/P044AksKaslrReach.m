@@ -1002,6 +1002,14 @@ static uint32_t p044_req_in(void) { return p044ReqInOverride ? p044ReqInOverride
    the ane.* gates from the app sandbox. procIdx=0 = stock. Consumed on read. */
 static uint32_t p044ProcIdxOverride;
 static uint32_t p044_proc_idx(void) { return p044ProcIdxOverride ? p044ProcIdxOverride : 0; }
+/* v75c loadModel door (note 249 / weightBufs): Documents/p044_load_model.txt
+   present = route the load through the DAEMON path — _ANEClient
+   loadDataModel/loadModel:options:qos:error: (XPC to aned, kernel-side pid =
+   aned's own, entitled) instead of doLoadModel. weightBufs' vehicle never
+   touches the evaluate path; if the Stage-B record machinery rides aned's
+   load, the procIdx wall (proven note 249) is out of the path. Consumed. */
+static int p044UseDaemonLoad;
+static int p044_daemon_load(void) { return p044UseDaemonLoad; }
 /* v56: 602112 -> 0x4000. Note 127 proved CheckandPrewire marshals into a FIXED
    kalloc.3072 object (192-record capacity) regardless of request count — the
    overflow is the mechanism, not the geometry. The remaining variable is why
@@ -1060,7 +1068,10 @@ static int p044_ane_load_attempt(Class Model, Class Client, NSURL *url,
     /* qos CLOSED (v54): qos 2 on compile+load produced the identical
        status=0x2 statusType=0x9. qos stays 2 (PoC parity). */
     SEL compileSel = NSSelectorFromString(@"compileModel:options:qos:error:");
-    SEL loadSel = NSSelectorFromString(@"doLoadModel:options:qos:error:");
+    /* v75c: daemon door (weightBufs vehicle, note 249) or the direct doLoadModel. */
+    SEL loadSel = NSSelectorFromString(p044_daemon_load()
+        ? @"loadModel:options:qos:error:"
+        : @"doLoadModel:options:qos:error:");
     if ([client respondsToSelector:compileSel]) {
         ((BOOL (*)(id, SEL, id, id, unsigned, NSError **))objc_msgSend)(
             client, compileSel, model, opts, 2, &err);
@@ -1362,6 +1373,13 @@ static int p044_ane_client_fire(NSMutableString *out) {
         g_aneModelObj, @{}, g_aneReq, (unsigned)2, &err);
     [out appendFormat:@"  doEvaluateDirectWithModel ok=%d err=%@\n", ok,
         err ? err.localizedDescription : @"<nil>"];
+    /* v75b: surface the client-side reject CODE — localizedDescription hid it
+       ("<nil>" even when the kernel/client checked). domain+code = the decode. */
+    if (err) {
+        [out appendFormat:@"  [v75b] err domain=%@ code=%ld\n", err.domain, (long)err.code];
+    } else {
+        [out appendString:@"  [v75b] no NSError object — reject was silent (client returned NO without err)\n"];
+    }
     return ok ? 1 : 0;
 }
 
@@ -2271,6 +2289,7 @@ static void *watch_worker(void *arg) {
     pthread_mutex_unlock(&g_evLock);
     cls_reset();
     p044ReqInOverride = 0;
+    p044UseDaemonLoad = 0;
 
     /* v58 REQ_IN sweep loader: p044_req_in.txt with a single "N" line
        overrides the 191-input default for THIS tap only (deleted on read —
@@ -2354,6 +2373,19 @@ static void *watch_worker(void *arg) {
             } else {
                 [out appendString:@"  [v75b] proc_listallpids unavailable; procIdx stays 0.\n"];
             }
+        }
+    }
+
+    /* v75c loadModel door: Documents/p044_load_model.txt (any content) =
+       route the load through the daemon path (loadModel:) for THIS tap. */
+    {
+        NSString *sweepDocs = NSSearchPathForDirectoriesInDomains(
+            NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+        NSString *doorPath = [sweepDocs stringByAppendingPathComponent:@"p044_load_model.txt"];
+        if ([[NSFileManager defaultManager] fileExistsAtPath:doorPath]) {
+            unlink(doorPath.fileSystemRepresentation);
+            p044UseDaemonLoad = 1;
+            [out appendString:@"  [v75c] DAEMON LOAD ARMED (p044_load_model.txt; consumed) — loadSel=loadModel:options:qos:error: (XPC aned, kernel pid=aned)\n"];
         }
     }
 
