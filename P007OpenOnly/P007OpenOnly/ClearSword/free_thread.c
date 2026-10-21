@@ -70,8 +70,9 @@ void* free_thread_worker(void* arg) {
         
         if (kr == KERN_SUCCESS) {
             map_success_count++;
-            // Log every 100th success to track progress
-            if ((map_success_count % 100) == 0) {
+            // V25.5: every 1000th success (was 100 — that was ~9000 lines/run
+            // and froze the UI; results appear from the end-of-run summary)
+            if ((map_success_count % 1000) == 0) {
                 LOG("free_thread: map SUCCESS (count=%llu, fail=%llu)",
                     map_success_count, map_fail_count);
             }

@@ -62,6 +62,9 @@ extern int __proc_info(int callnum, int pid, int flavor, uint64_t arg, void *buf
 static pe_context_t s_ctx;
 static volatile int s_churn_go = 0;
 static int g_log_fd = -1;
+static uint64_t g_log_bytes = 0;
+static uint64_t g_log_cap = 1ull << 20;   /* 1 MB per run, like the main app's rolling cap */
+static int g_log_capped = 0;
 
 static void krw_log(const char *fmt, ...) {
     char buf[4096];
@@ -69,10 +72,26 @@ static void krw_log(const char *fmt, ...) {
     va_start(ap, fmt);
     vsnprintf(buf, sizeof(buf), fmt, ap);
     va_end(ap);
-    fprintf(stderr, "%s\n", buf);
+    /* V25.5: cap the on-disk log at 1 MB — 900KB+ runs froze the UI
+       (fullfsync per line). Keep stderr untruncated; the disk file gets
+       a marker and stops. Diagnostics live in the throttled verdict lines. */
+    size_t n = strlen(buf);
     if (g_log_fd >= 0) {
-        write(g_log_fd, buf, strlen(buf));
+        if (g_log_capped) {
+            fprintf(stderr, "%s\n", buf);
+            return;
+        }
+        if (g_log_bytes + n + 1 > g_log_cap) {
+            g_log_capped = 1;
+            static const char capNote[] = "[log capped at 1MB — run continues, disk log stopped]\n";
+            (void)write(g_log_fd, capNote, sizeof(capNote) - 1);
+            fcntl(g_log_fd, F_FULLFSYNC);
+            fprintf(stderr, "%s\n", capNote);
+            return;
+        }
+        write(g_log_fd, buf, n);
         write(g_log_fd, "\n", 1);
+        g_log_bytes += n + 1;
         fcntl(g_log_fd, F_FULLFSYNC);
     }
 }
@@ -471,10 +490,26 @@ void cs_log_line(const char *fmt, ...) {
     fflush(stderr);
 
     if (g_cs_log_fd >= 0) {
-        size_t n = strlen(buf);
-        write(g_cs_log_fd, buf, n);
-        write(g_cs_log_fd, "\n", 1);
-        fcntl(g_cs_log_fd, F_FULLFSYNC);
+        /* V25.5: 1 MB disk cap (main-app-style) — 900 KB+ runs froze the UI
+           via fullfsync-per-line. stderr + the 512 KB in-memory copy keep
+           flowing after the cap. */
+        if (g_log_capped) {
+            /* skip disk; caller still logs everywhere else */
+        } else {
+            size_t n = strlen(buf);
+            if (g_log_bytes + n + 1 > g_log_cap) {
+                g_log_capped = 1;
+                static const char capNote[] = "[log capped at 1MB — run continues, disk log stopped]\n";
+                (void)write(g_cs_log_fd, capNote, sizeof(capNote) - 1);
+                fcntl(g_cs_log_fd, F_FULLFSYNC);
+                fprintf(stderr, "%s", capNote);
+            } else {
+                write(g_cs_log_fd, buf, n);
+                write(g_cs_log_fd, "\n", 1);
+                g_log_bytes += n + 1;
+                fcntl(g_cs_log_fd, F_FULLFSYNC);
+            }
+        }
     }
     if (g_cs_log_str && g_cs_log_lock) {
         [g_cs_log_lock lock];
@@ -483,7 +518,10 @@ void cs_log_line(const char *fmt, ...) {
         }
         [g_cs_log_lock unlock];
     }
-    usleep(1000);
+    /* V25.5: the usleep(1000) here REMOVED — every log line slept 1 ms inside
+       the logger, i.e. the FREE THREAD (which logs every 100 maps) had its
+       cadence rhythmically destroyed ~9000 times per run. Lab-invented
+       throttle; the OG has nothing like it in the hot path. */
 }
 
 @implementation LuminaClearSword
@@ -495,6 +533,9 @@ void cs_log_line(const char *fmt, ...) {
     NSString *docs = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
     NSString *lp = [docs stringByAppendingPathComponent:@"clearsword_krw_log.txt"];
     g_cs_log_fd = open([lp UTF8String], O_CREAT | O_TRUNC | O_WRONLY, 0644);
+    /* V25.5: reset the disk-cap state per run */
+    g_log_bytes = 0;
+    g_log_capped = 0;
 
     cs_log_line("time %s", [[[NSDate date] description] UTF8String]);
     cs_log_line("=== ClearSword KRW V23 — Pointer Fix (A14 23F77) ===");
