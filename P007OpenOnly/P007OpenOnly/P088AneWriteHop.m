@@ -181,7 +181,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P088_BUILD @"p088-write-hop-v11-stageband"
+#define P088_BUILD @"p088-write-hop-v12-measurevolley"
 
 /* kernel-target tap: 0 = in-process T (safe-ish), 1 = kernel sid (PANIC) */
 #define P088_KERNEL_TARGET 0
@@ -999,17 +999,40 @@ static NSString *p088_yfmt(double y) {
         NSError *lErrA10 = nil;
         MLModel *mA10 = [MLModel modelWithContentsOfURL:
                           p088_model_url(P088_ADDCHAIN) configuration:cfgA10 error:&lErrA10];
-        MLModel *mUse = mA10 ?: mA;
+        __block MLModel *mUse = mA10 ?: mA;
         if (!mA10) p088_log(@"  [v10] A load FAILED %@ — falling back to cached A", lErrA10 ?: @"-");
         __block double yA = NAN;
         __block NSString *aErr = @"none";
         __block NSTimeInterval dA = 0;
         dispatch_semaphore_t aDone = dispatch_semaphore_create(0);
         CFAbsoluteTime t0 = CFAbsoluteTimeGetCurrent();
+        /* v12 measure-volley: the 00:00 v10 boot (4 fills) and the 00:27 v11
+           boot (0 D2 hits; its 00:28 MAF panic carried OUR staging-band sids
+           939/818/1045) prove fills fire every round but the D2 census only
+           samples ~1/4 of them into the run ports. MEASURE rounds now fire
+           3 back-to-back FRESH-A prewires (3 fills) before the harvest;
+           CONV rounds keep the single timed A the volley window needs. */
+        __block uint32_t aVolley = 0;
         dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-            NSError *e = nil;
-            yA = p088_predict(mUse, fpA, &dA, &e);
-            aErr = e.localizedDescription ?: @"none";
+            uint32_t reps = conv ? 1 : 3;
+            for (uint32_t rep = 0; rep < reps; rep++) {
+                if (rep > 0) {
+                    MLModelConfiguration *cfg12 = [[MLModelConfiguration alloc] init];
+                    cfg12.computeUnits = P088_ANE_UNITS;
+                    NSError *le2 = nil;
+                    MLModel *mFresh12 = [MLModel modelWithContentsOfURL:
+                                          p088_model_url(P088_ADDCHAIN) configuration:cfg12 error:&le2];
+                    if (!mFresh12) {
+                        p088_log(@"  [v12] A reload #%u FAILED — volley shortened", rep);
+                        break;
+                    }
+                    mUse = mFresh12;
+                }
+                NSError *e = nil;
+                yA = p088_predict(mUse, fpA, &dA, &e);
+                aErr = e.localizedDescription ?: @"none";
+                aVolley++;
+            }
             dispatch_semaphore_signal(aDone);
         });
 
@@ -1073,9 +1096,11 @@ static NSString *p088_yfmt(double y) {
             if ([aErr isEqualToString:@"none"]) aOK = YES;
         }
         lastAErr = aErr;
-        p088_log(@"  A y=%@ t=%.1fms err=%@ %s", p088_yfmt(yA),
+        p088_log(@"  A y=%@ t=%.1fms err=%@ %s (v12 measure-volley: %u fresh prewire%s)",
+                 p088_yfmt(yA),
                  (w == 0 ? dA * 1000.0 : (tA1 - t0) * 1000.0), aErr,
-                 (w != 0) ? "(STILL IN-FLIGHT 10s)" : "");
+                 (w != 0) ? "(STILL IN-FLIGHT 10s)" : "",
+                 aVolley, aVolley == 1 ? "" : "s");
 
         /* --- D2: harvest the whole run -> fill-hit INDEX MAP (no destroy:
            the run is persistent; emptied ports are re-armed instead).
