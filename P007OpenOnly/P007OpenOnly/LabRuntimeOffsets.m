@@ -229,6 +229,10 @@ static LabOffTab gT8150_24A435 = {
     .ane_table_entries = T8150_24A435_ANE_TABLE_ENTRIES,
     .ane_record_off = T8150_24A435_ANE_RECORD_OFF,
     .ane_fill_cap = 0,
+    .res_size = 0x4000,                     /* the same IOGPU res class as A14 0x4000 —
+                                               P017's replace-page vm_allocate got size 0
+                                               on the 17 (CALIB FAILED, 16:00 log); this
+                                               unblocks the 64788/43805-class race tests */
     .socket_usecount = 0x23c,               /* info.c: darwin>=25.0 = 0x23c; the iOS-27.0
                                                branch does NOT touch struct socket — no
                                                later adjustments. The sibling rows

