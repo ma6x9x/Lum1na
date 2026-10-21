@@ -1001,6 +1001,8 @@ static uint32_t p044_req_in(void) { return p044ReqInOverride ? p044ReqInOverride
    field, setting this to com.apple.aned's pid (found via kern.proc) claims
    the ane.* gates from the app sandbox. procIdx=0 = stock. Consumed on read. */
 static uint32_t p044ProcIdxOverride;
+/* v75e cache-jitter counter: one fresh cache identity per load attempt */
+static uint32_t s_p044CacheJitter;
 static uint32_t p044_proc_idx(void) { return p044ProcIdxOverride ? p044ProcIdxOverride : 0; }
 /* v75c loadModel door (note 249 / weightBufs): Documents/p044_load_model.txt
    present = route the load through the DAEMON path — _ANEClient
@@ -1056,9 +1058,20 @@ static CFTypeRef p044_surface_create_poc(size_t size, uint8_t fill) {
 static int p044_ane_load_attempt(Class Model, Class Client, NSURL *url,
                                  NSDictionary *opts, NSString *key, id cacheID,
                                  NSMutableString *out) {
+    /* v75e cache-jitter: the 13:46 fire decoded the "Program Inference
+       error" as INPUT-COUNT MISMATCH (kernel InitialChecks gate: "inputs
+       passed (192) does not match expected (254) for procedure net") —
+       cacheURLIdentifier reuse returned the STALE 254-in compiled program
+       from the ModelAssetsCache. Per-tap unique cache id = fresh compile,
+       fresh procedure, shape-matched expectations. */
+    id jitCacheID = cacheID;
+    if (jitCacheID) {
+        jitCacheID = [NSString stringWithFormat:@"%@-%u@%u",
+            (NSString *)jitCacheID, (unsigned)getpid(), ++s_p044CacheJitter];
+    }
     id model = ((id (*)(id, SEL, id, id, id, id))objc_msgSend)(
         Model, NSSelectorFromString(@"modelAtURLWithSourceURL:sourceURL:key:cacheURLIdentifier:"),
-        url, url, key, cacheID);
+        url, url, key, jitCacheID);
     if (!model) {
         [out appendString:@"  _ANEModel create returned nil\n"];
         return 0;
