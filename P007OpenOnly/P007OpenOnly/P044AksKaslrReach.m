@@ -152,7 +152,9 @@
 #import <string.h>
 #import <sys/resource.h>
 #import <sys/socket.h>
+#import <sys/sysctl.h>
 #import <unistd.h>
+#import <libproc.h>
 #import <stdlib.h>
 #import <dlfcn.h>
 #import <math.h>
@@ -2323,6 +2325,32 @@ static void *watch_worker(void *arg) {
                 [out appendFormat:@"  [v75] p044_proc_idx.txt present but N=%u out of range — procIdx 0 kept\n", n];
             }
             unlink(sweepPath.fileSystemRepresentation);
+        } else {
+            /* v75b auto-enumerate: pids rotate every boot — find the ANE
+               daemon ourselves. libproc from an app-sandboxed process:
+               proc_listallpids + proc_name. If proc_name is sandbox-nulled
+               the fire itself is still the test with whatever we can arm. */
+            int nAll = proc_listallpids(NULL, 0);
+            if (nAll > 0) {
+                pid_t *pids = calloc((size_t)nAll, sizeof(pid_t));
+                int got = proc_listallpids(pids, nAll * (int)sizeof(pid_t));
+                BOOL armedAuto = NO;
+                for (int i = 0; i < got; i++) {
+                    char nm[64] = {0};
+                    if (proc_name(pids[i], nm, sizeof(nm)) <= 0) continue;
+                    if (strcmp(nm, "aned") == 0 || strncmp(nm, "aned", 4) == 0) {
+                        p044ProcIdxOverride = (uint32_t)pids[i];
+                        armedAuto = YES;
+                        [out appendFormat:@"  [v75b] AUTO-ARM: procIdx=%d (proc='%s')\n", pids[i], nm];
+                        break;
+                    }
+                }
+                free(pids);
+                if (!armedAuto)
+                    [out appendString:@"  [v75b] proc census ran; no aned-class name resolved. procIdx stays 0.\n"];
+            } else {
+                [out appendString:@"  [v75b] proc_listallpids unavailable; procIdx stays 0.\n"];
+            }
         }
     }
 
