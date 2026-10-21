@@ -155,9 +155,13 @@ static BOOL p098_addr_exec_p(const void *addr, char *out, size_t outn) {
                 L(@"[peek] %-26s %@ %s", peek[i].n,
                   callOK ? @"FUNC(r-x) callable" : @"DATA(not callable)", prot);
             }
-            L(@"[peek] key CFStrings: width='%@' height='%@' bpe='%@' bpr='%@' alloc='%@'",
-              (__bridge id)pKeyWidth, (__bridge id)pKeyHeight, (__bridge id)pKeyBPE,
-              (__bridge id)pKeyBPR, (__bridge id)pKeyAlloc);
+            /* 2026-10-21 05:20 SIGBUS attribution: this line's (__bridge id)
+               args hit _objc_msgSend on a non-initialized export slot
+               (class-realize faulted writing __AUTH_CONST). The keys are
+               printed as ADDRESSES now — no message send, no crash class. */
+            L(@"[peek] key CFStrings: width=%p height=%p bpe=%p bpr=%p alloc=%p",
+              (void *)pKeyWidth, (void *)pKeyHeight, (void *)pKeyBPE,
+              (void *)pKeyBPR, (void *)pKeyAlloc);
         }
 
         /* Scoped body: ARC forbids jumping over ObjC declarations in scope
