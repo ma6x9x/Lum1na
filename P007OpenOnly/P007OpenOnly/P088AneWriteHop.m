@@ -1014,13 +1014,6 @@ static NSString *p088_yfmt(double y) {
                      @"mag swap; A pops queue=K_%u, record=K_%u (spill=K_%u+0xC00) DET'd",
                      nRun - 2, h + 1, h, h, h + 1, h + 1);
         }
-            p088_punch(run[h + 1].port); run[h + 1].alive = NO;
-            p088_punch(run[h].port);     run[h].alive = NO;
-            punched[0] = (int)h;
-            p088_log(@"  run %u live; PAIR punched run[%u] then run[%u] -> "
-                     @"A pops queue=K_%u, record=K_%u (spill=K_%u+0xC00)",
-                     nRun - 2, h + 1, h, h, h + 1, h + 1);
-        }
 
         /* --- dispatch A (fill fires at ~tA inside A's submit) ---
            v10 FRESH-INSTANCE A (p087→p073 v6 lesson, note 220/221): a repeat
