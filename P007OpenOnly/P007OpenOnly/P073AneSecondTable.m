@@ -44,7 +44,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P073_BUILD @"p073-second-table-v4-probeopen"
+#define P073_BUILD @"p073-second-table-v5-probeopen"
 
 /* kmsg geometry — P034 contract: msgh_size 0x7FC -> kdata 0x820 (ANE class) */
 #define P073_MSG_SIZE     0x7FCu
@@ -485,6 +485,23 @@ static NSURL *p073_model_url(NSString *name) {
 
     if (nHoles >= 2 && smallFP) {
 
+    /* v5 SKU gate (2026-10-20 21:18 twin lesson): 254-in CheckandPrewire is
+       fill_cap-dead on 23G71 (EXPECT-BAD 0xe00002c2) — the 43748 OOB cannot
+       occur on this SKU at all. Printing MISS-ADJACENCY there is a lie; the
+       honest output is SKIP. Documents/p073_force_fire.txt overrides
+       (forensics only, panic possible). */
+    if ([LabDeviceProfile detectedSku] == LabSkuA12X_23G71
+        && ![[NSFileManager defaultManager] fileExistsAtPath:
+            [docs stringByAppendingPathComponent:@"p073_force_fire.txt"]]) {
+        p073_log(@"[SKIP] 254 CheckandPrewire is fill_cap-dead on 23G71 (EXPECT-BAD).");
+        p073_log(@"[SKIP] The 43748 OOB cannot occur on this SKU — hunt lane is 23F77-only.");
+        p073_log(@"[SKIP] Force with Documents/p073_force_fire.txt (forensics only).");
+        p073_log(@"[VERDICT] kind=skip first_fail_stage=none fires=0 ok=0");
+        p073_log(@"hasKread=NO.");
+        if (g_p073_fd >= 0) { fcntl(g_p073_fd, F_FULLFSYNC); close(g_p073_fd); g_p073_fd = -1; }
+        NSString *ret = g_p073_buf; g_p073_buf = nil; return ret;
+    }
+
     /* ---- punch ALL holes in allocation order (LIFO: hole[127] on top) ---- */
     {
         uint32_t punched = 0;
@@ -580,11 +597,14 @@ static NSURL *p073_model_url(NSString *name) {
                 pred254Fired = YES;
                 break;
             }
-            if (ms >= 15.0) {
-                /* post-marshal window reached — v42: error -1 still filled.
-                   Re-arming here could double-fire; stop. */
+            if (ms >= 10.0) {
+                /* v5 threshold (2026-10-20 21:19 correction): the 19:41 MAF
+                   pair proved a 13ms-reject boot FIRED the fill — the old
+                   15ms line was wrong. Treat >=10ms as marshal-window open;
+                   the true no-fill signature is only the very fast rejects
+                   (<10ms, the 00:15 8ms class). */
                 pred254Fired = YES;
-                p073_log(@"[FIRE] 254 marshal window open (slow reject = post-marshal) — stop re-arming");
+                p073_log(@"[FIRE] 254 marshal window open (%.0fms reject = post-marshal) — stop re-arming", ms);
                 break;
             }
             if (attempt < P073_254_RETRY) usleep(200000);
