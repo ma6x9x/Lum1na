@@ -95,6 +95,7 @@
 #import "P102TitanWriteTest.h"
 #import "P103M2ScalerCensus.h"
 #import "P106JPEGTeardownOracle.h"
+#import "DeviceTLS.h"
 #import "P107AveWrapDims.h"
 #import "P104SepksCensus.h"
 #import "P105IosurfaceGates.h"

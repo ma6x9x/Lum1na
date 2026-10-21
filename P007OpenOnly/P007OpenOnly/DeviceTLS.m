@@ -98,14 +98,14 @@ static OSStatus dWrite(SSLConnectionRef ctx, const void *data, size_t *len) {
     return (void *)ctx;
 }
 
-+ (int)tlsRead:(void *)ctx buf:(void *)buf len:(int)len {
++ (int)tlsRead:(void *)ctx buf:(uint8_t *)buf len:(int)len {
     size_t processed = 0;
     OSStatus st = SSLRead((SSLContextRef)ctx, buf, (size_t)len, &processed);
     if (st == noErr || st == errSSLWouldBlock) return (int)processed; // 0 = retry
     return -1;
 }
 
-+ (int)tlsWrite:(void *)ctx bytes:(const void *)buf len:(int)len {
++ (int)tlsWrite:(void *)ctx bytes:(const uint8_t *)buf len:(int)len {
     size_t processed = 0;
     OSStatus st = SSLWrite((SSLContextRef)ctx, buf, (size_t)len, &processed);
     if (st == noErr || st == errSSLWouldBlock) return (int)processed;

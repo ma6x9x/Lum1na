@@ -12,6 +12,6 @@
 // trust — the device presents its own cert).
 + (void *)upgradeFD:(int)fd cert:(NSData *)cert key:(NSData *)key errOut:(NSString **)errOut;
 // through the established TLS: returns bytes read (0 = clean retry/empty), <0 = EOF/err
-+ (int)tlsRead:(void *)ctx buf:(void *)buf len:(int)len;
-+ (int)tlsWrite:(void *)ctx bytes:(const void *)buf len:(int)len;
++ (int)tlsRead:(void *)ctx buf:(uint8_t *)buf len:(int)len;
++ (int)tlsWrite:(void *)ctx bytes:(const uint8_t *)buf len:(int)len;
 @end
