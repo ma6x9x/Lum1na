@@ -66,10 +66,17 @@ final class DeviceConsole: ObservableObject {
 
     private func run() { autoreleasepool {
         guard let pair = loadPairing() else { setStatus("no valid Documents/Pairing.plist"); return }
-        guard let ip = Self.lanIPv4() else { setStatus("no en0/pdp_ip0 IPv4 (Wi-Fi ON?)"); return }
-        setStatus("control: \(ip):62078")
-        controlFD = Self.tcpConnect("\(ip):62078")
-        guard controlFD >= 0 else { setStatus("tcp failed"); return }
+        var ip: String? = nil
+        for cand in ["127.0.0.1", Self.lanIPv4() ?? ""] where !cand.isEmpty {
+            setStatus("control: \(cand):62078 …")
+            let fd = Self.tcpConnect("\(cand):62078")
+            if fd >= 0 { controlFD = fd; ip = cand; break }
+            close(fd)
+        }
+        guard controlFD >= 0, let ip = ip else {
+            setStatus("tcp failed on all candidates (Wi-Fi ON? LocalDevVPN running for 127.0.0.1?)")
+            return
+        }
         guard Self.sendPlist(controlFD, ["Request": "QueryType", "Label": "Lum1naDevConsole"]) != nil
         else { setStatus("query failed"); return }
         guard let r1 = Self.sendPlist(controlFD, [
@@ -95,6 +102,7 @@ final class DeviceConsole: ObservableObject {
         else { setStatus("StartService denied: \(dd["Error"] ?? "?")"); return }
         setStatus("relay :\(port)")
         serviceFD = Self.tcpConnect("\(ip):\(port)")
+        if serviceFD < 0 && ip != "127.0.0.1" { serviceFD = Self.tcpConnect("127.0.0.1:\(port)") }
         guard serviceFD >= 0 else { setStatus("service tcp failed"); return }
         svc = DeviceTLS.upgradeFD(serviceFD, cert: pair.hostCert, key: pair.hostKey, errOut: &err)
         guard svc != nil else { setStatus("service TLS failed: \(err ?? "?")"); return }
