@@ -94,6 +94,7 @@
 #import "P101DmaCommandFire.h"
 #import "P102TitanWriteTest.h"
 #import "P103M2ScalerCensus.h"
+#import "P108DiskImagesCensus.h"
 #import "P106JPEGTeardownOracle.h"
 #import "DeviceTLS.h"
 #import "P107AveWrapDims.h"

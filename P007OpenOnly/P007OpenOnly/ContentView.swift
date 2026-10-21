@@ -328,6 +328,7 @@ struct ContentView: View {
             "p085": "p085_ave84607_racer_log.txt",
             "p086": "p086_iomd_dma_fingerprint_log.txt",
             "p103": "p103_m2scaler_census_log.txt",
+            "p108": "p108_diskimages_census_log.txt",
             "p104": "p104_sepks_census_log.txt",
             "p105": "p105_iosurface_gates_log.txt",
             "p106": "p106_jpeg_teardown_oracle_log.txt",
@@ -896,6 +897,13 @@ struct ContentView: View {
                     result = Self.readFreshLog(
                         named: "p095_ucred_log.txt",
                         missing: "p095 finished but log missing")
+                }
+            case "p108", "dicensus":
+                result = P108DiskImagesCensus.tap()
+                if result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    result = Self.readFreshLog(
+                        named: "p108_diskimages_census_log.txt",
+                        missing: "p108 finished but log missing")
                 }
             case "p103", "m2census":
                 result = P103M2ScalerCensus.tap()
