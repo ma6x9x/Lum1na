@@ -44,7 +44,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P073_BUILD @"p073-second-table-v5-probeopen"
+#define P073_BUILD @"p073-second-table-v6-freshinstance"
 
 /* kmsg geometry — P034 contract: msgh_size 0x7FC -> kdata 0x820 (ANE class) */
 #define P073_MSG_SIZE     0x7FCu
@@ -558,22 +558,57 @@ static NSURL *p073_model_url(NSString *name) {
             }
             dispatch_semaphore_signal(smallDone);
         });
-        /* v4 burst worker: bounded small-fire loop over the marshal window */
+        /* v4 burst worker → v6 FRESH-INSTANCE burst (note 220/221): a repeat
+           predict on the SAME model instance is a resource-CACHE HIT in
+           CheckandPrewire (local_88 != 0 — the "Resource is already cached"
+           path) and allocates NO record-area, so v4's burst iterations
+           #2..#16 could not keep a fresh table_small in the 254's marshal
+           window; only predict #1 ever had a table, and it dies ~1ms into
+           its own prewire (thunk release, same call). Load a FRESH MLModel
+           instance per iteration instead: new program stream => every
+           resource is a lookup MISS => a fresh record-area allocates and
+           pops the next LIFO hole INSIDE the window, alive for its ~1ms
+           prewire. Neighbor geometry: holes allocated ascending, freed i=0..
+           127, popped LIFO 127->...; a fresh small's table lands on the hole
+           the 254's fill walks into (+0xc00 = +0x3e0 into the neighbor). */
         dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+            NSMutableArray *holders = [NSMutableArray array];
+            __block unsigned smallLoads = 0;
             for (uint32_t k = 0; k < P073_SMALL_BURST; k++) {
+                MLModelConfiguration *cfgB = [[MLModelConfiguration alloc] init];
+                cfgB.computeUnits = MLComputeUnitsCPUAndNeuralEngine;
+                NSError *lErr = nil;
+                CFAbsoluteTime tl0 = CFAbsoluteTimeGetCurrent();
+                MLModel *fresh = [MLModel modelWithContentsOfURL:urlSmall configuration:cfgB error:&lErr];
+                if (!fresh) {
+                    dispatch_async(dispatch_get_main_queue(), ^{
+                        p073_log(@"[B6] small load #%u FAILED %@/%ld (no fresh table this iter)",
+                                 k, lErr.domain ?: @"-", (long)lErr.code);
+                    });
+                    usleep(P073_SMALL_BURST_GAP_US);
+                    continue;
+                }
+                [holders addObject:fresh];
+                smallLoads++;
                 NSError *bErr = nil;
-                id<MLFeatureProvider> bPred = [modelSmall predictionFromFeatures:smallFP error:&bErr];
+                id<MLFeatureProvider> bPred = [fresh predictionFromFeatures:smallFP error:&bErr];
                 if (bPred) {
                     smallGood++;
                 } else {
                     smallBad++;
                     dispatch_async(dispatch_get_main_queue(), ^{
-                        p073_log(@"[B4] small #%u FAILED %@/%ld — table consumed smashed records",
+                        p073_log(@"[B6] small #%u FAILED %@/%ld — table consumed smashed records",
                                  k, bErr.domain ?: @"-", (long)bErr.code);
                     });
                 }
                 usleep(P073_SMALL_BURST_GAP_US);
             }
+            /* hold the fresh program streams alive through the whole window:
+               the burst loop itself spans >= 16 load+predict+gap iterations,
+               which covers the 254's >=10ms-marshal retry window (~100-700ms),
+               so freeing the stream holders here is already post-window */
+            [holders removeAllObjects];
+            p073_log(@"[B6] burst fresh tables: loads=%u good=%u bad=%u", smallLoads, smallGood, smallBad);
         });
         usleep(P073_HEADSTART_US);
 
@@ -632,7 +667,8 @@ static NSURL *p073_model_url(NSString *name) {
         }
         if (P073_SMALL_BURST)
             p073_log(@"[B4] burst tally: good=%u bad=%u (bad = that small's table "
-                     @"consumed smashed records — direction+consume named)", smallGood, smallBad);
+                     @"consumed smashed records — direction+consume named; v6 "
+                     @"fresh-instance loads keep tables alive in-window)", smallGood, smallBad);
         p073_log(@"[*] small ANOMALY check: error/hang/wrong-output => table_small consumed smashed records");
     }
 
