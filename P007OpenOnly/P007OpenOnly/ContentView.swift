@@ -8,6 +8,7 @@ struct ContentView: View {
     @State private var running = false
     @State private var showMore = false
     @State private var showHour = false
+    @State private var showSettings = false
     @State private var kreadSignal = P007Board.shared().kreadSignal
 
     var body: some View {
@@ -63,6 +64,13 @@ struct ContentView: View {
                             .buttonStyle(.bordered)
                             .disabled(running)
                         Button {
+                            showSettings = true
+                        } label: {
+                            Image(systemName: "gearshape")
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(running)
+                        Button {
                             UIPasteboard.general.string = text
                             copiedFlash = true
                             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { copiedFlash = false }
@@ -102,6 +110,9 @@ struct ContentView: View {
         }
         // Do NOT scan Documents on first frame — that caused ~1s freeze.
         .preferredColorScheme(.light)
+        .sheet(isPresented: $showSettings) {
+            RigSettingsView()
+        }
         .sheet(isPresented: $showHour) {
             HourLogGallery { body in
                 text = body
