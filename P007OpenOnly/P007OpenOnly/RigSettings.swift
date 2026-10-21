@@ -1,4 +1,9 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#else
+import AppKit
+#endif
 import UniformTypeIdentifiers
 
 // RigSettings — the StikDebug-style setup menu (v1: scaffolding).
@@ -13,7 +18,32 @@ import UniformTypeIdentifiers
 // console-source preferences, and the LocalDevVPN/DDI status rows.
 // v2 (next session): the RSD+lockdown client (syslog_relay / DDI mount).
 
+struct DeviceConsoleSheet: View {
+    @StateObject private var console = DeviceConsole()
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 0) {
+                Text("status: \(console.status)").font(.caption.monospaced()).foregroundColor(.secondary).padding(6)
+                List(console.lines.indices.reversed(), id: \.self) { i in
+                    Text(console.lines[i]).font(.system(size: 10, design: .monospaced)).lineLimit(2)
+                }.listStyle(.plain)
+            }
+            .toolbar { ToolbarItem(placement: .automatic) {
+                #if canImport(UIKit)
+                Button { UIPasteboard.general.string = console.logText() } label: { Image(systemName: "doc.on.doc") }
+#else
+                Button { let pb = NSPasteboard.general; pb.clearContents(); pb.setString(console.logText(), forType: .string) } label: { Image(systemName: "doc.on.doc") }
+#endif
+            } }
+            .navigationTitle("Live Device Console")
+            .onAppear { console.start() }
+            .onDisappear { console.stop() }
+        }
+    }
+}
+
 struct RigSettingsView: View {
+    @State private var showConsole = false
     @State private var pairingName: String = ""
     @State private var pairingStatus: String = ""
     @State private var consoleSource: String = UserDefaults.standard.string(forKey: "rig.consoleSource") ?? "klog-only"
@@ -25,7 +55,8 @@ struct RigSettingsView: View {
         NavigationView {
             Form {
                 Section("Console (live, filtered)") {
-                    Text("LIVE DEVICE CONSOLE = v2.2 (pending): the lockdown session machinery is built and verified up to the STARTTLS gate; the TLS bridge (NWConnection) lands next session. Until then use tools/logwatch.sh on the Mac.")
+                    Button("Open LIVE DEVICE CONSOLE (syslog_relay v2)") { showConsole = true }
+                    Text("Streams the device syslog in-app (self-over-WiFi lockdown → STARTTLS → syslog_relay). Persists to Documents/device_console_log.txt; copy button inside.")
                         .font(.footnote)
                         .foregroundColor(.secondary)
                     Picker("Source", selection: $consoleSource) {
