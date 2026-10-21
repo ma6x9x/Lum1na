@@ -19,7 +19,7 @@
 #import <mach/vm_map.h>
 #import <mach/vm_region.h>
 
-#define P098_BUILD @"p098-m2scaler-v3-cfprops"
+#define P098_BUILD @"p098-m2scaler-v4-cfstrings"
 
 /* dlsym prototypes (local per P059/P032 convention) */
 typedef CFMutableDictionaryRef (*IOServiceMatching_t)(const char *);
@@ -218,19 +218,29 @@ static BOOL p098_addr_exec_p(const void *addr, char *out, size_t outn) {
         CFMutableDictionaryRef props = CFDictionaryCreateMutable(kCFAllocatorDefault, 8,
             &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
         {
+            // V4: kill every dlsym'd pKey* bridge. On 23F77 the imported
+            // CFString export slots realize to garbage-class pointers — every
+            // dictionary mutation on them dies (05:20, 17:18, 17:35 x2,
+            // 18:08 — the same realizeClass/__AUTH_CONST SIGBUS). Plain
+            // CFStringCreateWithCString keys + CFNumberCreate values:
+            // no imported objects in the dict at all.
+            const char *keyNames[5] = { "IOSurfaceWidth", "IOSurfaceHeight",
+                                        "IOSurfaceBytesPerElement",
+                                        "IOSurfaceBytesPerRow", "IOSurfaceAllocSize" };
             const NSInteger vals[5] = { 256, 1, 4, 1024, 1024 };
-            const void *keys[5] = { (const void *)pKeyWidth, (const void *)pKeyHeight,
-                                    (const void *)pKeyBPE,  (const void *)pKeyBPR,
-                                    (const void *)pKeyAlloc };
             for (int i = 0; i < 5; i++) {
-                if (!keys[i]) { L(@"[v3] prop %d key MISSING", i); continue; }
+                CFStringRef key = CFStringCreateWithCString(kCFAllocatorDefault,
+                                                            keyNames[i], kCFStringEncodingUTF8);
                 CFNumberRef num = CFNumberCreate(kCFAllocatorDefault,
                                                  kCFNumberNSIntegerType, &vals[i]);
-                if (num) {
-                    CFDictionarySetValue(props, keys[i], num);
-                    CFRelease(num);
+                if (key && num) {
+                    CFDictionarySetValue(props, key, num);
+                    L(@"[v4] prop %d set (%s val=%ld)", i, keyNames[i], (long)vals[i]);
+                } else {
+                    L(@"[v4] prop %d alloc FAIL", i);
                 }
-                L(@"[v3] prop %d set (key=%p val=%ld)", i, keys[i], (long)vals[i]);
+                if (key) CFRelease(key);
+                if (num) CFRelease(num);
             }
         }
         void *surf = pSurfCreate((CFDictionaryRef)props);
