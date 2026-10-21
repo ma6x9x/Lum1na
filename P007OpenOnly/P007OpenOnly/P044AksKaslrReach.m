@@ -2389,6 +2389,39 @@ static void *watch_worker(void *arg) {
         }
     }
 
+    /* v75d cache census (old-agent claim RETEST, notes 55/58/P046 said
+       "DataVault not app-listable" on 2026-09-11 — verify on 23F77 today,
+       pure-read, always-on): try NSFileManager list on the aned cache root
+       and on OUR-cacheID-pattern paths. No unlink, no write. If the subpath
+       list SUCCEEDS the claim was wrong and the compiled hwx = readable
+       input for the weightBufs patch vehicle. */
+    {
+        NSString *sweepDocs = NSSearchPathForDirectoriesInDomains(
+            NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+        (void)sweepDocs;
+        NSFileManager *fm = [NSFileManager defaultManager];
+        const char *probe[] = {
+            "/var/mobile/Library/Caches/com.apple.aned",
+            "/var/mobile/Library/Caches/com.apple.aned/23F77",
+            "/var/mobile/Library/Caches/com.apple.aned/23F77/ModelAssetsCache",
+            NULL };
+        for (int i = 0; probe[i]; i++) {
+            NSError *e = nil;
+            NSArray *sub = [fm subpathsOfDirectoryAtPath:@(probe[i]) error:&e];
+            if (sub) {
+                [out appendFormat:@"  [v75d] LISTABLE %s -> %lu entries (claim WRONG — hwx may be readable)\n",
+                    probe[i], (unsigned long)sub.count];
+                for (NSString *s2 in sub) {
+                    if ([s2 containsString:@"hwx"] || [s2 containsString:@"ma6x9x"])
+                        [out appendFormat:@"    [v75d]   %@\n", s2];
+                }
+            } else {
+                [out appendFormat:@"  [v75d] %s denied: %@ (%ld)\n",
+                    probe[i], e.domain ?: @"?", (long)e.code];
+            }
+        }
+    }
+
     /* v62 TARGET loader: app Documents/p044_target.txt, one decimal line =
        the IOSurfaceGetID of the surface to receive the ANE output (the
        LC-guest closed loop writes its own GetID here; we pull the file via
