@@ -2,6 +2,7 @@
 // whose constants are not Swift-visible). Used by DeviceConsole (lockdown
 // control-channel STARTTLS + TLS-from-start service sockets).
 #import <Foundation/Foundation.h>
+#import <Security/SecIdentity.h>
 #import <Security/SecureTransport.h>
 
 @interface DeviceTLS : NSObject
