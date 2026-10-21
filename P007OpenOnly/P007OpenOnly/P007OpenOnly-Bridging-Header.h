@@ -93,6 +93,7 @@
 #import "P100AutoLearn.h"
 #import "P101DmaCommandFire.h"
 #import "P102TitanWriteTest.h"
+#import "P103M2ScalerCensus.h"
 #import "P104SepksCensus.h"
 #import "P105IosurfaceGates.h"
 #import "P097ConsoleSecLeak.h"

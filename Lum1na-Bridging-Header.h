@@ -103,6 +103,7 @@
 #import "Exploit/P069DmaCommandMap.h"
 #import "Exploit/P101DmaCommandFire.h"
 #import "Exploit/P102TitanWriteTest.h"
+#import "Exploit/P103M2ScalerCensus.h"
 #import "Exploit/P104SepksCensus.h"
 #import "Exploit/P105IosurfaceGates.h"
 #import "Exploit/P070ChainSequencer.h"
