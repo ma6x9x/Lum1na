@@ -21,11 +21,7 @@
 #define T8150_24A435_LabOffsets_h
 
 #define T8150_24A435_STATIC_BASE            0xFFFFFE0007004000ULL
-/* NOTE 232 (2026-10-21): the 0x…8C16A88 pin was STALE for the fresh 24A437
-   cache — real CheckandPrewire = 0xFFFFFE0008C5C3E4, re-anchored via the
-   klog string xref ("[ERROR] %s: %s: MemoryMapRequest for %u buffers,
-   result: %d" @ 0xfffffe0007436a72 ← param in the writer). */
-#define T8150_24A435_ANE_CHECKANDPREWIRE    0xFFFFFE0008C5C3E4ULL
+#define T8150_24A435_ANE_CHECKANDPREWIRE    0xFFFFFE0008C16A88ULL
 #define T8150_24A435_ANE_MAPLOCKED          0xFFFFFE0008C17190ULL
 #define T8150_24A435_ANE_MAPREQUEST         0xFFFFFE0008C19708ULL
 #define T8150_24A435_ANE_MAPALLOC           0xFFFFFE0008C0D324ULL

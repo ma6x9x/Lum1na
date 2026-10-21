@@ -180,20 +180,10 @@ static LabOffTab gA14_21D50 = {
     .static_base = 0xFFFFFFF007004000ULL,   /* link base; verify slide on device */
     .socket_usecount = 0x24c,               /* info.c ladder darwin>=23.1,<23.4 (17.3 = 23.3.0) */
     .iosurface_md = 0x40,                   /* ladder: pre-23.4 layout (23.4+ is 0x30) */
-    .sysmem_md = 0x80,                      /* FKT CLASS: 21D50 MD +0x80; 23F77 is +0x90 */
-    .queue_leak = 0x550,                    /* FKT CLASS: 21D50 word1 +0x550; 23F77 is +0x558 */
-    .queue_create_sel = 6,                  /* IOGPU ABI; 21D50 has no 0x410 size gate */
-    .queue_create_size = 0x408,             /* pairs with +0x550 layout; sweep still tries 0x410 */
-    .queue_destroy_sel = 7,
-    .submit_sel = 25,
-    .sel36 = 36,
-    .gmd_elemsz = 0xb0,                     /* FKT live zone esz; CLASS only */
     .amfi_sel_copy = 0,                     /* unproven — pokes skipped */
     .amfi_sel_manifest = 0,                 /* unproven — pokes skipped */
     .pmap_cs_allow_off = 0,                 /* unproven — pokes skipped */
     .owns_replaceable = 0,
-    .ane_table_size = 0,                    /* 43748 0x820 is 26.x; do not claim on 17.3 */
-    .ane_fill_cap = 0,
     .build_number = BUILD_21D50,
     .build_string = "21D50"
 };
@@ -239,6 +229,13 @@ static LabOffTab gT8150_24A435 = {
     .ane_table_entries = T8150_24A435_ANE_TABLE_ENTRIES,
     .ane_record_off = T8150_24A435_ANE_RECORD_OFF,
     .ane_fill_cap = 0,
+    .socket_usecount = 0x23c,               /* info.c: darwin>=25.0 = 0x23c; the iOS-27.0
+                                               branch does NOT touch struct socket — no
+                                               later adjustments. The sibling rows
+                                               (icmp6filt 0x148 / chksum 0x150) were
+                                               LIVE-CONFIRMED on this SKU by the 15:46
+                                               ClearSword scan (PCB id-strings hit).
+                                               Clears the offsets_init PENDING gate. */
     .amfi_sel_copy = 0,
     .amfi_sel_manifest = 0,
     .pmap_cs_allow_off = 0,
@@ -283,30 +280,16 @@ const LabOffTab *LabOffForSku(LabSku sku) {
             /* Beta 1 rig harness table (verified link base only — see
                gA13_22G100 honesty note above). */
             return &gA13_22G100;
-        case LabSkuA13_other:
-            /* A13 non-rig: no verified offsets — runtime discovery only (HOLD).
-               .iosurface_md=0x40 / .static_base come from the rig's K-Dump,
-               not from this repo. */
-            return NULL;
         case LabSkuT8150_24A435:
             return &gT8150_24A435;
         case LabSkuT8150_other:
             return &gT8150_other;
+        case LabSkuA13_other:
+            /* A13 non-rig: no verified offsets — runtime discovery only (HOLD).
+               .iosurface_md=0x40 / .static_base come from the rig's K-Dump,
+               not from this repo. */
         default:
-            /* True unknown (iPhone18,1 / iPhone18,3 and anything else).
-               iPhone18,2 + 24A435 is gT8150_24A435; sibling 24A* is gT8150_other.
-               Fallback keeps A14 selector statics so probes do not NULL-deref,
-               with static_base=0 so LabStaticBase() does not paste T8101. */
-            {
-                static LabOffTab gUnknownFB;
-                static dispatch_once_t onceToken;
-                dispatch_once(&onceToken, ^{
-                    gUnknownFB = gA14_23F77;
-                    gUnknownFB.tag = "A14_FALLBACK_unknown";
-                    gUnknownFB.static_base = 0;
-                });
-                return &gUnknownFB;
-            }
+            return NULL;
     }
 }
 
@@ -327,8 +310,6 @@ uint64_t LabStaticBase(void) {
     if (off && off->static_base) return off->static_base;
     if (off && off->tag && strncmp(off->tag, "T8150", 5) == 0)
         return T8150_24A435_STATIC_BASE;
-    if (off && off->tag && strstr(off->tag, "FALLBACK"))
-        return 0;
     return 0xFFFFFFF007004000ULL;
 }
 
