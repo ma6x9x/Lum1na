@@ -19,7 +19,7 @@
 #import <mach/vm_map.h>
 #import <mach/vm_region.h>
 
-#define P098_BUILD @"p098-m2scaler-v4-cfstrings"
+#define P098_BUILD @"p098-m2scaler-v5-queuecreate"
 
 /* dlsym prototypes (local per P059/P032 convention) */
 typedef CFMutableDictionaryRef (*IOServiceMatching_t)(const char *);
@@ -247,6 +247,19 @@ static BOOL p098_addr_exec_p(const void *addr, char *out, size_t outn) {
         L(@"[*] IOSurfaceCreate -> %@ alloc=%zu", surf ? @"OK" : @"FAIL",
           surf ? pSurfAllocSize(surf) : 0);
 
+        // V5: CREATE THE QUEUE FIRST (v4 law: sel=8 kr=0xe00002bf with zero
+        // bytes read = no queue on the connection). QueueCreate = sel 6,
+        // struct input, 0x410 bytes (p098 decode). Benign zeros = rejected or
+        // created without transforms; failures are honest.
+        static uint8_t qBuf[0x410];
+        memset(qBuf, 0, sizeof(qBuf));
+        size_t qOutLen = 0;
+        uint64_t qOut[4] = {0};
+        kern_return_t krQ = pCallStruct(conn, 6, qBuf, sizeof(qBuf), qOut, &qOutLen);
+        L(@"[v5] QueueCreate sel=6 stIn=0x410 zeros kr=0x%x outLen=%zu "
+          @"out=%016llx %016llx %016llx %016llx",
+          krQ, qOutLen, qOut[0], qOut[1], qOut[2], qOut[3]);
+
         // Selector 8 = user_get_iosaDiag. Input shape unknown on this build:
         // try the natural {user VA of out-buffer, size} pair; the driver
         // copies entries into the mapped output. All failures are honest.
@@ -257,6 +270,14 @@ static BOOL p098_addr_exec_p(const void *addr, char *out, size_t outn) {
         kr = pCallStruct(conn, 8, inS, sizeof(inS), outBuf, &outLen);
         L(@"[*] sel=8 stIn={va=0x%llx,size=0x%x} kr=0x%x outLen=%zu (0x%x)",
           (unsigned long long)inS[0], (unsigned)sizeof(inS), kr, outLen, (unsigned)outLen);
+
+        // V5: retry the diag on an in-connection queue if the create landed.
+        if (krQ == KERN_SUCCESS) {
+            inS[0] = qOut[0];
+            kr = pCallStruct(conn, 8, inS, sizeof(inS), outBuf, &outLen);
+            L(@"[v5] sel=8 retry-with-queue stIn={q=%016llx} kr=0x%x outLen=%zu",
+              (unsigned long long)inS[0], kr, outLen);
+        }
 
         if (kr == KERN_SUCCESS && outLen) {
             // Raw dump of the first 0x100 bytes.
