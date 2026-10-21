@@ -112,6 +112,8 @@ struct ContentView: View {
             NavigationStack {
                 List {
                     Section("NEW") {
+                        moreRow("P105. IOSurface gates census (framework-level; global-warn/lookup/protection-bits/pool oracle; NO iopl — 64749 closed)", "p105")
+                        moreRow("P104. AppleSEPKeyStore census (163-sel; sels 7/17/31 handle-0 gate expect 0xfffffffa; benign shapes; watch aks klog lines)", "p104")
                         moreRow("P099. 43748 ANE prewire GROOMED (espresso/CoreML primary, 254-in addchain; STANDALONE ONLY — real OOB, never in chain)", "p099")
                         moreRow("P098. M2ScalerCSC iosaDiag census (sel 8, honest input shape, READ-ONLY)", "p098")
                         moreRow("P097. console-sec gRegistryRoot leak (CVE-2026-65371, READ-ONLY — lock/unlock once while it waits)", "p097")
@@ -311,6 +313,8 @@ struct ContentView: View {
             "p084": "p084_pmap_tte_puaf_log.txt",
             "p085": "p085_ave84607_racer_log.txt",
             "p086": "p086_iomd_dma_fingerprint_log.txt",
+            "p104": "p104_sepks_census_log.txt",
+            "p105": "p105_iosurface_gates_log.txt",
             "p087": "p087_reclaim_observer_log.txt",
             "p045": "p045_kmsg_recv_oracle_log.txt",
             "p046": "p046_f77_patch_oracle_log.txt",
@@ -875,6 +879,20 @@ struct ContentView: View {
                     result = Self.readFreshLog(
                         named: "p095_ucred_log.txt",
                         missing: "p095 finished but log missing")
+                }
+            case "p104", "sepks":
+                result = P104SepksCensus.tap()
+                if result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    result = Self.readFreshLog(
+                        named: "p104_sepks_census_log.txt",
+                        missing: "p104 finished but log missing")
+                }
+            case "p105", "iosgates":
+                result = P105IosurfaceGates.tap()
+                if result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    result = Self.readFreshLog(
+                        named: "p105_iosurface_gates_log.txt",
+                        missing: "p105 finished but log missing")
                 }
             case "p101":
                 result = P101DmaCommandFire.tap()
