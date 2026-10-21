@@ -19,7 +19,7 @@
 #import <mach/vm_map.h>
 #import <mach/vm_region.h>
 
-#define P098_BUILD @"p098-m2scaler-v2-gated"
+#define P098_BUILD @"p098-m2scaler-v3-cfprops"
 
 /* dlsym prototypes (local per P059/P032 convention) */
 typedef CFMutableDictionaryRef (*IOServiceMatching_t)(const char *);
@@ -206,14 +206,34 @@ static BOOL p098_addr_exec_p(const void *addr, char *out, size_t outn) {
         }
 
         // One IOSurface so a queueAndExecute-style log entry exists to read.
-        NSDictionary *props = @{
-            (__bridge id)pKeyWidth:  @256,
-            (__bridge id)pKeyHeight: @1,
-            (__bridge id)pKeyBPE:    @4,
-            (__bridge id)pKeyBPR:    @1024,
-            (__bridge id)pKeyAlloc:  @1024
-        };
-        void *surf = pSurfCreate((__bridge CFDictionaryRef)props);
+        // V3: the v2 @{...} literal crashed at realizeClassWithoutSwift after
+        // the door open on BOTH SKUs (17:18 / 17:35 x2, same signature) — but
+        // the in-file 05:20 attribution already named the crash class: a
+        // msgSend on the non-initialized dlsym'd CFString export slots. The
+        // literal's (__bridge id)pKey* bridges hit exactly that. Rebuild the
+        // surface properties with pure CF APIs: keys passed as raw CFString
+        // pointers, values CFNumberCreate — no ObjC literal machinery, no
+        // bridges on the imported keys.
+        L(@"[v3] checkpoint: post-open, building props (CF path)");
+        CFMutableDictionaryRef props = CFDictionaryCreateMutable(kCFAllocatorDefault, 8,
+            &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+        {
+            const NSInteger vals[5] = { 256, 1, 4, 1024, 1024 };
+            const void *keys[5] = { (const void *)pKeyWidth, (const void *)pKeyHeight,
+                                    (const void *)pKeyBPE,  (const void *)pKeyBPR,
+                                    (const void *)pKeyAlloc };
+            for (int i = 0; i < 5; i++) {
+                if (!keys[i]) { L(@"[v3] prop %d key MISSING", i); continue; }
+                CFNumberRef num = CFNumberCreate(kCFAllocatorDefault,
+                                                 kCFNumberNSIntegerType, &vals[i]);
+                if (num) {
+                    CFDictionarySetValue(props, keys[i], num);
+                    CFRelease(num);
+                }
+                L(@"[v3] prop %d set (key=%p val=%ld)", i, keys[i], (long)vals[i]);
+            }
+        }
+        void *surf = pSurfCreate((CFDictionaryRef)props);
         L(@"[*] IOSurfaceCreate -> %@ alloc=%zu", surf ? @"OK" : @"FAIL",
           surf ? pSurfAllocSize(surf) : 0);
 
