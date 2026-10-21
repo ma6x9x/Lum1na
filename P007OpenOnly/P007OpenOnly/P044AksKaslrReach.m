@@ -154,7 +154,10 @@
 #import <sys/socket.h>
 #import <sys/sysctl.h>
 #import <unistd.h>
-#import <libproc.h>
+/* libproc fns (libproc.h absent from this SDK build): linker-resolved
+   from libsystem_kernel/libproc the same as before, just declared here. */
+extern int proc_listallpids(void *buffer, int buffersize);
+extern int proc_name(int pid, void *buffer, uint32_t buffersize);
 #import <stdlib.h>
 #import <dlfcn.h>
 #import <math.h>

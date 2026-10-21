@@ -25,7 +25,10 @@
 #import <sys/sysctl.h>
 #import <sys/time.h>
 #import <mach/mach.h>
-#import <libproc.h>
+/* libproc fns (libproc.h absent from this SDK build): linker-resolved
+   from libsystem_kernel/libproc the same as before, just declared here. */
+extern int proc_listallpids(void *buffer, int buffersize);
+extern int proc_name(int pid, void *buffer, uint32_t buffersize);
 
 #define P100_BUILD "p100-autolearn-v3-censusgate"
 
