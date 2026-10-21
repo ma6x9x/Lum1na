@@ -113,6 +113,8 @@ struct ContentView: View {
                 List {
                     Section("NEW") {
                         moreRow("P103. M2Scaler user_* census (opens-only; sel 8/11 semantics + boundary denials; NO transforms)", "p103")
+                        moreRow("P106. JPEG teardown ORACLE (sel5 +0x30=0 two-call; JpegRequest view ktflag 0x64; 2 requests NO fuzz)", "p106")
+                        moreRow("P107. AVE2 wrap-dims ORACLE (VT 16384x16384 vs control; MulDimsBitDepth no-checks static; PANIC POSSIBLE — fresh boot)", "p107")
                         moreRow("P105. IOSurface gates census (framework-level; global-warn/lookup/protection-bits/pool oracle; NO iopl — 64749 closed)", "p105")
                         moreRow("P104. AppleSEPKeyStore census (163-sel; sels 7/17/31 handle-0 gate expect 0xfffffffa; benign shapes; watch aks klog lines)", "p104")
                         moreRow("P099. 43748 ANE prewire GROOMED (espresso/CoreML primary, 254-in addchain; STANDALONE ONLY — real OOB, never in chain)", "p099")
@@ -317,6 +319,8 @@ struct ContentView: View {
             "p103": "p103_m2scaler_census_log.txt",
             "p104": "p104_sepks_census_log.txt",
             "p105": "p105_iosurface_gates_log.txt",
+            "p106": "p106_jpeg_teardown_oracle_log.txt",
+            "p107": "p107_ave_wrap_dims_log.txt",
             "p087": "p087_reclaim_observer_log.txt",
             "p045": "p045_kmsg_recv_oracle_log.txt",
             "p046": "p046_f77_patch_oracle_log.txt",
@@ -888,6 +892,20 @@ struct ContentView: View {
                     result = Self.readFreshLog(
                         named: "p103_m2scaler_census_log.txt",
                         missing: "p103 finished but log missing")
+                }
+            case "p106", "jpegteardown":
+                result = P106JPEGTeardownOracle.tap()
+                if result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    result = Self.readFreshLog(
+                        named: "p106_jpeg_teardown_oracle_log.txt",
+                        missing: "p106 finished but log missing")
+                }
+            case "p107", "avewrap":
+                result = P107AveWrapDims.tap()
+                if result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    result = Self.readFreshLog(
+                        named: "p107_ave_wrap_dims_log.txt",
+                        missing: "p107 finished but log missing")
                 }
             case "p104", "sepks":
                 result = P104SepksCensus.tap()

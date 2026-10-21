@@ -97,7 +97,7 @@ Proved unslid pins (`kernelcache.release.iPhone18,2`):
 | Field | Value |
 | --- | --- |
 | `static_base` | `0xfffffe0007004000` (T8150 PPL/SPTM map) |
-| CheckandPrewire | `0xfffffe0008c16a88` |
+| CheckandPrewire | `0xfffffe0008c5c3e4` (note 232: the 0x…8c16a88 pin was stale; re-anchored via the klog string xref) |
 | MapLocked | `0xfffffe0008c17190` |
 | MapRequest | `0xfffffe0008c19708` |
 | MapAlloc | `0xfffffe0008c0d324` kalloc `0x10b8`, clear `0x10a0`, records at object `+0x90` |
