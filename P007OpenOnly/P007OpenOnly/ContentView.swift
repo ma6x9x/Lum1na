@@ -903,10 +903,11 @@ struct ContentView: View {
                 }
             case "p109", "anesweep":
                 result = P109AneSelSweep.tap()
-                writeProbeLogToDocumentsIfPossible(
-                    body: result,
-                    named: "p109_ane_selsweep_log.txt",
-                    missing: "p109 finished but log missing")
+                if result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    result = Self.readFreshLog(
+                        named: "p109_ane_selsweep_log.txt",
+                        missing: "p109 finished but log missing")
+                }
             case "p108", "dicensus":
                 result = P108DiskImagesCensus.tap()
                 if result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
