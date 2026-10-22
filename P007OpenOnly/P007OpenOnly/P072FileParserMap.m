@@ -33,6 +33,7 @@
 #import <zlib.h>
 #import <signal.h>
 #import <setjmp.h>
+#import <mach/mach.h>
 #import <dlfcn.h>
 #import <fcntl.h>
 

@@ -7,13 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		0B0481B749CEEC12356EC3C5 /* libz.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = E0764B71E67FDC5415F2C832 /* libz.tbd */; };
-		74A36F25A8C39CA06C0FC5D7 /* GameKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = FE24E06F929C4642F160B65F /* GameKit.framework */; };
-		FE3FEB3C4E0E7BC2278F218E /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8BFFC511A2C5C0F27EC8ECB5 /* Metal.framework */; };
-		1E52DDD37695518663633E6A /* CoreVideo.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 556737D8ECFFA0FCB9E71E78 /* CoreVideo.framework */; };
-		BA26DA162BD90EA071996991 /* CoreMedia.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5C8D9BE883BA77918EAF03EF /* CoreMedia.framework */; };
-		0F90C49977849880539FB830 /* CoreAudioTypes.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AB73248794FB1C673A3F80AA /* CoreAudioTypes.framework */; };
-		96EA771C9391C72864D41AC8 /* CoreAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 9E8267502A4D8105653F7FFA /* CoreAudio.framework */; };
 		E6A80120305F556E00473E8B /* CoreML.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E6A8011F305F556E00473E8B /* CoreML.framework */; };
 		E6A801B2305F96D200473E8B /* IOKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E6A800F6305F2FE000473E8B /* IOKit.framework */; };
 		E6A80234305F9CC200473E8B /* IOSurface.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E6A800F5305F2FE000473E8B /* IOSurface.framework */; };
@@ -68,13 +61,6 @@
 		E6DAA280305DD93E00B0914F /* Lum1na.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Lum1na.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E6DAA28D305DD94500B0914F /* Lum1naTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Lum1naTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		E6DAA297305DD94500B0914F /* Lum1naUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = Lum1naUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		9E8267502A4D8105653F7FFA /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
-		AB73248794FB1C673A3F80AA /* CoreAudioTypes.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudioTypes.framework; path = System/Library/Frameworks/CoreAudioTypes.framework; sourceTree = SDKROOT; };
-		5C8D9BE883BA77918EAF03EF /* CoreMedia.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreMedia.framework; path = System/Library/Frameworks/CoreMedia.framework; sourceTree = SDKROOT; };
-		556737D8ECFFA0FCB9E71E78 /* CoreVideo.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreVideo.framework; path = System/Library/Frameworks/CoreVideo.framework; sourceTree = SDKROOT; };
-		8BFFC511A2C5C0F27EC8ECB5 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
-		FE24E06F929C4642F160B65F /* GameKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = GameKit.framework; path = System/Library/Frameworks/GameKit.framework; sourceTree = SDKROOT; };
-		E0764B71E67FDC5415F2C832 /* libz.tbd */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.text-based-dylib-definition; name = libz.tbd; path = usr/lib/libz.tbd; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -142,13 +128,6 @@
 				E6A80234305F9CC200473E8B /* IOSurface.framework in Frameworks */,
 				E6A801B2305F96D200473E8B /* IOKit.framework in Frameworks */,
 				E6A80120305F556E00473E8B /* CoreML.framework in Frameworks */,
-				0B0481B749CEEC12356EC3C5 /* libz.tbd in Frameworks */,
-				74A36F25A8C39CA06C0FC5D7 /* GameKit.framework in Frameworks */,
-				FE3FEB3C4E0E7BC2278F218E /* Metal.framework in Frameworks */,
-				1E52DDD37695518663633E6A /* CoreVideo.framework in Frameworks */,
-				BA26DA162BD90EA071996991 /* CoreMedia.framework in Frameworks */,
-				0F90C49977849880539FB830 /* CoreAudioTypes.framework in Frameworks */,
-				96EA771C9391C72864D41AC8 /* CoreAudio.framework in Frameworks */,
 				E6A80350305FAE0100473E8B /* Security.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -176,13 +155,6 @@
 				E6A80245305FAD3900473E8B /* libpthread.tbd */,
 				E6A80239305F9CE800473E8B /* CoreImage.framework */,
 				E6A8011F305F556E00473E8B /* CoreML.framework */,
-				E0764B71E67FDC5415F2C832 /* libz.tbd */,
-				FE24E06F929C4642F160B65F /* GameKit.framework */,
-				8BFFC511A2C5C0F27EC8ECB5 /* Metal.framework */,
-				556737D8ECFFA0FCB9E71E78 /* CoreVideo.framework */,
-				5C8D9BE883BA77918EAF03EF /* CoreMedia.framework */,
-				AB73248794FB1C673A3F80AA /* CoreAudioTypes.framework */,
-				9E8267502A4D8105653F7FFA /* CoreAudio.framework */,
 				E6A800F6305F2FE000473E8B /* IOKit.framework */,
 				E6A80351305FAE0100473E8B /* Security.framework */,
 				E6A800F5305F2FE000473E8B /* IOSurface.framework */,
