@@ -1,0 +1,8 @@
+Package: com.ma6x9x.lum1naroot
+Name: Lum1naRoot
+Version: 0.0.1
+Architecture: iphoneos-arm64
+Description: Lum1na root helper - uid0 jbclient check-in daemon (libkrw primitives live in-process; kernel observation host for the A14_21D50 lane)
+Author: ma6x9x
+Section: Research
+Priority: optional
