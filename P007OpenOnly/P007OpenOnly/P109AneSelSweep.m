@@ -116,10 +116,15 @@ static NSString *p109_krname(kern_return_t kr) {
 
     for (int sv = 0; sv < 2; sv++) {
         CFMutableDictionaryRef md = pMatching(kServices[sv]);
-        if (!md) { p109_log(@"[svc] %@ matching nil", @(kServices[sv])); continue; }
+        p109_log([NSString stringWithFormat:@"[svc] %@ matching=%@",
+                  @(kServices[sv]), md ? @"OK" : @"nil"]);
+        if (!md) continue;
         io_service_t svc = pGet(*pMainPort, md);
-        CFRelease(md);
-        if (!svc) { p109_log(@"[svc] %@ NOT FOUND", @(kServices[sv])); continue; }
+        p109_log([NSString stringWithFormat:@"[svc] %@ get=%@ svc=0x%x",
+                  @(kServices[sv]),
+                  svc ? @"OK" : @"nil", (unsigned)svc]);
+        if (md) CFRelease(md);
+        if (!svc) continue;
         p109_log([NSString stringWithFormat:@"[svc] %@ FOUND — sweep open", @(kServices[sv])]);
 
         for (int ti = 0; ti < 2; ti++) {
@@ -155,7 +160,7 @@ static NSString *p109_krname(kern_return_t kr) {
             p109_log([NSString stringWithFormat:@"[svc %@ type %u] sweep done — verdicts above", @(kServices[sv]), kTypes[ti]]);
             pClose(conn);
         }
-        pRelease(svc);
+        if (svc) pRelease(svc);
     }
 done:
     p109_log(@"=== VERDICT: sels with STAGE-B-HIT(2f0) = the Stage-B door; ===");

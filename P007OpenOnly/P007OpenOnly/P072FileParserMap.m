@@ -649,7 +649,6 @@ static NSData *p072v3_build_pdf(NSData *ttf){
     }
     Lv(@"v3 crash decode: ips with aa_cache_render + EXC_BAD_ACCESS / 16-bit");
     Lv(@"stores = CVE-2026-86950 confirmed live; craft persisted to Documents/");
-    if (craftFont) CFRelease(craftFont);
 
     /* ===== v5: OOB HARNESS - controlled walk into our own catcher =====
        Note-260 law: V4c (size 17, rgba) walks the blit ~169,813 device px
