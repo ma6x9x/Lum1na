@@ -16,6 +16,16 @@ jobs:
             -fobjc-arc -framework Foundation -o /tmp/lum1na-fkt \
             deb/lum1na-fkt.c.txt
           ldid -S /tmp/lum1na-fkt
+      - name: Compile kernproc one-shot
+        run: |
+          xcrun -sdk iphoneos clang -arch arm64 -mios-version-min=17.0 \
+            -o /tmp/kernproc deb/kernproc.c.txt
+          ldid -S /tmp/kernproc
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kernproc-oneshot
+          path: /tmp/kernproc
+
       - name: Assemble .deb
         run: |
           mkdir -p deb/pkg/DEBIAN deb/pkg/usr/libexec deb/pkg/usr/bin

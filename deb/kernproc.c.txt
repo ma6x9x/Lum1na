@@ -1,0 +1,32 @@
+// kernproc one-shot (21D50): proc_find(0) via libjailbreak helpers.
+// Compiled by .github/workflows/build-lum1naroot.yml -> .deb/artifact.
+// Run as ROOT over SSH on the 12 mini; prints the A14_21D50 kernproc row.
+#include <stdio.h>
+#include <dlfcn.h>
+#include <stdint.h>
+#define STATIC_BASE 0xfffffff007004000ull
+
+int main(void) {
+    void *lj = dlopen("/var/jb/usr/lib/libjailbreak.dylib", RTLD_NOW);
+    void *krw = dlopen("/var/jb/usr/lib/libkrw/libkrw-dopamine.dylib", RTLD_NOW);
+    if (!lj || !krw) { printf("dlopen fail lj=%p krw=%p\n", lj, krw); return 1; }
+    void *(*jbinit)(void)  = dlsym(lj, "jbclient_initialize_primitives");
+    uint64_t (*proc_find)(int) = dlsym(lj, "proc_find");
+    uint64_t (*kbase_fn)(void) = dlsym(krw, "kbase");
+    if (!jbinit || !proc_find || !kbase_fn) {
+        printf("dlsym fail jbinit=%p pf=%p kbase=%p\n", jbinit, proc_find, kbase_fn);
+        return 1;
+    }
+    jbinit();
+    uint64_t kbase = kbase_fn();
+    uint64_t slide = kbase - STATIC_BASE;
+    uint64_t p0 = (uint64_t)proc_find(0);   /* kernel_task proc */
+    uint64_t p1 = (uint64_t)proc_find(1);   /* launchd */
+    printf("KRWLIVE kbase=0x%llx slide=0x%llx\n", (unsigned long long)kbase,
+           (unsigned long long)slide);
+    printf("KERNPROC_LIVE proc0=0x%llx unslid=0x%llx | proc1=0x%llx\n",
+           (unsigned long long)p0,
+           p0 ? (unsigned long long)(p0 - slide) : 0, (unsigned long long)p1);
+    if (p0 && p1) printf("ROW: kernproc|A14_21D50|0x%llx\n", (unsigned long long)(p0 - slide));
+    return 0;
+}
