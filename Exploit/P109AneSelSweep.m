@@ -153,7 +153,7 @@ static NSString *p109_krname(kern_return_t kr) {
                     memset(out, 0, sizeof out);
                     size_t osz = sizeof out;
                     kern_return_t kr = pStruct(conn, sel, in, sz, out, &osz);
-                    [line appendFormat:@" %s=%@",
+                    [line appendFormat:@" %@=%@",
                         sizes[sz_i] == 0x200 ? @"s200" : @"s400",
                         p109_krname(kr)];
                 }
