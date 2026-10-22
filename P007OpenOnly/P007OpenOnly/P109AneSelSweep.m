@@ -19,7 +19,7 @@
 #import "LabLocalTime.h"
 
 #import <Foundation/Foundation.h>
-#import <IOKit/IOReturn.h>
+#import <mach/mach.h>
 #import <fcntl.h>
 #import <string.h>
 #import <stdint.h>
@@ -29,17 +29,16 @@
 
 #define P109_BUILD @"p109-ane-selsweep-v1"
 
+typedef mach_port_t io_object_t;
 typedef mach_port_t io_service_t;
+typedef mach_port_t io_connect_t;
 typedef CFMutableDictionaryRef (*IOServiceMatching_t)(const char *);
 typedef io_service_t (*IOServiceGetMatchingService_t)(mach_port_t, CFDictionaryRef);
 typedef kern_return_t (*IOServiceOpen_t)(io_service_t, task_port_t, uint32_t, io_connect_t *);
 typedef kern_return_t (*IOServiceClose_t)(io_connect_t);
 typedef kern_return_t (*IOObjectRelease_t)(io_object_t);
-typedef io_connect_t io_connect_t_;
 typedef kern_return_t (*IOConnectCallStructMethod_t)(io_connect_t, uint32_t,
         const void *, size_t, void *, size_t *);
-typedef kern_return_t (*IOConnectCallAsyncStructMethod_t)(io_connect_t, uint32_t,
-        mach_port_t, uint64_t *, uint32_t, const void *, size_t, void *, size_t *);
 
 static int p109_fd = -1;
 static NSMutableString *p109_buf = nil;
@@ -56,7 +55,7 @@ static void p109_logv(NSString *s) {
     [p109_buf appendString:out];
     if (p109_fd >= 0) {
         const char *p = out.UTF8String; if (p) write(p109_fd, p, strlen(p));
-        fdatasync(p109_fd);            /* ladder: every sel verdict fsync'd */
+        fsync(p109_fd);            /* ladder: every sel verdict fsync'd */
     }
 }
 static void p109_log(NSString *fmt, ...) NS_FORMAT_FUNCTION(1,2);
