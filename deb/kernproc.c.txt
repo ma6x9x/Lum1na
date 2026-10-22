@@ -1,32 +1,51 @@
-// kernproc one-shot (21D50): proc_find(0) via libjailbreak helpers.
-// Compiled by .github/workflows/build-lum1naroot.yml -> .deb/artifact.
-// Run as ROOT over SSH on the 12 mini; prints the A14_21D50 kernproc row.
+// kernproc one-shot v2: jbclient check-in FIRST, then proc_find(0)/(1).
+// kbase via the libkrw plugin-initialize symbol candidates; fallback to
+// argv[1] slide. Slide known-good today: 0x1a658000 (cs2core, 12 mini).
 #include <stdio.h>
+#include <stdlib.h>
 #include <dlfcn.h>
 #include <stdint.h>
 #define STATIC_BASE 0xfffffff007004000ull
 
-int main(void) {
+int main(int argc, char **argv) {
     void *lj = dlopen("/var/jb/usr/lib/libjailbreak.dylib", RTLD_NOW);
-    void *krw = dlopen("/var/jb/usr/lib/libkrw/libkrw-dopamine.dylib", RTLD_NOW);
-    if (!lj || !krw) { printf("dlopen fail lj=%p krw=%p\n", lj, krw); return 1; }
-    void *(*jbinit)(void)  = dlsym(lj, "jbclient_initialize_primitives");
+    if (!lj) { printf("dlopen libjailbreak fail\n"); return 1; }
+    void *(*jbinit)(void) = dlsym(lj, "jbclient_initialize_primitives");
     uint64_t (*proc_find)(int) = dlsym(lj, "proc_find");
-    uint64_t (*kbase_fn)(void) = dlsym(krw, "kbase");
-    if (!jbinit || !proc_find || !kbase_fn) {
-        printf("dlsym fail jbinit=%p pf=%p kbase=%p\n", jbinit, proc_find, kbase_fn);
+    if (!jbinit || !proc_find) {
+        printf("dlsym fail jbinit=%p pf=%p\n", jbinit, proc_find);
         return 1;
     }
     jbinit();
-    uint64_t kbase = kbase_fn();
-    uint64_t slide = kbase - STATIC_BASE;
-    uint64_t p0 = (uint64_t)proc_find(0);   /* kernel_task proc */
-    uint64_t p1 = (uint64_t)proc_find(1);   /* launchd */
-    printf("KRWLIVE kbase=0x%llx slide=0x%llx\n", (unsigned long long)kbase,
-           (unsigned long long)slide);
-    printf("KERNPROC_LIVE proc0=0x%llx unslid=0x%llx | proc1=0x%llx\n",
-           (unsigned long long)p0,
-           p0 ? (unsigned long long)(p0 - slide) : 0, (unsigned long long)p1);
-    if (p0 && p1) printf("ROW: kernproc|A14_21D50|0x%llx\n", (unsigned long long)(p0 - slide));
+    uint64_t p0 = (uint64_t)proc_find(0);
+    uint64_t p1 = (uint64_t)proc_find(1);
+    uint64_t slide = 0;
+    uint64_t kbase = 0;
+    void *krw = dlopen("/var/jb/usr/lib/libkrw/libkrw-dopamine.dylib", RTLD_NOW);
+    if (krw) {
+        /* libkrw plugin-initialize fills the primitive struct; try the
+           names the FKT dump attested + the interface candidates. */
+        void *(*init_syms[])(void *) = {
+            (void *(*)(void *))dlsym(krw, "libkrw_plugin_initialize"),
+            (void *(*)(void *))dlsym(krw, "krw_initializer"),
+        };
+        void *struct_out[8] = {0,0,0,0,0,0,0,0};
+        for (unsigned i = 0;
+             i < sizeof init_syms / sizeof init_syms[0] && !kbase; i++) {
+            if (!init_syms[i]) continue;
+            if (init_syms[i](&struct_out) == 0) {
+                /* libkrw_plugin_t layout per libkrw.h: (kbase fn sits in
+                   the struct; v0.2 reads it properly - v0.1 fallback below). */
+            }
+        }
+    }
+    if (argc > 1) slide = strtoull(argv[1], NULL, 0);
+    if (slide) kbase = STATIC_BASE + slide;
+    printf("PROC0_LIVE p0=0x%llx proc1=0x%llx\n",
+           (unsigned long long)p0, (unsigned long long)p1);
+    if (p0 && slide) {
+        printf("ROW kernproc|A14_21D50|unslid=0x%llx (slide=0x%llx)\n",
+               (unsigned long long)(p0 - slide), (unsigned long long)slide);
+    }
     return 0;
 }

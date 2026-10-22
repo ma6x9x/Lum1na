@@ -22,6 +22,7 @@ jobs:
           cp deb/kernproc.c.txt /tmp/kernproc.c
           xcrun -sdk iphoneos clang -arch arm64 -mios-version-min=17.0 \
             -o /tmp/kernproc /tmp/kernproc.c
+            # NOTE: run with slide arg on-device: /var/jb/usr/libexec/kernproc <slide>
           ldid -S /tmp/kernproc
       - uses: actions/upload-artifact@v4
         with:
