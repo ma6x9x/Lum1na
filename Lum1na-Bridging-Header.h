@@ -108,6 +108,7 @@
 #import "Exploit/P107AveWrapDims.h"
 #import "Exploit/P104SepksCensus.h"
 #import "Exploit/P105IosurfaceGates.h"
+#import "Exploit/P108DiskImagesCensus.h"
 #import "Exploit/P070ChainSequencer.h"
 #import "Exploit/P071AneOverflowMap.h"
 #import "Exploit/P072FileParserMap.h"

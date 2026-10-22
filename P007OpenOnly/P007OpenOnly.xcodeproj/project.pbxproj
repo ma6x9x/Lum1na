@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		08675A0F9622F754A78E6707 /* libz.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = E98628FED0E73C4173710D38 /* libz.tbd */; };
+		7309326181F491D1536DF3E1 /* libpthread.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 5140B5DF5A63F43D9DA257ED /* libpthread.tbd */; };
 		E687D3A1302AE86400E24ACE /* VideoToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E687D39F302AE85C00E24ACE /* VideoToolbox.framework */; };
 		E687D3A5302AE88B00E24ACE /* CoreMedia.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E687D3A4302AE88B00E24ACE /* CoreMedia.framework */; };
 		E687D3A7302AE8C300E24ACE /* CoreVideo.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = E687D3A6302AE8C300E24ACE /* CoreVideo.framework */; };
@@ -95,6 +97,8 @@
 		E6A8FFB13047EF4E00416069 /* CoreAudioTypes.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudioTypes.framework; path = System/Library/Frameworks/CoreAudioTypes.framework; sourceTree = SDKROOT; };
 		E6A8FFB33047EF7F00416069 /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
 		E6A8FFEE304A4F2600416069 /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = System/Library/Frameworks/IOKit.framework; sourceTree = SDKROOT; };
+		5140B5DF5A63F43D9DA257ED /* libpthread.tbd */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.text-based-dylib-definition; name = libpthread.tbd; path = usr/lib/libpthread.tbd; sourceTree = SDKROOT; };
+		E98628FED0E73C4173710D38 /* libz.tbd */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.text-based-dylib-definition; name = libz.tbd; path = usr/lib/libz.tbd; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -153,6 +157,8 @@
 				E687D3A1302AE86400E24ACE /* VideoToolbox.framework in Frameworks */,
 				E687D3A7302AE8C300E24ACE /* CoreVideo.framework in Frameworks */,
 				E687D3B1302AF00100E24ACE /* Metal.framework in Frameworks */,
+				08675A0F9622F754A78E6707 /* libz.tbd in Frameworks */,
+				7309326181F491D1536DF3E1 /* libpthread.tbd in Frameworks */,
 				E687D3B3302B100100E24ACE /* IOSurface.framework in Frameworks */,
 				E687D3C3302C000300E24ACE /* ImageIO.framework in Frameworks */,
 				E687D3C4302C000400E24ACE /* CoreImage.framework in Frameworks */,
@@ -193,6 +199,8 @@
 				E687D3A4302AE88B00E24ACE /* CoreMedia.framework */,
 				E687D39F302AE85C00E24ACE /* VideoToolbox.framework */,
 				E687D3B0302AF00100E24ACE /* Metal.framework */,
+				E98628FED0E73C4173710D38 /* libz.tbd */,
+				5140B5DF5A63F43D9DA257ED /* libpthread.tbd */,
 				E687D3B2302B100100E24ACE /* IOSurface.framework */,
 				E687D3C1302C000100E24ACE /* ImageIO.framework */,
 				E687D3C2302C000200E24ACE /* CoreImage.framework */,
