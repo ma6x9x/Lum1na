@@ -636,9 +636,9 @@ static void *p017_thread_d(void *arg) {
                 if (sfd[i] >= 0) sfdn++;
             }
             for (int i = 0; i < sfdn; i++) close(sfd[i]);
+            if (sfdn == 0) local_err++;
         }
         local_iter++;
-        if (sfdn == 0) local_err++;
 
         if ((local_iter & P017_ITER_FLUSH_MASK) == 0) {
             p017_d_iters += local_iter;
