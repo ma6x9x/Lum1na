@@ -112,7 +112,7 @@ static NSString *p109_krname(kern_return_t kr) {
     }
 
     static const char *kServices[] = { "H11ANEIn", "H1xANELoadBalancer" };
-    const uint32_t kTypes[] = { 0, 1 };           /* 0 = program-loading (Stage-B client) */
+    const uint32_t kTypes[] = { 0, 1, 2, 3, 4 };  /* v2: type0 denied 2c7 on-device; the program-loading client is a higher type */
 
     for (int sv = 0; sv < 2; sv++) {
         CFMutableDictionaryRef md = pMatching(kServices[sv]);
