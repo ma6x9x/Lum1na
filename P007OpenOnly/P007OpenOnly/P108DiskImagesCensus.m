@@ -14,13 +14,14 @@
 #import <IOKit/IOKitLib.h>
 #import <fcntl.h>
 #import <string.h>
+#import <stdarg.h>
 #import <unistd.h>
 
 #define P108_BUILD @"p108-diskimages-regwalk-v2"
 
 static NSMutableString *g_log = nil;
 static int g_fd = -1;
-static void L(NSString *s) {
+static void Lv(NSString *s) {
     if (!g_log) return;
     NSString *out = [s hasSuffix:@"\n"] ? s : [s stringByAppendingString:@"\n"];
     [g_log appendString:out];
@@ -28,6 +29,13 @@ static void L(NSString *s) {
         const char *p = out.UTF8String;
         if (p) { write(g_fd, p, strlen(p)); fcntl(g_fd, F_FULLFSYNC); }
     }
+}
+static void L(NSString *fmt, ...) NS_FORMAT_FUNCTION(1,2);
+static void L(NSString *fmt, ...) {
+    va_list ap; va_start(ap, fmt);
+    NSString *s = [[NSString alloc] initWithFormat:fmt arguments:ap];
+    va_end(ap);
+    Lv(s);
 }
 
 @implementation P108DiskImagesCensus
