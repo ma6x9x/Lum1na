@@ -12,14 +12,16 @@ jobs:
         run: brew install ldid dpkg
       - name: Compile lum1na-fkt (root helper)
         run: |
+          cp deb/lum1na-fkt.c.txt /tmp/lum1na-fkt.c
           xcrun -sdk iphoneos clang -arch arm64 -mios-version-min=17.0 \
             -fobjc-arc -framework Foundation -o /tmp/lum1na-fkt \
-            deb/lum1na-fkt.c.txt
+            /tmp/lum1na-fkt.c
           ldid -S /tmp/lum1na-fkt
       - name: Compile kernproc one-shot
         run: |
+          cp deb/kernproc.c.txt /tmp/kernproc.c
           xcrun -sdk iphoneos clang -arch arm64 -mios-version-min=17.0 \
-            -o /tmp/kernproc deb/kernproc.c.txt
+            -o /tmp/kernproc /tmp/kernproc.c
           ldid -S /tmp/kernproc
       - uses: actions/upload-artifact@v4
         with:
