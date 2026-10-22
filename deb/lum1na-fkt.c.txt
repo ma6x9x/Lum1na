@@ -3,6 +3,7 @@
 // should initialize here (kbase != 0). v0.2 lands the kernproc/zone
 // payload. Build: xcrun -sdk iphoneos clang (see build-lum1naroot.yml).
 #include <stdio.h>
+#include <unistd.h>
 #include <dlfcn.h>
 #include <stdint.h>
 #define STATIC_BASE 0xfffffff007004000ull
