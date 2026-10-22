@@ -123,7 +123,9 @@ static NSString *p109_krname(kern_return_t kr) {
         p109_log([NSString stringWithFormat:@"[svc] %@ get=%@ svc=0x%x",
                   @(kServices[sv]),
                   svc ? @"OK" : @"nil", (unsigned)svc]);
-        if (md) CFRelease(md);
+        /* IOServiceGetMatchingService CONSUMES the matching dictionary
+           (releases it internally) - our CFRelease was an over-release
+           of freed memory = the SIGTRAP. Do not release md. */
         if (!svc) continue;
         p109_log([NSString stringWithFormat:@"[svc] %@ FOUND — sweep open", @(kServices[sv])]);
 

