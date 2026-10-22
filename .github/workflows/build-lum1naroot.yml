@@ -1,0 +1,30 @@
+name: Lum1naRoot deb
+on:
+  workflow_dispatch:
+  push:
+    paths: ['deb/**']
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install packaging tools
+        run: brew install ldid dpkg
+      - name: Compile lum1na-fkt (root helper)
+        run: |
+          xcrun -sdk iphoneos clang -arch arm64 -mios-version-min=17.0 \
+            -fobjc-arc -framework Foundation -o /tmp/lum1na-fkt \
+            deb/lum1na-fkt.c.txt
+          ldid -S /tmp/lum1na-fkt
+      - name: Assemble .deb
+        run: |
+          mkdir -p deb/pkg/DEBIAN deb/pkg/usr/libexec deb/pkg/usr/bin
+          cp deb/Lum1naRoot/DEBIAN/control deb/pkg/DEBIAN/control
+          cp deb/Lum1naRoot/DEBIAN/postinst deb/pkg/DEBIAN/postinst
+          cp /tmp/lum1na-fkt deb/pkg/usr/libexec/lum1na-fkt
+          dpkg-deb --root-owner-group --build deb/pkg \
+            com.ma6x9x.lum1naroot_0.0.1_iphoneos-arm64.deb
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lum1naroot-deb
+          path: com.ma6x9x.lum1naroot_0.0.1_iphoneos-arm64.deb
