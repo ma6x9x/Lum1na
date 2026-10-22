@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
-# Rootless (Procursus/Dopamine): $THEOS_PACKAGE_DIR_PREFIX=/var/jb
+# Rootless (Procursus/Dopamine): JBPREFIX=/var/jb
 JBPREFIX="${THEOS_PACKAGE_DIR_PREFIX:-/var/jb}"
 ln -sf "$JBPREFIX/usr/libexec/lum1na-fkt" "$JBPREFIX/usr/bin/lum1na-fkt" 2>/dev/null || true
-# one-shot: initialize libkrw in-process AS ROOT (jbclient check-in happens
-# for this process because it is a jb-packaged, platform-signed daemon) and
-# dump the observation payload for the rig app.
-"$JBPREFIX/usr/bin/lum1na-fkt" --once > /var/mobile/Library/Lum1naRoot/last.json 2>/dev/null || true
+# one-shot FKT lane probe -> AFC-readable results for the rig
+mkdir -p /var/mobile/Documents/Lum1naRoot
+OUT=/var/mobile/Documents/Lum1naRoot/row.txt
+{
+  "/var/jb/usr/libexec/lum1na-fkt" --once 2>&1 || true
+  "/var/jb/usr/libexec/kernproc"   2>&1 || true
+} > "$OUT" 2>&1
+chmod 644 "$OUT"
 exit 0

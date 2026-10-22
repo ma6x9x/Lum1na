@@ -34,6 +34,7 @@ jobs:
           cp deb/Lum1naRoot/DEBIAN/control deb/pkg/DEBIAN/control
           cp deb/Lum1naRoot/DEBIAN/postinst deb/pkg/DEBIAN/postinst
           cp /tmp/lum1na-fkt deb/pkg/usr/libexec/lum1na-fkt
+          cp /tmp/kernproc deb/pkg/usr/libexec/kernproc
           dpkg-deb --root-owner-group --build deb/pkg \
             com.ma6x9x.lum1naroot_0.0.1_iphoneos-arm64.deb
       - uses: actions/upload-artifact@v4
