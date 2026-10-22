@@ -16,7 +16,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P108_BUILD @"p108-diskimages-census-v1"
+#define P108_BUILD @"p108-diskimages-regwalk-v2"
 
 static NSMutableString *g_log = nil;
 static int g_fd = -1;
@@ -46,6 +46,37 @@ static void L(NSString *s) {
 
     /* service names = the controller plate + any KDI class the IORegistry
        exposes directly. Matching is honest (absence = a result). */
+    /* v2: plane-wide registry walk FIRST - the four legacy names returned
+       "service not found" on every device (v1). On modern iOS the disk-image
+       driver may surface under an entirely different class name, or only
+       while an image is attached. Absence = a MEASURED result. */
+    {
+        mach_port_t mp = kIOMainPortDefault;
+        io_iterator_t it = 0;
+        kern_return_t wkr = IORegistryCreateIterator(mp, "IOService", 0, &it);
+        L(@"[regwalk] IOService-plane iterator kr=0x%x", (unsigned)wkr);
+        int hits = 0;
+        if (wkr == KERN_SUCCESS && it) {
+            io_object_t obj;
+            while ((obj = IOIteratorNext(it))) {
+                io_name_t cls = {0}, nam = {0};
+                IOObjectGetClass(obj, cls);
+                IORegistryEntryGetName(obj, nam);
+                if (strcasestr(cls, "Disk") || strcasestr(nam, "Disk") ||
+                    strcasestr(cls, "HDIX") || strcasestr(nam, "HDIX") ||
+                    strcasestr(cls, "Image") || strcasestr(nam, "Image") ||
+                    strcasestr(cls, "Digi")  || strcasestr(nam, "Digi")) {
+                    L(@"[regwalk] HIT class=%s name=%s", cls, nam);
+                    hits++;
+                }
+                IOObjectRelease(obj);
+                if (hits > 40) break;
+            }
+            IOObjectRelease(it);
+        }
+        L(@"[regwalk] done hits=%d (plane-wide Disk/HDIX/Image/Digi)", hits);
+    }
+
     const char *svcs[] = {
         "AppleDiskImages2",
         "AppleDiskImages2DiskImageController",
