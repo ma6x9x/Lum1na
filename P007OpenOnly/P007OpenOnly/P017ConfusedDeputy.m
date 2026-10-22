@@ -86,7 +86,7 @@ static p017_gettype_t  p017_gettype_fn = NULL;
 #define P017_MAG_CAP            A14_23F77_ZONE_MAGAZINE_CAP
 #define P017_RECLAIM_SPIN       500
 #define P017_A_SPIN             750 /* FIX16: A's spin to widen fn4 window */
-#define P017_BUILD              "p017v2-fix18-gc-pressure-inpcb"
+#define P017_BUILD              "p017v3-fix19-groom-timing"
 #ifndef THREAD_AFFINITY_POLICY_COUNT
 #define THREAD_AFFINITY_POLICY_COUNT 1
 #endif
