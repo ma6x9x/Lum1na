@@ -39,6 +39,27 @@ static inline void boardSet(NSMutableDictionary *d, NSString *key, id val) {
     d[key] = val ?: [NSNull null];
 }
 
+static NSString *LabBoardBootUUID(void) {
+    size_t len = 0;
+    if (sysctlbyname("kern.uuid", NULL, &len, NULL, 0) != 0) {
+        if (sysctlbyname("kern.bootuuid", NULL, &len, NULL, 0) != 0) len = 0;
+    }
+    if (!len) return @"unknown";
+    char *buf = malloc(len); if (!buf) return @"unknown";
+    if (sysctlbyname("kern.uuid", buf, &len, NULL, 0) != 0 &&
+        sysctlbyname("kern.bootuuid", buf, &len, NULL, 0) != 0) {
+        free(buf); return @"unknown";
+    }
+    NSString *u = [NSString stringWithUTF8String:buf];
+    free(buf); return u ?: @"unknown";
+}
+static int64_t LabBoardBootTime(void) {
+    struct timeval tv;
+    size_t len = sizeof(tv);
+    if (sysctlbyname("kern.boottime", &tv, &len, NULL, 0) != 0) return 0;
+    return (int64_t)tv.tv_sec;
+}
+
 @implementation Lum1naBoard {
     NSMutableDictionary *_d;
     uint64_t _kslide;
@@ -97,7 +118,17 @@ static inline void boardSet(NSMutableDictionary *d, NSString *key, id val) {
     _hasKread = NO;
     _hasKwrite = NO;
     if ([_d[@"hasKread"] boolValue]) {
-        NSLog(@"[board] note: store claims hasKread=YES from prior run — requires re-verify this run");
+        NSString *stampedUUID = _d[@"slide_boot_uuid"];
+        NSString *curUUID = LabBoardBootUUID();
+        BOOL stale = stampedUUID && ![stampedUUID isEqualToString:curUUID];
+        if (stale) {
+            NSLog(@"[board] GUARD: store's hasKread=YES carries a slide from a DIFFERENT boot (uuid %@ != %@) — hasKread forced NO; re-establish (cs2core/libkrw) this session", stampedUUID, curUUID);
+            _hasKread = NO;
+            _d[@"kslide"] = @"0x0";
+            _kslide = 0;
+        } else {
+            NSLog(@"[board] note: store claims hasKread=YES from prior run — requires re-verify this run");
+        }
     }
 
     [self compactLeaks];
@@ -352,6 +383,10 @@ static inline void boardSet(NSMutableDictionary *d, NSString *key, id val) {
 - (BOOL)commitSlide:(uint64_t)slide reason:(NSString *)reason {
     @synchronized (self) {
         P06xLogF(@"board", @"commitSlide 0x%016llx reason=%@", slide, reason ?: @"?");
+        /* stale-slide guard: stamp THIS boot's identity so any later load
+           can distinguish in-session truth from a prior boot's slide. */
+        _d[@"slide_boot_uuid"] = LabBoardBootUUID();
+        _d[@"slide_boot_time"] = [NSString stringWithFormat:@"%lld", LabBoardBootTime()];
 
         if (slide > 0x100000000) {
             P06xLog(@"board", @"commitSlide FAIL slide out of range");
