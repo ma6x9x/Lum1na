@@ -39,6 +39,11 @@ concat.output.append("o0")
 concat.concatND.axis = 0              # concat axis 0 of the rank-1 arrays
 # K-1 identity outputs: concatND of ONE input (records = inputs + K)
 for k in range(1, K):
+    # identity outputs are copies of ONE scalar -> shape [1] (CoreML
+    # validates declared shape vs actual; record count is FEATURES, not bytes)
+    odesc = spec.description.output[k]
+    del odesc.type.multiArrayType.shape[:]
+    odesc.type.multiArrayType.shape.extend([1])
     lay = nn.layers.add()
     lay.name = f"id_{k}"
     lay.input.append(names[N - k])
