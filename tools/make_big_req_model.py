@@ -7,7 +7,8 @@
    0x10b8 table per note 251). Ships via Documents/p044_model.txt."""
 import sys, os, shutil, subprocess
 N = int(sys.argv[1]) if len(sys.argv) > 1 else 257
-NAME = f"XVRC27_{N}in_1out_big_req"
+K = int(sys.argv[2]) if len(sys.argv) > 2 else 1  # outputs
+NAME = f"XVRC27_{N}in_{K}out_big_req"
 
 from coremltools.proto import Model_pb2
 from coremltools.proto.NeuralNetwork_pb2 import (
@@ -23,10 +24,11 @@ for n in names:
     f.type.multiArrayType.shape.extend([1])
     f.type.multiArrayType.dataType = ArrayFeatureType.FLOAT32
 
-out = spec.description.output.add()
-out.name = "o0"
-out.type.multiArrayType.shape.extend([N])
-out.type.multiArrayType.dataType = ArrayFeatureType.FLOAT32
+for k in range(K):
+    out = spec.description.output.add()
+    out.name = f"o{k}" if K > 1 else "o0"
+    out.type.multiArrayType.shape.extend([N])
+    out.type.multiArrayType.dataType = ArrayFeatureType.FLOAT32
 spec.description.predictedFeatureName = "o0"
 
 nn = spec.neuralNetwork
@@ -35,6 +37,14 @@ concat.name = "concat"
 concat.input.extend(names)          # 257 inputs -> single output
 concat.output.append("o0")
 concat.concatND.axis = 0              # concat axis 0 of the rank-1 arrays
+# K-1 identity outputs: concatND of ONE input (records = inputs + K)
+for k in range(1, K):
+    lay = nn.layers.add()
+    lay.name = f"id_{k}"
+    lay.input.append(names[N - k])
+    lay.output.append(f"o{k}")
+    lay.copy.SetInParent()  # presence marks the layer as type copy (no params)
+
 nn.arrayInputShapeMapping = 1        # EXACT_ARRAY_MAPPING (required for spec-v7 layers)
 
 mlmodel = f"{NAME}.mlmodel"
