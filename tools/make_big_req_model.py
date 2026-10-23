@@ -17,6 +17,20 @@ open(f"{d}/coremldata.spec", "w").write("model-type: neuralNetwork\n")
 xcode = "/Applications/Xcode_16.4.app/Contents/Developer"
 coremlc = subprocess.check_output(
     f"xcrun -find coremlc", shell=True).decode().strip()
-subprocess.check_call([coremlc, "generate", "mlmodelc", f"{d}/model.mil",
-                       "-o", f"{d}.mlmodelc", "--deployment-target", "17.0"])
+# coremlc arg order differs by version: try both, need --platform too.
+import itertools
+attempts = [
+    [coremlc, "generate", "mlmodelc", f"{d}/model.mil", "-o", f"{d}.mlmodelc",
+     "--platform", "iOS", "--deployment-target", "17.0"],
+    [coremlc, "generate", f"{d}/model.mil", "mlmodelc", "-o", f"{d}.mlmodelc",
+     "--platform", "iOS", "--deployment-target", "17.0"],
+]
+last = None
+for cmd in attempts:
+    try:
+        subprocess.check_call(cmd); break
+    except subprocess.CalledProcessError as e:
+        last = e
+else:
+    raise last
 print(f"BUILT {d}.mlmodelc — ship via Documents/p044_model.txt={NAME}")
