@@ -527,8 +527,7 @@ jobs:
         with:
           name: "${{ env.PROJECT_NAME }}-unsigned-ipa"
           path: "${{ env.PROJECT_NAME }}.ipa"
-  retention-days: 1
-          retention-days: 30
+          retention-days: 1
 
       - name: Build Summary
         run: |
@@ -651,8 +650,7 @@ jobs:
         with:
           name: "Lum1na-Debug-unsigned-ipa"
           path: "Lum1na-Debug.ipa"
-  retention-days: 1
-          retention-days: 30
+          retention-days: 1
 
       - name: Build Summary (Lum1na-Debug)
         run: |
