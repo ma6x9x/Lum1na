@@ -1,0 +1,20 @@
+name: cleanup artifacts
+on:
+  workflow_dispatch:
+jobs:
+  clean:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Delete all artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          # paginate all artifact ids and delete each (frees Actions storage quota)
+          ids=$(gh api --paginate "repos/$REPO/actions/artifacts?per_page=100" \
+                --jq '.artifacts[].id')
+          for id in $ids; do gh api -X DELETE "repos/$REPO/actions/artifacts/$id" || true; done
+          echo deleted.
