@@ -6,6 +6,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Generate + compile >254-in mlmodelc
-        run: sudo xcode-select -s /Applications/Xcode_16.4.app && python3 tools/make_big_req_model.py 257 || python3 tools/make_big_req_model.py 257
+        run: |
+          pip install coremltools numpy
+          python3 tools/make_big_req_model.py 257
       - uses: actions/upload-artifact@v4
         with: { name: bigreq-mlmodelc, path: "XVRC27_257in_1out_bigreq.mlmodelc/", retention-days: 1 }
