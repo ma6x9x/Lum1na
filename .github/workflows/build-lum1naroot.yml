@@ -28,7 +28,7 @@ jobs:
         with:
           name: kernproc-oneshot
           path: /tmp/kernproc
-  retention-days: 1
+          retention-days: 1
 
       - name: Assemble .deb
         run: |
@@ -43,4 +43,4 @@ jobs:
         with:
           name: lum1naroot-deb
           path: com.ma6x9x.lum1naroot_0.0.1_iphoneos-arm64.deb
-  retention-days: 1
+          retention-days: 1
