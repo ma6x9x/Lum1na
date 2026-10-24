@@ -657,7 +657,7 @@ struct ContentView: View {
                 result = "STOP t019 intercepted — XR leak class. Do not re-tap."
             case "t014a", "t014b", "t014c", "t014d", "t014e", "t014f":
                 result = "STOP T014 intercepted — XR leftover. Use P040 dest ABI only."
-            case "cscali":      result = CSRaceCalib.runCalib()
+            case "cscali":      result = LightSwordCalib.runCalib()
             case "cskrw":       result = LuminaClearSword.runKRW()
             case "cs2":         result = CS2Runner.runUpstream()
             case "intel":       result = P093IntelCrossCheck.tap()

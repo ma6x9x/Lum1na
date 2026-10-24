@@ -79,7 +79,7 @@
 #import "Exploit/P056VTCompressionReach.h"
 #import "Kernel/Lum1naBoard.h"
 #import "Kernel/Lum1naAfterKread.h"
-#import "Exploit/CSRaceCalib.h"
+#import "Exploit/LightSwordCalib.h"
 #import "Exploit/APFS84523.h"
 #import "Exploit/P057WVEKReach.h"
 #import "Exploit/P058JPEGDriverReach.h"

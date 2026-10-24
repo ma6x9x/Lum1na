@@ -27,7 +27,7 @@
 #import <string.h>
 #import <stdarg.h>
 
-/* iOS SDK has no IOSurface/IOSurface.h — same dlsym pattern as P009 / CSRaceCalib. */
+/* iOS SDK has no IOSurface/IOSurface.h — same dlsym pattern as P009 / LightSwordCalib. */
 typedef struct __IOSurface *IOSurfaceRef;
 typedef IOSurfaceRef (*IOSurfaceCreate_t)(CFDictionaryRef);
 typedef mach_port_t (*IOSurfaceCreateMachPort_t)(IOSurfaceRef);

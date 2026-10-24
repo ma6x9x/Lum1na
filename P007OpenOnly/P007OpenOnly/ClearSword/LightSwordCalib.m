@@ -1,8 +1,8 @@
-// CSRaceCalib.m
+// LightSwordCalib.m
 // v10: Hot-Replay Tuner (ID-sweep choreography, unsplit, spray-ON) + cross-boot hot-offset persistence
 // (v8 was the sock_DGRAM spray ID sweep; v9 split-sampler demoted to negative control)
 
-#import "CSRaceCalib.h"
+#import "LightSwordCalib.h"
 
 #include <dlfcn.h>
 #include <errno.h>
@@ -107,7 +107,7 @@ static void *rc_socket_spray_thread(void *arg) {
     return NULL;
 }
 
-@implementation CSRaceCalib
+@implementation LightSwordCalib
 
 static int g_rc_log_fd = -1;
 static NSMutableString *g_rc_log_str = nil;
@@ -165,7 +165,7 @@ static CFNumberRef RCNUM(int64_t v) {
     NSString *lp = [docs stringByAppendingPathComponent:@"racecalib_log.txt"];
     g_rc_log_fd = open([lp UTF8String], O_CREAT | O_TRUNC | O_WRONLY, 0644);
     rc_log("time %s", [[[NSDate date] description] UTF8String]);
-    rc_log("=== phys_oob calib v10 — SOCK_DGRAM socket spray ===");
+    rc_log("=== LightSword calib v10 — SOCK_DGRAM socket spray ===");
     {
         char mch[64] = "?", osv[32] = "?";
         size_t mlen = sizeof mch, olen = sizeof osv;
@@ -173,15 +173,21 @@ static CFNumberRef RCNUM(int64_t v) {
         sysctlbyname("kern.osversion", osv, &olen, NULL, 0);
         rc_log("IDENT device=%s os=%s", mch, osv);
     }
-    /* v10: warm hot-offset set from previous boots (per-boot law — PARTIAL
-       windows rotate/recur across boots; the tuner accumulates the set). */
+    /* LightSword: hot-offset set from previous boots (per-boot law — PARTIAL
+       windows rotate/recur across boots; the tuner accumulates the set).
+       Reads lightsword_hot.txt, falling back to the legacy racecalib_hot.txt
+       so pre-rename accumulated warm sets survive. Writes under the new name. */
     uint64_t rc_warm[64]; uint32_t warmN = 0;
     char hotfile[512];
     {
         NSString *docs = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-        NSString *hp2 = [docs stringByAppendingPathComponent:@"racecalib_hot.txt"];
+        NSString *hp2 = [docs stringByAppendingPathComponent:@"lightsword_hot.txt"];
         snprintf(hotfile, sizeof hotfile, "%s", [hp2 fileSystemRepresentation]);
-        FILE *hf0 = fopen(hotfile, "r");
+        NSString *hpl = [docs stringByAppendingPathComponent:@"racecalib_hot.txt"];
+        NSString *readFrom = [NSFileManager.defaultManager fileExistsAtPath:hp2] ? hp2 : hpl;
+        NSString *srcName = [NSFileManager.defaultManager fileExistsAtPath:hp2] ? @"lightsword_hot.txt"
+                          : ([NSFileManager.defaultManager fileExistsAtPath:hpl] ? @"racecalib_hot.txt" : @"(none)");
+        FILE *hf0 = fopen([readFrom fileSystemRepresentation], "r");
         if (hf0) {
             char ln0[64];
             while (fgets(ln0, sizeof ln0, hf0)) {
@@ -190,7 +196,7 @@ static CFNumberRef RCNUM(int64_t v) {
             }
             fclose(hf0);
         }
-        rc_log("--- v10 warm hot set: %u offsets from racecalib_hot.txt", warmN);
+        rc_log("--- LightSword warm hot set: %u offsets from %@", warmN, srcName);
     }
     rc_log("logfile: %s", [lp UTF8String]);
     rc_log("vm_page_size=0x%lx", vm_page_size);

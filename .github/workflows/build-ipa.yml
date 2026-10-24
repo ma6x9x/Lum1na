@@ -187,7 +187,7 @@ jobs:
                        P051APFSXattr P052APFSNstream P053NECPDoubleFree \
                        P054APFSReapList P055IOSurfaceUPL P056VTCompressionReach \
                        P057WVEKReach P058JPEGDriverReach P061AVEEncTypeReach \
-                       AKSExploitController CSKRW CSRaceCalib APFS84523 \
+                       AKSExploitController CSKRW LightSwordCalib APFS84523 \
                        CVE_2026_84530_KASLR DeviceIdentProbe LabDeviceProfile \
                        LabIOGPUQueue; do
             if ls "Exploit/${probe}"* >/dev/null 2>&1 || \

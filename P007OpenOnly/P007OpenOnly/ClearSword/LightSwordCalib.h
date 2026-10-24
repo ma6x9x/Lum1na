@@ -2,7 +2,7 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface CSRaceCalib : NSObject
+@interface LightSwordCalib : NSObject
 
 /// phys_oob calibration v4 — exploit-faithful: IOSurfacePrefetchPages on
 /// the search mapping, M0 tagged, every pwritev classified (success + EFAULT).

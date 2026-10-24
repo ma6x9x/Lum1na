@@ -106,7 +106,7 @@ static void cs2_write_banner(void) {
         cs2_log("[*] Viable trains: <=21D, 22A-22G, 23A. 23B+ SKUs: LightSword stalepage lane instead.");
         if (g_cs2_log_fd >= 0) { close(g_cs2_log_fd); g_cs2_log_fd = -1; }
         g_cs2_running = NO;
-        return @"cs2 SKIP (patched train) — no spray fired. Use LightSword/CSRaceCalib/CSKRW lanes here.";
+        return @"cs2 SKIP (patched train) — no spray fired. Use LightSword/LightSwordCalib/CSKRW lanes here.";
     }
 
     cs2_stop = 0;
