@@ -236,6 +236,7 @@ kern_return_t cs2_pe_v1(void) {
             cs2_surface_munlock(search_mapping_address);
             mach_vm_deallocate(mach_task_self(), search_mapping_address, search_mapping_size);
         }
+        cs2_surface_reset_locked();   /* slot-table hygiene: keep passes independent */
 
         // if (cs2_ctx.is_a18_devices) {
         //     cs2_surface_munlock(wired_mapping);

@@ -603,8 +603,13 @@ struct ContentView: View {
         text = "Running \(id)…\nDon't touch UI. Classify ips after reboot.\n"
         logTap(id)
 
-        let raceHot = (id == "p017v2" || id == "p031" || id == "cskrw" || id == "cscali" || id == "cs2"
-                       || id == "p050" || id == "p053" || id == "P053")
+        // 8BADF00D postmortem (P007OpenOnly-2026-10-24-181415/184530 ips):
+        // demoting the MAIN thread's QoS while cs2/calib saturate the cores
+        // starved the scene-update loop -> FRONTBOARD scene-update watchdog
+        // killed the app mid-tap (its 🤯 term flavor). Demotion stays for the
+        // P-core A/B/C probes only; cs2/cskrw/cscali no longer throttle the
+        // UI thread (their inner race threads set their own QoS).
+        let raceHot = (id == "p017v2" || id == "p031" || id == "p050" || id == "p053" || id == "P053")
         if raceHot {
             // Give P-cores to A/B/C (USER_INTERACTIVE in probe). Main/UI → BACKGROUND.
             pthread_set_qos_class_self_np(QOS_CLASS_BACKGROUND, 0)

@@ -62,10 +62,32 @@ kern_return_t cs2_create_pc_mapping(mach_port_t* port_out, mach_vm_address_t* ad
 void cs2_surface_mlock(mach_vm_address_t address, mach_vm_size_t size) {
     // create surface at address with size, and "mlock" it with IOSurfacePrefetchPages
     IOSurfaceRef surface = cs2_surface_at(address, size);
-    size_t idx = cs2_ctx.mlock_surfaces_count++;
-    assert(idx < CS2_MAX_LOCKED_SURFACES);
+    // slot-reuse law (2026-10-24 SIGABRT postmortem): munlock NULLs slots but
+    // never decremented the counter — pass 2 then overflowed the 8-slot table
+    // and the assert aborted the app (P007OpenOnly-2026-10-24-183116.ips).
+    // Find a NULL slot first; only grow the count when none is free.
+    size_t idx = CS2_MAX_LOCKED_SURFACES;
+    for (size_t i = 0; i < CS2_MAX_LOCKED_SURFACES; i++) {
+        if (cs2_ctx.mlock_surfaces[i].surface == NULL && cs2_ctx.mlock_surfaces[i].address == 0) { idx = i; break; }
+    }
+    if (idx == CS2_MAX_LOCKED_SURFACES) idx = cs2_ctx.mlock_surfaces_count++;
+    if (idx >= CS2_MAX_LOCKED_SURFACES) {
+        // out of slots: release the oldest and take slot 0 (never abort)
+        idx = 0;
+        if (cs2_ctx.mlock_surfaces[0].surface) CFRelease(cs2_ctx.mlock_surfaces[0].surface);
+        cs2_ctx.mlock_surfaces_count = CS2_MAX_LOCKED_SURFACES;
+    }
     cs2_ctx.mlock_surfaces[idx].address = address;
     cs2_ctx.mlock_surfaces[idx].surface = surface;
+}
+
+void cs2_surface_reset_locked(void) {
+    // release any surface slots still held and zero the table (call at pass end)
+    for (size_t i = 0; i < CS2_MAX_LOCKED_SURFACES; i++) {
+        if (cs2_ctx.mlock_surfaces[i].surface) { CFRelease(cs2_ctx.mlock_surfaces[i].surface); cs2_ctx.mlock_surfaces[i].surface = NULL; }
+        cs2_ctx.mlock_surfaces[i].address = 0;
+    }
+    cs2_ctx.mlock_surfaces_count = 0;
 }
 
 void cs2_surface_munlock(mach_vm_address_t address) {
