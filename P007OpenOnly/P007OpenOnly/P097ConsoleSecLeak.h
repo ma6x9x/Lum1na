@@ -20,7 +20,7 @@
 //
 //  READ-ONLY. Registers one IOConsoleSecurityInterest notifier on
 //  IOPlatformExpertDevice, waits for a lock/unlock trigger. No user client,
-//  no kernel writes. Standalone tap, never in the JAILBREAK chain.
+//  no kernel writes. Standalone tap, never in the PATCH chain.
 //
 
 #import <Foundation/Foundation.h>

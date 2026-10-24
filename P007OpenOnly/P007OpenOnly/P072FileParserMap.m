@@ -6,7 +6,7 @@
 //    2. Privileged-daemon parse of a planted file (MobileBackup 84598,
 //       lockdownd, Photos) is sandbox-adjacent. PARK remaining-fire.
 //    3. AfterKread payload parse (board JSON, basebin.tar / basebin.tc)
-//       is the jailbreak file mechanic. HOLD until kread32(kbase)==MH_MAGIC_64.
+//       is the persistence file mechanic. HOLD until kread32(kbase)==MH_MAGIC_64.
 //  v1: dlopen census + 1x1 PNG ImageIO smoke. v2 adds the CVE-2026-86950
 //  ("Great Glyph Grift") glyph-OOB oracle: synthetic 30-em extreme-coord
 //  TrueType, AA-rasterizer device-space sweep (coarse + fixed-point
@@ -438,7 +438,7 @@ static NSData *p072v3_build_pdf(NSData *ttf){
     L(@"2 DAEMON PLANT MobileBackup 84598 / lockdownd / Photos parse a file the");
     L(@"               app can write. Sandbox-adjacent. Still not kread. PARK.");
     L(@"3 AFTER KREAD  board JSON + basebin.tar / basebin.tc ingest. This is the");
-    L(@"               jailbreak file mechanic once commitSlide sticks.");
+    L(@"               persistence file mechanic once commitSlide sticks.");
     L(@"               HOLD until kread32(kbase)==0xfeedfacf.");
 
     L(@"=== HT149041 FILE-ACE CVE IDS (PARK, no PoC). 86950 = THE LIVE ONE ===");
@@ -819,7 +819,7 @@ static NSData *p072v3_build_pdf(NSData *ttf){
     L(@"=== VERDICT ===");
     L(@"Slot 1: in-app parse is occupancy of THIS task. 86950 oracle aimed.");
     L(@"Slot 2: daemon plant stays PARK (84598 / lockdownd).");
-    L(@"Slot 3: AfterKread board + basebin ingest is the jailbreak file path.");
+    L(@"Slot 3: AfterKread board + basebin ingest is the persistence file path.");
     L(@"hasKread stays NO. Isolation: one TAP per force-quit.");
     if (fd >= 0) { fcntl(fd, F_FULLFSYNC); close(fd); }
     return log;

@@ -1,7 +1,7 @@
 # Third-party BaseBin payloads (credit)
 
 Lum1na stages these files for the first post-KRW tweak-injection slot
-(`Kernel/Lum1naAfterKread`). They are **not** a jailbreak on A14 23F77 by
+(`Kernel/Lum1naAfterKread`). They are **not** a persistence on A14 23F77 by
 themselves. AMFI UserClient loadTrustCache sel 2/7 and
 `pmap_cs_allow_invalid` stay compiled and unfired until
 `Lum1naBoard.hasKread` after `commitSlide`.

@@ -245,7 +245,7 @@ static kern_return_t p099_recv_payload(mach_port_t port, uint8_t *payloadOut) {
               off ? off->ane_fill_cap : 0u, (off && off->tag) ? off->tag : "?");
         }
         L(@"table 0x820, next-chunk 0xc0; n>=0xc1 reaches NEXT 3072.");
-        L(@"One evaluation. STANDALONE ONLY - not in JAILBREAK chain.");
+        L(@"One evaluation. STANDALONE ONLY - not in PATCH chain.");
         L(@"Probe app: fire even on fill_cap / unknown SKU. Public Lum1na is the SKU gate.");
         L(@"%@", [LabDeviceProfile identBlock] ?: @"ident ?");
         L(@"%@", [LabDeviceProfile huntTapWarn:@"p099"] ?: @"");

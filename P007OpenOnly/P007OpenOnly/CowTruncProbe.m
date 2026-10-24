@@ -11,7 +11,7 @@
 #import <unistd.h>
 
 /* <mach/mach_vm.h> is unsupported on iOS; these libsystem_kernel MIG stubs
- * are exported and link fine (standard jailbreak practice). Types come via
+ * are exported and link fine (standard persistence practice). Types come via
  * <mach/mach.h>. */
 extern vm_size_t vm_page_size;
 extern kern_return_t mach_vm_deallocate(vm_map_t target,

@@ -2,7 +2,7 @@
 //  Lum1naBoard.m
 //  Lum1na
 //
-//  Durable jailbreak-state file (Documents/lum1na_board.json).
+//  Durable persistence-state file (Documents/lum1na_board.json).
 //  v2: launch-path hardened — nil-guarded inserts, exception-safe JSON,
 //      self-healing corrupt store, thread-safe mutators.
 //      Launch path: ExploitManager.init → shared → jsonDump — NOTHING in

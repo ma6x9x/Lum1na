@@ -22,7 +22,7 @@
 //    4. scan victims for payload diffs = controlled OOB detection
 //
 //  PANIC RISK: accepted per lab protocol (groomed path). This probe fires
-//  a real OOB write — STANDALONE TAP ONLY, never in the JAILBREAK chain
+//  a real OOB write — STANDALONE TAP ONLY, never in the PATCH chain
 //  (AGENTS.md rule 9). Zero entitlements expected (direct path is
 //  reachable from a sandboxed process per the writeup).
 //

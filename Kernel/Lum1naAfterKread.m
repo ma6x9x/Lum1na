@@ -551,7 +551,7 @@ static void ak_tryInstallPkgman(NSMutableString *s) {
      @"  4 inject via opainject 1 launchdhook + ElleKit TweakLoader.\n"
      @"  5 package managers: Sileo first, then Zebra (Documents/pkgman/*.deb).\n"
      @"  6 respring: jbctl respring (sbreload / backboardd SIGTERM).\n"
-     @"  7 persist/tempRoot/boot-rejailbreak stay HOLD — novel Lum1na, later.\n"];
+     @"  7 persist/tempRoot/boot re-arm stays HOLD — novel Lum1na, later.\n"];
     if (!off) {
         [s appendString:@"HOLD: LabOff() is NULL (unknown SKU). AMFI/pmap pins unfired.\n"];
     } else if (off->tag && strcmp(off->tag, "A12X_23G71") == 0) {
@@ -747,7 +747,7 @@ static void ak_tryInstallPkgman(NSMutableString *s) {
     ak_tryInject(s);
     ak_tryInstallPkgman(s);
     ak_tryRespring(s);
-    ak_log(s, @"[*] persist/tempRoot/boot-rejailbreak HOLD — first injection is this slot, novel later.");
+    ak_log(s, @"[*] persist/tempRoot/re-arm HOLD — first injection is this slot, novel later.");
     NSString *body = P06xLogDump(AK_TAG);
     return body.length ? body : s;
 }

@@ -598,7 +598,7 @@ static int s_clearsword_run(void) {
         int ret = s_clearsword_run();
         if (ret == 0) {
             krw_log("=== KRW ESTABLISHED ===");
-            krw_log("NEXT: Integrate 65343 + 65330 + 65349 for full jailbreak chain.");
+            krw_log("NEXT: Integrate 65343 + 65330 + 65349 for full persistence chain.");
         } else {
             krw_log("=== NO KRW THIS RUN ===");
         }

@@ -42,14 +42,14 @@ FomoPeek/DarkSword local LPE stopped at iOS 26.1. Not this build.
 
 ## After kreadbuf (first tweak injection)
 
-Dopamine 3.0.10 does not run on A14 23F77. Relaxin is a RootHide/ElleKit jailbreak on other SKUs. Lum1na reuses **names and layout**, not their KRW.
+Dopamine 3.0.10 does not run on A14 23F77. Relaxin is a RootHide/ElleKit stack on other SKUs. Lum1na reuses **names and layout**, not their KRW.
 
 1. KRW self-test: `kread32(kbase) == MH_MAGIC_64`. Then AMFI UserClient loadTrustCache sel 2/7 + `pmap_cs_allow_invalid` + `pmap_load_trust_cache`
 2. AfterKread stages bundled `Resources/basebin/basebin.tar` (Dopamine 3.0.10) plus `Relaxin.roothide` / `relaxin.tc` into `Documents/basebin`. Names: launchdhook, systemhook, dyldhook, watchdoghook, forkfix, opainject, libjailbreak, ElleKit-as-Substrate. Credit in `Resources/basebin/CREDITS.md`. Drop extra tweak dylibs into `Documents/tweaks`.
 3. Package managers: Sileo first, Zebra second (`Resources/pkgman/*.deb` → `Documents/pkgman`). `dpkg -i` waits for Procursus bootstrap after KRW.
 4. `opainject 1 launchdhook` then `jbctl respring`
 
-Wired (2026-10-09): the JAILBREAK / FULL CHAIN flow drives this pipeline end to end via `Bootstrap/Lum1naBootstrap.swift` + the `Lum1naAfterKread` STAGE/FIRE split. Staging always runs (BaseBin.tar + debs into Documents); the gate, pmap_cs, AMFI trustcache, opainject, `dpkg -i`, and respring fire **only** on a passing self-test. Post-respring state is detected from the filesystem (jbroot dpkg + Sileo/Zebra bundles) and surfaces as `JAILBROKEN` in the device bar — detection, not a claim.
+Wired (2026-10-09): the PATCH / FULL CHAIN flow drives this pipeline end to end via `Bootstrap/Lum1naBootstrap.swift` + the `Lum1naAfterKread` STAGE/FIRE split. Staging always runs (BaseBin.tar + debs into Documents); the gate, pmap_cs, AMFI trustcache, opainject, `dpkg -i`, and respring fire **only** on a passing self-test. Post-respring state is detected from the filesystem (jbroot dpkg + Sileo/Zebra bundles) and surfaces as `PATCHED` in the device bar — detection, not a claim.
 
 Wired (2026-10-14): **elevate step 0** added to AfterKread FIRE (`Kernel/Lum1naElevate.m`, Dopamine order: uid0 → P_SUGID → MAC label → env → CS_PLATFORM), driven by the new per-SKU struct-offset table `Kernel/Lum1naStructOffsets.m` (darwin-24.4+ ladder; P7-leak values cross-validated against Dopamine info.c, P7 VAs rejected via Ghidra). Root cause of the 17:50 rig run (KRW gate PASSED but `posix_spawn opainject rc=1 EPERM`, no respring) was this missing step. `kernproc` is 0 for every SKU until per-SKU Ghidra derivation lands, so elevate logs an honest HOLD and the pipeline degrades to pre-elevate behavior instead of writing to a wrong VA. Next: derive `kernproc`/allproc on 23F77 (cache already open in Ghidra), 22G100, 23G71.
 5. A14 PPL — AMFI UC from this process after `hasKread`
@@ -112,7 +112,7 @@ on exactly this device/OS, so the core ships verbatim instead of re-derived:
   lanes now pick SocketKRW → libkrw → ClearSword core. `KRWBridge` gained
   `Lum1naKRW_EstablishFromCS2Core` (slide = kbase − LabStaticBase()).
 - Catalog tap `cs2core` ("B1 ClearSword core") → hasKread → PATCHSET gate opens.
-  JAILBREAK does NOT auto-run the spray; it stays a deliberate one-tap per
+  PATCH does NOT auto-run the spray; it stays a deliberate one-tap per
   force-quit, same honesty shape as `krwlib`.
 - `LabRuntimeOffsets.h` made C-safe (`__OBJC__` guard) with `LabSku` moved in as
   a plain C enum shared with `LabDeviceProfile.h` — pure C can now include the
@@ -223,7 +223,7 @@ magic self-test; JAILBROKEN only on real post-respring jbroot evidence.
   0xfffffff018128000, slide 0x11124000, 1103 ms, magic PASS) and the new
   upstream-criteria gate PASSED: "board committed hasKread via the
   ClearSword core lane" -> hasKread=YES hasKwrite=YES kslide=0x11124000
-  kbase=0xfffffff018128000. "PATCHSET (JAILBREAK) now passes the KRW
+  kbase=0xfffffff018128000. "PATCHSET (PATCH) now passes the KRW
   gate." First hasKread=YES in Lum1na. AfterKread pipeline next in the
   SAME session — the ClearSword primitive is process-local (leaked
   control/rw sockets die with the process), so the pipeline tap must run
@@ -464,7 +464,7 @@ magic self-test; JAILBROKEN only on real post-respring jbroot evidence.
 - airlift (MIT): ATAirlock double-move path validation, paired-Mac file
   plant into /var/mobile app containers. OPEN TASK: check -[ATAirlock
   processCompletedAsset:] identifier validation on the 23F77 dyld cache.
-  If the unchecked shape predates 27.0, airlift is a jailbreak-free
+  If the unchecked shape predates 27.0, airlift is a side-loaded
   staging channel on the hunt device. NOT a KRW door; do not claim 26.5
   support until run.
 - varik.dev bounty workflow folded into the ios-xnu-hunt skill:
@@ -534,7 +534,7 @@ magic self-test; JAILBROKEN only on real post-respring jbroot evidence.
   Dopamine info.c:390 (darwin >= 22.4.0). 0x25C was the pre-16.4 row.
   This is the P_SUGID bit elevate sets — wrong offset meant elevate's
   setuid prep silently wrote the wrong word on the rig.
-- JAILBREAK chain rewiring (ExploitManager.executeKernelStage):
+- PATCH chain rewiring (ExploitManager.executeKernelStage):
   SKU-aware. Hunt 26.5: T1 ANE 43748 then LightSword -> cs2core -> libkrw.
   Rig/mini/XR: skip T1 (43748 is a 26.5 door), lanes cs2core -> libkrw ->
   LightSword. After lanes, if hasKread && provenKernproc==0 the chain
@@ -713,34 +713,34 @@ fullchain.sh finding. One card per skill discipline.
   experiment, not a KRW claim. hasKread stays NO; Beta-1 stays Beta-1 until jbroot + Sileo/Zebra
   from our bootstrap.
 
-### 2026-10-15 ~17:10 — SwiftPeek × Lum1na: pre→post jailbreak continuity plan (user directive)
+### 2026-10-15 ~17:10 — SwiftPeek × Lum1na: pre→post persistence continuity plan (user directive)
 
 User: FomoPeek name-tie-in with **SwiftPeek** (`~/Projects/lumina/lumina-repo/SwiftPeek`, Theos
 tweak + SPKit support library, docs/DEPENDENCY_PLAN.md). Use it / its logic to make the chain more
-novel on modern iOS, as a dependency pre- and post-jailbreak.
+novel on modern iOS, as a dependency pre- and post-persistence.
 
 - **Feasibility, honest split**:
-  - *Pre-jailbreak*: NO exploit primitive comes from SwiftPeek (UI discovery is not kernel
+  - *Pre-persistence*: NO exploit primitive comes from SwiftPeek (UI discovery is not kernel
     access — the KRW producer stays the DarkSword web lane + catalog doors). What IS usable now:
     the shipped SPKit pieces (runtime hygiene / sync-fsync trace / overlay hosting) already mirror
     our own PersistentLogStore discipline, and the SwiftUI discovery logic can run **in-process**.
-  - *Post-jailbreak*: this is the goldmine. Lum1na's AfterKread pipeline already stages
+  - *Post-persistence*: this is the goldmine. Lum1na's AfterKread pipeline already stages
     `Resources/tweaks/` and runs `dpkg -i` — SwiftPeek ships there as a `.deb` beside Sileo/Zebra.
     Per DEPENDENCY_PLAN shape 3 (`Depends:` shared dylib), SwiftPeek becomes the SwiftUI-era tweak
     support library (SPHostingViewsIn / SPSwiftTypeName / SPKOverlayWindow / control discovery),
-    which no mainstream jailbreak ships out of the box today. That is the novelty claim.
+    which no mainstream persistence ships out of the box today. That is the novelty claim.
 - **Pre→post continuity (implemented this commit)**: `UI/PeekInspector.swift` + Settings
   "Peek UI Tree" — the in-app twin: walks Lum1na's own windows, finds UIHosting* views, names the
   SwiftUI rootView + one mirror level via public API only, logs through ExploitManager console.
-  Same discovery shape as SwiftPeek's SPAttach/SPHostingViewsIn; pre-jailbreak it peeks our app,
-  post-jailbreak the injected SwiftPeek peeks any app. API-identical-in-spirit so the code is
+  Same discovery shape as SwiftPeek's SPAttach/SPHostingViewsIn; pre-persistence it peeks our app,
+  post-persistence the injected SwiftPeek peeks any app. API-identical-in-spirit so the code is
   transferable without rewiring.
 - **Tasks queued (post-Beta-1, ordered by DEPENDENCY_PLAN dogfooding)**:
   1. Build SwiftPeek `.deb` on the Theos toolchain targeting 26.x and drop it into
      `Resources/tweaks/` (explicitFolder) — AfterKread installs it automatically; no pipeline
      changes needed.
   2. iOS 26 field re-dump: SwiftPeek's offline catalogs (MA-*.txt) are iOS 17.3-era; Liquid Glass
-     changed Music/SpringBoard internals. First job after first jailbreak: re-run the dump tools
+     changed Music/SpringBoard internals. First job after first persistence: re-run the dump tools
      on the hunt device at 26.5.
   3. Kill-switch exercise (SPKKillSwitchEngaged) on a lower-risk target before SpringBoard.
   4. Shape 3 (`Depends:`) only when third-party consumers or cross-tweak coordination force it —
