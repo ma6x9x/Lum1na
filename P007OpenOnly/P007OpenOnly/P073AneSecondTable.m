@@ -47,6 +47,7 @@
 #import <unistd.h>
 #import <sys/socket.h>
 #import <netinet/in.h>
+#import <objc/message.h>
 
 #define P073_BUILD @"p073-second-table-v7j1-chain-hook"
 
