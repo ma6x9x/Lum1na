@@ -98,7 +98,9 @@ kern_return_t cs2_pe_v1(void) {
        mlocked (munlock never ran on the fail path). Now: 2-pass bound,
        munlock every pass end, per-pass phys_footprint + oob kr telemetry. */
     size_t oob_read_fail_count = 0;
-    for (size_t pass = 0; pass < 2; pass++) {
+    /* pass-2 wedge law: fire #2 froze at pass-2's first read after a fully
+       healthy pass-1 (1.6M one-shot maps). Decode pending — tonight: one pass. */
+    for (size_t pass = 0; pass < 1; pass++) {
         {
             struct task_vm_info tvi; mach_msg_type_number_t tc = TASK_VM_INFO_COUNT;
             if (task_info(mach_task_self(), TASK_VM_INFO, (task_info_t)&tvi, &tc) == KERN_SUCCESS)
@@ -247,7 +249,7 @@ kern_return_t cs2_pe_v1(void) {
         }
     }
 
-    LOG("scan exhausted: 2 full passes, no corruption accepted, oob_read kr-fails=%lu — one tap per fresh boot", oob_read_fail_count);
+    LOG("scan exhausted: 1 pass (pass-2 wedge law), no corruption accepted, oob_read kr-fails=%lu — one tap per fresh boot", oob_read_fail_count);
     free(read_buffer);
     free(write_buffer);
     return KERN_SUCCESS;
