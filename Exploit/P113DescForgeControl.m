@@ -11,8 +11,12 @@
 #import <sys/socket.h>
 #import <netinet/in.h>
 #import <fcntl.h>
+#if __has_include("Lum1naCS2Core.h")
+#import "Lum1naCS2Core.h"   /* in-process ClearSword core — A13-proven KRW */
+#define P113_HAS_CS2CORE 1
+#endif
 
-#define P113_BUILD @"p113-descforge-control-v2"
+#define P113_BUILD @"p113-descforge-control-v3"
 #define P113_MAGIC 0x50313333u   /* "P133" marker in body */
 #define P113_NDESC 16u
 
@@ -26,29 +30,65 @@ static void p113_log(NSString *fmt, ...) {
     NSLog(@"%@", s);
 }
 
-/* krw handlers — same dlopen law as P007KreadLane (device-proven). */
+/* krw providers — A13-proven law (2026-10-24: cs2 PASSED on 22G100,
+   kbase=0xfffffff022690000 slide=0x1b68c000, kread8@kbase PASS).
+   PRIMARY = in-process ClearSword core via Lum1naCS2Core (same boot).
+   FALLBACK = true libkrw plugin ABI (P074 contract: version u64 FIRST,
+   kwrite is from→to — v1's struct had neither, so a loaded provider would
+   have written garbage). p090 law: Dopamine providers run uninitialized
+   primitives for mobile-uid apps, so they can't be primary. */
 typedef int (*krw_kread_t)(uint64_t, void *, size_t);
 typedef int (*krw_kwrite_t)(uint64_t, const void *, size_t);
 typedef int (*krw_kbase_t)(uint64_t *);
+typedef struct p113_krw_handlers {
+    uint64_t version;
+    krw_kbase_t kbase;
+    krw_kread_t kread;
+    int (*kwrite)(const void *from, uint64_t to, size_t len);
+    int (*kmalloc)(uint64_t *addr, size_t size);
+    int (*kdealloc)(uint64_t addr, size_t size);
+    int (*kcall)(uint64_t func, size_t argc, const uint64_t *argv, uint64_t *ret);
+    int (*physread)(uint64_t from, void *to, size_t len, uint8_t granule);
+    int (*physwrite)(const void *from, uint64_t to, size_t len, uint8_t granule);
+} p113_krw_handlers_t;
 static krw_kread_t  g_rd;
 static krw_kwrite_t g_wr;
 static krw_kbase_t  g_kb;
+static p113_krw_handlers_t g_h;
+
+#ifdef P113_HAS_CS2CORE
+static int p113_rd_cs2(uint64_t a, void *b, size_t n) { return Lum1naCS2Core_KReadBuf(a, b, n) ? 0 : -1; }
+static int p113_wr_cs2(uint64_t a, const void *b, size_t n) { return Lum1naCS2Core_KWriteBuf(a, b, n) ? 0 : -1; }
+static int p113_kb_cs2(uint64_t *out) { *out = Lum1naCS2Core_Kbase(); return *out ? 0 : -1; }
+#endif
+static int p113_rd_lk(uint64_t a, void *b, size_t n) { return g_h.kread(a, b, n); }
+static int p113_wr_lk(uint64_t a, const void *b, size_t n) { return g_h.kwrite(b, a, n); }
+static int p113_kb_lk(uint64_t *out) { return g_h.kbase(out); }
 
 static BOOL p113_krw(void) {
     if (g_rd) return YES;
-    const char *paths[] = { "/var/jb/usr/lib/libjailbreak.dylib",
-                            "/var/jb/basebin/libjailbreak.dylib",
-                            "/usr/lib/libjailbreak.dylib", NULL };
+#ifdef P113_HAS_CS2CORE
+    if (Lum1naCS2Core_IsLive()) {
+        g_rd = p113_rd_cs2; g_wr = p113_wr_cs2; g_kb = p113_kb_cs2;
+        p113_log(@"[+] krw via clearsword-core (in-process, cs2core tap same boot)");
+        return YES;
+    }
+#endif
+    static const char *paths[] = {
+        "/var/jb/usr/lib/libkrw/libkrw-dopamine.dylib",
+        "/var/jb/usr/lib/libkrw0/libkrw.dylib",
+        "/var/jb/usr/lib/libjailbreak.dylib",
+        "/var/jb/basebin/libjailbreak.dylib",
+        "/usr/lib/libjailbreak.dylib", NULL };
     for (int i = 0; paths[i]; i++) {
         void *h = dlopen(paths[i], RTLD_NOW);
         if (!h) continue;
         void *sym = dlsym(h, "krw_initializer");
         if (!sym) continue;
-        struct { void *kbase; void *kread; void *kwrite; unsigned long z[8]; } hd;
-        memset(&hd, 0, sizeof hd);
-        if (((int (*)(void *))sym)(&hd) != 0 || !hd.kread || !hd.kwrite || !hd.kbase) continue;
-        g_rd = (krw_kread_t)hd.kread; g_wr = (krw_kwrite_t)hd.kwrite; g_kb = (krw_kbase_t)hd.kbase;
-        p113_log(@"[+] krw via %s", paths[i]);
+        memset(&g_h, 0, sizeof g_h);
+        if (((int (*)(p113_krw_handlers_t *))sym)(&g_h) != 0 || !g_h.kread || !g_h.kwrite || !g_h.kbase) continue;
+        g_rd = p113_rd_lk; g_wr = p113_wr_lk; g_kb = p113_kb_lk;
+        p113_log(@"[+] krw via %s (libkrw ABI v%llu)", paths[i], (unsigned long long)g_h.version);
         return YES;
     }
     p113_log(@"[-] no krw provider (tap cs2core first on this boot)");

