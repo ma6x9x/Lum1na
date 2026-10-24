@@ -185,6 +185,7 @@ struct ContentView: View {
                        every id now renders exactly once. */
                     Section("ClearSword KRW (phys_oob → PCB)") {
                         moreRow("CS2. VERBATIM Dopamine core (A13 22G100 KRW — one tap)", "cs2")
+                        moreRow("LSWORD ARM. calib-licensed cs2 on patched trains (toggle arm file)", "lswarm")
                         moreRow("INTEL. merged offset DB + ladder cross-check (read-only)", "intel")
                         moreRow("CS KRW. mapped theory (runKRW, 23F77 offsets)", "cskrw")
                         moreRow("CS calib. phys_oob race only (not KRW)", "cscali")
