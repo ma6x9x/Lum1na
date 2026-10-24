@@ -129,7 +129,8 @@ struct ContentView: View {
                         moreRow("P105. IOSurface gates census (framework-level; global-warn/lookup/protection-bits/pool oracle; NO iopl — 64749 closed)", "p105")
                         moreRow("P104. AppleSEPKeyStore census (163-sel; sels 7/17/31 handle-0 gate expect 0xfffffffa; benign shapes; watch aks klog lines)", "p104")
                         moreRow("P108. DiskImages kernel-backed census (AppleDiskImages2 / IOHDIXHDDriveInKernel / KDIDiskImageNubUserClient opens + sels 0..24; 84552 attach doors; notes 255)", "p108")
-                                moreRow("P109. ANE sel sweep w/ Stage-B kernel oracle (H11ANEIn + LoadBalancer, types 0/1, sels 0..63, DEADBEEF pattern; 2f0 = the Stage-B door; notes 258/259)", "p109")
+                                moreRow("P113. DescForge CONTROL (KRW krw hand-forged desc -> recv oracle; A13 rig)", "p113")
+                        moreRow("P109. ANE sel sweep w/ Stage-B kernel oracle (H11ANEIn + LoadBalancer, types 0/1, sels 0..63, DEADBEEF pattern; 2f0 = the Stage-B door; notes 258/259)", "p109")
                         moreRow("P099. 43748 ANE prewire GROOMED (espresso/CoreML primary, 254-in addchain; STANDALONE ONLY — real OOB, never in chain)", "p099")
                         moreRow("P098. M2ScalerCSC iosaDiag census (sel 8, honest input shape, READ-ONLY)", "p098")
                         moreRow("P097. console-sec gRegistryRoot leak (CVE-2026-65371, READ-ONLY — lock/unlock once while it waits)", "p097")
@@ -332,6 +333,7 @@ struct ContentView: View {
             "p103": "p103_m2scaler_census_log.txt",
             "p108": "p108_diskimages_census_log.txt",
             "p109": "p109_ane_selsweep_log.txt",
+            "p113": "p113_descforge_log.txt",
             "p104": "p104_sepks_census_log.txt",
             "p105": "p105_iosurface_gates_log.txt",
             "p106": "p106_jpeg_teardown_oracle_log.txt",
@@ -903,6 +905,7 @@ struct ContentView: View {
                 }
             case "p109", "anesweep":
                 result = P109AneSelSweep.tap()
+                    case "p113": result = P113DescForgeControl.tap()
                 if result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     result = Self.readFreshLog(
                         named: "p109_ane_selsweep_log.txt",

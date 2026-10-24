@@ -109,6 +109,7 @@
 #import "Exploit/P105IosurfaceGates.h"
 #import "Exploit/P108DiskImagesCensus.h"
 #import "Exploit/P109AneSelSweep.h"
+#import "Exploit/P113DescForgeControl.h"
 #import "P007OpenOnly/P007OpenOnly/P113DescForgeControl.h"
 #import "Exploit/P070ChainSequencer.h"
 #import "Exploit/P071AneOverflowMap.h"

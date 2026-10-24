@@ -149,14 +149,14 @@ jobs:
             "Exploit/Lum1naKreadTest.m"
             "Exploit/P064Ht149041ChainMap.h"
             "Exploit/P064Ht149041ChainMap.m"
-            #import "Exploit/ColdForge.h"
-            #import "Exploit/Rapier.h"
-            #import "Exploit/Anvil.h"
-            #import "Exploit/LightSwordABC.h"
-            #import "Exploit/ColdForge.m"
-            #import "Exploit/Rapier.m"
-            #import "Exploit/Anvil.m"
-            #import "Exploit/LightSwordABC.m"
+            "Exploit/ColdForge.h"
+            "Exploit/ColdForge.m"
+            "Exploit/Rapier.h"
+            "Exploit/Rapier.m"
+            "Exploit/Anvil.h"
+            "Exploit/Anvil.m"
+            "Exploit/LightSwordABC.h"
+            "Exploit/LightSwordABC.m"
           )
 
           MISSING=0
