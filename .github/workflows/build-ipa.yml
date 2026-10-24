@@ -463,6 +463,14 @@ jobs:
             exit $RC
           fi
 
+      - name: Upload full build log (always, every failure retrievable)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: xcodebuild-log
+          path: ${{ runner.temp }}/build.log
+          retention-days: 3
+
       # ============================================
       # Package IPA
       # ============================================
