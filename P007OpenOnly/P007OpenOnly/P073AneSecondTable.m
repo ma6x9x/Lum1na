@@ -46,7 +46,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P073_BUILD @"p073-second-table-v7e-desc-literal"
+#define P073_BUILD @"p073-second-table-v7f-allport-desc"
 
 /* kmsg geometry — P034 contract: msgh_size 0x7FC -> kdata 0x820 (ANE class) */
 #define P073_MSG_SIZE     0x7FCu
@@ -606,7 +606,13 @@ static NSURL *p073_model_url(NSString *name) {
         mach_port_t p = p073_make_port();
         if (p == MACH_PORT_NULL) break;
         sentPre[nPre].port = p; sentPre[nPre].index = 0x1000u | i; sentPre[nPre].alive = YES;
-        if (!p073_send_simple(p, sentPre[nPre].index)) break;
+        /* v7f: sentPre is PORTKIND too — the 21:44 23F77 run landed the OOB
+           record stream inside sentPre[4156]=0x103C (a simple sentinel, no
+           desc region: "desc words unmodified"). Every neighbor must carry
+           the port-desc {type@8,disp@10} words. Fallback keeps the band. */
+        if (!p073_send_portkind(p, sentPre[nPre].index)) {
+            if (!p073_send_simple(p, sentPre[nPre].index)) break;
+        }
         nPre++;
     }
     /* v8: holes are PORTKIND descriptor kmsgs - the fill's record OOB lands
