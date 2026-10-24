@@ -905,11 +905,17 @@ struct ContentView: View {
                 }
             case "p109", "anesweep":
                 result = P109AneSelSweep.tap()
-                    case "p113": result = P113DescForgeControl.tap()
                 if result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     result = Self.readFreshLog(
                         named: "p109_ane_selsweep_log.txt",
                         missing: "p109 finished but log missing")
+                }
+            case "p113":
+                result = P113DescForgeControl.tap()
+                if result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    result = Self.readFreshLog(
+                        named: "p113_descforge_log.txt",
+                        missing: "p113 finished but log missing")
                 }
             case "p108", "dicensus":
                 result = P108DiskImagesCensus.tap()

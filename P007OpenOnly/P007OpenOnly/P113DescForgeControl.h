@@ -1,5 +1,5 @@
 #import <Foundation/Foundation.h>
-  P113DescForgeControl.h — A13 KRW control experiment (user request 2026-10-24).
+// P113DescForgeControl.h — A13 KRW control experiment (user request 2026-10-24).
 //  With cs2core KRW live: build ONE port-kind kmsg carrying the P113 marker,
 //  kernel-scan for its kdata address (content signature), kwrite-FORGE
 //  desc0's {type,disposition} words by hand, then recv — kernel-verified
