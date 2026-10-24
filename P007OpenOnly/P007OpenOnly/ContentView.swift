@@ -674,7 +674,7 @@ struct ContentView: View {
                         let n = hc > 0 ? hc
                             : ((try? String(contentsOfFile: (docs as NSString).appendingPathComponent("racecalib_hot.txt"), encoding: .utf8))?
                                 .components(separatedBy: .newlines).filter { $0.hasPrefix("0x") }.count ?? 0)
-                        result = "LSWORD ARMED (license: \(n) calib hot windows — need >=4). Next: FRESH BOOT -> tap cs2. Panic possible, one tap per fresh boot; the ladder prints name the next dial."
+                        result = "ARMED (explicit override; \(n) calib hot windows). NOTE: cs2 also auto-licenses when this device has >=8 calib windows — no toggle needed. Next: FRESH BOOT -> tap cs2 ONCE. Re-tapping lswarm clears the arm."
                     }
                 }
             case "cskrw":       result = LuminaClearSword.runKRW()
