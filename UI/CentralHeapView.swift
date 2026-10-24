@@ -2,7 +2,7 @@ import SwiftUI
 
 struct CentralHeapView: View {
     let heapAddress: String?
-    let stage: JailbreakStage
+    let stage: LabStage
     
     var body: some View {
         VStack(spacing: 8) {
@@ -47,7 +47,7 @@ struct CentralHeapView: View {
 }
 
 struct StatusIndicator: View {
-    let stage: JailbreakStage
+    let stage: LabStage
     @State private var pulseScale: CGFloat = 1.0
     
     var body: some View {

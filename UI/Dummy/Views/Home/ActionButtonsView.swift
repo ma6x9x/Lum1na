@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Wide purple glass Jailbreak control: neon rim, inner sheen, four-point star.
+/// Wide purple glass PATCH control: neon rim, inner sheen, four-point star.
 struct ActionButtonsView: View {
     @Environment(LuminaRunModel.self) private var model
     @Environment(\.luminaMotion) private var motion
@@ -79,7 +79,7 @@ struct ActionButtonsView: View {
 
     private var primaryTitle: String {
         switch model.phase {
-        case .idle, .cancelled: "JAILBREAK"
+        case .idle, .cancelled: "PATCH"
         case .running: "RUNNING"
         case .success: "RESET"
         }

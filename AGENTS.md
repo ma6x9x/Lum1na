@@ -8,7 +8,7 @@ Re-resolve `main` at the start of a task. Do not trust this file’s remembered 
 
 | Path | Role |
 |---|---|
-| `App/ContentView.swift` | Home: centered LUM1NA, motherboard, console, JAILBREAK |
+| `App/ContentView.swift` | Home: centered LUM1NA, motherboard, console, PATCH |
 | `App/Lum1naApp.swift` | `@main` |
 | `UI/` | Theme, motherboard, glass, circuit background, console |
 | `UI/LuminaGlass.swift` | Native `.glassEffect` when compiler ≥ 6.2; else Music27-style ultra-thin + edge light (not chrome material) |
@@ -62,7 +62,7 @@ Stale names (do **not** resurrect): FusionChain, KernelMap/LabOffsets.swift dupl
    Only import headers that exist. NSClassFromString does not need a bridge import, but `LabOff()` / `LabDeviceProfile` do.
 
 9. **Auto chain vs catalog**  
-   JAILBREAK must not invoke process-killing probes. P051, P053, and unbounded P054 (4×500×30s unlink) jetsam'd the app — those stay out. The DAEMON pad fires the **bounded** P054 tap (1 thread, 2s, 50 files). Do not restore the storm loop.
+   PATCH must not invoke process-killing probes. P051, P053, and unbounded P054 (4×500×30s unlink) jetsam'd the app — those stay out. The DAEMON pad fires the **bounded** P054 tap (1 thread, 2s, 50 files). Do not restore the storm loop.
 
 10. **`.deb` is an `ar` archive**  
    `sileo.deb` / `zebra.deb` will be **linked** if the synchronized root treats them as static libs (`ld: archive member 'debian-binary' not a mach-o file`). Keep `Resources/pkgman`, `Resources/basebin`, `Resources/tweaks` as `explicitFolders` and the two debs as `explicitFileTypes = file`. Do not add a Makefile — the IPA gate is `xcodebuild` in `build-ipa.yml`.
@@ -92,7 +92,7 @@ Numbering collisions to keep:
 - Catalog `p063` aliases `aio84530` (`CVE_2026_84530_KASLR`). Log is `p84530_aio_kqueue_log.txt`.
 - `p066` is one 128x128 EncType MAP. `p061` is dual H264+HEVC. Keep both.
 - `P069DmaCommandMap` uses a local `mach_vm_map` prototype. Do not `#import <mach/mach_vm.h>`.
-- JAILBREAK stays SANDBOX BadQuery + KERNEL T1 occupancy ledger + AfterKread HOLD. T1 does not remaining-fire 254. T8150 in-bounds is 255 (trailer +0x1080); 254-in is in-bounds. Do not auto-invoke P065–P072, LightSword last-wire, or CS2 hop-1 on hunt. Trigon is logic (T7 CacheMode / SocketKRW.Arm), not CVE-2023-32434.
+- PATCH stays SANDBOX BadQuery + KERNEL T1 occupancy ledger + AfterKread HOLD. T1 does not remaining-fire 254. T8150 in-bounds is 255 (trailer +0x1080); 254-in is in-bounds. Do not auto-invoke P065–P072, LightSword last-wire, or CS2 hop-1 on hunt. Trigon is logic (T7 CacheMode / SocketKRW.Arm), not CVE-2023-32434.
 
 `invokeController` order: instance `execute`, then `tap` (instance then class). `+tap` returning `NSString` is the P007 shape.
 
@@ -110,7 +110,7 @@ Numbering collisions to keep:
 - Centered **LUM1NA** at the top. No cloud wisps, glyph rain, or rainbow ribbon on the home screen.
 - Motherboard: four-point star hub, energy to KERNEL / SANDBOX / DAEMON / PATCHSET. No center ring.
 - Console: one monospaced stream of `ConsoleLine.formatted`. No second timestamp column.
-- PATCHSET / JAILBREAK must not claim success if `kreadbuf` is missing. The pipeline (AfterKread STAGE/FIRE via `Lum1naBootstrap`) fires only on a passing KRW self-test; COMPLETE shows on `hasKread`, JAILBROKEN only on real post-respring evidence (jbroot dpkg + Sileo/Zebra present).
+- PATCHSET / PATCH must not claim success if `kreadbuf` is missing. The pipeline (AfterKread STAGE/FIRE via `Lum1naBootstrap`) fires only on a passing KRW self-test; COMPLETE shows on `hasKread`, PATCHED only on real post-respring evidence (jbroot dpkg + Sileo/Zebra present).
 
 ## What not to change without an explicit ask
 

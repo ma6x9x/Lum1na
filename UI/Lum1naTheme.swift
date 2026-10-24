@@ -6,7 +6,7 @@
 import SwiftUI
 
 // FIXED: Added missing cases to match Lum1naViewModel usage
-enum JailbreakStage: String, CaseIterable, Identifiable {
+enum LabStage: String, CaseIterable, Identifiable {
     case idle = "IDLE"
     case detecting = "DETECTING"
     case kaslr = "KASLR"

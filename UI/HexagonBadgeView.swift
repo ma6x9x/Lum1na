@@ -76,7 +76,7 @@ struct HexagonShape: Shape {
 
 struct BadgeContainerView: View {
     let activeBadges: Set<BadgeType>
-    let stage: JailbreakStage
+    let stage: LabStage
     
     var body: some View {
         HStack(spacing: 16) {

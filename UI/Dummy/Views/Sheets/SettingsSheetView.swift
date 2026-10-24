@@ -60,7 +60,7 @@ struct SettingsPanelView: View {
                 .frame(maxWidth: .infinity)
             }
 
-            Text("Jailbreak runs the live chain. It does not report success until kreadbuf is proven.")
+            Text("PATCH runs the live chain. It does not report success until kreadbuf is proven.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

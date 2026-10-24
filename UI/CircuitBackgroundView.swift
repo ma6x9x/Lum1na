@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct CircuitBackgroundView: View {
-    let stage: JailbreakStage
+    let stage: LabStage
     @State private var flowOffset: CGFloat = 0
     
     var body: some View {
@@ -24,7 +24,7 @@ struct CircuitBackgroundView: View {
 
 struct PCBTraceGrid: View {
     let size: CGSize
-    let stage: JailbreakStage
+    let stage: LabStage
     let time: Date
     let gridSpacing: CGFloat = 14
     
@@ -113,7 +113,7 @@ struct PCBTraceGrid: View {
 
 struct EnergyNodes: View {
     let size: CGSize
-    let stage: JailbreakStage
+    let stage: LabStage
     let time: Date
     
     var body: some View {
@@ -146,7 +146,7 @@ struct EnergyNodes: View {
 
 struct DataFlowPaths: View {
     let size: CGSize
-    let stage: JailbreakStage
+    let stage: LabStage
     let time: Date
     
     var body: some View {

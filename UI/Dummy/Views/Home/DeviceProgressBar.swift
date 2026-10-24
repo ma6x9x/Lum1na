@@ -86,16 +86,16 @@ struct DeviceProgressBar: View {
 
     private var stageTitle: String {
         if bootstrap.bootstrapInstalled {
-            return bootstrap.pkgmanInstalled?.uppercased() ?? "JAILBROKEN"
+            return bootstrap.pkgmanInstalled?.uppercased() ?? "PATCHED"
         }
         return "STAGE \(stageNumber) / 4"
     }
 
     private var statusWord: String {
         if model.isFinished {
-            // "JAILBROKEN" only on real evidence: a jbroot dpkg + a
+            // "PATCHED" only on real evidence: a jbroot dpkg + a
             // package-manager app bundle present post-respring.
-            return bootstrap.bootstrapInstalled ? "JAILBROKEN" : "COMPLETE"
+            return bootstrap.bootstrapInstalled ? "PATCHED" : "COMPLETE"
         }
         if exploits.isRunning { return "RUNNING" }
         if exploits.progress >= 1 { return "HOLD" }

@@ -3,8 +3,8 @@ import UIKit
 
 /// In-app Peek inspector — SwiftPeek's discovery logic, running in-process.
 ///
-/// Pre-jailbreak this peeks LUM1NA's own view tree (the only process we can
-/// touch from a stock app). Post-jailbreak the same logic ships injected in
+/// Pre-commit this peeks LUM1NA's own view tree (the only process we can
+/// touch from a stock app). Post-commit the same logic ships injected in
 /// ANY app via SwiftPeek/SPKit — this view is the in-app twin, kept deliberately
 /// API-identical in spirit: hosting-view discovery + Swift type naming.
 ///

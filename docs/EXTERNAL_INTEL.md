@@ -29,7 +29,7 @@ Preferences, Caches, SpringBoard, SMS, Safari, Containers/Data/Application,
 Containers/Shared/AppGroup, /var/tmp). Reads are indirect (move into
 Media → AFC read → move back). **MobileGestalt plist: NO.**
 
-**Beta-1 value:** on a paired Mac this is a **jailbreak-free file plant
+**Beta-1 value:** on a paired Mac this is a **side-loaded file plant
 into any app container + mobile dirs** — staging channel for persistence
 files, logs pull (Safari/SMS), and app-data seeding on the hunt device
 without any kernel work. **KRW value: none** (mobile-domain fs only).
@@ -85,7 +85,7 @@ to copy; an operational install on the rigs at most.
 ## 4. Nyxian — jailed on-device IDE + Procursus Jailed (senumy listing)
 
 On-device native IDE with a "userspace microkernel", iOS 18–27+ (claims
-27.2b2 testing), works **without jailbreak** via developer signing;
+27.2b2 testing), works **on stock iOS** via developer signing;
 Procursus Jailed runs Sileo-managed DEBs inside its container. Does NOT
 work inside LiveContainer.
 

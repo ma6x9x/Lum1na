@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 
 /// Fullscreen log on the live board: same CRT glass plate as the compact
-/// console, filled with every line plus the LUM1NA splash. Hero, jailbreak
+/// console, filled with every line plus the LUM1NA splash. Hero, PATCH
 /// and progress hide; the circuit background stays. Header Done dismisses.
 struct ConsolePanelView: View {
     var onClose: () -> Void

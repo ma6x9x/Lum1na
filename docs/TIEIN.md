@@ -16,7 +16,7 @@ each domain has a `permissionHandler` (`libjailbreak/src/jbserver.c:22-23`). Dom
 
 | Domain | Gate | Citation |
 |---|---|---|
-| SYSTEMWIDE | any process, while jailbreak not hidden | `jbdomain_systemwide.c:61-76` |
+| SYSTEMWIDE | any process, while persistence is not hidden | `jbdomain_systemwide.c:61-76` |
 | PLATFORM | caller has CS_PLATFORMIZED / platform-application / is the Dopamine app | `jbdomain_platform.c:12-14` |
 | ROOT | **`audit_token_to_euid(clientToken) == 0`** — nothing else | `jbdomain_root.c:9-12` |
 | DOPAMINE | Dopamine app bundle only | `jbdomain_dopamine.c:110` |

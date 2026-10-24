@@ -53,7 +53,7 @@ Wired (2026-10-09): the JAILBREAK / FULL CHAIN flow drives this pipeline end to 
 
 Wired (2026-10-14): **elevate step 0** added to AfterKread FIRE (`Kernel/Lum1naElevate.m`, Dopamine order: uid0 → P_SUGID → MAC label → env → CS_PLATFORM), driven by the new per-SKU struct-offset table `Kernel/Lum1naStructOffsets.m` (darwin-24.4+ ladder; P7-leak values cross-validated against Dopamine info.c, P7 VAs rejected via Ghidra). Root cause of the 17:50 rig run (KRW gate PASSED but `posix_spawn opainject rc=1 EPERM`, no respring) was this missing step. `kernproc` is 0 for every SKU until per-SKU Ghidra derivation lands, so elevate logs an honest HOLD and the pipeline degrades to pre-elevate behavior instead of writing to a wrong VA. Next: derive `kernproc`/allproc on 23F77 (cache already open in Ghidra), 22G100, 23G71.
 5. A14 PPL — AMFI UC from this process after `hasKread`
-6. Persist / tempRoot / boot-time auto-rejailbreak stay later — that is the novel Lum1na layer, after this injection basis works
+6. Persist / tempRoot / boot-time re-arm stays later — that is the novel Lum1na layer, after this injection basis works
 
 ## GOLDMINE 26.5 (keep unrun angles open)
 

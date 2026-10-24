@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Panels that take over the home board. All of them sit on the live circuit
-/// background; the hero, compact console and jailbreak hide. The LUM1NA
+/// background; the hero, compact console and PATCH hide. The LUM1NA
 /// header stays (gear becomes Done).
 enum HomePanel {
     case settings

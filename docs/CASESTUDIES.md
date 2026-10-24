@@ -36,7 +36,7 @@ DarkSword harvest theory:
   **count_off +0x810**; `ProgramSendRequest` allows 0xff buffers → indices
   ≥ 0xc1 cross the chunk.
 - Consequence: the ANE lane is **UNPARKED for groomed standalone taps
-  only** (P099). Never in the JAILBREAK chain. AVE P087 zero-completions
+  only** (P099). Never in the PATCH chain. AVE P087 zero-completions
   finding stands (that was a different lane).
 
 ## P046 pin consistency (LabOff vs writeup)

@@ -6,7 +6,7 @@ IPA gate: GitHub **Lum1na Build** (`build-ipa.yml`, Xcode 16.4). Kernel read/wri
 
 | Control | What it runs | Crash history |
 |---|---|---|
-| JAILBREAK / Full Chain | KERNEL (AKS `execute` + P044 `execute`) → SANDBOX HOLD → DAEMON HOLD → PATCHSET HOLD | P051 then P053 then P054 killed the process. Auto chain no longer calls them. |
+| PATCH / Full Chain | KERNEL (AKS `execute` + P044 `execute`) → SANDBOX HOLD → DAEMON HOLD → PATCHSET HOLD | P051 then P053 then P054 killed the process. Auto chain no longer calls them. |
 | KERNEL pad | same AKS + P044 | P044 `execute` completed in your 04:10 log |
 | SANDBOX pad | HOLD log only | P051 gamed XPC, P053 NECP |
 | DAEMON pad | HOLD log only | P054 4×500×30s unlink → **jetsam ~4s**, no `+tap` return |
@@ -42,8 +42,8 @@ Offsets: `LabRuntimeOffsets.m` only. SKU: `hw.machine` + `kern.osversion` **23F7
 ## Catalog (All stages)
 
 Wired `+tap` in All stages: ident, aks, aio84530, p005, p009–p010, p017v2, p032–p034, p038, p040–p046, p050–p055, cskrw, lockdownd, p044.  
-CI strips P035/P036/P037/AVERace — not cataloged. Lum1naKRW.m is a pbx exception (placeholder). P051/P053/unbounded P054 stay off JAILBREAK.
+CI strips P035/P036/P037/AVERace — not cataloged. Lum1naKRW.m is a pbx exception (placeholder). P051/P053/unbounded P054 stay off PATCH.
 
 ## Agent rule
 
-`AGENTS.md`. Do not put P051/P053/unbounded P054 back on JAILBREAK.
+`AGENTS.md`. Do not put P051/P053/unbounded P054 back on PATCH.

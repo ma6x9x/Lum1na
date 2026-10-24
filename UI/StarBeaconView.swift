@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct StarBeaconView: View {
-    let stage: JailbreakStage
+    let stage: LabStage
     
     var body: some View {
         TimelineView(.animation(minimumInterval: 1/60, paused: false)) { context in

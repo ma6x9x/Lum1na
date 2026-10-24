@@ -4,11 +4,11 @@ This is not a claim of KRW. Pins are **unslid** per `LabOff()` (A14 23F77 T8101 
 
 ## KRW theory buttons (home)
 
-Seven isolated TAPs. Reboot + force-quit between T1–T4 and T7 GPU map. `ui-build phys-map-1`. Home is scaled down (star/pads clipped to the board; **JAILBREAK / ALL / COPY** on one row). Console glass is interactive. None of T1–T4 set `hasKread` from occupancy, `0xe00002be`, or blit `0x11`. PAC/PPL maps (T5/T6) do not skip kreadbuf. T7 is registry + read-only MapMemory.
+Seven isolated TAPs. Reboot + force-quit between T1–T4 and T7 GPU map. `ui-build phys-map-1`. Home is scaled down (star/pads clipped to the board; **PATCH / ALL / COPY** on one row). Console glass is interactive. None of T1–T4 set `hasKread` from occupancy, `0xe00002be`, or blit `0x11`. PAC/PPL maps (T5/T6) do not skip kreadbuf. T7 is registry + read-only MapMemory.
 
 | Button | Catalog | Theory |
 | --- | --- | --- |
-| **T1 ANE** | `krw` | Occupancy ledger (P099 CLASS on A14). Confirmed WRITE. conversion HOLD. JAILBREAK does not remaining-fire 254. Trigon logic: S1 occupancy write / T7 CacheMode, S2 IORVBAR reach, S3 SocketKRW.Arm. No CVE-2023-32434 copy. |
+| **T1 ANE** | `krw` | Occupancy ledger (P099 CLASS on A14). Confirmed WRITE. conversion HOLD. PATCH does not remaining-fire 254. Trigon logic: S1 occupancy write / T7 CacheMode, S2 IORVBAR reach, S3 SocketKRW.Arm. No CVE-2023-32434 copy. |
 | **T2 FACET** | `krw2` | 64788 1×65535 + Trap2 sel=3 oracle. |
 | **T3 SOCK** | `krw3` | 43748 then icmp6filt. Expected SKIP. |
 | **T4 LS** | `krw4` | Dual-wrap last-wire. 18:45 OOM sealed. |
@@ -18,7 +18,7 @@ Seven isolated TAPs. Reboot + force-quit between T1–T4 and T7 GPU map. `ui-bui
 
 Credit: opa334 / Lars Fröder — Dopamine 3.0.10 (`primitives_external.h`, `DOJailbreaker.m`, Titan, momentarius, `physrw_pte.c`, `trustcache.c`). Copied into Lum1na: `Exploit/DopaminePrimitives.h` (vtable contract only). Hop-1 / kfd / multicast_bytecopy bodies stay in the Dopamine tree.
 
-Solo `p044` / `staleentry` / `lightsword` stay All-stages. JAILBREAK is SANDBOX BadQuery → KERNEL T1 occupancy ledger (no 254 remaining-fire) → AfterKread HOLD. Occupancy CLASS on A14 is P099 hunt. Conversion is a live `0x820` ANE neighbor or named Shape L. CVE-2026-86950 stays parked.
+Solo `p044` / `staleentry` / `lightsword` stay All-stages. PATCH is SANDBOX BadQuery → KERNEL T1 occupancy ledger (no 254 remaining-fire) → AfterKread HOLD. Occupancy CLASS on A14 is P099 hunt. Conversion is a live `0x820` ANE neighbor or named Shape L. CVE-2026-86950 stays parked.
 
 Home also has **CHAINS** (`p070` census), **KREAD** (`kreadtest` commitSlide bar), **FILES** (`p072` parser census). Same processing contract as P007: TAP marker in `p011_tap_log.txt` before invoke, POSIX + `F_FULLFSYNC` probe logs, recover last TAP mapped log, `hasKread` only after `kread32(kbase)==MH_MAGIC_64`.
 
@@ -51,7 +51,7 @@ Three slots. None of them is first KRW.
 
 1. **In-app parse** of CG / ImageIO / SceneKit / JPEG / CoreMedia ACEs this IPA process. The app already owns that process. Cannot skip `commitSlide`.
 2. **Daemon plant** (MobileBackup 84598, lockdownd, Photos) is sandbox-adjacent. PARK remaining-fire.
-3. **AfterKread ingest** of board JSON + `basebin.tar` / `basebin.tc` is the jailbreak file mechanic. HOLD until `hasKread`.
+3. **AfterKread ingest** of board JSON + `basebin.tar` / `basebin.tc` is the injection file mechanic. HOLD until `hasKread`.
 
 P072 is print/dlopen census plus a 1x1 PNG we just encoded. No `trigger.pdf`. CVE-2026-86950 stays parked.
 
@@ -118,7 +118,7 @@ Live 2026-10-02 (iPhone13,2 23F77):
 - P044 v36: DeviceOpen `0x68` OK. Prepare sel 4 `0xe00002c2`. Bind aborted. CoreML async + `harvestKmsgs=NO` → t+0s hits=0. Regression vs P007 v18 (spray hole+victim → sync `predictionFromFeatures` → recv victims).
 - LightSword v1.8 Full Chain: REPLACE_OK, blit zeros or live `0xA5` new MD, kptrs=0 after 24 attempts (empty GART / new MD, not inpcb). v1.10 aborts on first detach `0xe00002e2` **and** first GART-zero / A5-full with kptrs=0. v2.0: `0xe00002d5` is **Busy** (not ExclusiveAccess); read path is spy alias B after detaching A. Replace-on-A stays off the read path until D/lsabc proves spy keeps 0x11. Metal type 0x80 length stays `0x1000`.
 - BadQuery consume `-4`. SANDBOX still the app container.
-- PATCHSET HOLD. Not a jailbreak.
+- PATCHSET HOLD. Not a root chain.
 - v37 restores P007 fire: punch even simple kmsgs, sync XVRC27, harvest kmsgs. Direct sel 2 still tried after DeviceOpen. Live 12:49 FILL HIT simple[511]/[509]; krw SKIP (icmp6filt wrong zone).
 - v38: keep even-simple punch + sync CoreML occupancy. Interleave fat type-3 OOL (`n=128` descriptors, kdata `0x824` in kalloc.3072). Do not punch OOL (v36 12:43 MAF). Recv of smashed type-3 can panic — isolate one tap per force-quit. P010 QueueCreate word1 is CommandQueue+0x558 userspace, 0 kptrs. P053 flow_add×close hits=0 (dest is NECP client).
 - AKS 13:28 / 13:56 / 14:05 / 14:19: `se_ok=YES` `capture_done=0` `hook_n=0`. sel0/1 `kr=0` empty; sel2–4,6–7 `0xe00002c2` BadArgument; **sel5 `0xe00002c1` NotPrivileged**. 2c1 is privilege, not a new leak. Getting past 2c2 is in-process ACM on our AppleKeyStore conn, not a size sweep and not a 163-sel crash. AKS complements aio84530 as KASLR; it cannot replace 43748 fill.
@@ -151,7 +151,7 @@ KRW self-test (must pass before inject): `kread32(kbase) == MH_MAGIC_64` and `kb
 5. `dpkg -i` Sileo, then Zebra (needs Procursus `dpkg`; debs stay staged until then)
 6. respring: `jbctl respring` (sbreload / `backboardd` SIGTERM)
 
-A14 is **PPL**, not momentarius. Drop files into the app container, then re-tap **afterkread** after `hasKread`. Persist / tempRoot / boot-time auto-rejailbreak stay later (novel Lum1na, not a Dopamine copy). See All stages → After-kread plan.
+A14 is **PPL**, not momentarius. Drop files into the app container, then re-tap **afterkread** after `hasKread`. Persist / tempRoot / boot-time re-arm stays later (novel Lum1na, not a Dopamine copy). See All stages → After-kread plan.
 
 Full Chain order: SANDBOX BadQuery → KERNEL T1 occupancy ledger (`KRWChainController` BUILD `occupancy-ledger-1`, no P044 v46 254 remaining-fire) → DAEMON P054 bounded (1 thread, 2s, 50 files — the 4×500×30s storm stays dead) → PATCHSET AfterKread HOLD (elevate → pmap_cs → AMFI → opainject → dpkg → respring only after `kread32(kbase)==MH_MAGIC_64`). Hunt auto-chain also skips LightSword last-wire and CS2 hop-1 (catalog T2/T4/cskrw stay isolated). P044 v46 stays All-stages isolated. Auto chain skips P051/P053. Parked All-stages: ColdForge, Rapier, p055, p058 JPEG open, p056/p061 AVE reach, Anvil open-only, P064AVE84607Racer remaining-fire, P065–P072 (invoke solo). Conversion TAP is Lum1na-Debug P044 N=192 / P073 after Game Mode notify=1.
 

@@ -10,7 +10,7 @@ honest — it flips only on a passing magic self-test on THAT device.
 | iPhone 12 mini | iPhone13,1 A14 / 17.3 | cs2core (proven) | KRW YES | Same PATCHSET pipeline; struct rows for 17.3 need the per-SKU Ghidra pass if P094 Path 2 misses (no scan delta pinned yet) |
 | iPhone 12 | iPhone13,2 A14 / 23F77 (26.5 GM) | none yet | **hasKread=NO** | Four live doors (docs/CASESTUDIES.md): p063 84530 heap leak (LIVE-PROVEN), P099 43748 groomed write-door candidate, P097 65371 gRegistryRoot leak, P098 M2Scaler diag. hasKread stays NO until a door yields `kread32(kbase)==0xfeedfacf` |
 
-## Vendored jailbreak stack (what fires after hasKread)
+## Vendored persistence stack (what fires after hasKread)
 
 - **Dopamine 3.0.10/3.0.11** (opa334, MIT): basebin.tc v1, jbctl,
   launchdhook/systemhook/watchdoghook/dyldhook/forkfix dylibs, hookd,
@@ -22,7 +22,7 @@ honest — it flips only on a passing magic self-test on THAT device.
 - **Procursus** (0BSD): dpkg/apt userland installed post-elevate.
 - **Nugget (misakaX family)**: NOT in the 26.5 path — SparseRestore was
   patched in 26.2 betas; Nugget remains a feature-flag tool for the
-  jb'd rigs (17.3/18.6.2), not a jailbreak door. Honest: it adds nothing
+  jb'd rigs (17.3/18.6.2), not an exploit door. Honest: it adds nothing
   to KRW on any device here.
 - **AltDaemon** (rig-only): keeps the IPA signed on jailbroken devices.
 - **Nyxian** (stock devices): jailed on-device iteration + signing
@@ -41,11 +41,11 @@ honest — it flips only on a passing magic self-test on THAT device.
    detection → shape the adjacent kalloc.3072 chunk with a known object →
    steer a corrupted field → first kread32(kbase) → then the same
    PATCHSET pipeline as the rig. P046 pins and the CASESTUDIES chain
-   plan govern; JAILBREAK never auto-invokes P099.
+   plan govern; PATCH never auto-invokes P099.
 
 ## Honesty
 
 - hasKread/hasKwrite are per-device flags. Rig YES does not imply hunt YES.
 - "Files present ≠ injection" — PATCHSET reports JAILBROKEN only on real
   post-respring evidence (AGENTS.md UI contract).
-- P099 is STANDALONE ONLY (real OOB; never in the JAILBREAK chain).
+- P099 is STANDALONE ONLY (real OOB; never in the PATCH chain).
