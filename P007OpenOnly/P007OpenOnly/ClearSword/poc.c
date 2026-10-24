@@ -136,7 +136,7 @@ kern_return_t pe_v1(void) {
                 continue;
             }
             
-            // V25: per-page unique tags (CSRaceCalib PAGE_ID law) instead of the
+            // V25: per-page unique tags (LightSwordCalib PAGE_ID law) instead of the
             // shared random_marker. A torn/partial race copy is now attributable
             // (page_idx in the tag) and no page contents echo the marker, so the
             // Q0-!=marker win test in phys_oob can no longer fire on our own
