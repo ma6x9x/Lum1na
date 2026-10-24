@@ -179,6 +179,13 @@ static BOOL lsword_arm_licensed(int *windows, BOOL *explicit_arm) {
 
         cs2_log("=== KRW SELF-TEST ===");
         cs2_log("kernel_base=0x%llx kernel_slide=0x%llx", (unsigned long long)cs2_ctx.kernel_base, (unsigned long long)cs2_ctx.kernel_slide);
+        /* board law (note 143 cross-ref): magic alone is not the gate — the
+           typeinfo triple-check is. kread64(kbase+8) must be one of
+           {0x200000000, 0xc00000002, 0xcc00000002}. */
+        uint64_t typeinfo = 0;
+        cs2_kreadbuf(cs2_ctx.kernel_base + 8, &typeinfo, sizeof(typeinfo));
+        BOOL typeinfo_ok = (typeinfo == 0x200000000 || typeinfo == 0xc00000002 || typeinfo == 0xcc00000002);
+        cs2_log("kread64@kbase+8=0x%llx typeinfo %s", (unsigned long long)typeinfo, typeinfo_ok ? "PASS" : "FAIL");
         cs2_log("kread8@kbase=0x%llx magic 0x100000cfeedfacf: %s",
                 (unsigned long long)hdr, magic_ok ? "PASS" : "FAIL");
         cs2_log("dump[0..31]= %s", hx.UTF8String ?: "");
