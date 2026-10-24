@@ -658,6 +658,24 @@ struct ContentView: View {
             case "t014a", "t014b", "t014c", "t014d", "t014e", "t014f":
                 result = "STOP T014 intercepted — XR leftover. Use P040 dest ABI only."
             case "cscali":      result = LightSwordCalib.runCalib()
+            case "lswarm":
+                do {
+                    let fm = FileManager.default
+                    let docs = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true).first ?? ""
+                    let p = (docs as NSString).appendingPathComponent("lswkrw_arm.txt")
+                    if fm.fileExists(atPath: p) {
+                        try? fm.removeItem(atPath: p)
+                        result = "LSWORD ARM CLEARED — cs2 back on the patched-train gate."
+                    } else {
+                        try? "LightSword arm 2026-10-24: calib-licensed cs2 ladder.".write(toFile: p, atomically: true, encoding: .utf8)
+                        let hc = (try? String(contentsOfFile: (docs as NSString).appendingPathComponent("lightsword_hot.txt"), encoding: .utf8))?
+                            .components(separatedBy: .newlines).filter { $0.hasPrefix("0x") }.count ?? 0
+                        let n = hc > 0 ? hc
+                            : ((try? String(contentsOfFile: (docs as NSString).appendingPathComponent("racecalib_hot.txt"), encoding: .utf8))?
+                                .components(separatedBy: .newlines).filter { $0.hasPrefix("0x") }.count ?? 0)
+                        result = "LSWORD ARMED (license: \(n) calib hot windows — need >=4). Next: FRESH BOOT -> tap cs2. Panic possible, one tap per fresh boot; the ladder prints name the next dial."
+                    }
+                }
             case "cskrw":       result = LuminaClearSword.runKRW()
             case "cs2":         result = CS2Runner.runUpstream()
             case "intel":       result = P093IntelCrossCheck.tap()

