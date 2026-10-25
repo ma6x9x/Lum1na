@@ -56,7 +56,9 @@ void cs2_early_kreadbuf(uint64_t where, void *readBuf, size_t size)
     //printf("offset %#llx\n", offset); fflush(stdout); usleep(10000);
 
     if (!cs2_set_target_kaddr(where - offset)) {
-        LOG_ERR("cs2_early_kreadbuf: failed to set target kaddr\n");
+        { static uint64_t rb_err_logs = 0;
+          if (rb_err_logs++ < 2 || (rb_err_logs % 5000) == 0)
+            LOG_ERR("cs2_early_kreadbuf: failed to set target kaddr\n"); }
         return;
     }
     uint8_t tmpBuf[CS2_EARLY_KRW_LENGTH];
@@ -98,7 +100,9 @@ void cs2_early_kwritebuf(uint64_t where, void *writeBuf, size_t size)
     memcpy(&tmpBuf[offset], writeBuf, size);
 
     if (!cs2_set_target_kaddr(where - offset)) {
-        LOG_ERR("cs2_early_kwritebuf: failed to set target kaddr\n");
+        { static uint64_t wb_err_logs = 0;
+          if (wb_err_logs++ < 2 || (wb_err_logs % 5000) == 0)
+            LOG_ERR("cs2_early_kwritebuf: failed to set target kaddr\n"); }
         return;
     }
     int res = setsockopt(cs2_ctx.rw_socket, IPPROTO_ICMPV6, ICMP6_FILTER, tmpBuf, CS2_EARLY_KRW_LENGTH);
