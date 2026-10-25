@@ -203,6 +203,22 @@ static LabOffTab gA14_21D50 = {
      - AMFI trustcache + pmap pokes are SKIPPED honestly (sel 0 = unproven;
        the rig is already AMFI/pmap-relaxed by Dopamine).
      - Stock A13 18.x support needs the real table via Ghidra/rig census. */
+
+/* A13_19F77 — the usbliter8 TETHERED RIG (iPhone12,5, iOS 15.5 stock).
+   HONESTY: link base verified cross-train; socket_usecount = darwin-21
+   branch of the info.c LADDER (0x228 — NOT the rig's 0x254 darwin>=23.4).
+   Everything else 0 until a 19F77 Ghidra pass; no cross-train VA pastes. */
+static LabOffTab gA13_19F77 = {
+    .tag = "A13_19F77",
+    .static_base = 0xFFFFFFF007004000ULL,
+    .socket_usecount = 0x228,
+    .amfi_sel_copy = 0,
+    .amfi_sel_manifest = 0,
+    .pmap_cs_allow_off = 0,
+    .owns_replaceable = 0,
+    .build_number = BUILD_19F77,
+    .build_string = "19F77"
+};
 static LabOffTab gA13_22G100 = {
     .tag = "A13_22G100",
     .static_base = 0xFFFFFFF007004000ULL,   /* verified link base only */
@@ -284,6 +300,9 @@ const LabOffTab *LabOffForSku(LabSku sku) {
             /* Beta 1 rig harness table (verified link base only — see
                gA13_22G100 honesty note above). */
             return &gA13_22G100;
+        case LabSkuA13_19F77:
+            /* usbliter8 tethered rig table — see gA13_19F77 honesty note. */
+            return &gA13_19F77;
         case LabSkuT8150_24A435:
             return &gT8150_24A435;
         case LabSkuT8150_other:

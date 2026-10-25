@@ -20,7 +20,8 @@ typedef enum {
     LabSkuA12X_other,    /* iPad8,* but not 23G71 */
     LabSkuXR_22H311,     /* XR A12 18.7.x (22H*) — user device on 18.7.2; ladder-only row */
     LabSkuA13_22G100,    /* iPhone12,* + 22x build (18.6.x) — reference rig (Dopamine KRW) */
-    LabSkuA13_other,     /* iPhone12,* but not 18.x */
+    LabSkuA13_19F77,     /* iPhone12,5 + 19F77 (15.5) — usbliter8 tethered rig (stock 15.5) */
+    LabSkuA13_other,     /* iPhone12,* but not 18.x/19F77 */
     LabSkuT8150_24A435,  /* iPhone18,2 + 24A435 — 17 Pro Max iOS 27.0 */
     LabSkuT8150_other    /* iPhone18,2 + other 24A* — static_base only */
 } LabSku;
@@ -29,6 +30,7 @@ typedef enum {
 #define BUILD_23F77    "23F77"
 #define BUILD_23G71    "23G71"
 #define BUILD_22G100   "22G100"
+#define BUILD_19F77    "19F77"
 #define BUILD_21D50    "21D50"
 #define BUILD_22H311   "22H311"
 #define BUILD_24A435   "24A435"

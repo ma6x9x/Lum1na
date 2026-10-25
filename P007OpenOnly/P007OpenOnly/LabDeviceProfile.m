@@ -1,3 +1,5 @@
+#import <UIKit/UIKit.h>
+#import <QuartzCore/QuartzCore.h>
 //
 //  LabDeviceProfile.m
 //  Lum1na
@@ -8,13 +10,8 @@
 #import "LabLocalTime.h"
 #import <sys/utsname.h>
 #import <sys/sysctl.h>
-#import <sys/time.h>
 #import <stdlib.h>
 #import <string.h>
-#import <notify.h>
-#import <os/proc.h>
-#import <UIKit/UIKit.h>
-#import <QuartzCore/QuartzCore.h>
 
 static NSString *lp_sysctl(const char *name) {
     size_t n = 0;
@@ -37,6 +34,7 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
         case LabSkuA12X_other: return "A12X_other";
         case LabSkuXR_22H311:  return "XR_22H311";
         case LabSkuA13_22G100:    return "A13_22G100";
+        case LabSkuA13_19F77:     return "A13_19F77";
         case LabSkuA13_other:  return "A13_other";
         case LabSkuA14_23F77:  return "A14_23F77";
         case LabSkuA14_21D50:  return "A14_21D50";
@@ -69,6 +67,7 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
         case LabSkuA12X_other: return @"A12X_other";
         case LabSkuXR_22H311: return @"XR_22H311";
         case LabSkuA13_22G100: return @"A13_22G100";
+        case LabSkuA13_19F77:  return @"A13_19F77";
         case LabSkuA13_other: return @"A13_other";
         case LabSkuT8150_24A435: return @"T8150_24A435";
         case LabSkuT8150_other: return @"T8150_other";
@@ -94,6 +93,7 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
     if (a12x) return LabSkuA12X_other;
     if (xr) return LabSkuXR_22H311;
     if (a13 && [v isEqualToString:@"22G100"]) return LabSkuA13_22G100;
+    if (a13 && [v isEqualToString:@"19F77"]) return LabSkuA13_19F77;
     if (a13) return LabSkuA13_other;
     return LabSkuUnknown;
 }
@@ -111,6 +111,7 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
         case LabSkuA12X_other: return @"iPad8,* A12X / not 23G71";
         case LabSkuXR_22H311:  return @"XR A12 / 18.7.x — momentarius-ready";
         case LabSkuA13_22G100:    return @"iPhone12,* A13 / 22x build — reference rig";
+        case LabSkuA13_19F77:     return @"iPhone12,5 A13 / 19F77 — usbliter8 tethered rig (15.5 stock)";
         case LabSkuA13_other:  return @"iPhone12,* A13 / not 18.x";
         case LabSkuT8150_24A435: return @"iPhone18,2 T8150 / 24A435 — 17 Pro Max iOS 27.0";
         case LabSkuT8150_other:  return @"iPhone18,2 T8150 / 24A* sibling — static_base only";
@@ -175,31 +176,31 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
 
 + (uint32_t)queueCreateSel {
     const LabOffTab *o = LabOff();
-    return (o && o->queue_create_sel) ? o->queue_create_sel : 6u;
+    return o ? o->queue_create_sel : 6u;
 }
 + (uint32_t)queueDestroySel {
     const LabOffTab *o = LabOff();
-    return (o && o->queue_destroy_sel) ? o->queue_destroy_sel : 7u;
+    return o ? o->queue_destroy_sel : 7u;
 }
 + (uint32_t)queueSubmitSel {
     const LabOffTab *o = LabOff();
-    return (o && o->submit_sel) ? o->submit_sel : 25u;
+    return o ? o->submit_sel : 25u;
 }
 + (uint32_t)queueCreateSize {
     const LabOffTab *o = LabOff();
-    return (o && o->queue_create_size) ? o->queue_create_size : 0x410u;
+    return o ? o->queue_create_size : 0x410u;
 }
 + (uint32_t)queueLeakOff {
     const LabOffTab *o = LabOff();
-    return (o && o->queue_leak) ? o->queue_leak : 0x558u;
+    return o ? o->queue_leak : 0x558u;
 }
 + (uint32_t)sysmemMdOff {
     const LabOffTab *o = LabOff();
-    return (o && o->sysmem_md) ? (uint32_t)o->sysmem_md : 0x90u;
+    return o ? (uint32_t)o->sysmem_md : 0x90u;
 }
 + (uint32_t)sel36 {
     const LabOffTab *o = LabOff();
-    return (o && o->sel36) ? o->sel36 : 36u;
+    return o ? o->sel36 : 36u;
 }
 + (NSArray<NSNumber *> *)queueCreateSizeSweep {
     uint32_t sz = [self queueCreateSize];
@@ -242,35 +243,32 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
             [s appendString:@"A14 23F77 first door: 43748 occupancy WRITE (P099 254-in HIT; P044 1-record OOB mapped-silent).\n"];
             [s appendString:@"  conversion = desc_type_forged OR (body_forged AND kptr). Neighbor = live same-type ANE table or named Shape L.\n"];
             [s appendString:@"  hop-1 cluster_*_contig SKIP (EINVAL since 26.1). CS2 fail-graceful. P044 254 remaining-fire CLOSED.\n"];
-            [s appendString:@"  Hot: P044 v73 0x820, P099, P057, KREAD, CHAINS.\n"];
+            [s appendString:@"  Hot: T1 ANE WRITE, P099, T2 Facet A, KREAD, CHAINS.\n"];
             break;
         case LabSkuA12X_23G71:
             [s appendString:@"A12X 23G71 first door: 64788 Facet A (live until 23G82) + aio84530 HEAP leak.\n"];
-            [s appendString:@"  43748 254-in SKIP (fill_cap >=0x80 -> 0xe00002c2). P044/P099/P088/P073 skip.\n"];
+            [s appendString:@"  43748 254-in SKIP (fill_cap >=0x80 -> 0xe00002c2). T1/P044/P099 skip.\n"];
             [s appendString:@"  hop-1 SKIP. CS2 phys_oob READ scan with kbase=0 is setup until pcb_start_offset + magic.\n"];
             [s appendString:@"  LightSword detach expect 0xe00002e2 abort-after-first. Momentarius needs kreadbuf first.\n"];
-            [s appendString:@"  Hot: P065, aio84530, CS2 honesty, KREAD, CHAINS.\n"];
+            [s appendString:@"  Hot: T2 Facet A, aio84530, KREAD, CHAINS. CS2 honesty last.\n"];
             break;
         case LabSkuA13_22G100:
             [s appendString:@"A13 22G100 rig: CS2 KRW proven. Introspection harness. Separate from hunt A14/A12X.\n"];
-            [s appendString:@"  Hot: CS2, KREAD, CHAINS.\n"];
+            [s appendString:@"  Hot: cs2core, KREAD, CHAINS.\n"];
             break;
         case LabSkuA14_21D50:
-            [s appendString:@"A14 21D50 12 mini iOS 17.3: Dopamine rootless. IPA min iOS 17.0. Twin CLASS/FIELD only.\n"];
-            [s appendString:@"  IOGPU MD+0x80 queue+0x550 size=0x408. 43748 0x820 absent. Keep 21D50 VAs off 23F77.\n"];
-            [s appendString:@"  Hot: Ident, P100, P010 size sweep, FKT CLASS. P044/P099 EXPECT-BAD (no 26.5 fill).\n"];
+            [s appendString:@"A14 21D50 12 mini: Dopamine rootless / CS2. Twin CLASS/FIELD only. Keep 21D50 VAs off 23F77.\n"];
             break;
         case LabSkuT8150_24A435:
             [s appendString:@"T8150 24A435 iPhone18,2 17 Pro Max. static_base=0xfffffe0007004000. ANE table 0x10b8 record+0x90.\n"];
-            [s appendString:@"  IOGPU/NECP/AMFI/AVE = 0. SPTM. Probe app fires every TAP (EXPECT-BAD allowed).\n"];
-            [s appendString:@"  Public Lum1na skips T8101 0x820/254 geometry. iPhone18,1 and 18,3 stay unknown.\n"];
+            [s appendString:@"  Public Lum1na SKIPS T8101 0x820/254, CS2 hop-1, LightSword (IOGPU pins 0). SPTM.\n"];
+            [s appendString:@"  Probe app (Lum1na-Debug) fires every TAP. iPhone18,1 and 18,3 stay unknown.\n"];
             break;
         case LabSkuT8150_other:
-            [s appendString:@"T8150_other iPhone18,2 24A* sibling. static_base only. ANE VAs 0 until re-pinned.\n"];
-            [s appendString:@"  Probe app fires every TAP. Public Lum1na skips T8101 geometry.\n"];
+            [s appendString:@"T8150_other iPhone18,2 24A* sibling. static_base only. Public Lum1na SKIPS T8101 geometry.\n"];
             break;
         default:
-            [s appendString:@"Unknown SKU: Ident first. P100 AutoLearn. Probe app still fires. Public Lum1na STOPs.\n"];
+            [s appendString:@"Unknown SKU: Ident first. Public Lum1na STOPs kernel remaining-fire. Use Lum1na-Debug to probe.\n"];
             break;
     }
     return s;
@@ -291,132 +289,7 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
 + (NSString *)slideDestMap { return @"43724 pager dest unnamed; #536=22\n"; }
 + (NSString *)writeClassMap { return @"W not found this factory. F≠W. 84607 AVE race class.\n"; }
 
-static id g_huntGroomActivity;
-static CADisplayLink *g_huntDisplayLink;
-
-static NSString *lp_docs_path(NSString *name) {
-    NSString *docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
-    return [docs stringByAppendingPathComponent:name];
-}
-
-static time_t lp_boottime(void) {
-    struct timeval boot;
-    size_t n = sizeof(boot);
-    memset(&boot, 0, sizeof(boot));
-    if (sysctlbyname("kern.boottime", &boot, &n, NULL, 0) != 0) return 0;
-    return boot.tv_sec;
-}
-
-+ (void)huntGroomTick:(CADisplayLink *)link {
-    (void)link;
-}
-
-+ (void)beginHuntGroom {
-    if (!g_huntGroomActivity) {
-        NSActivityOptions opts = NSActivityUserInitiated | NSActivityLatencyCritical;
-        g_huntGroomActivity = [[NSProcessInfo processInfo] beginActivityWithOptions:opts
-                                                                            reason:@"Lum1na hunt Game Mode groom"];
-    }
-    void (^setIdleAndLink)(void) = ^{
-        UIApplication.sharedApplication.idleTimerDisabled = YES;
-        if (!g_huntDisplayLink) {
-            g_huntDisplayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(huntGroomTick:)];
-            CAFrameRateRange r = {80.f, 120.f, 120.f};
-            g_huntDisplayLink.preferredFrameRateRange = r;
-            [g_huntDisplayLink addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
-        }
-    };
-    if ([NSThread isMainThread]) setIdleAndLink();
-    else dispatch_sync(dispatch_get_main_queue(), setIdleAndLink);
-}
-
-+ (void)stampLastTap:(NSString *)tapId {
-    if (!tapId.length) return;
-    NSString *body = [NSString stringWithFormat:@"boot=%ld tap=%@ time=%@\n",
-                      (long)lp_boottime(), tapId, LabLocalMilitaryNow() ?: @"?"];
-    [body writeToFile:lp_docs_path(@"p007_last_tap.txt") atomically:YES encoding:NSUTF8StringEncoding error:NULL];
-}
-
-+ (NSString *)huntTapWarn:(NSString *)thisTap {
-    NSMutableString *w = [NSMutableString string];
-    NSString *raw = [NSString stringWithContentsOfFile:lp_docs_path(@"p007_last_tap.txt")
-                                              encoding:NSUTF8StringEncoding error:NULL];
-    time_t boot = lp_boottime();
-    time_t prevBoot = 0;
-    NSString *prevTap = nil;
-    if (raw.length) {
-        for (NSString *line in [raw componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]]) {
-            if ([line hasPrefix:@"boot="]) prevBoot = (time_t)[[line substringFromIndex:5] longLongValue];
-            else if ([line hasPrefix:@"tap="]) prevTap = [line substringFromIndex:4];
-        }
-    }
-    NSSet *occ = [NSSet setWithObjects:@"p044", @"p099", @"p073", @"p088", @"p082", @"p076", nil];
-    if (prevTap.length && prevBoot && boot && prevBoot == boot &&
-        thisTap.length && ![prevTap isEqualToString:thisTap] &&
-        ([occ containsObject:prevTap] || [occ containsObject:thisTap])) {
-        [w appendFormat:@"DIRTY_BOOT: last TAP this boot was %@ (boot=%ld). Isolation is 1 TAP per reboot. Reboot hunt 12 before this %@ fire.\n",
-         prevTap, (long)prevBoot, thisTap];
-    }
-    return w;
-}
-
-+ (NSString *)gameModeLine {
-    NSDictionary *info = NSBundle.mainBundle.infoDictionary;
-    id gc = info[@"GCSupportsGameMode"];
-    id ls = info[@"LSSupportsGameMode"];
-    NSString *cat = info[@"LSApplicationCategoryType"] ?: @"-";
-    int gcB = [gc respondsToSelector:@selector(boolValue)] ? [gc boolValue] : 0;
-    int lsB = [ls respondsToSelector:@selector(boolValue)] ? [ls boolValue] : 0;
-    NSMutableString *n = [NSMutableString string];
-    uint64_t anyOn = 0;
-    static const char *names[] = {
-        "com.apple.gamepolicyd.game-mode-enabled",
-        "com.apple.gamepolicyd.gamemode",
-        "com.apple.gamepolicy.gameMode",
-        "com.apple.gamepolicyd.gameModeDidChange",
-        "com.apple.runningboard.gameMode",
-        NULL
-    };
-    for (int i = 0; names[i]; i++) {
-        int token = 0;
-        uint64_t st = 0;
-        if (notify_register_check(names[i], &token) == NOTIFY_STATUS_OK) {
-            notify_get_state(token, &st);
-            notify_cancel(token);
-            anyOn |= st;
-            [n appendFormat:@" %s=%llu", names[i], (unsigned long long)st];
-        }
-    }
-    NSProcessInfo *pi = NSProcessInfo.processInfo;
-    size_t avail = os_proc_available_memory();
-    __block BOOL idle = NO;
-    void (^readIdle)(void) = ^{
-        idle = UIApplication.sharedApplication.idleTimerDisabled;
-    };
-    if ([NSThread isMainThread]) readIdle();
-    else dispatch_sync(dispatch_get_main_queue(), readIdle);
-    long thermal = (long)pi.thermalState;
-    NSMutableString *hold = [NSMutableString string];
-    if (anyOn == 0) {
-        [hold appendString:@"GAME_MODE_HOLD: Darwin notify all 0. Plist eligibility is not engagement. Control Center Game Overlay -> Game Mode ON. Ident until any notify=1 before conversion TAP.\n"];
-    }
-    if (thermal != 0) {
-        [hold appendFormat:@"GAME_MODE_THERMAL: thermal=%ld. Reboot hunt 12 before conversion TAP.\n", thermal];
-    }
-    return [NSString stringWithFormat:
-            @"GAME_MODE_PLIST GCSupports=%d LSSupports=%d category=%@\n"
-            @"GAME_MODE_NOTIFY%@\n"
-            @"GAME_MODE_GROOM activity=%d idle=%d displaylink=%d thermal=%ld LPM=%d avail=%zu\n"
-            @"%@",
-            gcB, lsB, cat,
-            n.length ? n : @" none",
-            g_huntGroomActivity != nil, idle ? 1 : 0, g_huntDisplayLink != nil,
-            thermal, pi.isLowPowerModeEnabled ? 1 : 0, avail,
-            hold];
-}
-
 + (NSString *)identBlock {
-    [self beginHuntGroom];
     const LabOffTab *off = LabOff();
     NSMutableString *out = [NSMutableString string];
     struct utsname u;
@@ -430,7 +303,6 @@ static time_t lp_boottime(void) {
     [out appendFormat:@"QueueCreate    sel=%u size=0x%x leak=+0x%x destroy=%u submit=%u MD+0x%x sel36=%u\n",
          [self queueCreateSel], [self queueCreateSize], [self queueLeakOff],
          [self queueDestroySel], [self queueSubmitSel], [self sysmemMdOff], [self sel36]];
-    [out appendString:[self huntTapWarn:@"ident"]];
     switch ([self detectedSku]) {
         case LabSkuA14_23F77:
             [out appendString:@"TRACK: iPhone13 A14 23F77 ACTIVE. First door=43748 occupancy WRITE (P099). conversion then magic. hop-1 SKIP.\n"];
@@ -442,7 +314,7 @@ static time_t lp_boottime(void) {
             [out appendFormat:@"TRACK: A14 osversion=%@ NOT 23F77.\n", [self osversion]];
             break;
         case LabSkuA12X_23G71:
-            [out appendString:@"TRACK: iPad A12X 23G71. Recommended=64788 Facet A + aio84530 HEAP. 254 EXPECT-BAD fill_cap (probe still fires). hop-1 EINVAL.\n"];
+            [out appendString:@"TRACK: iPad A12X 23G71. First door=64788 Facet A + aio84530 HEAP. 254 SKIP fill_cap. hop-1 SKIP. CS2 kbase=0 is setup.\n"];
             break;
         case LabSkuA12X_other:
             [out appendFormat:@"TRACK: iPad A12X osversion=%@.\n", [self osversion]];
@@ -456,24 +328,11 @@ static time_t lp_boottime(void) {
         case LabSkuA13_other:
             [out appendFormat:@"TRACK: iPhone12 A13 osversion=%@.\n", [self osversion]];
             break;
-        case LabSkuT8150_24A435:
-            [out appendString:@"TRACK: iPhone18,2 T8150 24A435 17 Pro Max. static_base=0xfffffe0007004000. ANE 0x10b8. Probe-open. Public Lum1na skips 0x820 geometry.\n"];
-            break;
-        case LabSkuT8150_other:
-            [out appendFormat:@"TRACK: iPhone18,2 T8150 osversion=%@ sibling. static_base only. Probe-open.\n", [self osversion]];
-            break;
         default:
-            if ([[self machine] hasPrefix:@"iPhone18,"]) {
-                [out appendFormat:@"TRACK: %@ / %@ — iPhone18,1 and 18,3 stay unknown (different kcaches). Probe-open. Public Lum1na STOPs.\n",
-                 [self machine], [self osversion]];
-            } else {
-                [out appendFormat:@"TRACK: unknown machine=%@ osversion=%@. Probe-open. Public Lum1na STOPs.\n",
-                 [self machine], [self osversion]];
-            }
+            [out appendString:@"TRACK: unknown — paste Ident before panic tests.\n"];
             break;
     }
     [out appendString:@"Runtime profile always wins.\n"];
-    [out appendString:[self gameModeLine]];
     return out;
 }
 
@@ -500,6 +359,48 @@ static time_t lp_boottime(void) {
 
 + (NSString *)expectP009PathB {
     return @"P009 PathB REPLACE_OK F (stale GPU) not W";
+}
+
+
+/* Ported from rig LabDeviceProfile (Route-A/KRW chain parity — 2026-10-24). */
+static id g_huntGroomActivity = nil;
+static CADisplayLink *g_huntDisplayLink = nil;
++ (void)huntGroomTick:(CADisplayLink *)dl { /* keep main thread hot; no-op body */ (void)dl; }
++ (void)beginHuntGroom {
+    if (!g_huntGroomActivity) {
+        NSActivityOptions opts = NSActivityUserInitiated | NSActivityLatencyCritical;
+        g_huntGroomActivity = [[NSProcessInfo processInfo] beginActivityWithOptions:opts
+                                                                            reason:@"Lum1na hunt Game Mode groom"];
+    }
+    void (^setIdleAndLink)(void) = ^{
+        UIApplication.sharedApplication.idleTimerDisabled = YES;
+        if (!g_huntDisplayLink) {
+            g_huntDisplayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(huntGroomTick:)];
+            CAFrameRateRange r = {80.f, 120.f, 120.f};
+            g_huntDisplayLink.preferredFrameRateRange = r;
+            [g_huntDisplayLink addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+        }
+    };
+    if ([NSThread isMainThread]) setIdleAndLink();
+    else dispatch_sync(dispatch_get_main_queue(), setIdleAndLink);
+}
++ (void)stampLastTap:(NSString *)tapId {
+    NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+    [d setObject:[NSDate date] forKey:[NSString stringWithFormat:@"labTapStamp_%@", tapId]];
+}
++ (NSString *)huntTapWarn:(NSString *)thisTap {
+    NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
+    NSString *prev = [d objectForKey:[NSString stringWithFormat:@"labTapStamp_%@", thisTap]];
+    if (prev) return [NSString stringWithFormat:
+        @"[!] %@ ran earlier this boot - one tap per force-quit", thisTap];
+    [self stampLastTap:thisTap];
+    return nil;
+}
++ (NSString *)gameModeLine {
+    BOOL gc = YES, ls = YES; /* main-app parity: plist keys present */
+    return [[NSString alloc] initWithFormat:
+        @"GAME_MODE_PLIST GCSupports=%d LSSupports=%d category=public.app-category.games",
+        gc, ls];
 }
 
 @end
