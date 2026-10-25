@@ -190,6 +190,7 @@ struct ContentView: View {
                         moreRow("CS KRW. mapped theory (runKRW, 23F77 offsets)", "cskrw")
                         moreRow("CS calib. phys_oob race only (not KRW)", "cscali")
                         moreRow("P122 SwordForge. combined 64788 KRW test (freer→reclaim→read)", "swordforge")
+                        moreRow("P123 ShapeCensus. kalloc.3072 victims with KRW vision (mini/libkrw)", "shapecensus")
                     }
                     Section("Prove (23F77 live — Ident first)") {
                         moreRow("0. Device identity + prove matrix", "ident")
