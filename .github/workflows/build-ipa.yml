@@ -458,7 +458,7 @@ jobs:
           if [ $RC -ne 0 ]; then
             echo ""
             echo "================ REAL ERRORS ================"
-            grep -nE "error:|fatal error" "$RUNNER_TEMP/build.log" | grep -v "cc1\|Failed frontend" | head -40
+            grep -nE ": error: |fatal error" "$RUNNER_TEMP/build.log" | grep -v "cc1\|Failed frontend" | head -40
             echo "============================================="
             exit $RC
           fi
@@ -602,7 +602,7 @@ jobs:
           if [ $RC -ne 0 ]; then
             echo ""
             echo "================ REAL ERRORS (Lum1na-Debug) ================"
-            grep -nE "error:|fatal error" "$RUNNER_TEMP/build-debug.log" | grep -v "cc1\|Failed frontend" | head -40
+            grep -nE ": error: |fatal error" "$RUNNER_TEMP/build-debug.log" | grep -v "cc1\|Failed frontend" | head -40
             echo "============================================="
             exit $RC
           fi
