@@ -70,6 +70,18 @@ static NSString *P123Ret(void) {
 }
 
 static BOOL p123_krw(uint64_t *kbaseOut) {
+    /* V2 PROVIDER LAW (2026-10-25, device-proven): libkrw's kbase returns 0
+       for a mobile-uid app on Dopamine (gSystemInfo needs uid-0 check-in —
+       the p090 law). The mini's REAL route = cs2core in-process (rig cs2
+       PASSED on the mini: ret=0 kbase=0xfffffff0128128000-class). Try libkrw
+       first (12-mini FKT lane / other providers), else the proven core. */
+#ifdef P123_HAS_CS2CORE
+    if (Lum1naCS2Core_IsLive()) {
+        *kbaseOut = Lum1naCS2Core_Kbase();
+        p123_log(@"[+] krw via cs2core (in-process — the mini-proven route)");
+        return YES;
+    }
+#endif
     static const char *paths[] = {
         "/var/jb/usr/lib/libkrw/libkrw-dopamine.dylib",
         "/var/jb/usr/lib/libkrw0/libkrw.dylib",
