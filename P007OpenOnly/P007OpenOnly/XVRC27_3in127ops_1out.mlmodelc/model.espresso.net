@@ -1,0 +1,1720 @@
+{
+  "storage" : "model.espresso.weights",
+  "analyses" : {
+
+  },
+  "properties" : {
+
+  },
+  "format_version" : 200,
+  "metadata_in_weights" : [
+
+  ],
+  "layers" : [
+    {
+      "bottom" : "x_000,x_001",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "add_1",
+      "top" : "t1",
+      "type" : "elementwise",
+      "name" : "add_1",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t1,x_002",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "add_2",
+      "top" : "t2",
+      "type" : "elementwise",
+      "name" : "add_2",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_1",
+      "top" : "padneg_1",
+      "type" : "activation",
+      "name" : "padneg_1",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t2,padneg_1",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_1",
+      "top" : "t_1",
+      "type" : "elementwise",
+      "name" : "padadd_1",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_2",
+      "top" : "padneg_2",
+      "type" : "activation",
+      "name" : "padneg_2",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_1,padneg_2",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_2",
+      "top" : "t_2",
+      "type" : "elementwise",
+      "name" : "padadd_2",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_3",
+      "top" : "padneg_3",
+      "type" : "activation",
+      "name" : "padneg_3",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_2,padneg_3",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_3",
+      "top" : "t_3",
+      "type" : "elementwise",
+      "name" : "padadd_3",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_4",
+      "top" : "padneg_4",
+      "type" : "activation",
+      "name" : "padneg_4",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_3,padneg_4",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_4",
+      "top" : "t_4",
+      "type" : "elementwise",
+      "name" : "padadd_4",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_5",
+      "top" : "padneg_5",
+      "type" : "activation",
+      "name" : "padneg_5",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_4,padneg_5",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_5",
+      "top" : "t_5",
+      "type" : "elementwise",
+      "name" : "padadd_5",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_6",
+      "top" : "padneg_6",
+      "type" : "activation",
+      "name" : "padneg_6",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_5,padneg_6",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_6",
+      "top" : "t_6",
+      "type" : "elementwise",
+      "name" : "padadd_6",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_7",
+      "top" : "padneg_7",
+      "type" : "activation",
+      "name" : "padneg_7",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_6,padneg_7",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_7",
+      "top" : "t_7",
+      "type" : "elementwise",
+      "name" : "padadd_7",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_8",
+      "top" : "padneg_8",
+      "type" : "activation",
+      "name" : "padneg_8",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_7,padneg_8",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_8",
+      "top" : "t_8",
+      "type" : "elementwise",
+      "name" : "padadd_8",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_9",
+      "top" : "padneg_9",
+      "type" : "activation",
+      "name" : "padneg_9",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_8,padneg_9",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_9",
+      "top" : "t_9",
+      "type" : "elementwise",
+      "name" : "padadd_9",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_10",
+      "top" : "padneg_10",
+      "type" : "activation",
+      "name" : "padneg_10",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_9,padneg_10",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_10",
+      "top" : "t_10",
+      "type" : "elementwise",
+      "name" : "padadd_10",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_11",
+      "top" : "padneg_11",
+      "type" : "activation",
+      "name" : "padneg_11",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_10,padneg_11",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_11",
+      "top" : "t_11",
+      "type" : "elementwise",
+      "name" : "padadd_11",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_12",
+      "top" : "padneg_12",
+      "type" : "activation",
+      "name" : "padneg_12",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_11,padneg_12",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_12",
+      "top" : "t_12",
+      "type" : "elementwise",
+      "name" : "padadd_12",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_13",
+      "top" : "padneg_13",
+      "type" : "activation",
+      "name" : "padneg_13",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_12,padneg_13",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_13",
+      "top" : "t_13",
+      "type" : "elementwise",
+      "name" : "padadd_13",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_14",
+      "top" : "padneg_14",
+      "type" : "activation",
+      "name" : "padneg_14",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_13,padneg_14",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_14",
+      "top" : "t_14",
+      "type" : "elementwise",
+      "name" : "padadd_14",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_15",
+      "top" : "padneg_15",
+      "type" : "activation",
+      "name" : "padneg_15",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_14,padneg_15",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_15",
+      "top" : "t_15",
+      "type" : "elementwise",
+      "name" : "padadd_15",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_16",
+      "top" : "padneg_16",
+      "type" : "activation",
+      "name" : "padneg_16",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_15,padneg_16",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_16",
+      "top" : "t_16",
+      "type" : "elementwise",
+      "name" : "padadd_16",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_17",
+      "top" : "padneg_17",
+      "type" : "activation",
+      "name" : "padneg_17",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_16,padneg_17",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_17",
+      "top" : "t_17",
+      "type" : "elementwise",
+      "name" : "padadd_17",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_18",
+      "top" : "padneg_18",
+      "type" : "activation",
+      "name" : "padneg_18",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_17,padneg_18",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_18",
+      "top" : "t_18",
+      "type" : "elementwise",
+      "name" : "padadd_18",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_19",
+      "top" : "padneg_19",
+      "type" : "activation",
+      "name" : "padneg_19",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_18,padneg_19",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_19",
+      "top" : "t_19",
+      "type" : "elementwise",
+      "name" : "padadd_19",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_20",
+      "top" : "padneg_20",
+      "type" : "activation",
+      "name" : "padneg_20",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_19,padneg_20",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_20",
+      "top" : "t_20",
+      "type" : "elementwise",
+      "name" : "padadd_20",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_21",
+      "top" : "padneg_21",
+      "type" : "activation",
+      "name" : "padneg_21",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_20,padneg_21",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_21",
+      "top" : "t_21",
+      "type" : "elementwise",
+      "name" : "padadd_21",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_22",
+      "top" : "padneg_22",
+      "type" : "activation",
+      "name" : "padneg_22",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_21,padneg_22",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_22",
+      "top" : "t_22",
+      "type" : "elementwise",
+      "name" : "padadd_22",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_23",
+      "top" : "padneg_23",
+      "type" : "activation",
+      "name" : "padneg_23",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_22,padneg_23",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_23",
+      "top" : "t_23",
+      "type" : "elementwise",
+      "name" : "padadd_23",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_24",
+      "top" : "padneg_24",
+      "type" : "activation",
+      "name" : "padneg_24",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_23,padneg_24",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_24",
+      "top" : "t_24",
+      "type" : "elementwise",
+      "name" : "padadd_24",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_25",
+      "top" : "padneg_25",
+      "type" : "activation",
+      "name" : "padneg_25",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_24,padneg_25",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_25",
+      "top" : "t_25",
+      "type" : "elementwise",
+      "name" : "padadd_25",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_26",
+      "top" : "padneg_26",
+      "type" : "activation",
+      "name" : "padneg_26",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_25,padneg_26",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_26",
+      "top" : "t_26",
+      "type" : "elementwise",
+      "name" : "padadd_26",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_27",
+      "top" : "padneg_27",
+      "type" : "activation",
+      "name" : "padneg_27",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_26,padneg_27",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_27",
+      "top" : "t_27",
+      "type" : "elementwise",
+      "name" : "padadd_27",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_28",
+      "top" : "padneg_28",
+      "type" : "activation",
+      "name" : "padneg_28",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_27,padneg_28",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_28",
+      "top" : "t_28",
+      "type" : "elementwise",
+      "name" : "padadd_28",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_29",
+      "top" : "padneg_29",
+      "type" : "activation",
+      "name" : "padneg_29",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_28,padneg_29",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_29",
+      "top" : "t_29",
+      "type" : "elementwise",
+      "name" : "padadd_29",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_30",
+      "top" : "padneg_30",
+      "type" : "activation",
+      "name" : "padneg_30",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_29,padneg_30",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_30",
+      "top" : "t_30",
+      "type" : "elementwise",
+      "name" : "padadd_30",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_31",
+      "top" : "padneg_31",
+      "type" : "activation",
+      "name" : "padneg_31",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_30,padneg_31",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_31",
+      "top" : "t_31",
+      "type" : "elementwise",
+      "name" : "padadd_31",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_32",
+      "top" : "padneg_32",
+      "type" : "activation",
+      "name" : "padneg_32",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_31,padneg_32",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_32",
+      "top" : "t_32",
+      "type" : "elementwise",
+      "name" : "padadd_32",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_33",
+      "top" : "padneg_33",
+      "type" : "activation",
+      "name" : "padneg_33",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_32,padneg_33",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_33",
+      "top" : "t_33",
+      "type" : "elementwise",
+      "name" : "padadd_33",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_34",
+      "top" : "padneg_34",
+      "type" : "activation",
+      "name" : "padneg_34",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_33,padneg_34",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_34",
+      "top" : "t_34",
+      "type" : "elementwise",
+      "name" : "padadd_34",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_35",
+      "top" : "padneg_35",
+      "type" : "activation",
+      "name" : "padneg_35",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_34,padneg_35",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_35",
+      "top" : "t_35",
+      "type" : "elementwise",
+      "name" : "padadd_35",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_36",
+      "top" : "padneg_36",
+      "type" : "activation",
+      "name" : "padneg_36",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_35,padneg_36",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_36",
+      "top" : "t_36",
+      "type" : "elementwise",
+      "name" : "padadd_36",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_37",
+      "top" : "padneg_37",
+      "type" : "activation",
+      "name" : "padneg_37",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_36,padneg_37",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_37",
+      "top" : "t_37",
+      "type" : "elementwise",
+      "name" : "padadd_37",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_38",
+      "top" : "padneg_38",
+      "type" : "activation",
+      "name" : "padneg_38",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_37,padneg_38",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_38",
+      "top" : "t_38",
+      "type" : "elementwise",
+      "name" : "padadd_38",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_39",
+      "top" : "padneg_39",
+      "type" : "activation",
+      "name" : "padneg_39",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_38,padneg_39",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_39",
+      "top" : "t_39",
+      "type" : "elementwise",
+      "name" : "padadd_39",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_40",
+      "top" : "padneg_40",
+      "type" : "activation",
+      "name" : "padneg_40",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_39,padneg_40",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_40",
+      "top" : "t_40",
+      "type" : "elementwise",
+      "name" : "padadd_40",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_41",
+      "top" : "padneg_41",
+      "type" : "activation",
+      "name" : "padneg_41",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_40,padneg_41",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_41",
+      "top" : "t_41",
+      "type" : "elementwise",
+      "name" : "padadd_41",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_42",
+      "top" : "padneg_42",
+      "type" : "activation",
+      "name" : "padneg_42",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_41,padneg_42",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_42",
+      "top" : "t_42",
+      "type" : "elementwise",
+      "name" : "padadd_42",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_43",
+      "top" : "padneg_43",
+      "type" : "activation",
+      "name" : "padneg_43",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_42,padneg_43",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_43",
+      "top" : "t_43",
+      "type" : "elementwise",
+      "name" : "padadd_43",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_44",
+      "top" : "padneg_44",
+      "type" : "activation",
+      "name" : "padneg_44",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_43,padneg_44",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_44",
+      "top" : "t_44",
+      "type" : "elementwise",
+      "name" : "padadd_44",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_45",
+      "top" : "padneg_45",
+      "type" : "activation",
+      "name" : "padneg_45",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_44,padneg_45",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_45",
+      "top" : "t_45",
+      "type" : "elementwise",
+      "name" : "padadd_45",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_46",
+      "top" : "padneg_46",
+      "type" : "activation",
+      "name" : "padneg_46",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_45,padneg_46",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_46",
+      "top" : "t_46",
+      "type" : "elementwise",
+      "name" : "padadd_46",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_47",
+      "top" : "padneg_47",
+      "type" : "activation",
+      "name" : "padneg_47",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_46,padneg_47",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_47",
+      "top" : "t_47",
+      "type" : "elementwise",
+      "name" : "padadd_47",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_48",
+      "top" : "padneg_48",
+      "type" : "activation",
+      "name" : "padneg_48",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_47,padneg_48",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_48",
+      "top" : "t_48",
+      "type" : "elementwise",
+      "name" : "padadd_48",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_49",
+      "top" : "padneg_49",
+      "type" : "activation",
+      "name" : "padneg_49",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_48,padneg_49",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_49",
+      "top" : "t_49",
+      "type" : "elementwise",
+      "name" : "padadd_49",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_50",
+      "top" : "padneg_50",
+      "type" : "activation",
+      "name" : "padneg_50",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_49,padneg_50",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_50",
+      "top" : "t_50",
+      "type" : "elementwise",
+      "name" : "padadd_50",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_51",
+      "top" : "padneg_51",
+      "type" : "activation",
+      "name" : "padneg_51",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_50,padneg_51",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_51",
+      "top" : "t_51",
+      "type" : "elementwise",
+      "name" : "padadd_51",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_52",
+      "top" : "padneg_52",
+      "type" : "activation",
+      "name" : "padneg_52",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_51,padneg_52",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_52",
+      "top" : "t_52",
+      "type" : "elementwise",
+      "name" : "padadd_52",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_53",
+      "top" : "padneg_53",
+      "type" : "activation",
+      "name" : "padneg_53",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_52,padneg_53",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_53",
+      "top" : "t_53",
+      "type" : "elementwise",
+      "name" : "padadd_53",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_54",
+      "top" : "padneg_54",
+      "type" : "activation",
+      "name" : "padneg_54",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_53,padneg_54",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_54",
+      "top" : "t_54",
+      "type" : "elementwise",
+      "name" : "padadd_54",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_55",
+      "top" : "padneg_55",
+      "type" : "activation",
+      "name" : "padneg_55",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_54,padneg_55",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_55",
+      "top" : "t_55",
+      "type" : "elementwise",
+      "name" : "padadd_55",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_56",
+      "top" : "padneg_56",
+      "type" : "activation",
+      "name" : "padneg_56",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_55,padneg_56",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_56",
+      "top" : "t_56",
+      "type" : "elementwise",
+      "name" : "padadd_56",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_57",
+      "top" : "padneg_57",
+      "type" : "activation",
+      "name" : "padneg_57",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_56,padneg_57",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_57",
+      "top" : "t_57",
+      "type" : "elementwise",
+      "name" : "padadd_57",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_58",
+      "top" : "padneg_58",
+      "type" : "activation",
+      "name" : "padneg_58",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_57,padneg_58",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_58",
+      "top" : "t_58",
+      "type" : "elementwise",
+      "name" : "padadd_58",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_59",
+      "top" : "padneg_59",
+      "type" : "activation",
+      "name" : "padneg_59",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_58,padneg_59",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_59",
+      "top" : "t_59",
+      "type" : "elementwise",
+      "name" : "padadd_59",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_60",
+      "top" : "padneg_60",
+      "type" : "activation",
+      "name" : "padneg_60",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_59,padneg_60",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_60",
+      "top" : "t_60",
+      "type" : "elementwise",
+      "name" : "padadd_60",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_61",
+      "top" : "padneg_61",
+      "type" : "activation",
+      "name" : "padneg_61",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_60,padneg_61",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_61",
+      "top" : "t_61",
+      "type" : "elementwise",
+      "name" : "padadd_61",
+      "beta" : 0
+    },
+    {
+      "alpha" : -1,
+      "bottom" : "x_000",
+      "weights" : {
+
+      },
+      "mode" : 6,
+      "debug_info" : "padneg_62",
+      "top" : "padneg_62",
+      "type" : "activation",
+      "name" : "padneg_62",
+      "beta" : 0
+    },
+    {
+      "bottom" : "t_61,padneg_62",
+      "alpha" : 1,
+      "operation" : 0,
+      "beta" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "padadd_62",
+      "top" : "y",
+      "type" : "elementwise",
+      "name" : "padadd_62",
+      "attributes" : {
+        "is_output" : 1
+      }
+    }
+  ]
+}

@@ -1,0 +1,115 @@
+//
+//  P093IntelCrossCheck.m  (P007 mirror)
+//  Merged intel offset database: print + on-device cross-check.
+//
+//  The cross-check is the "porting is easier" hook: for this device's
+//  kern.osrelease, the Dopamine ladder predicts socket.usecount; the probe
+//  compares the prediction against LabOff()->socket_usecount and flags
+//  PASS / MISMATCH / UNSET. This is exactly the check that would have
+//  caught the usecount=0 bug that corrupted one so_list.le_next on the rig
+//  (2026-10-14). Read-only: no kread, no fire, no kwrite.
+//
+//  Mirrors the repo file. Sources: Lum1na runs (PROVEN), Dopamine
+//  libjailbreak info.c (LADDER), DarkSword chain_loader_26.js (LEAD).
+//
+
+#import "P093IntelCrossCheck.h"
+#import "LabDeviceProfile.h"
+#import "LabLocalTime.h"
+#import "LabIntelOffsets.h"
+#import "LabRuntimeOffsets.h"
+
+#import <fcntl.h>
+#import <string.h>
+#import <unistd.h>
+#import <sys/sysctl.h>
+
+#define P093_BUILD @"p093-intel-v1"
+
+static int p093_sysctl_int(const char *name) {
+    int v = 0;
+    size_t len = sizeof(v);
+    if (sysctlbyname(name, &v, &len, NULL, 0) != 0) return -1;
+    return v;
+}
+
+@implementation P093IntelCrossCheck
+
++ (NSString *)tap {
+    NSMutableString *log = [NSMutableString string];
+    NSString *docs = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
+    NSString *path = [docs stringByAppendingPathComponent:@"p093_intel_log.txt"];
+    int lfd = open(path.UTF8String, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+
+    void (^L)(NSString *) = ^(NSString *line) {
+        NSString *out = [line hasSuffix:@"\n"] ? line : [line stringByAppendingString:@"\n"];
+        [log appendString:out];
+        if (lfd >= 0) {
+            const char *s = out.UTF8String;
+            if (s) write(lfd, s, strlen(s));
+        }
+    };
+    void (^Lc)(const char *) = ^(const char *s) {
+        L([NSString stringWithUTF8String:s]);
+    };
+
+    L([NSString stringWithFormat:@"=== p093 session %@ BUILD %@ ===", LabLocalMilitaryNow(), P093_BUILD]);
+    L(@"Merged intel offset DB. PROVEN = our runs. LADDER = Dopamine info.c.");
+    L(@"LEAD = DarkSword claims, unproven. LabOff() stays the ONLY resolver;");
+    L(@"this table never feeds kread/kwrite. Repo docs: DARKSWORD.md LITER8.md.");
+    L([LabDeviceProfile identBlock]);
+
+    L(@"=== INTEL TABLE ===");
+    LabIntelEmitLines(Lc);
+
+    L(@"=== ON-DEVICE LADDER CROSS-CHECK (read-only) ===");
+    int darwinMajor = p093_sysctl_int("kern.osrelease");
+    uint32_t liveUC = LabOff()->socket_usecount;
+    uint64_t liveSB = LabOff()->static_base;
+
+    const char *family = "unknown";
+    uint32_t predicted = 0;
+    if (darwinMajor > 0 && darwinMajor < 23)      { family = "darwin<23.4";          predicted = 0x24c; }
+    else if (darwinMajor >= 23 && darwinMajor < 25){ family = "darwin>=23.4,<25";    predicted = 0x254; }
+    else if (darwinMajor >= 25)                   { family = "darwin>=25 (iOS 26+)"; predicted = 0x23c; }
+
+    char buf[256];
+    snprintf(buf, sizeof(buf), "kern.osrelease major: %d -> ladder family %s -> usecount 0x%x",
+             darwinMajor, family, predicted);
+    L([NSString stringWithUTF8String:buf]);
+
+    if (predicted == 0) {
+        L(@"usecount: NO PREDICTION (unknown darwin); LabOff live value above");
+        snprintf(buf, sizeof(buf), "LabOff live: usecount=0x%x static_base=%016llx",
+                 liveUC, (unsigned long long)liveSB);
+        L([NSString stringWithUTF8String:buf]);
+    } else if (liveUC == 0) {
+        L(@"usecount: FAIL - LabOff table UNSET (0). This is the 2026-10-14 rig");
+        L(@"bug shape: so_count read at socket+0 bumps refcount at wrong");
+        L(@"offset and corrupts one live so_list.le_next. Fill the table");
+        L(@"and REBOOT before any socket-lane tap.");
+        snprintf(buf, sizeof(buf), "LabOff live: usecount=0x%x (predicted 0x%x)", liveUC, predicted);
+        L([NSString stringWithUTF8String:buf]);
+    } else if (liveUC == predicted) {
+        L(@"usecount: PASS - LabOff table matches the Dopamine ladder.");
+        snprintf(buf, sizeof(buf), "LabOff live: usecount=0x%x static_base=%016llx",
+                 liveUC, (unsigned long long)liveSB);
+        L([NSString stringWithUTF8String:buf]);
+    } else {
+        L(@"usecount: MISMATCH - LabOff table disagrees with the ladder.");
+        L(@"Do not port until resolved (one of them is wrong for this build).");
+        snprintf(buf, sizeof(buf), "LabOff live: usecount=0x%x (predicted 0x%x)", liveUC, predicted);
+        L([NSString stringWithUTF8String:buf]);
+    }
+
+    L(@"=== LEAD VERIFICATION STATUS ===");
+    L(@"DarkSword LEAD rows: DEFERRED. Verification needs hasKread kread");
+    L(@"probe of kernproc/allproc sanity + our own Ghidra pass on 23F77.");
+    L(@"If the ladder says iOS 26+ for this device, cs2 socket work must");
+    L(@"use usecount 0x23c, NOT 0x254. This check runs per-device.");
+
+    if (lfd >= 0) { fcntl(lfd, F_FULLFSYNC); close(lfd); }
+    return log;
+}
+
+@end

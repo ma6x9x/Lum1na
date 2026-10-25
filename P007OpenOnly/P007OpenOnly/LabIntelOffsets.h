@@ -1,0 +1,44 @@
+//
+//  LabIntelOffsets.h
+//  Merged intel offset database: Lum1na proven pins + Dopamine libjailbreak
+//  ladder + DarkSword (GhostWave) leads. Pure C, shared by the repo app and
+//  the P007 lab app.
+//
+//  HARD RULE: this table is a REFERENCE and CROSS-CHECK source only.
+//  LabOff() / LabOffTab in LabRuntimeOffsets.m stays the ONLY resolution
+//  source for probe code. No probe may kread/kwrite through LabIntelValue().
+//  LEAD rows are another kit's unproven claims; they enter the LabOff table
+//  only after our own Ghidra proof on the exact SKU/build.
+//
+
+#ifndef LabIntelOffsets_h
+#define LabIntelOffsets_h
+
+#include <stdint.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+typedef struct {
+    const char *name;    // dotted key, e.g. "socket.usecount"
+    const char *family;  // build/family the value claims, e.g. "darwin>=23.4,<25"
+    uint64_t    value;
+    const char *status;  // PROVEN | LADDER | LEAD | GHIDRA | GHIDRA-EXT | PROVEN-EXT
+    const char *source;  // provenance string
+} LabIntelEntry;
+
+extern const LabIntelEntry LabIntelTab[];
+extern const int LabIntelCount;
+
+// 0 when absent. Never a kread/kwrite source.
+uint64_t LabIntelValue(const char *name, const char *family);
+
+// Logs the whole table as ASCII lines (caller appends "name family value status source").
+void LabIntelEmitLines(void (^line)(const char *s));
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* LabIntelOffsets_h */
