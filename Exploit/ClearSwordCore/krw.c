@@ -12,7 +12,11 @@ static bool cs2_set_target_kaddr(uint64_t where) {
         // lab: upstream walk_backtrace (libjailbreak) dropped; the LOG_ERR is
         // the diagnostic. An invalid kaddr here means the corruption window
         // drifted -- retry the run rather than proceed.
-        LOG_ERR("cs2_set_target_kaddr: invalid kaddr %#llx", where);
+        // spam law (2026-10-24 24A435 fire): post-run failure walks repeated
+        // this 8000+ lines — log first 3, then every 1000th.
+        { static uint64_t kaddr_err_logs = 0;
+          if (kaddr_err_logs++ < 3 || (kaddr_err_logs % 1000) == 0)
+            LOG_ERR("cs2_set_target_kaddr: invalid kaddr %#llx", where); }
         return false;
     }
     memset(cs2_ctx.control_data, 0, sizeof(cs2_ctx.control_data));
@@ -23,7 +27,9 @@ static bool cs2_set_target_kaddr(uint64_t where) {
     // we're writting rw_sockets icmp6filt ptr
     int res = setsockopt(cs2_ctx.control_socket, IPPROTO_ICMPV6, ICMP6_FILTER, cs2_ctx.control_data, sizeof(cs2_ctx.control_data));
     if (res != 0) {
-        LOG_ERR("cs2_set_target_kaddr: setsockopt: %s (%d)", strerror(errno), errno);
+        { static uint64_t opt_err_logs = 0;
+          if (opt_err_logs++ < 3 || (opt_err_logs % 1000) == 0)
+            LOG_ERR("cs2_set_target_kaddr: setsockopt: %s (%d)", strerror(errno), errno); }
         return false;
     }
     return true;
