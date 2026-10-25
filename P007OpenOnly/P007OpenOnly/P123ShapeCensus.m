@@ -79,6 +79,17 @@ static int p123_rd_cs2(uint64_t a, void *b, size_t n) { return Lum1naCS2Core_KRe
 static int p123_kb_cs2(uint64_t *out) { *out = Lum1naCS2Core_Kbase(); return *out ? 0 : -1; }
 #endif
 
+/* v3b: C-string anchor parsing — the 17.0 SDK's NSScanner drops the old hex
+   readers (CI error: scanHexUnsignedLongLong not found) and ?: chains on the
+   alloc'ed strings trip clang ("cannot compile this scalar expression yet"). */
+static uint64_t p123_kernel_hex(NSString *hay, NSString *key) {
+    if (hay.length == 0 || key.length == 0) return 0;
+    const char *h = hay.UTF8String, *k = key.UTF8String;
+    const char *p = strstr(h, k);
+    if (p == NULL) return 0;
+    return strtoull(p + strlen(k), NULL, 16);
+}
+
 static BOOL p123_krw(uint64_t *kbaseOut) {
     /* V2 PROVIDER LAW (2026-10-25, device-proven): libkrw's kbase returns 0
        for a mobile-uid app on Dopamine (gSystemInfo needs uid-0 check-in —
@@ -172,25 +183,20 @@ static BOOL p123_krw(uint64_t *kbaseOut) {
     }
 #endif
     {
-        NSMutableString *lm = [[NSMutableString alloc] initWithContentsOfFile:[docs stringByAppendingPathComponent:@"cs2_core_log.txt"]
-                                                      encoding:NSUTF8StringEncoding error:nil] ?: [NSMutableString string];
-        [lm appendFormat:@" %@", (ll ?: @"")];
+        NSMutableString *lm = [NSMutableString string];
+        NSString *cf = [NSString stringWithContentsOfFile:[docs stringByAppendingPathComponent:@"cs2_core_log.txt"]
+                                             encoding:NSUTF8StringEncoding error:nil];
+        [lm appendFormat:@"%@", (cf != nil ? cf : @"")];
 #ifdef P123_HAS_CS2CORE
-        [lm appendFormat:@" %@", (Lum1naCS2Core_LastLog() ?: @"")];
+        [lm appendFormat:@" %@", (Lum1naCS2Core_LastLog() != nil ? Lum1naCS2Core_LastLog() : @"")];
 #endif
-        NSScanner *sc = [NSScanner scannerWithString:lm];
-        if ([sc scanUpToString:@"inp_list_next_pointer: 0x" intoString:NULL] &&
-            [sc scanString:@"inp_list_next_pointer: 0x" intoString:NULL] &&
-            [sc scanHexUnsignedLongLong:&a_next] && a_next >= 0xfffff00000000000ULL) {
-            p123_log(@"[v3] anchor inp-list-next = 0x%llx", a_next);
-        } else { a_next = 0; }
-        sc = [NSScanner scannerWithString:lm];
-        if ([sc scanUpToString:@"icmp6filter: 0x" intoString:NULL] &&
-            [sc scanString:@"icmp6filter: 0x" intoString:NULL] &&
-            [sc scanHexUnsignedLongLong:&a_flt] && a_flt >= 0xfffff00000000000ULL) {
-            p123_log(@"[v3] anchor icmp6filter = 0x%llx", a_flt);
-        } else { a_flt = 0; }
+        a_next = p123_kernel_hex(lm, @"inp_list_next_pointer: 0x");
+        a_flt  = p123_kernel_hex(lm, @"icmp6filter: 0x");
     }
+    if (a_next < 0xfffff00000000000ULL) { a_next = 0; }
+    else { p123_log(@"[v3] anchor inp-list-next = 0x%llx", a_next); }
+    if (a_flt < 0xfffff00000000000ULL) { a_flt = 0; }
+    else { p123_log(@"[v3] anchor icmp6filter = 0x%llx", a_flt); }
     struct { uint64_t lo; uint64_t hi; const char *name; } bands[4];
     uint32_t nb = 0;
     if (a_next) { bands[nb].lo = a_next - 0x40000; bands[nb].hi = a_next + 0xc0000; bands[nb].name = "inp-list-next"; nb++; }
