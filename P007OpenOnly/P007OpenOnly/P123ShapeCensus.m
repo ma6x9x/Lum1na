@@ -30,11 +30,11 @@
 #import <unistd.h>
 #import "LabLocalTime.h"
 #import "P007Board.h"
+#if __has_include("Lum1naCS2Core.h")   /* same guard as rig P113 — the rig tree
+                                          carries no Lum1naCS2Core header */
 #import "Lum1naCS2Core.h"   /* in-process ClearSword core — mini-proven KRW */
-
-#define P123_HAS_CS2CORE 1   /* v2b fix: the #ifdef fallback was compiled OUT — the define
-                                was copied from P113 but never shipped, so "no krw provider"
-                                fired on the mini at 19:10 even on a booted cs2core */
+#define P123_HAS_CS2CORE 1
+#endif
 
 #define P123_TAG      @"P123 shapecensus"
 #define P123_BUILD    @"shapecensus-mini-v1"
