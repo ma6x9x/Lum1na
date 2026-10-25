@@ -2,6 +2,11 @@
 
 void* cs2_free_worker(void* arg) {
     cs2_free_shared_t* shared = arg;
+    /* calib-exact delta #1 (2026-10-24 cross-ref): the calib's swap thread
+       runs USER_INTERACTIVE so the one-shot map lands INSIDE the copy
+       window; cs2's default-QoS worker was scheduled after the copy —
+       w=16384 clean on every try. */
+    pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0);
 
     while (atomic_load_explicit(&shared->free_thread_start, memory_order_seq_cst) == 0);
 

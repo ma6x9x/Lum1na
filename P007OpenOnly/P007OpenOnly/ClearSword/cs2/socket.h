@@ -14,3 +14,5 @@ kern_return_t cs2_find_and_corrupt(mach_port_t memory_object, mach_vm_offset_t s
                                       size_t* target_inp_gencnt_count, bool do_read);
 
 #endif /* cs2_socket_h */
+
+extern void* cs2_churn_thread(void* arg);
