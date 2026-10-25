@@ -20,6 +20,7 @@
 #import "ClearSword/LuminaClearSword.h"
 #import "ClearSword/CS2Runner.h"
 #import "ClearSword/LightSwordCalib.h"
+#import "P122SwordForge.h"
 #import "P023VtExtremeProbe.h"
 #import "P024NecpStringRace.h"
 #import "P014CloseMethodRace.h"
