@@ -77,7 +77,11 @@ uint64_t cs2_spray_socket(void) {
             uint64_t v; memcpy(&v, socket_info + o, sizeof(v));
             if (v && (v >> 32) == 0 && v < 0x4000000) { inp_gencnt = v; caloff = o; break; }
         }
-        if (inp_gencnt) LOG("gencnt self-calibrated at blob+0x%llx (0x110 gave 0x%llx)", (unsigned long long)caloff, (unsigned long long)v110);
+        { static uint64_t pick_logs = 0;
+          if (inp_gencnt && pick_logs++ < 3)
+            LOG("gencnt pick: blob+0x%llx val=%#llx (0x110 gave 0x%llx)",
+                (unsigned long long)caloff, (unsigned long long)inp_gencnt, (unsigned long long)v110);
+          else if (pick_logs == 3) { pick_logs++; LOG("gencnt pick logs capped (self-calibration continues silently)"); } }
     }
     if (inp_gencnt == 0) {
         LOG("spray socket %zu: no plausible gencnt in PIDFILEPORTSOCKETINFO blob", cs2_ctx.socket_ports_count);
