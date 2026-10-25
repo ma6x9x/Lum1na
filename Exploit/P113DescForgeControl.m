@@ -200,8 +200,8 @@ static NSString *P113Ret(void) {
             }
         }
         free(rb);
-        if (!found) p113_log(@"[-] marker not found in the anchor windows (zone-class scan, honest miss — widen or add anchors)");
     }
+    if (!found) { p113_log(@"[-] marker not found in the anchor windows (zone-class scan, honest miss — widen or add anchors)"); }
     else {
         p113_log(@"[+] kmsg kdata @0x%llx (marker 'P133M' found)", found);
         /* v2: dump the kernel desc area BEFORE touching it — learns the live
