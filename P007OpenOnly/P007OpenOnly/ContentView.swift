@@ -396,6 +396,7 @@ struct ContentView: View {
             "t014f": "t014_close_log.txt",
             "cscali": "racecalib_log.txt",
             "swordforge": "p122_swordforge_log.txt",
+            "shapecensus": "p123_shapecensus_log.txt",
             "cskrw": "clearsword_krw_log.txt",
             "cs2": "cs2_krw_log.txt",
             "intel": "p093_intel_log.txt",
@@ -667,6 +668,7 @@ struct ContentView: View {
                 result = "STOP T014 intercepted — XR leftover. Use P040 dest ABI only."
             case "cscali":      result = LightSwordCalib.runCalib()
             case "swordforge": result = P122SwordForge.tap()
+            case "shapecensus": result = P123ShapeCensus.tap()
             case "lswarm":
                 do {
                     let fm = FileManager.default
