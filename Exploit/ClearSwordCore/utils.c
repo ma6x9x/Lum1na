@@ -96,6 +96,13 @@ void cs2_init_files(void) {
 
     cs2_ctx.read_fd = open(cs2_ctx.read_file_path, O_RDWR);
     cs2_ctx.write_fd = open(cs2_ctx.write_file_path, O_RDWR);
+    /* calib-exact delta #3 (2026-10-24 cross-ref): F_NOCACHE routes pwritev
+       into the direct/cluster IO paths (the window family the calib races
+       through, and the dest-side of vm_map_get_upl) instead of the buffered
+       page-cache copyin. The calib's fdMark runs F_NOCACHE; cs2's fd did
+       not — the last remaining file-path delta between the two races. */
+    fcntl(cs2_ctx.read_fd, F_NOCACHE, 1);
+    fcntl(cs2_ctx.write_fd, F_NOCACHE, 1);
 
     LOG("read_fd: %x", cs2_ctx.read_fd);
     LOG("write_fd: %x", cs2_ctx.write_fd);
