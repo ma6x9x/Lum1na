@@ -189,6 +189,7 @@ struct ContentView: View {
                         moreRow("INTEL. merged offset DB + ladder cross-check (read-only)", "intel")
                         moreRow("CS KRW. mapped theory (runKRW, 23F77 offsets)", "cskrw")
                         moreRow("CS calib. phys_oob race only (not KRW)", "cscali")
+                        moreRow("P122 SwordForge. combined 64788 KRW test (freer→reclaim→read)", "swordforge")
                     }
                     Section("Prove (23F77 live — Ident first)") {
                         moreRow("0. Device identity + prove matrix", "ident")
