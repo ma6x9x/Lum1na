@@ -33,7 +33,7 @@
 #import <unistd.h>
 #import <sys/stat.h>
 
-#define P090_BUILD @"p090-momentarius-census-v1"
+#define P090_BUILD @"p090-momentarius-census-v3"
 
 // ---- libkrw plugin ABI (Dopamine BaseBin/_external/include/libkrw) ----
 typedef int (*krw_kbase_func_t)(uint64_t *addr);
@@ -238,17 +238,48 @@ static BOOL p090_looks_kernel(uint64_t v) {
                              detail:[NSString stringWithFormat:@"kbase=0x%llx", (unsigned long long)kbase]
                              source:@"p090"];
 
-    // ---- Step 3: __DATA scan (A13 22G100 only - delta is SKU-specific) ----
-    BOOL isRig = [[LabDeviceProfile machine] isEqualToString:@"iPhone12,1"] &&
-                 [[LabDeviceProfile osversion] isEqualToString:@"22G100"];
-    if (!isRig) {
-        p090_log(@"[-] __DATA scan gated: delta 0x35CC000 is proven for A13 22G100 only.");
-        p090_log(@"[-] This device gets its own delta from Ghidra before any scan.");
-        p090_log(@"[*] Prereq report: scan delta for this SKU = v2 task.");
+    // ---- Step 3: per-build FILESET windows (v3) — deltas = unslid segment
+    // VA − staticBase, derived from each build's decrypted kernelcache via
+    // `ipsw macho info` (UUID-matched to the device's own panic headers).
+    // Reads stay INSIDE the fileset's mapped segments = the six-panic-law
+    // safe habitat. 22G100 = the A13 on-device-proven delta (its constants).
+    // 21D50 cache UUID 2BD6A021… 23F77 cache UUID 107196E1… ----
+    NSString *mach = [LabDeviceProfile machine];
+    NSString *osv  = [LabDeviceProfile osversion];
+    struct { uint64_t delta; uint64_t cap; const char *tag; } wins[4];
+    uint32_t nW = 0;
+    {
+        /* A13 22G100 — the original proven window (device-validated). */
+        BOOL a13 = ([mach isEqualToString:@"iPhone12,1"] && [osv isEqualToString:@"22G100"]);
+        /* A14 21D50 (mini/12 17.3) — dc 0x1870000/0x4C8000, d 0x32A0000/0x210000. */
+        BOOL a14_21d = ([mach hasPrefix:@"iPhone13,"] && [osv isEqualToString:@"21D50"]);
+        /* A14 23F77 (hunt 12 26.5) — dc 0xA80000/0x544000, d 0x3870000/0x240000. */
+        BOOL a14_23f77 = ([mach hasPrefix:@"iPhone13,"] && [osv isEqualToString:@"23F77"]);
+        if (a13) {
+            wins[nW].delta = kP090_DataDelta; wins[nW].cap = kP090_ScanCap;
+            wins[nW].tag = "a13-22g100-proven"; nW++;
+        }
+        if (a14_21d) {
+            wins[nW].delta = 0x1870000ULL; wins[nW].cap = 0x4C8000ULL;
+            wins[nW].tag = "a14-21d50-data-const"; nW++;
+            wins[nW].delta = 0x32A0000ULL; wins[nW].cap = 0x210000ULL;
+            wins[nW].tag = "a14-21d50-data"; nW++;
+        }
+        if (a14_23f77) {
+            wins[nW].delta = 0xA80000ULL; wins[nW].cap = 0x544000ULL;
+            wins[nW].tag = "a14-23f77-data-const"; nW++;
+            wins[nW].delta = 0x3870000ULL; wins[nW].cap = 0x240000ULL;
+            wins[nW].tag = "a14-23f77-data"; nW++;
+        }
+    }
+    if (nW == 0) {
+        p090_log(@"[-] __DATA scan gated: no per-build window row for %@ %@ yet.",
+                 mach, osv);
+        p090_log(@"[-] This build gets its own deltas from its decrypted kernelcache first (twin law).");
+        p090_log(@"[*] Prereq report: scan deltas for this build = v2 task.");
         NSString *ret = g_p090_buf; g_p090_buf = nil; p090_finish(); return ret;
     }
-    p090_log(@"[*] Step 3: __DATA scan, window = kbase + 0x%llx (A13 22G100 proven), cap 0x%llx.",
-             (unsigned long long)kP090_DataDelta, (unsigned long long)kP090_ScanCap);
+    p090_log(@"[*] Step 3: __DATA windows for %@ %@ — %u window(s).", mach, osv, nW);
 
     const char *needle = "Darwin Kernel Version";
     const size_t needleLen = strlen(needle);
@@ -263,11 +294,18 @@ static BOOL p090_looks_kernel(uint64_t v) {
         p090_log(@"[-] malloc chunk failed.");
         NSString *ret = g_p090_buf; g_p090_buf = nil; p090_finish(); return ret;
     }
-    uint64_t windowBase = kbase + kP090_DataDelta;
-    for (uint64_t off = 0; off < kP090_ScanCap && !allprocHead; off += kP090_Chunk) {
+    uint64_t windowBase = 0, capNow = 0;
+    const char *wTag = "";
+    for (uint32_t wi2 = 0; wi2 < nW && !(allprocHead && versionVA); wi2++) {
+        windowBase = kbase + wins[wi2].delta;
+        capNow = wins[wi2].cap;
+        wTag = wins[wi2].tag;
+        p090_log(@"[*] window[%u] %s = kbase + 0x%llx, cap 0x%llx",
+                 wi2, wTag, wins[wi2].delta, wins[wi2].cap);
+    for (uint64_t off = 0; off < capNow && !allprocHead; off += kP090_Chunk) {
         size_t chunkLen = kP090_Chunk;
-        if (windowBase + off + chunkLen > windowBase + kP090_ScanCap) {
-            chunkLen = kP090_ScanCap - off;
+        if (windowBase + off + chunkLen > windowBase + capNow) {
+            chunkLen = capNow - off;
         }
         rc = f_kread(windowBase + off, chunk, chunkLen);
         if (rc != 0) {
@@ -317,8 +355,10 @@ static BOOL p090_looks_kernel(uint64_t v) {
                 if (nextEl == headVA || !p090_looks_kernel(nextEl)) break;
                 cur = nextEl;
             }
+            if (allprocHead && versionVA) break;   /* v3: window loop satisfied */
         }
     }
+    }   /* v3: per-window outer loop */
     free(chunk);
 
     if (versionVA) {
