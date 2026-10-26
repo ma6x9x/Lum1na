@@ -145,6 +145,8 @@ static BOOL p090_looks_kernel(uint64_t v) {
     // kills libkrw's kbase on this app), then libkrw as the FKT fallback. ----
     krw_kbase_func_t f_kbase = NULL;
     krw_kread_func_t f_kread = NULL;
+    int rc = 0;   /* hoisted (v2b): the libkrw branch owns the old decl */
+
 #ifdef P090_HAS_CS2CORE
     if (Lum1naCS2Core_IsLive()) {
         f_kbase = p090_kb_cs2;
@@ -189,7 +191,7 @@ static BOOL p090_looks_kernel(uint64_t v) {
     }
     struct p090_krw_handlers_s handlers;
     memset(&handlers, 0, sizeof(handlers));
-    int rc = init(&handlers);
+    rc = init(&handlers);
     if (rc != 0 || !handlers.kread || !handlers.kbase) {
         p090_log(@"[-] krw_initializer rc=%d kread=%p kbase=%p -> no usable primitives.",
                  rc, (void *)handlers.kread, (void *)handlers.kbase);
