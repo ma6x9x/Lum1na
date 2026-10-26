@@ -17,7 +17,7 @@
 #import "LabLocalTime.h"
 #import "LabDeviceProfile.h"
 
-#define P097_BUILD @"p097-consolesec-v1"
+#define P097_BUILD @"p097-consolesec-v2-resume-drain"
 
 /* dlsym prototypes (local per P059/P032 convention) */
 typedef CFMutableDictionaryRef (*IOServiceMatching_t)(const char *);
@@ -150,16 +150,24 @@ static void p097_interest_cb(void *refcon, io_service_t service,
         }
 
         L(@"[*] NOW LOCK + UNLOCK the device (or lock from control center).");
-        L(@"[*] waiting up to 45 s on the run loop ...");
+        L(@"[*] waiting up to 150 s on the run loop (v2 resume-drain: the app");
+        L(@"[*]   suspends on lock — the queued event must fire right after unlock).");
 
-        CFAbsoluteTime deadline = CFAbsoluteTimeGetCurrent() + 45.0;
+        CFAbsoluteTime deadline = CFAbsoluteTimeGetCurrent() + 150.0;
         while (g_p097_hits == 0 && CFAbsoluteTimeGetCurrent() < deadline) {
             CFRunLoopRunInMode(kCFRunLoopDefaultMode, 1.0, false);
+            /* v2: also spin a background-eligible drain — the notification
+               port's messages queue while suspended; the 1.0 s loop pumps
+               them as soon as the app resumes (foreground re-entry). */
+            if (g_p097_hits == 0 && CFAbsoluteTimeGetCurrent() < deadline) {
+                CFRunLoopRunInMode(kCFRunLoopCommonModes, 0.1, true);
+            }
         }
 
         if (g_p097_hits == 0) {
-            L(@"[-] no console-security change observed in 45 s - lock/unlock once and re-tap.");
-            L(@"[-] honest miss (registration may fire only on a real console-user change).");
+            L(@"[-] no console-security change observed in 150 s - the notifier");
+            L(@"[-] either fires only outside app lifetime on this train, or the");
+            L(@"[-] IOConsoleSecurityInterest path changed on 27.x. Honest miss.");
         } else {
             uint64_t arg = g_p097_arg;
             L(@"[+] VERDICT: kIOMessageConsoleSecurityChange=0x%08x arg=0x%016llx",
