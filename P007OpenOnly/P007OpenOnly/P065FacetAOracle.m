@@ -318,10 +318,19 @@ static id<MTLTexture> p065_tex(id<MTLDevice> dev, uint32_t w, uint32_t h) {
                 p065_log(@"[v4] DIRECT-STALE purge(dead id=%u, state=%d) kr=0x%x "
                          "0xe00002be = UAF CONFIRMED", censusId, st, (unsigned)krU);
             } else {
-                /* honest banner (v4b drift fix: never label CONFIRMED at 0x0 —
-                   the 10-25 18:59 log ran this line twice as "0x0 UAF CONFIRMED") */
-                p065_log(@"[v4] DIRECT-STALE purge(dead id=%u, state=%d) kr=0x%x "
-                         "(no 2be — entry retained)", censusId, st, (unsigned)krU);
+                /* honest banner (v4b 21:49 hunt-12 lesson: 0x2c2 on the dead id
+                   = CLEAN FREE (table dropped the slot), NOT "retained" — the
+                   original label misread it; the UAF only exists at 2be) */
+                if (krU == P065_UAF_KR) {
+                    p065_log(@"[v4] DIRECT-STALE purge(dead id=%u, state=%d) kr=0x%x "
+                             "0xe00002be = UAF CONFIRMED", censusId, st, (unsigned)krU);
+                } else if (krU == 0xe00002c2) {
+                    p065_log(@"[v4] DIRECT-STALE purge(dead id=%u, state=%d) kr=0x%x "
+                             "(2c2 = clean free — no dangling index)", censusId, st, (unsigned)krU);
+                } else {
+                    p065_log(@"[v4] DIRECT-STALE purge(dead id=%u, state=%d) kr=0x%x "
+                             "(no 2be — entry retained)", censusId, st, (unsigned)krU);
+                }
             }
         }
         p065_log(@"[v4] direct-stale phase done, hits=%u", hits);
