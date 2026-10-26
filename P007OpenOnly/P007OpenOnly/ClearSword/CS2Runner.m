@@ -1,6 +1,7 @@
 #import "CS2Runner.h"
 #import "LabRuntimeOffsets.h"
 #import "LabDeviceProfile.h"
+#import "../P007Board.h"
 
 // cs2 core (verbatim upstream, prefixed)
 #include "cs2/poc.h"   // cs2_run, cs2_pe*, cs2_context_t/cs2_ctx
@@ -13,6 +14,16 @@
 #include <sys/sysctl.h>
 #include <time.h>
 #include <unistd.h>
+
+/* v2 board-wire (audit 2026-10-25: the arm self-tested but never committed the
+   board, so a passing arm could never flip hasKread on the 12). The fn the
+   board's commitSlide re-checks kread32(kbase) through. */
+static uint32_t cs2_arm_kread32(uint64_t kaddr, BOOL *ok) {
+    uint32_t v = 0;
+    if (!cs2_kreadbuf(kaddr, &v, sizeof v)) { if (ok) *ok = NO; return 0; }
+    if (ok) *ok = YES;
+    return v;
+}
 
 // lab deadline infra consumed by cs2/common.h cs2_expired()
 volatile int cs2_stop = 0;
@@ -192,6 +203,19 @@ static BOOL lsword_arm_licensed(int *windows, BOOL *explicit_arm) {
         if (!magic_ok) {
             cs2_log("HONESTY: magic mismatch => kread NOT confirmed; hasKread stays NO.");
             ret = -2;
+        } else if (!typeinfo_ok) {
+            cs2_log("HONESTY: typeinfo gate FAIL (board law: magic alone is not the gate) => ret=-2, hasKread stays NO.");
+            ret = -2;
+        } else {
+            /* v2 board-wire: register the reader + commit — the gate check is
+               the board's own kread32(kbase) inside commitSlide. */
+            P007Board *board = [P007Board shared];
+            [board setKread32:cs2_arm_kread32];
+            uint64_t slide = cs2_ctx.kernel_slide;
+            BOOL committed = [board commitSlide:slide reason:@"lswarm_cs2"];
+            cs2_log("%s board commitSlide reason=lswarm_cs2 %s (slide=0x%llx)",
+                    committed ? "[+]" : "[-]", committed ? "OK — hasKread=NO until this; now gated again" : "did not commit (gate re-check failed)",
+                    (unsigned long long)slide);
         }
     } else {
         cs2_log("=== cs2 run FAILED ret=%d (see steps above; log: %s) ===",
