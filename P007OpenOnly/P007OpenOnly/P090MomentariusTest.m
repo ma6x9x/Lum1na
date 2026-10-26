@@ -52,6 +52,19 @@ struct p090_krw_handlers_s {
 };
 typedef int (*krw_plugin_initializer_t)(struct p090_krw_handlers_s *handlers);
 
+// ---- v2 provider chain (2026-10-25: the mini's 21D50 route) — cs2core FIRST;
+// libkrw stays the fallback. The mobile-uid law (libkrw kbase=0 for this app)
+// is why the core lane leads now. Same __has_include guard as rig P113 —
+// the rig tree may carry no Lum1naCS2Core header. ----
+#if __has_include("Lum1naCS2Core.h")
+#import "Lum1naCS2Core.h"
+#define P090_HAS_CS2CORE 1
+#endif
+#ifdef P090_HAS_CS2CORE
+static int p090_rd_cs2(uint64_t a, void *b, size_t n) { return Lum1naCS2Core_KReadBuf(a, b, n) ? 0 : -1; }
+static int p090_kb_cs2(uint64_t *out) { *out = Lum1naCS2Core_Kbase(); return *out ? 0 : -1; }
+#endif
+
 static int g_p090_fd = -1;
 static NSMutableString *g_p090_buf;
 
@@ -128,7 +141,18 @@ static BOOL p090_looks_kernel(uint64_t v) {
                                      ko.proc_pid, ko.proc_svuid, ko.ipc_space_table]
                              source:@"p090"];
 
-    // ---- Step 2: libkrw glue (works only on a jailbroken device) ----
+    // ---- Step 2: KRW provider glue — v2: cs2core FIRST (the mobile-uid law
+    // kills libkrw's kbase on this app), then libkrw as the FKT fallback. ----
+    krw_kbase_func_t f_kbase = NULL;
+    krw_kread_func_t f_kread = NULL;
+#ifdef P090_HAS_CS2CORE
+    if (Lum1naCS2Core_IsLive()) {
+        f_kbase = p090_kb_cs2;
+        f_kread = p090_rd_cs2;
+        p090_log(@"[+] krw via cs2core (in-process — the mini-proven route)");
+    }
+#endif
+    if (!f_kread) {
     p090_log(@"[*] Step 2: libkrw glue.");
     const char *candidates[] = {
         "/var/jb/usr/lib/libkrw/libkrw-dopamine.dylib",   /* Dopamine 3.x */
@@ -173,9 +197,9 @@ static BOOL p090_looks_kernel(uint64_t v) {
     }
     p090_log(@"[+] krw_initializer rc=0 handlers v=%llu kbase=%p kread=%p",
              (unsigned long long)handlers.version, (void *)handlers.kbase, (void *)handlers.kread);
-
-    krw_kbase_func_t f_kbase = handlers.kbase;
-    krw_kread_func_t f_kread = handlers.kread;
+    f_kbase = handlers.kbase;
+    f_kread = handlers.kread;
+    }   /* end of the libkrw-glue fallback branch */
     uint64_t kbase = 0;
     rc = f_kbase(&kbase);
     if (rc != 0 || kbase < 0xfffff00000000000ULL) {
