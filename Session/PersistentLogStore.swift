@@ -32,6 +32,7 @@ public final class PersistentLogStore {
         "shapecensus": "p123_shapecensus_log.txt",
         "descforge": "p113_descforge_log.txt",
         "swordchain": "p125_swordchain_log.txt",
+        "lsidcalib": "racecalib_log.txt",
         "krw": "p06x_krw_log.txt",
         "krw2": "p06x_krw2_log.txt",
         "krw3": "p06x_krw3_log.txt",
