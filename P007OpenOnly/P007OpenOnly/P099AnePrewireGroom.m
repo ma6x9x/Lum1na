@@ -384,7 +384,18 @@ static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
         g_p099_portkindN = 0;
         {
             NSString *dialP = [docs stringByAppendingPathComponent:@"p099_victim.txt"];
-            if ([[NSFileManager defaultManager] fileExistsAtPath:dialP]) {
+            NSFileManager *fm99 = [NSFileManager defaultManager];
+            if (![fm99 fileExistsAtPath:dialP]) {
+                /* v6b stage: the default door-round dial is WRITTEN on first
+                   run so the door is armed on-device without an external
+                   push (v12b night order). Edit/delete on-device to change. */
+                NSString *def = @"portkind=64\n";
+                if ([def writeToFile:dialP atomically:YES
+                            encoding:NSUTF8StringEncoding error:nil])
+                    L(@"[v6] STAGED default door dial (portkind=64) → Documents/p099_victim.txt "
+                      @"(was absent; the last 64 victims send PORTKIND = the conversion door)");
+            }
+            if ([fm99 fileExistsAtPath:dialP]) {
                 NSString *dial = [NSString stringWithContentsOfFile:dialP
                     encoding:NSUTF8StringEncoding error:nil];
                 NSRange r = [dial rangeOfString:@"portkind="];

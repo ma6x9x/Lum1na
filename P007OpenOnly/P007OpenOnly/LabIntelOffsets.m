@@ -135,6 +135,19 @@ const LabIntelEntry LabIntelTab[] = {
     { "lockdownd.scprefs_cltm",     "ncxcy lockdownd 26.5",   0x10000A570ULL,        "LEAD", "post-session SCPreferences write, no auth check" },
     { "lockdownd.braa_cluster",     "ncxcy lockdownd 26.5",   0x100006BFCULL,        "LEAD", "8x braa vtable dispatch 0x100006bfc-0x100006cc0; PAC forgery needs x2 control" },
 
+    // ---- GHIDRA-EXT: 24A435 T8150 exact-build sweep (2026-10-26 night, note 266 §P) ----
+    { "t8150.sysent",           "Ghidra-ext 24A435 T8150", 0xFFFFFE0007EAEE90ULL, "GHIDRA-EXT", "BSD sysent: stride 16, ~558 entries (limit 0x22e); auth-fn hi words 0x8010/8020/8030; tiny cluster 0xad83464/74/8c; [21]=0xadca020 [24]=0xadcf500" },
+    { "t8150.iogpu_smethods_a", "Ghidra-ext 24A435 T8150", 0xFFFFFE00082F64B0ULL, "GHIDRA-EXT", "IOGPUDeviceUserClient sMethods A: 56 entries sel0..0x37 stride 0x18; table B 0x82f69f0; choice = [uc+0x103] bit0" },
+    { "t8150.iogpu_dispatch",   "Ghidra-ext 24A435 T8150", 0xFFFFFE000A024D94ULL, "GHIDRA-EXT", "getTargetAndMethodForIndex; gate [uc+0x100] bit0 else 0xE00002D8" },
+    { "t8150.s_submit_buffers", "Ghidra-ext 24A435 T8150", 0xFFFFFE000A02299CULL, "GHIDRA-EXT", "s_submit_command_buffers = sel 0x24 (idx 36) on 24A435 — Rocket's 17.x sel 0x1A does NOT carry; sel26 = 0xa022c2c single-resource" },
+    { "t8150.rock_keys_1_3",    "Ghidra-ext 24A435 T8150", 0xFFFFFE000A02C3C0ULL, "GHIDRA-EXT", "Rocket battery CONFIRMED: owner=0x120, submitObject=0x28, resObjMemory=0x30 (site 0xa02c3c0); ioGpuUserClientTypeStatic=0x7f20260 (AGXDeviceUserClient-class nuance!)" },
+    { "t8150.ave2_mapper",      "Ghidra-ext 24A435 T8150", 0xFFFFFE00087A4B4CULL, "GHIDRA-EXT", "AVE2 id->slot mapper (smell: raw id*8 offsets, no size check; only bound = ctx+0x110 AND). sole caller 0x8879dc8; configure 0x887660c validates NOTHING; thunk 0x8876968; sibling reader 0x87a450c" },
+    { "sptm.022.remove_ctx_id", "SPTM 820.0.22 blob",      0xFFFFFFF0270B7AB0ULL, "GHIDRA-EXT", "UAT race fn (40.18-twin at -0x1c): casab ttbat-lock 0x…0b7b38 -> PTE stores 0x…0b7b88/90 -> dsb oshst -> tlbi 0x…0b7bf0 — NO Dekker gate/ish barrier = UNGATED on 24A435" },
+    { "sptm.022.upd_unmap_sync","SPTM 820.0.22 blob",      0xFFFFFFF0270B8460ULL, "GHIDRA-EXT", "update_permissions_unmap_sync (twin -0x1c); prepare_fw_unmap_continue 0x…0b9594; root PTE writer 0x…0b80e4; issue_tlbi 0x…0b7ed0 (stub table 0x2701c6e8); map_continue 0x…0b9a90" },
+    { "sptm.022.percpu",        "SPTM 820.0.22 blob",      0xFFFFFFF02709E1F8ULL, "GHIDRA-EXT", "mutation-path globals: +0x60 ttbat lock, +0x78 root table, +0x138 ctx array; per-CPU base = sysreg s3_6_c15_c11_1, flag byte +0x1628" },
+    { "vfs.cluster_write",      "Ghidra-ext 24A435 T8150", 0xFFFFFE000AD67FB8ULL, "GHIDRA-EXT", "clustered-write pipeline (note 266 §G): contig-decider 0xad68b04 (bail PRESENT), copy path 0xad682a8, upl-uiomove 0xad6c398, copyin core 0xad14e28; vm_fault side still open" },
+    { "t8150.physmap_dats",     "Ghidra-ext 24A435 T8150", 0xFFFFFE0007E59780ULL, "GHIDRA-EXT", "physmap aperture DATs (data-abort handler 0xad1cdd4): physmap 0x7e59780..0x7e58df8, static region 0x7e58e00..0x7e97b50; vm_page array 0x7e58010; NO gPhysBase strings on 27.x" },
+    { "t8150.debugheader_fn",   "Ghidra-ext 24A435 T8150", 0xFFFFFE000AB55AF0ULL, "GHIDRA-EXT", "debug-header printer: chain head *(0x7ed30f0+0x60); prints Kernel slide + SPTM/TXM load addrs + UUIDs per entry; panic_decode upgrade candidate" },
     // ---- PROVEN-EXT: m2scaler iosaDiag leak (P098 implements) ----
     { "m2scaler.get_iosaDiag_sel",  "iOS<=26.5.2 (23F77 live)", 8,                   "PROVEN-EXT", "AppleM2ScalerCSCDriver sel 8; event_payload +0x18 leaks IOSurface KVA (MTE tag on A17+); fixed 26.6 (23G71); likely CVE-2026-64709" },
 };
