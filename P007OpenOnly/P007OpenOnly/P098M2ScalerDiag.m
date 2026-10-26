@@ -251,14 +251,21 @@ static BOOL p098_addr_exec_p(const void *addr, char *out, size_t outn) {
         // bytes read = no queue on the connection). QueueCreate = sel 6,
         // struct input, 0x410 bytes (p098 decode). Benign zeros = rejected or
         // created without transforms; failures are honest.
+        /* v6 sizing law (23:58 23H30 lesson): the runtime queue row WINS — the
+           hardcoded 0x410 = the A14-23F77 class; this iPad's row = 0x408 and
+           the size mismatch rejected the create with 0x2c2 outright. */
+        uint32_t qsz = 0x408u;
+        { const LabOffTab *qoff = LabOff();
+          if (qoff && qoff->queue_create_size) qsz = qoff->queue_create_size;
+          if (qsz > 0x410) qsz = 0x410; }   /* buffer bound */
         static uint8_t qBuf[0x410];
         memset(qBuf, 0, sizeof(qBuf));
         size_t qOutLen = 0;
         uint64_t qOut[4] = {0};
-        kern_return_t krQ = pCallStruct(conn, 6, qBuf, sizeof(qBuf), qOut, &qOutLen);
-        L(@"[v5] QueueCreate sel=6 stIn=0x410 zeros kr=0x%x outLen=%zu "
+        kern_return_t krQ = pCallStruct(conn, 6, qBuf, qsz, qOut, &qOutLen);
+        L(@"[v6] QueueCreate sel=6 stIn=0x%x (runtime row; 0x410=F77 class) zeros kr=0x%x outLen=%zu "
           @"out=%016llx %016llx %016llx %016llx",
-          krQ, qOutLen, qOut[0], qOut[1], qOut[2], qOut[3]);
+          qsz, krQ, qOutLen, qOut[0], qOut[1], qOut[2], qOut[3]);
 
         // Selector 8 = user_get_iosaDiag. Input shape unknown on this build:
         // try the natural {user VA of out-buffer, size} pair; the driver
