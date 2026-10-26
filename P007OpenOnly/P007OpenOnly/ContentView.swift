@@ -34,7 +34,7 @@ struct ContentView: View {
                         hotButton("P084 PUAF", id: "p084")
                     }
                     HStack(spacing: 8) {
-                        hotButton("P057 AKS v6", id: "p057")
+                        hotButton("P057 AKS v9", id: "p057")
                         hotButton("KREAD", id: "kreadtest")
                     }
                     HStack(spacing: 8) {
@@ -160,7 +160,7 @@ struct ContentView: View {
                         moreRow("P073. 43748 second-table conversion (v46 parity + detectors)", "p073")
                         moreRow("KREAD. commitSlide kread32(kbase)==MH_MAGIC_64", "kreadtest")
                         moreRow("P062 NEON exception-state self-test (not KRW, not hasKread)", "p062")
-                        moreRow("P057 AKS 65343 sel0/1 hex (not 163-sel, not hasKread)", "p057")
+                        moreRow("P057 AKS 65343 sel16 feeder (not 163-sel, not hasKread)", "p057")
                         moreRow("P050 buflet UAF v3 (not 65349)", "p050")
                         moreRow("P019 64749 iopl MAP (size mismatch, not 65349)", "p019")
                         moreRow("P051 gamed census v6 (in-cache only, no WVEK/TrollRestore)", "p051")

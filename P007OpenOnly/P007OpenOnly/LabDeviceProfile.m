@@ -279,8 +279,8 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
     [s appendString:[self beta1Matrix]];
     [s appendString:@"prove matrix:\n"
                     @"  hasKread=NO until commitSlide kread32(kbase)==MH_MAGIC_64 on THIS sku\n"
-                    @"  LIVE A14: P057 65343 KASLR sel0/1; P044 occupancy+conversion bar; P099 254 occupancy; KREAD; 64788 Facet A P065 0x2be oracle; P063 aio84530 HEAP; P070 census\n"
-                    @"  LIVE A12X: P065 Facet A; P063 aio84530 HEAP; P057 sel0/1; CS2 phys_oob READ scan; P034 occupancy class; KREAD; P070 census. 254 SKIP.\n"
+                    @"  LIVE A14: P057 65343 KASLR sel16; P044 occupancy+conversion bar; P099 254 occupancy; KREAD; 64788 Facet A P065 0x2be oracle; P063 aio84530 HEAP; P070 census\n"
+                    @"  LIVE A12X: P065 Facet A; P063 aio84530 HEAP; P057 sel16; CS2 phys_oob READ scan; P034 occupancy class; KREAD; P070 census. 254 SKIP.\n"
                     @"  CLOSED: 84523 sandbox (P057/P051/P052); P045 recv; LightSword last-wire GPU OOM; type-3 PACGA; hop-1 since 26.1; 43748 254 on fill_cap\n"
                     @"  PARKED: 28968 reap fire; 163-sel; 0x800; AfterKread persist; 86950 CG; file-ACE payloads (P072 is census)\n"
                     @"  NOTE: Lum1na catalog p064 = AVE racer. HT149041 print map id = ht149041. P007 p064 = that map.\n"];

