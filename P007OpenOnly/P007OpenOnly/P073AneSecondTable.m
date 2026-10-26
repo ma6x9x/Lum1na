@@ -620,7 +620,19 @@ static NSURL *p073_model_url(NSString *name) {
     /* ---- D1: IOSurface marker spray FIRST (keeps 3072 band clean) ---- */
     {
         NSString *dialPath = [docs stringByAppendingPathComponent:@"p073_conv.txt"];
-        if ([[NSFileManager defaultManager] fileExistsAtPath:dialPath]) {
+        NSFileManager *fmDial = [NSFileManager defaultManager];
+        if (![fmDial fileExistsAtPath:dialPath]) {
+            /* 2026-10-26 stage: the default conversion dial is WRITTEN by the
+               tap itself on first run so the file is always present on-device
+               (v10 night order). Edit/delete Documents/p073_conv.txt on-device
+               to change or clear the dial. */
+            NSString *def = @"prefill=8 burst=0\n";
+            if ([def writeToFile:dialPath atomically:YES
+                        encoding:NSUTF8StringEncoding error:nil])
+                p073_log(@"[v10] STAGED default dial (prefill=8 burst=0) → Documents/p073_conv.txt "
+                         @"(was absent; edit on-device to change dials without a rebuild)");
+        }
+        if ([fmDial fileExistsAtPath:dialPath]) {
             NSString *dial = [[NSString alloc] initWithContentsOfFile:dialPath
                 encoding:NSUTF8StringEncoding error:nil];
             NSRange r = [dial rangeOfString:@"prefill="];
