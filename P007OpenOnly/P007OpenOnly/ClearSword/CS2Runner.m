@@ -17,10 +17,13 @@
 
 /* v2 board-wire (audit 2026-10-25: the arm self-tested but never committed the
    board, so a passing arm could never flip hasKread on the 12). The fn the
-   board's commitSlide re-checks kread32(kbase) through. */
+   board's commitSlide re-checks kread32(kbase) through.
+   v2b (23:03 mini run: magic+typeinfo PASS, commit REJECTED): cs2_kreadbuf
+   returns 0 = success — the !-form reported failure on success and the board
+   refused the commit of a textbook-clean establish. Convention fixed. */
 static uint32_t cs2_arm_kread32(uint64_t kaddr, BOOL *ok) {
     uint32_t v = 0;
-    if (!cs2_kreadbuf(kaddr, &v, sizeof v)) { if (ok) *ok = NO; return 0; }
+    if (cs2_kreadbuf(kaddr, &v, sizeof v) != 0) { if (ok) *ok = NO; return 0; }
     if (ok) *ok = YES;
     return v;
 }
