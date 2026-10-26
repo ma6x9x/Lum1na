@@ -150,6 +150,10 @@ const LabIntelEntry LabIntelTab[] = {
     { "t8150.debugheader_fn",   "Ghidra-ext 24A435 T8150", 0xFFFFFE000AB55AF0ULL, "GHIDRA-EXT", "debug-header printer: chain head *(0x7ed30f0+0x60); prints Kernel slide + SPTM/TXM load addrs + UUIDs per entry; panic_decode upgrade candidate" },
     // ---- PROVEN-EXT: m2scaler iosaDiag leak (P098 implements) ----
     { "m2scaler.get_iosaDiag_sel",  "iOS<=26.5.2 (23F77 live)", 8,                   "PROVEN-EXT", "AppleM2ScalerCSCDriver sel 8; event_payload +0x18 leaks IOSurface KVA (MTE tag on A17+); fixed 26.6 (23G71); likely CVE-2026-64709" },
+    // ---- AKS 65343 lane CLOSED on app-reach (2026-10-26 verification, re_aks23.md) ----
+    { "aks23.dispatch_index",    "Ghidra 23F77 (AKS)",     0xFFFFFFF008D9F868ULL, "GHIDRA-EXT", "AKS 163-sel table: idx = RAWSEL-1 (subs w28,w1,#1)! raw sel 17 = idx 0x10 = 0x8d998f0 -> 0x8d9b95c -> 0x8d8ca10 -> ctor 0xa43e240 -> prepare_output_ool 0x8d88a68. raw 16 = idx 0xf = 0x8d99a20 (worker 0x8d8c010, GATED [uc+0xf0] bit4)" },
+    { "aks23.copyout_bounded",   "Ghidra 23F77 (AKS)",     0xFFFFFFF008D88A68ULL, "GHIDRA-EXT", "65343's declared_length NOT trusted on 23F77: declared < vtable+0xa0 ret = 0x2db; ret OVERWRITES declared; copyout = kernel-computed len ONLY. no app-reachable OOB on this copyout" },
+    { "aks23.acm_disconnected",  "Ghidra 23F77 (AKS)",     0xFFFFFFF008D72C78ULL, "GHIDRA-EXT", "AppleKeyStoreCommand 0x8d72c78 (the ONLY xref into the ACM deserializer chain) = ZERO image-wide refs on 23F77: the 65343 deserializer (0x8d5cc80) is NOT UC-reachable — daemon/secd-shape only. LANE CLOSED for app-reach" },
 };
 
 const int LabIntelCount = (int)(sizeof(LabIntelTab) / sizeof(LabIntelTab[0]));

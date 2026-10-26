@@ -42,7 +42,7 @@
 #import <string.h>
 #import <mach/mach.h>
 
-#define P057_BUILD @"aks-p007-v9-sel16-feeder"
+#define P057_BUILD @"aks-p007-v10-sel17-scalar"
 #define SE_KEY_TAG "com.research.p007.aks.v5"
 #define OUTBUF_SZ  0x400u
 #define FILL_BYTE  0xBBu
@@ -375,8 +375,13 @@ static void p057_cleanup_se(void) {
     SecItemDelete((__bridge CFDictionaryRef)delQ);
 }
 
-/* Megafunction feeder only (sel 16, plus a captured sel in 0..0xa2).
-   declared is the u32 at +24. Never 0x400/0x800. Never sel 5. */
+/* AKS-lane v10 (the 0x8d5cc80-chain verification): raw wire selector 17
+   (the dispatcher computes table idx = sel-1 — idx 0x10 hits the decoded
+   chain), scalarInputCount = 1 (the control code), scalarOutputCount = 0,
+   NO packed struct-in. The 65343 deserializer = NOT on the 23F77 UC path
+   (0x8d72c78 = zero refs image-wide) and the copyout = kernel-length-
+   bounded (0x8d88a68 does not trust declared) — LANE CLOSED for app-reach;
+   these probes are the confirmation shape. */
 static int p057_probe(io_connect_t conn, const uint8_t *handle16,
                      int sel, uint32_t declared, uint32_t nscalar)
 {
