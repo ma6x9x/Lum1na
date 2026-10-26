@@ -349,10 +349,12 @@ static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
         uint32_t name, padw; uint16_t dtype, ddisp;
         memcpy(&name, dp + 0, 4); memcpy(&padw, dp + 4, 4);
         memcpy(&dtype, dp + 8, 2); memcpy(&ddisp, dp + 10, 2);
-        /* v7 clean law from the 19:15 reads: bytes @4-7 = 00 00 11 00
-           (pad1:16, disposition=0x11 @6, type=0 @7). 12B stride kept; the
-           raw dumps + the clean diff are the layout's ground truth. */
-        BOOL clean = (ddisp == 0x11u && dtype == 0u && (padw & 0xFFFF0000u) == 0x00110000u);
+        /* v9 TRUE clean law (the 19:47 v8-round bytes): a clean arm64 wire
+           port-desc = bytes @4-7 == 00 00 11 00 (pad1:16=0; disposition
+           0x11 @6; type 0 @7). The 0x11 must be @+6 — NOT @+5 — and the
+           per-victim name word @8-11 legitimately differs (it is the
+           translated port name); name/pad@0-7 = the smash-detect words. */
+        BOOL clean = (dp[4] == 0 && dp[5] == 0 && dp[6] == 0x11 && dp[7] == 0x00);
         if (clean) continue;
         smashes++;
         L(@"[v6] DOOR SMASH victim=%u desc[%u] name=0x%08x pad=0x%08x type=0x%04x disp=0x%04x "
