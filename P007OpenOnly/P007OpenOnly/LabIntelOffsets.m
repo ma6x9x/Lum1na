@@ -154,6 +154,14 @@ const LabIntelEntry LabIntelTab[] = {
     { "aks23.dispatch_index",    "Ghidra 23F77 (AKS)",     0xFFFFFFF008D9F868ULL, "GHIDRA-EXT", "AKS 163-sel table: idx = RAWSEL-1 (subs w28,w1,#1)! raw sel 17 = idx 0x10 = 0x8d998f0 -> 0x8d9b95c -> 0x8d8ca10 -> ctor 0xa43e240 -> prepare_output_ool 0x8d88a68. raw 16 = idx 0xf = 0x8d99a20 (worker 0x8d8c010, GATED [uc+0xf0] bit4)" },
     { "aks23.copyout_bounded",   "Ghidra 23F77 (AKS)",     0xFFFFFFF008D88A68ULL, "GHIDRA-EXT", "65343's declared_length NOT trusted on 23F77: declared < vtable+0xa0 ret = 0x2db; ret OVERWRITES declared; copyout = kernel-computed len ONLY. no app-reachable OOB on this copyout" },
     { "aks23.acm_disconnected",  "Ghidra 23F77 (AKS)",     0xFFFFFFF008D72C78ULL, "GHIDRA-EXT", "AppleKeyStoreCommand 0x8d72c78 (the ONLY xref into the ACM deserializer chain) = ZERO image-wide refs on 23F77: the 65343 deserializer (0x8d5cc80) is NOT UC-reachable — daemon/secd-shape only. LANE CLOSED for app-reach" },
+
+    // ---- IOMD 43684-family VERIFIED LIVE-SHAPED on 23F77 (2026-10-26, re_iomd23.md) ----
+    { "iomd23.retain_unchecked",  "Ghidra 23F77",  0xFFFFFFF00A511624ULL, "GHIDRA-EXT", "IOMD dmaref RETAIN: ldaddh w9,#1,[x0+0x34] — u16 refcount at md+0x34, NO CEILING (2nd site 0xa515dc4). Fix NOT present on 23F77 — LANE LIVE-SHAPED" },
+    { "iomd23.dec_underflow_panic","Ghidra 23F77",  0xFFFFFFF00A5116D0ULL, "GHIDRA-EXT", "dma-ref dec: ldaddh #-1 at +0x34; pre-0 = PANIC _dmaReferences-underflow (string 0xfffffff0070b27ec); old==1 → teardown 0x9f1975c" },
+    { "iomd23.release_gated",     "Ghidra 23F77",  0xFFFFFFF00A515D60ULL, "GHIDRA-EXT", "op-6 release dispatcher (sel=byte2 w1): case-6 @0xa515f88 ldr w8,[x0,#0x98]; cbz -> RELEASE SKIPPED. [x0+0x98]=u32 mapped-16K-pg-count, computed in worker 0xa50737c, RESET 0 by unmap-arm 0xa5073c4. TWIN dispatcher 0xa511324 = UNGATED sel6 (panic-on-underflow!) — route must use 0xa515d60" },
+    { "iomd23.gate_oracle",       "Ghidra 23F77",  0xFFFFFFF00A515D60ULL, "GHIDRA-EXT", "sel-2 (case 1) copies [x0+0x98] into out-struct +0xc = APP-VISIBLE gate-state readback (user-readable oracle)" },
+    { "iomd23.make_mapping",      "Ghidra 23F77",  0xFFFFFFF00A512314ULL, "GHIDRA-EXT", "IOMemoryDescriptor_makeMapping (single BL caller 0xa51f9cc = the mapper side — next hop for the UC-reach chase). NO entitlement check in any lane fn = NO AMFI gate" },
+    { "iomd23.pglist_alloc",      "Ghidra 23F77",  0xFFFFFFF00A5081ECULL, "GHIDRA-EXT", "ioGMD page-list array alloc: 16B/entry (bl kalloc 0x9e18728), entry-count u32 at sub+0xe8, freepool head 0xa903db0 — the UAF type-confusion target" },
 };
 
 const int LabIntelCount = (int)(sizeof(LabIntelTab) / sizeof(LabIntelTab[0]));
