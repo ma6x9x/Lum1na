@@ -58,7 +58,7 @@
 #import <mach/thread_policy.h>
 #import <sys/qos.h>
 
-#define P110_BUILD      @"p110-swapclaim-v1"
+#define P110_BUILD      @"p110-swapclaim-v1.1"
 #define P110_ROUNDS     64
 #define P110_PREFILL    6       /* pre-created live sibling-client objects */
 #define P110_POP        2       /* fresh creates popped AT the window      */
@@ -102,11 +102,19 @@ static volatile int g_d_probe_alive;      /* post-ownership sid resolvable? */
 static volatile int g_st_e, g_st_d, g_st_p;
 static volatile int g_park_e, g_park_d, g_park_p;  /* back-at-idle flags    */
 
-/* verdict counters */
+/* verdict counters — v1.1 SPLIT: the session counters reset at tap start (the
+   12:06-round bug: the v1 verdict printed the process-lifetime accumulated
+   counts (113) under the session shape, because +tap is a class method over
+   file statics that live for the whole process). The _proc counters keep
+   accumulating across taps for the process-totals verdict line. */
 static atomic_int v_win_lost;
 static atomic_int v_family_b;             /* in-process fault only          */
 static atomic_int v_claim_won;
 static atomic_int v_aborted;
+static atomic_int v_win_lost_proc;
+static atomic_int v_family_b_proc;
+static atomic_int v_claim_won_proc;
+static atomic_int v_aborted_proc;
 
 static NSMutableString *g_log = nil;
 
@@ -307,6 +315,13 @@ static NSString *p110_flags_law(void) {
 + (NSString *)tap {
     g_log = [NSMutableString string];
     g_run = false;
+    /* v1.1: the SESSION counters reset at tap start (the 12:06-round bug:
+       113 accumulated counts printed under the session shape); the _proc
+       counters below keep accumulating for the process-totals line. */
+    atomic_store(&v_win_lost, 0);
+    atomic_store(&v_family_b, 0);
+    atomic_store(&v_claim_won, 0);
+    atomic_store(&v_aborted, 0);
 
     NSString *docs = [NSSearchPathForDirectoriesInDomains(
         NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
@@ -447,7 +462,7 @@ static NSString *p110_flags_law(void) {
         if (!s || !sid) {
             Lf(@"[r %d/%d] OUTCOME (a) WINDOW LOST (honest) — create failed, nothing raced; "
                @"dial stays %ldns", r, P110_ROUNDS, dial);
-            atomic_fetch_add(&v_win_lost, 1);
+            atomic_fetch_add(&v_win_lost, 1); atomic_fetch_add(&v_win_lost_proc, 1);
             if (sib) { p110_release(sib); sib = NULL; }
             continue;
         }
@@ -481,7 +496,7 @@ static NSString *p110_flags_law(void) {
             parked++;
         }
         if (!(g_park_e && g_park_d && g_park_p)) {
-            atomic_fetch_add(&v_aborted, 1);
+            atomic_fetch_add(&v_aborted, 1); atomic_fetch_add(&v_aborted_proc, 1);
             Lf(@"[r %d/%d] ABORTED ROUND (honest): racers never re-parked "
                @"(E-park=%d D-park=%d P-park=%d) — bounded stop, no retry storm",
                r, P110_ROUNDS, g_park_e, g_park_d, g_park_p);
@@ -507,7 +522,7 @@ static NSString *p110_flags_law(void) {
             unwound++;
         }
         if (!g_st_e || !g_st_d || !g_st_p) {
-            atomic_fetch_add(&v_aborted, 1);
+            atomic_fetch_add(&v_aborted, 1); atomic_fetch_add(&v_aborted_proc, 1);
             Lf(@"[r %d/%d] ABORTED ROUND (honest): racer(s) missed the window "
                @"(E=%d D=%d P=%d) — bounded stop, no retry storm",
                r, P110_ROUNDS, g_st_e, g_st_d, g_st_p);
@@ -573,12 +588,12 @@ static NSString *p110_flags_law(void) {
               userspace read of that field exists in this lane. Evidence
               stays proxy-class until a kread lane pairs this door.         */
         if (anomalies) {
-            atomic_fetch_add(&v_claim_won, 1);
+            atomic_fetch_add(&v_claim_won, 1); atomic_fetch_add(&v_claim_won_proc, 1);
             Lf(@"[r %d/%d] OUTCOME (c) CLAIM-WON-CANDIDATE (proxy-class evidence, no "
                @"success claim): %@", r, P110_ROUNDS, evidence);
             dial = 0;             /* a won window resets the dial (267 v10 law) */
         } else {
-            atomic_fetch_add(&v_win_lost, 1);
+            atomic_fetch_add(&v_win_lost, 1); atomic_fetch_add(&v_win_lost_proc, 1);
             long nd = dial ? dial * 2 : 200;
             if (nd > P110_DIAL_MAX) nd = P110_DIAL_MAX;
             dial = nd;
@@ -616,8 +631,15 @@ static NSString *p110_flags_law(void) {
     int fb = atomic_load(&v_family_b);
     int cw = atomic_load(&v_claim_won);
     int ab = atomic_load(&v_aborted);
-    Lf(@"=== VERDICT (honest) === rounds requested=%d: window-lost=%d claim-won-candidates=%d "
-       @"family-b-in-process=%d aborted=%d", P110_ROUNDS, wl, cw, fb, ab);
+    /* v1.1: two verdict lines — THIS tap vs the process lifetime (the 12:06
+       round bug printed the accumulated process numbers as session totals). */
+    Lf(@"=== VERDICT (honest) === rounds requested=%d", P110_ROUNDS);
+    Lf(@"[v1.1] session totals: window-lost=%d claim-won-candidates=%d "
+       @"family-b-in-process=%d aborted=%d", wl, cw, fb, ab);
+    Lf(@"[v1.1] process totals: window-lost=%d claim-won-candidates=%d "
+       @"family-b-in-process=%d aborted=%d (every tap this process, not reset)",
+       atomic_load(&v_win_lost_proc), atomic_load(&v_claim_won_proc),
+       atomic_load(&v_family_b_proc), atomic_load(&v_aborted_proc));
     L(@"  (a) clean-no-anomaly      = window lost (honest print; dial bumped one slot per round)");
     L(@"  (b) Family-B-shaped fault = window WON, free slot. Two shapes: an in-process "
       @"SIGBUS/EFAULT-class catch on the alias path (printed above), or the device panic on "

