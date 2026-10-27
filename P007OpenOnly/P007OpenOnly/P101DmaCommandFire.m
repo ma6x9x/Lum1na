@@ -578,7 +578,7 @@ static uint32_t p101_gate_w(const uint8_t *out, size_t outsz) {
                     memset(inb, 0, sizeof(inb));
                     outsz = sizeof(outb);
                     kern_return_t rkr = csm ? csm((mach_port_t)relConn, relSel, inb, sizeof(inb), outb, &outsz)
-                                            : 0xe00002c2;
+                                            : (kern_return_t)0xe00002c2;
                     L([NSString stringWithFormat:@"[*] RELEASE-ATTEMPT %@ sel=%u kr=0x%x",
                        connOf(relConn), relSel, rkr]);
                     /* SKIP verdict: oracle still readable + a subsequent op */
