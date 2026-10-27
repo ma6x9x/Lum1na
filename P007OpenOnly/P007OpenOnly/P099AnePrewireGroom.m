@@ -33,7 +33,7 @@
 #import "LabLocalTime.h"
 #import "LabDeviceProfile.h"
 
-#define P099_BUILD @"p099-aneprewire-v19-samecpu"
+#define P099_BUILD @"p099-aneprewire-v20-pinnedburst"
 
 #define P099_INPUT_COUNT 254
 /* v13 INTERLEAVE LAW (the 21:38/21:40 v12 MAF rounds): the fill's crossing
@@ -699,6 +699,11 @@ static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
                             }
                             err = nil;
                             if (!t) { p099_pump_start(); L(@"[v19] pump thread armed SAME-CPU (tag 1 — the p110 fleet law; pump 4/25ms racing the ANE's pops in ONE magazine)"); }
+                            /* v20: the last untested combination — v17's per-attempt
+                               burst WITH the v19 same-CPU pin (v17's own loss was
+                               the UNPINNED pump; four steer laws each produced the
+                               same rec0xc0 MAF, this pair is the remaining shape). */
+                            p099_fire_pump(8);
                             id<MLFeatureProvider> pred =
                                 [model predictionFromFeatures:provider error:&err];
                             if (pred) {
