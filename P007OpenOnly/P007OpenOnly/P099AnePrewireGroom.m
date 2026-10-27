@@ -31,7 +31,7 @@
 #import "LabLocalTime.h"
 #import "LabDeviceProfile.h"
 
-#define P099_BUILD @"p099-aneprewire-v11-doordial-all"
+#define P099_BUILD @"p099-aneprewire-v12-fireconfirm"
 
 #define P099_INPUT_COUNT 254
 #define P099_OUTPUT_COUNT 1
@@ -546,16 +546,40 @@ static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
                     MLDictionaryFeatureProvider *provider =
                         [[MLDictionaryFeatureProvider alloc] initWithDictionary:features error:&err];
                     if (provider) {
-                        id<MLFeatureProvider> pred = [model predictionFromFeatures:provider error:&err];
-                        if (pred) {
-                            MLFeatureValue *yv = [pred featureValueForName:@"y"];
-                            double got = yv.multiArrayValue ? yv.multiArrayValue[0].doubleValue : -1;
-                            L(@"[*] inference ok y[0]=%.0f expected=%.0f", got, expected);
-                        } else {
-                            L(@"[-] prediction failed: %@ (model may not delegate to ANE on this SKU)",
-                              err ? err.localizedDescription : @"?");
+                        /* v12 FIRE-CONFIRM LAW (the 20:19/20:33/20:56 cold
+                           rounds): the prewire OOB fires ONLY when the ANE
+                           actually evaluates (fill at the ANE submit). This
+                           model = compiled espresso = ANE-only (no CPU
+                           fallback; the -1 error = no ANE delegate) — so
+                           prediction success IS the fire proof, y[0] ==
+                           sum(1..254) the confirmation. v10/v11 rounds set
+                           evaluated=YES even on failed prediction = the fill
+                           never ran = "table landed elsewhere" rounds
+                           explained. Bounded warm-up retries (cold ANE
+                           session), stop on first success; the first
+                           successful eval is the fill (resource-cache-miss
+                           law — later calls on the same model instance hit
+                           the cache and fill nothing). */
+                        BOOL aneEvaluated = NO;
+                        for (int t = 0; t < 4 && !aneEvaluated; t++) {
+                            if (t) [NSThread sleepForTimeInterval:1.0];
+                            err = nil;
+                            id<MLFeatureProvider> pred =
+                                [model predictionFromFeatures:provider error:&err];
+                            if (pred) {
+                                MLFeatureValue *yv = [pred featureValueForName:@"y"];
+                                double got = yv.multiArrayValue ? yv.multiArrayValue[0].doubleValue : -1;
+                                L(@"[fire %d] inference y[0]=%.0f expected=%.0f -> %s",
+                                  t, got, expected,
+                                  (got == expected) ? "FILLED (ANE evaluated, record-area allocated this call)"
+                                    : "y-mismatch (honest, no OOB conclusion)");
+                                if (got == expected) aneEvaluated = YES;
+                            } else {
+                                L(@"[fire %d] prediction failed: %@ — warm-up retry",
+                                  t, err ? err.localizedDescription : @"?");
+                            }
                         }
-                        evaluated = YES;
+                        evaluated = aneEvaluated;
                     } else {
                         L(@"[-] feature provider failed: %@", err.localizedDescription);
                     }
