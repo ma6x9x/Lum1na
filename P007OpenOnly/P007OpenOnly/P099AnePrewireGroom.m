@@ -31,7 +31,7 @@
 #import "LabLocalTime.h"
 #import "LabDeviceProfile.h"
 
-#define P099_BUILD @"p099-aneprewire-v8-class"
+#define P099_BUILD @"p099-aneprewire-v10-doordial"
 
 #define P099_INPUT_COUNT 254
 #define P099_OUTPUT_COUNT 1
@@ -431,12 +431,24 @@ static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
             if (![fm99 fileExistsAtPath:dialP]) {
                 /* v6b stage: the default door-round dial is WRITTEN on first
                    run so the door is armed on-device without an external
-                   push (v12b night order). Edit/delete on-device to change. */
-                NSString *def = @"portkind=64\n";
+                   push; v10 refreshes by dialver. */
+                NSString *def = @"dialver=10\nportkind=96\n";
                 if ([def writeToFile:dialP atomically:YES
                             encoding:NSUTF8StringEncoding error:nil])
-                    L(@"[v6] STAGED default door dial (portkind=64) → Documents/p099_victim.txt "
-                      @"(was absent; the last 64 victims send PORTKIND = the conversion door)");
+                    L(@"[v10] STAGED door dial (portkind=96, dialver=10); last 96 victims = door rounds");
+            } else {
+                /* v10: the 20:01 round's record-crossing victim (1981) sat 5
+                   short of the door band (last 64 = 1984..2047) — the door
+                   band must COVER the crossing element, whatever element it
+                   wanders to this boot. Widen to 96 (±31 margin). The old
+                   staged portkind=64 file persists in the container across
+                   sideloads, so refresh it when dialver mismatches. */
+                NSString *cur = [NSString stringWithContentsOfFile:dialP
+                    encoding:NSUTF8StringEncoding error:nil];
+                if (cur && ![cur containsString:@"dialver=10"]
+                    && ["dialver=10\nportkind=96\n" writeToFile:dialP
+                        atomically:YES encoding:NSUTF8StringEncoding error:nil])
+                    L(@"[v10] dial default refreshed → portkind=96 (dialver=10)");
             }
             if ([fm99 fileExistsAtPath:dialP]) {
                 NSString *dial = [NSString stringWithContentsOfFile:dialP
