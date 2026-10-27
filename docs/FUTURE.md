@@ -989,3 +989,23 @@ Device log + `panic-full-2026-10-15-172914.0002.ips` (SHA-256 589fa3f1…, kept 
   dispatch builds both the concat big_req and the bundled addchain shape and
   uploads `addchain257-mlmodelc` for re-ship; IPA validate checks both model
   names. Never bundle an UNcompiled .mlmodel (coremlc breaks the IPA).
+
+### 2026-10-26 (cont.) — v13b: 300-in forging stream (same session, host/CI only)
+
+- Precision law from the door map: first out-of-object record (1-based
+  #259, index 258) straddles obj+0x10b0..0x10c0; #260.. fully outside.
+  257-in+1-out = 258 total = only 1 crossing record (first round); the kdesc
+  door needs the stream to run MANY records into the neighbor element
+  (16B kdescs = 1:1 with 16B records on xnu-13432). in-count = compiled
+  program input count — nothing derived caps it at 257.
+- New artifact XVRC27_300in_1out_addchain (tools/make_300in_addchain.py,
+  same addchain/coremlc pipeline): x_000..x_299 -> "y" Double [1],
+  y = sum(x); host CoreML smoke: y = 45150 = sum(1..300) = 300x301/2
+  (the 257-in y = sum(1..257) = 33153). Committed in model/,
+  Resources/ane/, P007OpenOnly/P007OpenOnly/ + Desktop mirror.
+- OOB math: 300-in + 1-out = 301 total = 258 in-through-object (255-record
+  array + trailer band) + 43 records past the 0x10b8 boundary (indices
+  258..300: 1 straddler + 42 fully outside) = the desc-block forging stream.
+- P073 v13b: T8150 row (0x10b8) selects 300-in when the bundle carries it,
+  257-in fallback; in-count still follows the loaded model description.
+  A14/23F77, LabIntelOffsets, P099 unchanged.

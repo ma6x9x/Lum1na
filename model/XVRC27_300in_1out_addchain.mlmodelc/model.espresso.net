@@ -1,0 +1,4232 @@
+{
+  "storage" : "model.espresso.weights",
+  "analyses" : {
+
+  },
+  "properties" : {
+
+  },
+  "format_version" : 200,
+  "metadata_in_weights" : [
+
+  ],
+  "layers" : [
+    {
+      "bottom" : "x_000",
+      "alpha" : 1,
+      "operation" : 1,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_000",
+      "top" : "acc_000",
+      "type" : "elementwise",
+      "name" : "acc_000",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_000,x_001",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_001",
+      "top" : "acc_001",
+      "type" : "elementwise",
+      "name" : "acc_001",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_001,x_002",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_002",
+      "top" : "acc_002",
+      "type" : "elementwise",
+      "name" : "acc_002",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_002,x_003",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_003",
+      "top" : "acc_003",
+      "type" : "elementwise",
+      "name" : "acc_003",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_003,x_004",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_004",
+      "top" : "acc_004",
+      "type" : "elementwise",
+      "name" : "acc_004",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_004,x_005",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_005",
+      "top" : "acc_005",
+      "type" : "elementwise",
+      "name" : "acc_005",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_005,x_006",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_006",
+      "top" : "acc_006",
+      "type" : "elementwise",
+      "name" : "acc_006",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_006,x_007",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_007",
+      "top" : "acc_007",
+      "type" : "elementwise",
+      "name" : "acc_007",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_007,x_008",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_008",
+      "top" : "acc_008",
+      "type" : "elementwise",
+      "name" : "acc_008",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_008,x_009",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_009",
+      "top" : "acc_009",
+      "type" : "elementwise",
+      "name" : "acc_009",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_009,x_010",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_010",
+      "top" : "acc_010",
+      "type" : "elementwise",
+      "name" : "acc_010",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_010,x_011",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_011",
+      "top" : "acc_011",
+      "type" : "elementwise",
+      "name" : "acc_011",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_011,x_012",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_012",
+      "top" : "acc_012",
+      "type" : "elementwise",
+      "name" : "acc_012",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_012,x_013",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_013",
+      "top" : "acc_013",
+      "type" : "elementwise",
+      "name" : "acc_013",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_013,x_014",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_014",
+      "top" : "acc_014",
+      "type" : "elementwise",
+      "name" : "acc_014",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_014,x_015",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_015",
+      "top" : "acc_015",
+      "type" : "elementwise",
+      "name" : "acc_015",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_015,x_016",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_016",
+      "top" : "acc_016",
+      "type" : "elementwise",
+      "name" : "acc_016",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_016,x_017",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_017",
+      "top" : "acc_017",
+      "type" : "elementwise",
+      "name" : "acc_017",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_017,x_018",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_018",
+      "top" : "acc_018",
+      "type" : "elementwise",
+      "name" : "acc_018",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_018,x_019",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_019",
+      "top" : "acc_019",
+      "type" : "elementwise",
+      "name" : "acc_019",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_019,x_020",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_020",
+      "top" : "acc_020",
+      "type" : "elementwise",
+      "name" : "acc_020",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_020,x_021",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_021",
+      "top" : "acc_021",
+      "type" : "elementwise",
+      "name" : "acc_021",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_021,x_022",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_022",
+      "top" : "acc_022",
+      "type" : "elementwise",
+      "name" : "acc_022",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_022,x_023",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_023",
+      "top" : "acc_023",
+      "type" : "elementwise",
+      "name" : "acc_023",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_023,x_024",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_024",
+      "top" : "acc_024",
+      "type" : "elementwise",
+      "name" : "acc_024",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_024,x_025",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_025",
+      "top" : "acc_025",
+      "type" : "elementwise",
+      "name" : "acc_025",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_025,x_026",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_026",
+      "top" : "acc_026",
+      "type" : "elementwise",
+      "name" : "acc_026",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_026,x_027",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_027",
+      "top" : "acc_027",
+      "type" : "elementwise",
+      "name" : "acc_027",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_027,x_028",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_028",
+      "top" : "acc_028",
+      "type" : "elementwise",
+      "name" : "acc_028",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_028,x_029",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_029",
+      "top" : "acc_029",
+      "type" : "elementwise",
+      "name" : "acc_029",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_029,x_030",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_030",
+      "top" : "acc_030",
+      "type" : "elementwise",
+      "name" : "acc_030",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_030,x_031",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_031",
+      "top" : "acc_031",
+      "type" : "elementwise",
+      "name" : "acc_031",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_031,x_032",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_032",
+      "top" : "acc_032",
+      "type" : "elementwise",
+      "name" : "acc_032",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_032,x_033",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_033",
+      "top" : "acc_033",
+      "type" : "elementwise",
+      "name" : "acc_033",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_033,x_034",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_034",
+      "top" : "acc_034",
+      "type" : "elementwise",
+      "name" : "acc_034",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_034,x_035",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_035",
+      "top" : "acc_035",
+      "type" : "elementwise",
+      "name" : "acc_035",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_035,x_036",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_036",
+      "top" : "acc_036",
+      "type" : "elementwise",
+      "name" : "acc_036",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_036,x_037",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_037",
+      "top" : "acc_037",
+      "type" : "elementwise",
+      "name" : "acc_037",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_037,x_038",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_038",
+      "top" : "acc_038",
+      "type" : "elementwise",
+      "name" : "acc_038",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_038,x_039",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_039",
+      "top" : "acc_039",
+      "type" : "elementwise",
+      "name" : "acc_039",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_039,x_040",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_040",
+      "top" : "acc_040",
+      "type" : "elementwise",
+      "name" : "acc_040",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_040,x_041",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_041",
+      "top" : "acc_041",
+      "type" : "elementwise",
+      "name" : "acc_041",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_041,x_042",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_042",
+      "top" : "acc_042",
+      "type" : "elementwise",
+      "name" : "acc_042",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_042,x_043",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_043",
+      "top" : "acc_043",
+      "type" : "elementwise",
+      "name" : "acc_043",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_043,x_044",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_044",
+      "top" : "acc_044",
+      "type" : "elementwise",
+      "name" : "acc_044",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_044,x_045",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_045",
+      "top" : "acc_045",
+      "type" : "elementwise",
+      "name" : "acc_045",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_045,x_046",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_046",
+      "top" : "acc_046",
+      "type" : "elementwise",
+      "name" : "acc_046",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_046,x_047",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_047",
+      "top" : "acc_047",
+      "type" : "elementwise",
+      "name" : "acc_047",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_047,x_048",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_048",
+      "top" : "acc_048",
+      "type" : "elementwise",
+      "name" : "acc_048",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_048,x_049",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_049",
+      "top" : "acc_049",
+      "type" : "elementwise",
+      "name" : "acc_049",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_049,x_050",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_050",
+      "top" : "acc_050",
+      "type" : "elementwise",
+      "name" : "acc_050",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_050,x_051",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_051",
+      "top" : "acc_051",
+      "type" : "elementwise",
+      "name" : "acc_051",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_051,x_052",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_052",
+      "top" : "acc_052",
+      "type" : "elementwise",
+      "name" : "acc_052",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_052,x_053",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_053",
+      "top" : "acc_053",
+      "type" : "elementwise",
+      "name" : "acc_053",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_053,x_054",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_054",
+      "top" : "acc_054",
+      "type" : "elementwise",
+      "name" : "acc_054",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_054,x_055",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_055",
+      "top" : "acc_055",
+      "type" : "elementwise",
+      "name" : "acc_055",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_055,x_056",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_056",
+      "top" : "acc_056",
+      "type" : "elementwise",
+      "name" : "acc_056",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_056,x_057",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_057",
+      "top" : "acc_057",
+      "type" : "elementwise",
+      "name" : "acc_057",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_057,x_058",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_058",
+      "top" : "acc_058",
+      "type" : "elementwise",
+      "name" : "acc_058",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_058,x_059",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_059",
+      "top" : "acc_059",
+      "type" : "elementwise",
+      "name" : "acc_059",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_059,x_060",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_060",
+      "top" : "acc_060",
+      "type" : "elementwise",
+      "name" : "acc_060",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_060,x_061",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_061",
+      "top" : "acc_061",
+      "type" : "elementwise",
+      "name" : "acc_061",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_061,x_062",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_062",
+      "top" : "acc_062",
+      "type" : "elementwise",
+      "name" : "acc_062",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_062,x_063",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_063",
+      "top" : "acc_063",
+      "type" : "elementwise",
+      "name" : "acc_063",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_063,x_064",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_064",
+      "top" : "acc_064",
+      "type" : "elementwise",
+      "name" : "acc_064",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_064,x_065",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_065",
+      "top" : "acc_065",
+      "type" : "elementwise",
+      "name" : "acc_065",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_065,x_066",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_066",
+      "top" : "acc_066",
+      "type" : "elementwise",
+      "name" : "acc_066",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_066,x_067",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_067",
+      "top" : "acc_067",
+      "type" : "elementwise",
+      "name" : "acc_067",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_067,x_068",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_068",
+      "top" : "acc_068",
+      "type" : "elementwise",
+      "name" : "acc_068",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_068,x_069",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_069",
+      "top" : "acc_069",
+      "type" : "elementwise",
+      "name" : "acc_069",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_069,x_070",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_070",
+      "top" : "acc_070",
+      "type" : "elementwise",
+      "name" : "acc_070",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_070,x_071",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_071",
+      "top" : "acc_071",
+      "type" : "elementwise",
+      "name" : "acc_071",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_071,x_072",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_072",
+      "top" : "acc_072",
+      "type" : "elementwise",
+      "name" : "acc_072",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_072,x_073",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_073",
+      "top" : "acc_073",
+      "type" : "elementwise",
+      "name" : "acc_073",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_073,x_074",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_074",
+      "top" : "acc_074",
+      "type" : "elementwise",
+      "name" : "acc_074",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_074,x_075",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_075",
+      "top" : "acc_075",
+      "type" : "elementwise",
+      "name" : "acc_075",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_075,x_076",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_076",
+      "top" : "acc_076",
+      "type" : "elementwise",
+      "name" : "acc_076",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_076,x_077",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_077",
+      "top" : "acc_077",
+      "type" : "elementwise",
+      "name" : "acc_077",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_077,x_078",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_078",
+      "top" : "acc_078",
+      "type" : "elementwise",
+      "name" : "acc_078",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_078,x_079",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_079",
+      "top" : "acc_079",
+      "type" : "elementwise",
+      "name" : "acc_079",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_079,x_080",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_080",
+      "top" : "acc_080",
+      "type" : "elementwise",
+      "name" : "acc_080",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_080,x_081",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_081",
+      "top" : "acc_081",
+      "type" : "elementwise",
+      "name" : "acc_081",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_081,x_082",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_082",
+      "top" : "acc_082",
+      "type" : "elementwise",
+      "name" : "acc_082",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_082,x_083",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_083",
+      "top" : "acc_083",
+      "type" : "elementwise",
+      "name" : "acc_083",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_083,x_084",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_084",
+      "top" : "acc_084",
+      "type" : "elementwise",
+      "name" : "acc_084",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_084,x_085",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_085",
+      "top" : "acc_085",
+      "type" : "elementwise",
+      "name" : "acc_085",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_085,x_086",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_086",
+      "top" : "acc_086",
+      "type" : "elementwise",
+      "name" : "acc_086",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_086,x_087",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_087",
+      "top" : "acc_087",
+      "type" : "elementwise",
+      "name" : "acc_087",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_087,x_088",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_088",
+      "top" : "acc_088",
+      "type" : "elementwise",
+      "name" : "acc_088",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_088,x_089",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_089",
+      "top" : "acc_089",
+      "type" : "elementwise",
+      "name" : "acc_089",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_089,x_090",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_090",
+      "top" : "acc_090",
+      "type" : "elementwise",
+      "name" : "acc_090",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_090,x_091",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_091",
+      "top" : "acc_091",
+      "type" : "elementwise",
+      "name" : "acc_091",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_091,x_092",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_092",
+      "top" : "acc_092",
+      "type" : "elementwise",
+      "name" : "acc_092",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_092,x_093",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_093",
+      "top" : "acc_093",
+      "type" : "elementwise",
+      "name" : "acc_093",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_093,x_094",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_094",
+      "top" : "acc_094",
+      "type" : "elementwise",
+      "name" : "acc_094",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_094,x_095",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_095",
+      "top" : "acc_095",
+      "type" : "elementwise",
+      "name" : "acc_095",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_095,x_096",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_096",
+      "top" : "acc_096",
+      "type" : "elementwise",
+      "name" : "acc_096",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_096,x_097",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_097",
+      "top" : "acc_097",
+      "type" : "elementwise",
+      "name" : "acc_097",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_097,x_098",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_098",
+      "top" : "acc_098",
+      "type" : "elementwise",
+      "name" : "acc_098",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_098,x_099",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_099",
+      "top" : "acc_099",
+      "type" : "elementwise",
+      "name" : "acc_099",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_099,x_100",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_100",
+      "top" : "acc_100",
+      "type" : "elementwise",
+      "name" : "acc_100",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_100,x_101",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_101",
+      "top" : "acc_101",
+      "type" : "elementwise",
+      "name" : "acc_101",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_101,x_102",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_102",
+      "top" : "acc_102",
+      "type" : "elementwise",
+      "name" : "acc_102",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_102,x_103",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_103",
+      "top" : "acc_103",
+      "type" : "elementwise",
+      "name" : "acc_103",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_103,x_104",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_104",
+      "top" : "acc_104",
+      "type" : "elementwise",
+      "name" : "acc_104",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_104,x_105",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_105",
+      "top" : "acc_105",
+      "type" : "elementwise",
+      "name" : "acc_105",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_105,x_106",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_106",
+      "top" : "acc_106",
+      "type" : "elementwise",
+      "name" : "acc_106",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_106,x_107",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_107",
+      "top" : "acc_107",
+      "type" : "elementwise",
+      "name" : "acc_107",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_107,x_108",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_108",
+      "top" : "acc_108",
+      "type" : "elementwise",
+      "name" : "acc_108",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_108,x_109",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_109",
+      "top" : "acc_109",
+      "type" : "elementwise",
+      "name" : "acc_109",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_109,x_110",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_110",
+      "top" : "acc_110",
+      "type" : "elementwise",
+      "name" : "acc_110",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_110,x_111",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_111",
+      "top" : "acc_111",
+      "type" : "elementwise",
+      "name" : "acc_111",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_111,x_112",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_112",
+      "top" : "acc_112",
+      "type" : "elementwise",
+      "name" : "acc_112",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_112,x_113",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_113",
+      "top" : "acc_113",
+      "type" : "elementwise",
+      "name" : "acc_113",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_113,x_114",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_114",
+      "top" : "acc_114",
+      "type" : "elementwise",
+      "name" : "acc_114",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_114,x_115",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_115",
+      "top" : "acc_115",
+      "type" : "elementwise",
+      "name" : "acc_115",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_115,x_116",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_116",
+      "top" : "acc_116",
+      "type" : "elementwise",
+      "name" : "acc_116",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_116,x_117",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_117",
+      "top" : "acc_117",
+      "type" : "elementwise",
+      "name" : "acc_117",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_117,x_118",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_118",
+      "top" : "acc_118",
+      "type" : "elementwise",
+      "name" : "acc_118",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_118,x_119",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_119",
+      "top" : "acc_119",
+      "type" : "elementwise",
+      "name" : "acc_119",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_119,x_120",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_120",
+      "top" : "acc_120",
+      "type" : "elementwise",
+      "name" : "acc_120",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_120,x_121",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_121",
+      "top" : "acc_121",
+      "type" : "elementwise",
+      "name" : "acc_121",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_121,x_122",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_122",
+      "top" : "acc_122",
+      "type" : "elementwise",
+      "name" : "acc_122",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_122,x_123",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_123",
+      "top" : "acc_123",
+      "type" : "elementwise",
+      "name" : "acc_123",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_123,x_124",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_124",
+      "top" : "acc_124",
+      "type" : "elementwise",
+      "name" : "acc_124",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_124,x_125",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_125",
+      "top" : "acc_125",
+      "type" : "elementwise",
+      "name" : "acc_125",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_125,x_126",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_126",
+      "top" : "acc_126",
+      "type" : "elementwise",
+      "name" : "acc_126",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_126,x_127",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_127",
+      "top" : "acc_127",
+      "type" : "elementwise",
+      "name" : "acc_127",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_127,x_128",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_128",
+      "top" : "acc_128",
+      "type" : "elementwise",
+      "name" : "acc_128",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_128,x_129",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_129",
+      "top" : "acc_129",
+      "type" : "elementwise",
+      "name" : "acc_129",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_129,x_130",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_130",
+      "top" : "acc_130",
+      "type" : "elementwise",
+      "name" : "acc_130",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_130,x_131",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_131",
+      "top" : "acc_131",
+      "type" : "elementwise",
+      "name" : "acc_131",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_131,x_132",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_132",
+      "top" : "acc_132",
+      "type" : "elementwise",
+      "name" : "acc_132",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_132,x_133",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_133",
+      "top" : "acc_133",
+      "type" : "elementwise",
+      "name" : "acc_133",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_133,x_134",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_134",
+      "top" : "acc_134",
+      "type" : "elementwise",
+      "name" : "acc_134",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_134,x_135",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_135",
+      "top" : "acc_135",
+      "type" : "elementwise",
+      "name" : "acc_135",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_135,x_136",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_136",
+      "top" : "acc_136",
+      "type" : "elementwise",
+      "name" : "acc_136",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_136,x_137",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_137",
+      "top" : "acc_137",
+      "type" : "elementwise",
+      "name" : "acc_137",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_137,x_138",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_138",
+      "top" : "acc_138",
+      "type" : "elementwise",
+      "name" : "acc_138",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_138,x_139",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_139",
+      "top" : "acc_139",
+      "type" : "elementwise",
+      "name" : "acc_139",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_139,x_140",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_140",
+      "top" : "acc_140",
+      "type" : "elementwise",
+      "name" : "acc_140",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_140,x_141",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_141",
+      "top" : "acc_141",
+      "type" : "elementwise",
+      "name" : "acc_141",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_141,x_142",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_142",
+      "top" : "acc_142",
+      "type" : "elementwise",
+      "name" : "acc_142",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_142,x_143",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_143",
+      "top" : "acc_143",
+      "type" : "elementwise",
+      "name" : "acc_143",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_143,x_144",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_144",
+      "top" : "acc_144",
+      "type" : "elementwise",
+      "name" : "acc_144",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_144,x_145",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_145",
+      "top" : "acc_145",
+      "type" : "elementwise",
+      "name" : "acc_145",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_145,x_146",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_146",
+      "top" : "acc_146",
+      "type" : "elementwise",
+      "name" : "acc_146",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_146,x_147",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_147",
+      "top" : "acc_147",
+      "type" : "elementwise",
+      "name" : "acc_147",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_147,x_148",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_148",
+      "top" : "acc_148",
+      "type" : "elementwise",
+      "name" : "acc_148",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_148,x_149",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_149",
+      "top" : "acc_149",
+      "type" : "elementwise",
+      "name" : "acc_149",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_149,x_150",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_150",
+      "top" : "acc_150",
+      "type" : "elementwise",
+      "name" : "acc_150",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_150,x_151",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_151",
+      "top" : "acc_151",
+      "type" : "elementwise",
+      "name" : "acc_151",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_151,x_152",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_152",
+      "top" : "acc_152",
+      "type" : "elementwise",
+      "name" : "acc_152",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_152,x_153",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_153",
+      "top" : "acc_153",
+      "type" : "elementwise",
+      "name" : "acc_153",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_153,x_154",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_154",
+      "top" : "acc_154",
+      "type" : "elementwise",
+      "name" : "acc_154",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_154,x_155",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_155",
+      "top" : "acc_155",
+      "type" : "elementwise",
+      "name" : "acc_155",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_155,x_156",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_156",
+      "top" : "acc_156",
+      "type" : "elementwise",
+      "name" : "acc_156",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_156,x_157",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_157",
+      "top" : "acc_157",
+      "type" : "elementwise",
+      "name" : "acc_157",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_157,x_158",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_158",
+      "top" : "acc_158",
+      "type" : "elementwise",
+      "name" : "acc_158",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_158,x_159",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_159",
+      "top" : "acc_159",
+      "type" : "elementwise",
+      "name" : "acc_159",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_159,x_160",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_160",
+      "top" : "acc_160",
+      "type" : "elementwise",
+      "name" : "acc_160",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_160,x_161",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_161",
+      "top" : "acc_161",
+      "type" : "elementwise",
+      "name" : "acc_161",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_161,x_162",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_162",
+      "top" : "acc_162",
+      "type" : "elementwise",
+      "name" : "acc_162",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_162,x_163",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_163",
+      "top" : "acc_163",
+      "type" : "elementwise",
+      "name" : "acc_163",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_163,x_164",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_164",
+      "top" : "acc_164",
+      "type" : "elementwise",
+      "name" : "acc_164",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_164,x_165",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_165",
+      "top" : "acc_165",
+      "type" : "elementwise",
+      "name" : "acc_165",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_165,x_166",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_166",
+      "top" : "acc_166",
+      "type" : "elementwise",
+      "name" : "acc_166",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_166,x_167",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_167",
+      "top" : "acc_167",
+      "type" : "elementwise",
+      "name" : "acc_167",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_167,x_168",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_168",
+      "top" : "acc_168",
+      "type" : "elementwise",
+      "name" : "acc_168",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_168,x_169",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_169",
+      "top" : "acc_169",
+      "type" : "elementwise",
+      "name" : "acc_169",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_169,x_170",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_170",
+      "top" : "acc_170",
+      "type" : "elementwise",
+      "name" : "acc_170",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_170,x_171",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_171",
+      "top" : "acc_171",
+      "type" : "elementwise",
+      "name" : "acc_171",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_171,x_172",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_172",
+      "top" : "acc_172",
+      "type" : "elementwise",
+      "name" : "acc_172",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_172,x_173",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_173",
+      "top" : "acc_173",
+      "type" : "elementwise",
+      "name" : "acc_173",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_173,x_174",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_174",
+      "top" : "acc_174",
+      "type" : "elementwise",
+      "name" : "acc_174",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_174,x_175",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_175",
+      "top" : "acc_175",
+      "type" : "elementwise",
+      "name" : "acc_175",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_175,x_176",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_176",
+      "top" : "acc_176",
+      "type" : "elementwise",
+      "name" : "acc_176",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_176,x_177",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_177",
+      "top" : "acc_177",
+      "type" : "elementwise",
+      "name" : "acc_177",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_177,x_178",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_178",
+      "top" : "acc_178",
+      "type" : "elementwise",
+      "name" : "acc_178",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_178,x_179",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_179",
+      "top" : "acc_179",
+      "type" : "elementwise",
+      "name" : "acc_179",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_179,x_180",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_180",
+      "top" : "acc_180",
+      "type" : "elementwise",
+      "name" : "acc_180",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_180,x_181",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_181",
+      "top" : "acc_181",
+      "type" : "elementwise",
+      "name" : "acc_181",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_181,x_182",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_182",
+      "top" : "acc_182",
+      "type" : "elementwise",
+      "name" : "acc_182",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_182,x_183",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_183",
+      "top" : "acc_183",
+      "type" : "elementwise",
+      "name" : "acc_183",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_183,x_184",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_184",
+      "top" : "acc_184",
+      "type" : "elementwise",
+      "name" : "acc_184",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_184,x_185",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_185",
+      "top" : "acc_185",
+      "type" : "elementwise",
+      "name" : "acc_185",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_185,x_186",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_186",
+      "top" : "acc_186",
+      "type" : "elementwise",
+      "name" : "acc_186",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_186,x_187",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_187",
+      "top" : "acc_187",
+      "type" : "elementwise",
+      "name" : "acc_187",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_187,x_188",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_188",
+      "top" : "acc_188",
+      "type" : "elementwise",
+      "name" : "acc_188",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_188,x_189",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_189",
+      "top" : "acc_189",
+      "type" : "elementwise",
+      "name" : "acc_189",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_189,x_190",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_190",
+      "top" : "acc_190",
+      "type" : "elementwise",
+      "name" : "acc_190",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_190,x_191",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_191",
+      "top" : "acc_191",
+      "type" : "elementwise",
+      "name" : "acc_191",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_191,x_192",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_192",
+      "top" : "acc_192",
+      "type" : "elementwise",
+      "name" : "acc_192",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_192,x_193",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_193",
+      "top" : "acc_193",
+      "type" : "elementwise",
+      "name" : "acc_193",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_193,x_194",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_194",
+      "top" : "acc_194",
+      "type" : "elementwise",
+      "name" : "acc_194",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_194,x_195",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_195",
+      "top" : "acc_195",
+      "type" : "elementwise",
+      "name" : "acc_195",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_195,x_196",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_196",
+      "top" : "acc_196",
+      "type" : "elementwise",
+      "name" : "acc_196",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_196,x_197",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_197",
+      "top" : "acc_197",
+      "type" : "elementwise",
+      "name" : "acc_197",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_197,x_198",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_198",
+      "top" : "acc_198",
+      "type" : "elementwise",
+      "name" : "acc_198",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_198,x_199",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_199",
+      "top" : "acc_199",
+      "type" : "elementwise",
+      "name" : "acc_199",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_199,x_200",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_200",
+      "top" : "acc_200",
+      "type" : "elementwise",
+      "name" : "acc_200",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_200,x_201",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_201",
+      "top" : "acc_201",
+      "type" : "elementwise",
+      "name" : "acc_201",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_201,x_202",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_202",
+      "top" : "acc_202",
+      "type" : "elementwise",
+      "name" : "acc_202",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_202,x_203",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_203",
+      "top" : "acc_203",
+      "type" : "elementwise",
+      "name" : "acc_203",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_203,x_204",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_204",
+      "top" : "acc_204",
+      "type" : "elementwise",
+      "name" : "acc_204",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_204,x_205",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_205",
+      "top" : "acc_205",
+      "type" : "elementwise",
+      "name" : "acc_205",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_205,x_206",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_206",
+      "top" : "acc_206",
+      "type" : "elementwise",
+      "name" : "acc_206",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_206,x_207",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_207",
+      "top" : "acc_207",
+      "type" : "elementwise",
+      "name" : "acc_207",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_207,x_208",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_208",
+      "top" : "acc_208",
+      "type" : "elementwise",
+      "name" : "acc_208",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_208,x_209",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_209",
+      "top" : "acc_209",
+      "type" : "elementwise",
+      "name" : "acc_209",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_209,x_210",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_210",
+      "top" : "acc_210",
+      "type" : "elementwise",
+      "name" : "acc_210",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_210,x_211",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_211",
+      "top" : "acc_211",
+      "type" : "elementwise",
+      "name" : "acc_211",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_211,x_212",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_212",
+      "top" : "acc_212",
+      "type" : "elementwise",
+      "name" : "acc_212",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_212,x_213",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_213",
+      "top" : "acc_213",
+      "type" : "elementwise",
+      "name" : "acc_213",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_213,x_214",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_214",
+      "top" : "acc_214",
+      "type" : "elementwise",
+      "name" : "acc_214",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_214,x_215",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_215",
+      "top" : "acc_215",
+      "type" : "elementwise",
+      "name" : "acc_215",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_215,x_216",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_216",
+      "top" : "acc_216",
+      "type" : "elementwise",
+      "name" : "acc_216",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_216,x_217",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_217",
+      "top" : "acc_217",
+      "type" : "elementwise",
+      "name" : "acc_217",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_217,x_218",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_218",
+      "top" : "acc_218",
+      "type" : "elementwise",
+      "name" : "acc_218",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_218,x_219",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_219",
+      "top" : "acc_219",
+      "type" : "elementwise",
+      "name" : "acc_219",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_219,x_220",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_220",
+      "top" : "acc_220",
+      "type" : "elementwise",
+      "name" : "acc_220",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_220,x_221",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_221",
+      "top" : "acc_221",
+      "type" : "elementwise",
+      "name" : "acc_221",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_221,x_222",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_222",
+      "top" : "acc_222",
+      "type" : "elementwise",
+      "name" : "acc_222",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_222,x_223",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_223",
+      "top" : "acc_223",
+      "type" : "elementwise",
+      "name" : "acc_223",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_223,x_224",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_224",
+      "top" : "acc_224",
+      "type" : "elementwise",
+      "name" : "acc_224",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_224,x_225",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_225",
+      "top" : "acc_225",
+      "type" : "elementwise",
+      "name" : "acc_225",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_225,x_226",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_226",
+      "top" : "acc_226",
+      "type" : "elementwise",
+      "name" : "acc_226",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_226,x_227",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_227",
+      "top" : "acc_227",
+      "type" : "elementwise",
+      "name" : "acc_227",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_227,x_228",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_228",
+      "top" : "acc_228",
+      "type" : "elementwise",
+      "name" : "acc_228",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_228,x_229",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_229",
+      "top" : "acc_229",
+      "type" : "elementwise",
+      "name" : "acc_229",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_229,x_230",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_230",
+      "top" : "acc_230",
+      "type" : "elementwise",
+      "name" : "acc_230",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_230,x_231",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_231",
+      "top" : "acc_231",
+      "type" : "elementwise",
+      "name" : "acc_231",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_231,x_232",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_232",
+      "top" : "acc_232",
+      "type" : "elementwise",
+      "name" : "acc_232",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_232,x_233",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_233",
+      "top" : "acc_233",
+      "type" : "elementwise",
+      "name" : "acc_233",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_233,x_234",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_234",
+      "top" : "acc_234",
+      "type" : "elementwise",
+      "name" : "acc_234",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_234,x_235",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_235",
+      "top" : "acc_235",
+      "type" : "elementwise",
+      "name" : "acc_235",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_235,x_236",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_236",
+      "top" : "acc_236",
+      "type" : "elementwise",
+      "name" : "acc_236",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_236,x_237",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_237",
+      "top" : "acc_237",
+      "type" : "elementwise",
+      "name" : "acc_237",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_237,x_238",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_238",
+      "top" : "acc_238",
+      "type" : "elementwise",
+      "name" : "acc_238",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_238,x_239",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_239",
+      "top" : "acc_239",
+      "type" : "elementwise",
+      "name" : "acc_239",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_239,x_240",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_240",
+      "top" : "acc_240",
+      "type" : "elementwise",
+      "name" : "acc_240",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_240,x_241",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_241",
+      "top" : "acc_241",
+      "type" : "elementwise",
+      "name" : "acc_241",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_241,x_242",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_242",
+      "top" : "acc_242",
+      "type" : "elementwise",
+      "name" : "acc_242",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_242,x_243",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_243",
+      "top" : "acc_243",
+      "type" : "elementwise",
+      "name" : "acc_243",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_243,x_244",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_244",
+      "top" : "acc_244",
+      "type" : "elementwise",
+      "name" : "acc_244",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_244,x_245",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_245",
+      "top" : "acc_245",
+      "type" : "elementwise",
+      "name" : "acc_245",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_245,x_246",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_246",
+      "top" : "acc_246",
+      "type" : "elementwise",
+      "name" : "acc_246",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_246,x_247",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_247",
+      "top" : "acc_247",
+      "type" : "elementwise",
+      "name" : "acc_247",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_247,x_248",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_248",
+      "top" : "acc_248",
+      "type" : "elementwise",
+      "name" : "acc_248",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_248,x_249",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_249",
+      "top" : "acc_249",
+      "type" : "elementwise",
+      "name" : "acc_249",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_249,x_250",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_250",
+      "top" : "acc_250",
+      "type" : "elementwise",
+      "name" : "acc_250",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_250,x_251",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_251",
+      "top" : "acc_251",
+      "type" : "elementwise",
+      "name" : "acc_251",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_251,x_252",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_252",
+      "top" : "acc_252",
+      "type" : "elementwise",
+      "name" : "acc_252",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_252,x_253",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_253",
+      "top" : "acc_253",
+      "type" : "elementwise",
+      "name" : "acc_253",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_253,x_254",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_254",
+      "top" : "acc_254",
+      "type" : "elementwise",
+      "name" : "acc_254",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_254,x_255",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_255",
+      "top" : "acc_255",
+      "type" : "elementwise",
+      "name" : "acc_255",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_255,x_256",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_256",
+      "top" : "acc_256",
+      "type" : "elementwise",
+      "name" : "acc_256",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_256,x_257",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_257",
+      "top" : "acc_257",
+      "type" : "elementwise",
+      "name" : "acc_257",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_257,x_258",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_258",
+      "top" : "acc_258",
+      "type" : "elementwise",
+      "name" : "acc_258",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_258,x_259",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_259",
+      "top" : "acc_259",
+      "type" : "elementwise",
+      "name" : "acc_259",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_259,x_260",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_260",
+      "top" : "acc_260",
+      "type" : "elementwise",
+      "name" : "acc_260",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_260,x_261",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_261",
+      "top" : "acc_261",
+      "type" : "elementwise",
+      "name" : "acc_261",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_261,x_262",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_262",
+      "top" : "acc_262",
+      "type" : "elementwise",
+      "name" : "acc_262",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_262,x_263",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_263",
+      "top" : "acc_263",
+      "type" : "elementwise",
+      "name" : "acc_263",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_263,x_264",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_264",
+      "top" : "acc_264",
+      "type" : "elementwise",
+      "name" : "acc_264",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_264,x_265",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_265",
+      "top" : "acc_265",
+      "type" : "elementwise",
+      "name" : "acc_265",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_265,x_266",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_266",
+      "top" : "acc_266",
+      "type" : "elementwise",
+      "name" : "acc_266",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_266,x_267",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_267",
+      "top" : "acc_267",
+      "type" : "elementwise",
+      "name" : "acc_267",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_267,x_268",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_268",
+      "top" : "acc_268",
+      "type" : "elementwise",
+      "name" : "acc_268",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_268,x_269",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_269",
+      "top" : "acc_269",
+      "type" : "elementwise",
+      "name" : "acc_269",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_269,x_270",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_270",
+      "top" : "acc_270",
+      "type" : "elementwise",
+      "name" : "acc_270",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_270,x_271",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_271",
+      "top" : "acc_271",
+      "type" : "elementwise",
+      "name" : "acc_271",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_271,x_272",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_272",
+      "top" : "acc_272",
+      "type" : "elementwise",
+      "name" : "acc_272",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_272,x_273",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_273",
+      "top" : "acc_273",
+      "type" : "elementwise",
+      "name" : "acc_273",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_273,x_274",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_274",
+      "top" : "acc_274",
+      "type" : "elementwise",
+      "name" : "acc_274",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_274,x_275",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_275",
+      "top" : "acc_275",
+      "type" : "elementwise",
+      "name" : "acc_275",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_275,x_276",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_276",
+      "top" : "acc_276",
+      "type" : "elementwise",
+      "name" : "acc_276",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_276,x_277",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_277",
+      "top" : "acc_277",
+      "type" : "elementwise",
+      "name" : "acc_277",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_277,x_278",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_278",
+      "top" : "acc_278",
+      "type" : "elementwise",
+      "name" : "acc_278",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_278,x_279",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_279",
+      "top" : "acc_279",
+      "type" : "elementwise",
+      "name" : "acc_279",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_279,x_280",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_280",
+      "top" : "acc_280",
+      "type" : "elementwise",
+      "name" : "acc_280",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_280,x_281",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_281",
+      "top" : "acc_281",
+      "type" : "elementwise",
+      "name" : "acc_281",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_281,x_282",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_282",
+      "top" : "acc_282",
+      "type" : "elementwise",
+      "name" : "acc_282",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_282,x_283",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_283",
+      "top" : "acc_283",
+      "type" : "elementwise",
+      "name" : "acc_283",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_283,x_284",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_284",
+      "top" : "acc_284",
+      "type" : "elementwise",
+      "name" : "acc_284",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_284,x_285",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_285",
+      "top" : "acc_285",
+      "type" : "elementwise",
+      "name" : "acc_285",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_285,x_286",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_286",
+      "top" : "acc_286",
+      "type" : "elementwise",
+      "name" : "acc_286",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_286,x_287",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_287",
+      "top" : "acc_287",
+      "type" : "elementwise",
+      "name" : "acc_287",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_287,x_288",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_288",
+      "top" : "acc_288",
+      "type" : "elementwise",
+      "name" : "acc_288",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_288,x_289",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_289",
+      "top" : "acc_289",
+      "type" : "elementwise",
+      "name" : "acc_289",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_289,x_290",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_290",
+      "top" : "acc_290",
+      "type" : "elementwise",
+      "name" : "acc_290",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_290,x_291",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_291",
+      "top" : "acc_291",
+      "type" : "elementwise",
+      "name" : "acc_291",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_291,x_292",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_292",
+      "top" : "acc_292",
+      "type" : "elementwise",
+      "name" : "acc_292",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_292,x_293",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_293",
+      "top" : "acc_293",
+      "type" : "elementwise",
+      "name" : "acc_293",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_293,x_294",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_294",
+      "top" : "acc_294",
+      "type" : "elementwise",
+      "name" : "acc_294",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_294,x_295",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_295",
+      "top" : "acc_295",
+      "type" : "elementwise",
+      "name" : "acc_295",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_295,x_296",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_296",
+      "top" : "acc_296",
+      "type" : "elementwise",
+      "name" : "acc_296",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_296,x_297",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_297",
+      "top" : "acc_297",
+      "type" : "elementwise",
+      "name" : "acc_297",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_297,x_298",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_298",
+      "top" : "acc_298",
+      "type" : "elementwise",
+      "name" : "acc_298",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_298,x_299",
+      "alpha" : 1,
+      "operation" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "acc_299",
+      "top" : "acc_299",
+      "type" : "elementwise",
+      "name" : "acc_299",
+      "beta" : 0
+    },
+    {
+      "bottom" : "acc_299",
+      "alpha" : 1,
+      "operation" : 1,
+      "beta" : 0,
+      "weights" : {
+
+      },
+      "fused_relu" : 0,
+      "debug_info" : "out_scale",
+      "top" : "y",
+      "type" : "elementwise",
+      "name" : "out_scale",
+      "attributes" : {
+        "is_output" : 1
+      }
+    }
+  ]
+}

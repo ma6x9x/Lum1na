@@ -11,28 +11,40 @@ jobs:
           /tmp/mvenv/bin/python -m pip install --quiet --upgrade pip
           /tmp/mvenv/bin/pip install --quiet coremltools numpy
           /tmp/mvenv/bin/python tools/make_big_req_model.py 257
-      # P073 v13 T8150 artifact — the bundled addchain shape (y = sum(x),
-      # output "y", Double MultiArray [1], x_000..x_256). This is the one the
-      # lab app actually loads (ane_table_size 0x10b8 selection): 257-in + 1-out
-      # = 258 records vs T8150's 255 in-bounds = 3 OOB record writes.
-      - name: Compile XVRC27_257in_1out_addchain.mlmodelc
+      # P073 v13/v13b T8150 artifacts — the bundled addchain shapes (y =
+      # sum(x), output "y", Double MultiArray [1]). These are the ones the
+      # lab app actually loads (ane_table_size 0x10b8 selection): 300-in
+      # (v13b forging stream; 300-in + 1-out = 301 total = 43 records past
+      # the 0x10b8 boundary) and 257-in (v13 first round; 258 total = 3 OOB
+      # record writes, 300-in fallback).
+      - name: Compile + verify XVRC27_300in/257in_1out_addchain.mlmodelc
         run: |
+          /tmp/mvenv/bin/python tools/make_300in_addchain.py "$RUNNER_TEMP/addchain300out"
           /tmp/mvenv/bin/python tools/make_257in_addchain.py "$RUNNER_TEMP/addchain257out"
+          test -d "$RUNNER_TEMP/addchain300out/XVRC27_300in_1out_addchain.mlmodelc"
           test -d "$RUNNER_TEMP/addchain257out/XVRC27_257in_1out_addchain.mlmodelc"
           python3 - <<'PY'
-          import json, pathlib, sys
-          js = json.load(open(pathlib.Path(
-              "$RUNNER_TEMP/addchain257out/XVRC27_257in_1out_addchain.mlmodelc/metadata.json")))
-          d = js[0]
-          ins = [t["name"] for t in d["inputSchema"]]
-          outs = [t["name"] for t in d["outputSchema"]]
-          assert ins == ["x_%03d" % i for i in range(257)], ins[:2] + ins[-2:]
-          assert outs == ["y"], outs
-          assert ins[0] == "x_000" and ins[-1] == "x_256"
-          print("257-in addchain verified: x_000..x_256 -> y")
+          import json, pathlib
+          for name, n, first, last in (
+              ("XVRC27_300in_1out_addchain", 300, "x_000", "x_299"),
+              ("XVRC27_257in_1out_addchain", 257, "x_000", "x_256"),
+          ):
+              d = json.load(open(pathlib.Path(
+                  "$RUNNER_TEMP/addchain%dout" % n, name + ".mlmodelc/metadata.json")))[0]
+              ins = [t["name"] for t in d["inputSchema"]]
+              outs = [t["name"] for t in d["outputSchema"]]
+              assert ins == ["x_%03d" % i for i in range(n)], ins[:2] + ins[-2:]
+              assert outs == ["y"], outs
+              assert ins[0] == first and ins[-1] == last
+              print("%d-in addchain verified: x_000..%s -> y" % (n, last))
           PY
       - uses: actions/upload-artifact@v4
         with: { name: bigreq-mlmodelc, path: "XVRC27_257in_1out_bigreq.mlmodelc/", retention-days: 1 }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: addchain300-mlmodelc
+          path: ${{ runner.temp }}/addchain300out/XVRC27_300in_1out_addchain.mlmodelc/
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         with:
           name: addchain257-mlmodelc

@@ -280,9 +280,24 @@ jobs:
           fi
 
           # T8150 (17 Pro Max / 24A435, ane_table_size 0x10b8 = 255-record
-          # area) fires the 43748 OOB with the 257-in addchain (257-in + 1-out
-          # = 258 records = 3 OOB record writes). A14/23F77 keeps the 254-in
-          # model. Both stay bundled.
+          # area) fires the 43748 OOB with the big-in addchains: 300-in
+          # (v13b forging stream; 300-in + 1-out = 301 total = 43 records
+          # past the 0x10b8 boundary) with the 257-in first-round shape
+          # (257-in + 1-out = 258 records = 3 OOB record writes) as
+          # fallback. A14/23F77 keeps the 254-in model. All stay bundled.
+          MODEL300="XVRC27_300in_1out_addchain"
+          for path in "model/${MODEL300}.mlmodelc" "Resources/${MODEL300}.mlmodelc"; do
+            if [ -d "$path" ]; then
+              echo "✓ Found model at: $path"
+              BREAK300=1
+              break
+            fi
+          done
+          if [ "${BREAK300:-0}" -ne 1 ]; then
+            echo "⚠️  ${MODEL300} not found (T8150 lane falls back to 257-in)"
+          else
+            echo "✅ ${MODEL300} verified"
+          fi
           MODEL257="XVRC27_257in_1out_addchain"
           for path in "model/${MODEL257}.mlmodelc" "Resources/${MODEL257}.mlmodelc"; do
             if [ -d "$path" ]; then
@@ -595,31 +610,38 @@ jobs:
           sudo xcode-select -s "$XCODE/Contents/Developer"
           xcodebuild -version
 
-      # T8150 (17 Pro Max / 24A435) P073 v13 artifact: the lab app's bundle
-      # carries BOTH addchain models — the committed 254-in (A14/23F77 lane,
-      # untouched) and the 257-in addchain (ane_table_size 0x10b8 = 255
-      # in-bounds records; 257-in + 1-out = 258 records = 3 OOB record writes
-      # past the record array). Compile the 257-in .mlmodelc here when the
-      # committed copy is absent — NEVER bundle an uncompiled .mlmodel
-      # (coremlc breaks the IPA; ship precompiled .mlmodelc only).
-      - name: Ensure XVRC27_257in_1out_addchain.mlmodelc (T8150, compiled)
+      # T8150 (17 Pro Max / 24A435) P073 v13/v13b artifacts: the lab app's
+      # bundle carries BOTH addchain models — the committed 254-in
+      # (A14/23F77 lane, untouched) and the big-in addchains for the 0x10b8
+      # record area (255 in-bounds records): 300-in (v13b forging stream,
+      # 301 total = 43 records past the 0x10b8 boundary) with 257-in
+      # (v13 first round, 258 total = 3 OOB record writes) as fallback.
+      # Compile whichever committed copy is absent — NEVER bundle an
+      # uncompiled .mlmodel (coremlc breaks the IPA; ship precompiled
+      # .mlmodelc only).
+      - name: Ensure XVRC27_300in/257in_1out_addchain.mlmodelc (T8150, compiled)
         run: |
           set -euo pipefail
-          MLC="P007OpenOnly/P007OpenOnly/XVRC27_257in_1out_addchain.mlmodelc"
-          if [ -d "$MLC" ]; then
-            echo "✓ Committed ${MLC} present — reusing (deterministic artifact)"
-            ls -la "$MLC" | head -5
-            exit 0
-          fi
-          echo "257-in mlmodelc absent — compiling with coremlc (Xcode 16.4)"
-          python3 -m venv /tmp/mvenv257
-          /tmp/mvenv257/bin/python -m pip install --quiet --upgrade pip
-          /tmp/mvenv257/bin/pip install --quiet coremltools numpy
-          OUT="$RUNNER_TEMP/xvrc257out"
-          mkdir -p "$OUT"
-          /tmp/mvenv257/bin/python tools/make_257in_addchain.py "$OUT"
-          test -d "$OUT/XVRC27_257in_1out_addchain.mlmodelc"
-          cp -R "$OUT/XVRC27_257in_1out_addchain.mlmodelc" "$MLC"
+          for ML in "XVRC27_300in_1out_addchain tools/make_300in_addchain.py" \
+                    "XVRC27_257in_1out_addchain tools/make_257in_addchain.py"; do
+            set -- $ML
+            MODEL="$1"; GEN="$2"
+            MLC="P007OpenOnly/P007OpenOnly/${MODEL}.mlmodelc"
+            if [ -d "$MLC" ]; then
+              echo "✓ Committed ${MLC} present — reusing (deterministic artifact)"
+              ls -la "$MLC" | head -3
+              continue
+            fi
+            echo "${MODEL} absent — compiling with coremlc (Xcode 16.4) via ${GEN}"
+            python3 -m venv /tmp/mvenv257
+            /tmp/mvenv257/bin/python -m pip install --quiet --upgrade pip
+            /tmp/mvenv257/bin/pip install --quiet coremltools numpy
+            OUT="$RUNNER_TEMP/${MODEL}out"
+            mkdir -p "$OUT"
+            /tmp/mvenv257/bin/python "$GEN" "$OUT"
+            test -d "$OUT/${MODEL}.mlmodelc"
+            cp -R "$OUT/${MODEL}.mlmodelc" "$MLC"
+          done
 
       # Pin 17.0 so Sideloadly can install on 12 mini (iOS 17.3 / 21D50)
       # and every later lab SKU. Do not raise this above 17.0.
