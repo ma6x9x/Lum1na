@@ -131,6 +131,7 @@ struct ContentView: View {
                         moreRow("P108. DiskImages kernel-backed census (AppleDiskImages2 / IOHDIXHDDriveInKernel / KDIDiskImageNubUserClient opens + sels 0..24; 84552 attach doors; notes 255)", "p108")
                                 moreRow("P113. DescForge CONTROL (KRW krw hand-forged desc -> recv oracle; A13 rig)", "p113")
                         moreRow("P109. ANE sel sweep w/ Stage-B kernel oracle (H11ANEIn + LoadBalancer, types 0/1, sels 0..63, DEADBEEF pattern; 2f0 = the Stage-B door; notes 258/259)", "p109")
+                        moreRow("P110. IOSurface swap-claim probe (270 design; sibling-client reclaim after owner death, prefill(6)+2 same-CPU pop, 64 rounds; three-outcome honest verdicts; T8101 23F77 + T8150 24A435; STANDALONE — Family-B is a target outcome)", "p110")
                         moreRow("P099. 43748 ANE prewire GROOMED (espresso/CoreML primary, 254-in addchain; STANDALONE ONLY — real OOB, never in chain)", "p099")
                         moreRow("P098. M2ScalerCSC iosaDiag census (sel 8, honest input shape, READ-ONLY)", "p098")
                         moreRow("P097. console-sec gRegistryRoot leak (CVE-2026-65371, READ-ONLY — lock/unlock once while it waits)", "p097")
@@ -404,7 +405,8 @@ struct ContentView: View {
             "luminakrw": "lumina_krw_log.txt",
             "OOB PoC": "p050_getattrlist_oob_log.txt",
             "p053": "p053_necp_dfree_log.txt",
-            "P053": "p053_necp_dfree_log.txt"
+            "P053": "p053_necp_dfree_log.txt",
+            "p110": "p110_swapclaim_log.txt"
         ]
 
         var preferredName: String? = nil
@@ -1009,6 +1011,13 @@ struct ContentView: View {
                     result = Self.readFreshLog(
                         named: "p100_learn_log.txt",
                         missing: "p100 finished but log missing")
+                }
+            case "p110", "swapclaim":
+                result = P110SurfaceSwapClaim.tap()
+                if result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    result = Self.readFreshLog(
+                        named: "p110_swapclaim_log.txt",
+                        missing: "p110 finished but log missing")
                 }
             case "p099", "anegroom":
                 result = P099AnePrewireGroom.tap()
