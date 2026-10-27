@@ -34,6 +34,7 @@
 #import <CoreFoundation/CoreFoundation.h>
 #import "LabLocalTime.h"
 #import "LabDeviceProfile.h"
+#import "LabBandit.h"
 
 #define P099_BUILD @"p099-aneprewire-v22-bandit"
 
@@ -908,6 +909,35 @@ static void p099_bandit_close(NSString *outcome) {
 
         // ---- v22 bandit: ledger + MAF attribution + UCB1 pick (Documents/p099_bandit.json) ----
         p099_bandit_tapstart(docs, p099stampWarn);
+
+        /* v22b: the SHARED LabBandit ledger (Documents/lab_bandit.json) gains
+           a p099 REFERENCE row seeded from the note-267 documented priors.
+           The in-probe bandit above (Documents/p099_bandit.json, the
+           prototype law) stays the deciding pick: seed-only registration —
+           no shared pick, no shared record (the prototype's maf=1 reward law
+           is intentionally NOT the shared LabBandit law; honesty law:
+           documented history only). */
+        {
+            static const char *const p099SharedArms[6] = {
+                "interleave", "reclaim", "fireburst", "thread", "pinnedburst", "bullet"
+            };
+            static const LabBanditSeedRow p099SharedSeeds[] = {
+                { "bullet",      "maf",    5 },
+                { "bullet",      "nofire", 1 },
+                { "pinnedburst", "abort",  1 },
+                { "thread",      "maf",    2 },
+                { "fireburst",   "maf",    2 },
+                { "reclaim",     "maf",    5 },
+                { "interleave",  "maf",    2 },
+            };
+            char p099Attr[256];
+            (void)LabBanditRegister("p099", p099SharedArms, 6,
+                                    p099SharedSeeds, 7,
+                                    "note-267 ledger (approximate priors, honestly labeled: "
+                                    "bullet{maf5,nofire1} pinnedburst{abort1} thread{maf2} "
+                                    "fireburst{maf2} reclaim{maf5} interleave{maf2})",
+                                    NULL, NULL, p099Attr, sizeof p099Attr);
+        }
         if (p099_arm_pinned(g_p099_arm)) {
             p099_pin();   /* v19/v22: the pin gates on arm in {pinnedburst, bullet};
                              the tap's main thread = the pump's magazine */

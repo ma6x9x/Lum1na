@@ -34,6 +34,7 @@
 #import "P073AneSecondTable.h"
 #import "LabDeviceProfile.h"
 #import "LabLocalTime.h"
+#import "LabBandit.h"
 #import "P007Board.h"
 
 #import <CoreML/CoreML.h>
@@ -79,7 +80,7 @@
    selection stays RUNTIME off LabOff()->ane_table_size (T8150 0x10b8 only,
    300-in preferred when present, 257-in fallback). Every other row
    (A14/23F77 0x820 included) keeps the 254 path bit-for-bit. */
-#define P073_BUILD @"p073-second-table-v13b-t8150-300in"
+#define P073_BUILD @"p073-second-table-v14-bandit-t8150-300in"
 
 /* kmsg geometry — P034 contract: msgh_size 0x7FC -> kdata 0x820 (ANE class).
    v12: the class is RUNTIME — T8150's record law = 0x10b8 (notes 251/265,
@@ -213,6 +214,54 @@ static uint32_t g_p073_oolHits;
 static uint32_t g_p073_burstN   = P073_SMALL_BURST;
 static uint32_t g_p073_prefillN = 2u;
 static uint32_t g_p073_prefillCap = 128u;  /* dial room: prefill=16 covers the pop neighborhood */
+
+/* v14 bandit (LabBandit shared harness): the dial DEFAULTS become
+   bandit-selectable per tap. Documents/p073_conv.txt ("prefill=N burst=N")
+   stays the manual override; an ABSENT file = LabBandit picks the defaults
+   (the v10 auto-stage is retired — create/edit the file to force a shape).
+   Arms = dial combos ALREADY reachable by the v10 dial law — the prefill
+   and fresh-instance-burst loops are unchanged (no new race shapes):
+     0 "p2-b0"   : prefill=2 burst=0   (v9 positioned-groom pure round)
+     1 "p8-b0"   : prefill=8 burst=0   (the v10 staged default)
+     2 "p2-b16"  : prefill=2 burst=16  (the v4/v7j fresh-instance burst era)
+     3 "p8-b16"  : prefill=8 burst=16
+     4 "manual-dial" : a hand-edited dial matching no arm above (recorded,
+                       never picked — LabBandit manual bucket)
+   Outcomes = the [VERDICT] kinds on the shared reward map:
+     kind=conversion (ok=1)      -> "ok"             (1.0)
+     kind=occupancy (fill landed on live sentinels, desc region intact)
+                                 -> "fires"          (0.5)
+     kind=miss & fill fired      -> "miss-adjacency" (0.25)
+     kind=miss & fill never ran  -> "nofire"          (0.25)
+   The dirty-boot law (shared): a PROVEN kern.boottime change with the round
+   open = the fire panicked the device mid-round (the freed-crossing MAF
+   class) -> "maf"; same boot/unknown -> conservative "abort".
+   p073's race internals are untouched: the dial only sets g_p073_prefillN
+   / g_p073_burstN exactly as it did before. */
+static const char *const g_p073_bArms[5] = {
+    "p2-b0", "p8-b0", "p2-b16", "p8-b16", "manual-dial"
+};
+static int g_p073_bArm;                     /* the tap's ledger arm */
+static const LabBanditSeedRow g_p073_bSeeds[] = {
+    /* documented history, approximate and honestly labeled: the v7j/v9
+       prefill-2 + default-burst era boots recv-measured mutated=64
+       live-lane landings (occupancy = the "fires" class). "p8-b0" (the v10
+       staged default) has no verdict totals documented yet -> zero seed. */
+    { "p2-b16", "fires", 1 },
+};
+/* apply a bandit arm's dial defaults (existing dial values only) */
+static void p073_barm_apply(int arm) {
+    g_p073_prefillN = 2u;
+    g_p073_burstN   = 0u;
+    switch (arm) {
+        case 0: break;                                  /* p2-b0 */
+        case 1: g_p073_prefillN = 8u; break;            /* p8-b0 */
+        case 2: g_p073_burstN = P073_SMALL_BURST; break;/* p2-b16 */
+        case 3: g_p073_prefillN = 8u;                   /* p8-b16 */
+                g_p073_burstN = P073_SMALL_BURST; break;
+        default: break;
+    }
+}
 
 /* v9: inspect one received descriptor for the OOL conversion door.
    Layout law (v7d, measured): {name u32 @0, pad u32 @4, type u16 @8,
@@ -624,6 +673,27 @@ static NSURL *p073_model_url(NSString *name) {
     p073_log(@"%@", [LabDeviceProfile huntTapWarn:@"p073"] ?: @"");
     [LabDeviceProfile stampLastTap:@"p073"];
 
+    /* ---- v14 bandit: shared ledger + dirty-boot attribution (the pick lands
+       at the dial block: it selects the prefill/burst DEFAULTS only when the
+       manual dial file is absent). Shared law: a PROVEN kern.boottime change
+       with the round open = the fire panicked the device mid-round (the
+       freed-crossing MAF class); same boot/unknown = conservative abort
+       (a force-quit looks identical). ------------------- */
+    {
+        char attr[256];
+        int a = LabBanditRegister("p073", g_p073_bArms, 5, g_p073_bSeeds, 1,
+            "p073 v7j/v9/v10 dial history (approximate, honestly labeled): the "
+            "prefill-2 + default-burst era boots recv-measured mutated=64 "
+            "live-lane landings (occupancy = fires class); the v10 staged "
+            "default (p8-b0) has no verdict totals documented yet",
+            "maf", "abort", attr, sizeof attr);
+        if (a == 1 || a == 2)
+            p073_log(@"[v14] bandit %@", [NSString stringWithUTF8String:attr]);
+        else if (a < 0)
+            p073_log(@"[v14] bandit shared ledger load FAILED — this round may "
+                     @"not attribute after a panic");
+    }
+
     {
         const LabOffTab *off = LabOff();
         if (off && off->ane_fill_cap) {
@@ -667,17 +737,25 @@ static NSURL *p073_model_url(NSString *name) {
         NSString *dialPath = [docs stringByAppendingPathComponent:@"p073_conv.txt"];
         NSFileManager *fmDial = [NSFileManager defaultManager];
         if (![fmDial fileExistsAtPath:dialPath]) {
-            /* 2026-10-26 stage: the default conversion dial is WRITTEN by the
-               tap itself on first run so the file is always present on-device
-               (v10 night order). Edit/delete Documents/p073_conv.txt on-device
-               to change or clear the dial. */
-            NSString *def = @"prefill=8 burst=0\n";
-            if ([def writeToFile:dialPath atomically:YES
-                        encoding:NSUTF8StringEncoding error:nil])
-                p073_log(@"[v10] STAGED default dial (prefill=8 burst=0) → Documents/p073_conv.txt "
-                         @"(was absent; edit on-device to change dials without a rebuild)");
-        }
-        if ([fmDial fileExistsAtPath:dialPath]) {
+            /* v14: ABSENT dial file = LabBandit picks the prefill/burst
+               defaults per tap (the v10 auto-stage is retired — the file is
+               now the MANUAL override only: create/edit
+               Documents/p073_conv.txt "prefill=N burst=N" to force a shape
+               on-device without a rebuild). The bandit values are dial
+               combos the v10 dial law could already set; the race internals
+               are untouched. */
+            char bl[160];
+            g_p073_bArm = LabBanditPick("p073", bl, sizeof bl);
+            p073_log(@"[v14] no dial file — bandit defaults this tap: %@",
+                     [NSString stringWithUTF8String:bl]);
+            p073_barm_apply(g_p073_bArm);
+            char sc[512];
+            if (LabBanditScores("p073", sc, sizeof sc) >= 0)
+                p073_log(@"[v14] bandit UCB1 %s", sc);
+            p073_log(@"[v14] bandit dial: prefill=%u burst=%u (arm=%s, Documents/lab_bandit.json)",
+                     g_p073_prefillN, g_p073_burstN,
+                     LabBanditArmName("p073", g_p073_bArm));
+        } else {
             NSString *dial = [[NSString alloc] initWithContentsOfFile:dialPath
                 encoding:NSUTF8StringEncoding error:nil];
             NSRange r = [dial rangeOfString:@"prefill="];
@@ -690,8 +768,26 @@ static NSURL *p073_model_url(NSString *name) {
                 int v = [dial substringFromIndex:NSMaxRange(r)].intValue;
                 g_p073_burstN = v < 0 ? 0u : (uint32_t)v;
             }
+            /* v14: manual override — attribute the round to the arm whose
+               combo the file names, or to the manual bucket (recorded,
+               never picked). The UCB1 pick is NOT used this tap. */
+            {
+                int m = -1;
+                for (int ai = 0; ai < 4; ai++) {
+                    uint32_t pf = (ai == 1 || ai == 3) ? 8u : 2u;
+                    uint32_t bn = (ai >= 2) ? P073_SMALL_BURST : 0u;
+                    if (g_p073_prefillN == pf && g_p073_burstN == bn) { m = ai; break; }
+                }
+                g_p073_bArm = (m >= 0) ? m : 4;
+            }
             p073_log(@"[v10] dial: prefill=%u burst=%u (Documents/p073_conv.txt)",
                      g_p073_prefillN, g_p073_burstN);
+            p073_log(@"[v14] manual dial override — bandit arm pinned: %s "
+                     @"(UCB1 not used this tap; arm %s)",
+                     g_p073_bArms[g_p073_bArm],
+                     g_p073_bArm == 4
+                       ? @"records outcomes, never picked"
+                       : @"reaches UCB1 data next tap");
         }
     }
     p073_surf_t *surfs = calloc(P073_N_SURF, sizeof(p073_surf_t));
@@ -741,6 +837,8 @@ static NSURL *p073_model_url(NSString *name) {
         p073_log(@"[-] model missing: addchain=%@ small=%@", url254 ? @"ok" : @"MISSING",
                  urlSmall ? @"ok" : @"MISSING");
         p073_log(@"=== VERDICT === abort (no model). hasKread=NO.");
+        LabBanditRecord("p073", g_p073_bArm, "abort");
+        LabBanditRoundClose("p073", "abort");
         for (uint32_t i = 0; i < nSurf; i++) if (surfs[i].surf) CFRelease(surfs[i].surf);
         free(surfs);
         if (g_p073_fd >= 0) { fcntl(g_p073_fd, F_FULLFSYNC); close(g_p073_fd); g_p073_fd = -1; }
@@ -762,6 +860,8 @@ static NSURL *p073_model_url(NSString *name) {
     }
     if (!model254 || !modelSmall) {
         p073_log(@"=== VERDICT === abort (model load). hasKread=NO.");
+        LabBanditRecord("p073", g_p073_bArm, "abort");
+        LabBanditRoundClose("p073", "abort");
         for (uint32_t i = 0; i < nSurf; i++) if (surfs[i].surf) CFRelease(surfs[i].surf);
         free(surfs);
         if (g_p073_fd >= 0) { fcntl(g_p073_fd, F_FULLFSYNC); close(g_p073_fd); g_p073_fd = -1; }
@@ -818,6 +918,8 @@ static NSURL *p073_model_url(NSString *name) {
     if (!provider) {
         p073_log(@"[-] feature provider FAILED: %@", err.localizedDescription ?: @"-");
         p073_log(@"=== VERDICT === abort (features). hasKread=NO.");
+        LabBanditRecord("p073", g_p073_bArm, "abort");
+        LabBanditRoundClose("p073", "abort");
         for (uint32_t i = 0; i < nSurf; i++) if (surfs[i].surf) CFRelease(surfs[i].surf);
         free(surfs);
         if (g_p073_fd >= 0) { fcntl(g_p073_fd, F_FULLFSYNC); close(g_p073_fd); g_p073_fd = -1; }
@@ -949,6 +1051,7 @@ static NSURL *p073_model_url(NSString *name) {
         p073_log(@"[SKIP] Force with Documents/p073_force_fire.txt (forensics only).");
         p073_log(@"[VERDICT] kind=skip first_fail_stage=none fires=0 ok=0");
         p073_log(@"hasKread=NO.");
+        LabBanditRoundClose("p073", NULL);   /* a SKIP is not an arm outcome */
         if (g_p073_fd >= 0) { fcntl(g_p073_fd, F_FULLFSYNC); close(g_p073_fd); g_p073_fd = -1; }
         NSString *ret = g_p073_buf; g_p073_buf = nil; return ret;
     }
@@ -1316,12 +1419,26 @@ static NSURL *p073_model_url(NSString *name) {
              conv ? "none"
                : (mut > 0 ? "adjacency" : (!pred254Fired ? "a-fill" : "b-adjacency")),
              (int)pred254Attempts, conv ? 1 : 0);
+    /* v14 bandit record: the [VERDICT] kind on the shared reward map
+       (conversion -> ok, occupancy -> fires, fill-fired miss ->
+       miss-adjacency, never-marshaled -> nofire), then close the round. */
+    {
+        const char *bOc = conv ? "ok"
+                        : (mut > 0 ? "fires"
+                        : (pred254Fired ? "miss-adjacency" : "nofire"));
+        LabBanditRecord("p073", g_p073_bArm, bOc);
+        LabBanditRoundClose("p073", bOc);
+        p073_log(@"[v14] bandit record: arm=%s outcome=%s (Documents/lab_bandit.json)",
+                 g_p073_bArms[g_p073_bArm], bOc);
+    }
     p073_log(@"hasKread=NO. kread32 registers only from a copyout of kernel bytes we did not write.");
     p073_log(@"One TAP per force-quit. Reboot if ANE/kmsg state is dirty.");
 
     } else {
         p073_log(@"[-] hole spray too small — abort before fire");
         p073_log(@"=== VERDICT === abort (spray). hasKread=NO.");
+        LabBanditRecord("p073", g_p073_bArm, "abort");
+        LabBanditRoundClose("p073", "abort");
     }
 
     for (uint32_t i = 0; i < nPre; i++)

