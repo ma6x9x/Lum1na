@@ -100,6 +100,7 @@ static volatile int g_d_probe_alive;      /* post-ownership sid resolvable? */
 #define TST_NONE 0
 #define TST_DONE 1
 static volatile int g_st_e, g_st_d, g_st_p;
+static volatile int g_park_e, g_park_d, g_park_p;  /* back-at-idle flags    */
 
 /* verdict counters */
 static atomic_int v_win_lost;
@@ -205,7 +206,11 @@ static void *p110_t_engine(void *arg) {
     (void)arg;
     p110_pin();
     while (g_run) {
+        g_park_e = 1;
+        __sync_synchronize();
         while (g_run && !g_gate) { sched_yield(); }
+        g_park_e = 0;
+        __sync_synchronize();
         if (!g_run) break;
         IOSurfaceRef t = g_e_target;
         if (t) { (void)p110_release(t); }   /* owner-death release (detacher
@@ -222,7 +227,11 @@ static void *p110_t_destroy(void *arg) {
     (void)arg;
     p110_pin();
     while (g_run) {
+        g_park_d = 1;
+        __sync_synchronize();
         while (g_run && !g_gate) { sched_yield(); }
+        g_park_d = 0;
+        __sync_synchronize();
         if (!g_run) break;
         IOSurfaceRef t = g_d_target;
         uint32_t sid = g_d_sid;
@@ -248,7 +257,11 @@ static void *p110_t_reclaim(void *arg) {
     (void)arg;
     p110_pin();
     while (g_run) {
+        g_park_p = 1;
+        __sync_synchronize();
         while (g_run && !g_gate) { sched_yield(); }
+        g_park_p = 0;
+        __sync_synchronize();
         if (!g_run) break;
         /* the dial: bounded ns spin on THIS cpu between the owner-release
            and the +2 pop — the 267 v10 one-slot calibration law           */
@@ -457,6 +470,24 @@ static NSString *p110_flags_law(void) {
                                         = owner death for the round n-1 victim */
         g_d_sid    = prev_sid;
         g_dial     = dial;
+
+        /* bounded park wait: every racer back at idle before the gate —
+           closes the miss-the-gate race (a stuck racer deadlocks a round,
+           so an armed window waits for parked threads only, never guesses) */
+        int parked = 0;
+        while (g_run && parked < P110_GO_TIMEOUT_MS &&
+               !(g_park_e && g_park_d && g_park_p)) {
+            usleep(1000);
+            parked++;
+        }
+        if (!(g_park_e && g_park_d && g_park_p)) {
+            atomic_fetch_add(&v_aborted, 1);
+            Lf(@"[r %d/%d] ABORTED ROUND (honest): racers never re-parked "
+               @"(E-park=%d D-park=%d P-park=%d) — bounded stop, no retry storm",
+               r, P110_ROUNDS, g_park_e, g_park_d, g_park_p);
+            g_run = false;
+            break;
+        }
 
         __sync_synchronize();
         g_gate = 1;                                   /* GO                   */
