@@ -31,7 +31,7 @@
 #import "LabLocalTime.h"
 #import "LabDeviceProfile.h"
 
-#define P099_BUILD @"p099-aneprewire-v15-reclaim"
+#define P099_BUILD @"p099-aneprewire-v16-reload"
 
 #define P099_INPUT_COUNT 254
 /* v13 INTERLEAVE LAW (the 21:38/21:40 v12 MAF rounds): the fill's crossing
@@ -622,7 +622,26 @@ static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
                            the cache and fill nothing). */
                         BOOL aneEvaluated = NO;
                         for (int t = 0; t < 4 && !aneEvaluated; t++) {
-                            if (t) [NSThread sleepForTimeInterval:1.0];
+                            if (t) {
+                                [NSThread sleepForTimeInterval:2.0];
+                                /* v16 RELOAD law (tonight's no-fire rounds; both
+                                   v14 22:30 and v15 22:43 = tap-1 boots where
+                                   -1 *4 + ANECCompile FAILED, and the NEXT tap
+                                   fired after force-quit): an ANE compile failure
+                                   is CACHED on the model instance — recreate the
+                                   MLModel fresh per retry (fresh resource = a
+                                   fresh ANE compile session = tap-2's law inside
+                                   one tap). */
+                                err = nil;
+                                model = [MLModel modelWithContentsOfURL:compiledURL
+                                                         configuration:cfg error:&err];
+                                if (!model) {
+                                    L(@"[fire %d] model reload failed: %@ — retry", t,
+                                      err ? err.localizedDescription : @"?");
+                                    continue;
+                                }
+                                L(@"[fire %d] model reloaded (fresh ANE compile session)", t);
+                            }
                             err = nil;
                             id<MLFeatureProvider> pred =
                                 [model predictionFromFeatures:provider error:&err];
