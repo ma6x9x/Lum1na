@@ -28,14 +28,16 @@
 #import "P112CGShading.h"
 #import "LabDeviceProfile.h"
 #import "LabLocalTime.h"
+#import "LabBandit.h"
 
 #import <CoreGraphics/CoreGraphics.h>
 #import <fcntl.h>
 #import <signal.h>
+#import <stdio.h>
 #import <string.h>
 #import <unistd.h>
 
-#define P112_BUILD @"p112-cgshading-v1"
+#define P112_BUILD @"p112-cgshading-v1.1-bandit"
 
 /* Oracle constants, pinned to the generator (analysis §3-4):
    BPCOORD 32 ∈ {1,2,4,8,12,16,24,32}; BPCOMP 8 ∈ {1,2,4,8,12,16}; VPR 2.
@@ -87,6 +89,30 @@ static void p112_close_fd(void) {
    above already names the sweep round and its expected pattern.             */
 
 static uint64_t g_p112_pat;   /* the in-flight sweep's chosen-double bits     */
+
+/* ---- v1.1 bandit (LabBandit shared harness): the sweep ORDER arms --------
+   Both arms sweep the same four chosen doubles — only the ORDER differs,
+   and both orders are already-present paths (the sweep table is a constant
+   either way; no new race/render shape):
+     0 "fixed-1-2-4-8" : the current fixed sweep (the v1 value-control proof)
+     1 "f77-2first"    : leading with the 23F77-derived-value law — chosen=2.0
+                         first — as the alternate first-strike arm
+   Outcomes = exactly the existing three: (a) survived / (b) fault-with-far /
+   (c) anomaly. The ledger signal = which chosen-double first-strikes on
+   WHICH SKU: per-sweep LabBanditNote rows carry the SKU, the order and each
+   IN FLIGHT pattern (the 23F77 0x3ef0 vs the 24A435 0x3ff0 far-pattern
+   classes land as ledger data alongside the fsync'd log's (b) lines). The
+   (b) class itself is recorded by LabBandit's same-boot attribution — the
+   (b) catcher is the ONLY exit that leaves the round open (a force-quit
+   looks identical; the log's (b) line names the far + the chosen bits).   */
+static const char *const g_p112_arms[2] = { "fixed-1-2-4-8", "f77-2first" };
+static int g_p112_arm;
+static const LabBanditSeedRow g_p112_seeds[] = {
+    /* documented receipt (on-device proof): deterministic EXC_BAD_ACCESS
+       SIGSEGV far 0x3ff000000000001c = 1.0-bits + 0x1c under the fixed sweep
+       (analysis/on-device-proof.md). One strike, approximate count. */
+    { "fixed-1-2-4-8", "fault-with-far", 1 },
+};
 
 static void p112_put_hex(char *b, int *n, uint64_t v) {
     static const char hx[17] = "0123456789abcdef";
@@ -354,7 +380,42 @@ static int p112_render(NSMutableData *pdf, NSString *tag) {
     (void)sigaction(SIGSEGV, &sa, NULL);
     (void)sigaction(SIGFPE,  &sa, NULL);
 
-    static const double sweep[P112_SWEEP_MAX] = {1.0, 2.0, 4.0, 8.0};
+    /* ---- v1.1 bandit: shared ledger + dirty-boot attribution + one pick
+       per tap (Documents/lab_bandit.json). The pick = the sweep ORDER arm.
+       Attribution law: a still-open round from the previous session means
+       the (b) catcher fired in-process (the only exit that leaves the round
+       open) on the SAME boot -> fault-with-far; a PROVEN boot change (no
+       p112 path panics the device) -> conservative abort. ---------------- */
+    {
+        char attr[256];
+        int a = LabBanditRegister("p112", g_p112_arms, 2, g_p112_seeds, 1,
+            "p112 on-device receipt (approximate, honestly labeled): far "
+            "0x3ff000000000001c = 1.0-bits + 0x1c under the fixed sweep "
+            "(analysis/on-device-proof.md); f77-2first seeds at zero",
+            "abort", "fault-with-far", attr, sizeof attr);
+        if (a == 1 || a == 2)
+            Lf(@"[bandit] %@", [NSString stringWithUTF8String:attr]);
+        else if (a < 0)
+            Lf(@"[bandit] shared ledger load FAILED — this round may not "
+               @"attribute if a fault ends the session");
+        char pickLine[160];
+        g_p112_arm = LabBanditPick("p112", pickLine, sizeof pickLine);
+        Lf(@"[bandit] %@", [NSString stringWithUTF8String:pickLine]);
+        char sc[512];
+        if (LabBanditScores("p112", sc, sizeof sc) >= 0)
+            Lf(@"[bandit] UCB1 %s", sc);
+        char skuNote[192];
+        snprintf(skuNote, sizeof skuNote, "arm=%s order: chosen=%.0f first "
+                 "(ledger carries this SKU's per-sweep strike/survival rows; "
+                 "the (b) far+pattern receipts live in the fsync'd log)",
+                 LabBanditArmName("p112", g_p112_arm),
+                 (g_p112_arm == 1) ? 2.0 : 1.0);
+        LabBanditNote("p112", skuNote);
+    }
+
+    static const double sweepFixed[P112_SWEEP_MAX] = {1.0, 2.0, 4.0, 8.0};
+    static const double sweepF77 [P112_SWEEP_MAX] = {2.0, 1.0, 4.0, 8.0};
+    const double *sweep = (g_p112_arm == 1) ? sweepF77 : sweepFixed;
 
     /* ---- CONTROL: R = nc (in-bounds; passes the 27.2 gate on every build;
        same render path) — the p076 discriminator law: proves the harness
@@ -370,6 +431,10 @@ static int p112_render(NSMutableData *pdf, NSString *tag) {
           @"honest, nothing swept.");
         L(@"=== VERDICT === abort (control render failed). hasKread=NO hasKwrite=NO. "
           @"No sweep ran, no success claim.");
+        LabBanditRecord("p112", g_p112_arm, "abort");
+        LabBanditRoundClose("p112", "abort");
+        Lf(@"[bandit] round closed: arm=%s outcome=abort (Documents/lab_bandit.json)",
+           LabBanditArmName("p112", g_p112_arm));
         p112_close_fd();
         NSString *ret = g_p112_log;
         g_p112_log = nil;
@@ -403,6 +468,19 @@ static int p112_render(NSMutableData *pdf, NSString *tag) {
            k + 1, P112_SWEEP_MAX, P112_RANGE_DIM, v, (unsigned long long)pat,
            (unsigned long long)pat);
 
+        /* bandit ledger: the IN FLIGHT pattern lands in the history ring's
+           note FIRST — if the (b) catcher ends the session, the last
+           lab_bandit.json note names exactly the striking chosen double on
+           this SKU (the same-boot attribution then records fault-with-far).
+           The sigfault catcher itself is async-signal-safe only and never
+           touches the ledger. */
+        {
+            char infl[128];
+            snprintf(infl, sizeof infl, "sweep %d/%d IN FLIGHT chosen=%.17g bits=0x%016llx",
+                     k + 1, P112_SWEEP_MAX, v, (unsigned long long)pat);
+            LabBanditNote("p112", infl);
+        }
+
         p112_render(pdf, [NSString stringWithFormat:@"oracle-%.0f", v]);
 
         Lf(@"[sweep %d/%d] OUTCOME (a) SURVIVED (honest): render returned without fault. "
@@ -410,6 +488,13 @@ static int p112_render(NSMutableData *pdf, NSString *tag) {
            @"in mapped heap without a fault (deferred-corruption caveat — p076 law; one "
            @"tap per force-quit regardless). No success claim.",
            k + 1, P112_SWEEP_MAX);
+        LabBanditRecord("p112", g_p112_arm, "survived");
+        {
+            char surv[128];
+            snprintf(surv, sizeof surv, "sweep %d/%d SURVIVED chosen=%.17g bits=0x%016llx",
+                     k + 1, P112_SWEEP_MAX, v, (unsigned long long)pat);
+            LabBanditNote("p112", surv);
+        }
         pdf = nil;
     }
 
@@ -428,6 +513,13 @@ static int p112_render(NSMutableData *pdf, NSString *tag) {
     L(@"HONESTY: userspace OOB in OUR process — NOT kernel, NOT KRW. hasKread=NO "
       @"hasKwrite=NO. The value-control sweep (bit-pattern match) is the ONLY primitive "
       @"claim. One TAP per force-quit.");
+
+    /* bandit: close the open round (per-sweep outcomes recorded in the loop;
+       a (b) fault instead leaves it open for the shared same-boot
+       attribution law — see g_p112_arms comment). */
+    LabBanditRoundClose("p112", "survived");
+    Lf(@"[bandit] round closed: arm=%s sweeps survived=%d (Documents/lab_bandit.json)",
+       LabBanditArmName("p112", g_p112_arm), P112_SWEEP_MAX);
 
     p112_close_fd();
     NSString *ret = g_p112_log;
