@@ -235,6 +235,37 @@ int LabBanditRegister(const char *domain,
             snprintf(attrLineOut, (size_t)attrLineCap,
                      "ledger SEEDED (priors from documented history only): %s",
                      [(NSString *)dom[@"seeded_from"] UTF8String] ?: "(?)");
+    } else {
+        /* v1.1 arm-merge law: a probe may ADD arms in a later build (p110 v2
+           added the leakgate-on/leakgate-off arm pair). The first-seen ledger
+           keeps its arm_order, so newly registered arms are APPENDED with
+           zeroed counts (UCB1 explores them first) instead of being silently
+           lost to the fresh-only seed path. Order-preserving; capped at
+           LABB_MAX_ARMS so Pick/Scores' fixed stat buffers stay in range.
+           Existing order rows are also normalized so every order entry has a
+           backing counts dict. */
+        NSMutableArray *order = labb_mut(dom[@"arm_order"],
+                                         [NSMutableArray class],
+                                         [NSMutableArray array]);
+        dom[@"arm_order"] = order;
+        NSMutableDictionary *armsDict = labb_mut(dom[@"arms"],
+                                                 [NSMutableDictionary class],
+                                                 [NSMutableDictionary dictionary]);
+        dom[@"arms"] = armsDict;
+        for (int i = 0; i < armCount && order.count < LABB_MAX_ARMS; i++) {
+            NSString *nm = [NSString stringWithUTF8String:arms[i] ?: ""];
+            if (nm.length == 0) continue;
+            if ([order indexOfObject:nm] != NSNotFound) continue;
+            if ([armsDict objectForKey:nm] != nil) continue;
+            armsDict[nm] = [NSMutableDictionary dictionary];
+            [order addObject:nm];
+        }
+        for (int i = 0; i < armCount && i < (int)order.count; i++) {
+            NSString *nm = [NSString stringWithUTF8String:arms[i] ?: ""];
+            if (nm.length == 0 || [order indexOfObject:nm] == NSNotFound) continue;
+            if ([armsDict objectForKey:nm] == nil) armsDict[nm] = [NSMutableDictionary dictionary];
+        }
+        while (order.count > LABB_MAX_ARMS) [order removeLastObject];
     }
 
     /* ---- dirty-boot attribution (the p099 v22 law, shared) ---- */
@@ -295,6 +326,7 @@ int LabBanditPick(const char *domain, char *lineOut, int lineCap) {
                                          [NSMutableDictionary dictionary]);
     dom[@"arms"] = arms;
     int n = (int)order.count;
+    if (n > LABB_MAX_ARMS) n = LABB_MAX_ARMS;   /* fixed stat buffers (merge cap) */
     if (n == 0) {
         labb_save_locked(doc);
         os_unfair_lock_unlock(&g_labbLock);
@@ -443,6 +475,7 @@ int LabBanditScores(const char *domain, char *out, int cap) {
     double nArm[LABB_MAX_ARMS], mean[LABB_MAX_ARMS];
     double nTotal = 0;
     int n = (int)order.count;
+    if (n > LABB_MAX_ARMS) n = LABB_MAX_ARMS;   /* fixed stat buffers (merge cap) */
     for (int i = 0; i < n; i++) {
         labb_arm_stats(arms, order[i], &nArm[i], &mean[i]);
         nTotal += nArm[i];

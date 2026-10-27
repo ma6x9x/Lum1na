@@ -61,6 +61,7 @@ public final class PersistentLogStore {
         "p097": "p097_consolesec_log.txt",
         "p098": "p098_m2scaler_diag_log.txt",
         "p112": "p112_cgshading_log.txt",
+        "p114": "p114_surfaceleak_log.txt",
         "p108": "p108_diskimages_census_log.txt",
         "p109": "p109_ane_selsweep_log.txt",
         "p099": "p099_aneprewire_log.txt",

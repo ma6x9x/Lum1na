@@ -110,6 +110,7 @@
 #import "Exploit/P108DiskImagesCensus.h"
 #import "Exploit/P109AneSelSweep.h"
 #import "Exploit/P112CGShading.h"
+#import "Exploit/P114SurfaceLeak.h"
 #import "Exploit/P113DescForgeControl.h"
 #import "Exploit/P122SwordForge.h"
 #import "Exploit/P123ShapeCensus.h"

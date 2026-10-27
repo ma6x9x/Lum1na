@@ -24,6 +24,22 @@
 //  64 rounds. dlsym-only IOSurface APIs (no <IOSurface/IOSurface.h>);
 //  mach via <mach/mach.h>. Bounded, one tap, fsync log, honest verdicts.
 //
+//  v2 LEAK-GATE: the claim stage is now PAIRED with the M2ScalerCSCDriver
+//  selector-8 leak (the derived law: {u64} 8-byte input; out = the
+//  activity-queue serializer's records, stride 0x7c, rec+0x18 = raw
+//  first-event qword passthrough with no auth = the IOSurface-KVA
+//  disclosure class — likely CVE-2026-64709; rec+0x30 = the +0x30-class
+//  client-ptr field = the claim law's own [surface+0x30] shape). Per
+//  round: a pre-window sel-8 snapshot (its record count rides the IN
+//  FLIGHT stamp), and on a claim-won round a pre/post leak DIFF — the
+//  +0x30-class KV changes = the claim-corruption observable (proxy-class:
+//  names the objects, proves the corruption CLASS, no kread claim).
+//  Leaked KVs print labeled LAW: KVA DISCLOSURE CLASS — not kread;
+//  hasKread=NO until a kread32-class receipt exists. Shape mismatch
+//  (kext drift) = honest hexdump + HOLD the pairing. The 6-arm bandit
+//  adds leakgate-on / leakgate-off (does leak-gating change the claim
+//  rate?). The (b) catch stays the sigaction law.
+//
 //  Three-outcome law per round (note 270 §4):
 //    (a) clean-no-anomaly     = window lost (honest print)
 //    (b) Family-B-shaped fault(SIGBUS/EFAULT-class on the alias path, or
