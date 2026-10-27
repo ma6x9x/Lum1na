@@ -365,7 +365,6 @@ static volatile int g_p099_pumpRun;
 static void *p099_pump_thread(void *unused) {
     p099_pin();   /* v19: same magazine as the fire */
     while (g_p099_pumpRun) {
-    while (g_p099_pumpRun) {
         p099_fire_pump(4);
         usleep(25000);   /* 160/s pump cadence ≈ the reload window's alloc rate */
     }
