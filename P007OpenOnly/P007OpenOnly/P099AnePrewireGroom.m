@@ -27,12 +27,13 @@
 #import <unistd.h>
 #import <mach/mach.h>
 #import <mach/mach_error.h>
+#import <mach/thread_policy.h>
 #import <pthread.h>
 #import <CoreFoundation/CoreFoundation.h>
 #import "LabLocalTime.h"
 #import "LabDeviceProfile.h"
 
-#define P099_BUILD @"p099-aneprewire-v18-pumpthread"
+#define P099_BUILD @"p099-aneprewire-v19-samecpu"
 
 #define P099_INPUT_COUNT 254
 /* v13 INTERLEAVE LAW (the 21:38/21:40 v12 MAF rounds): the fill's crossing
@@ -348,8 +349,22 @@ static void p099_fire_pump(uint32_t batch) {
    reload+fire window — whoever pops next is physically adjacent to the
    record area's element, and our pump keeps that top stocked with LIVE
    door kmsgs (win ≈ every pop the pump takes; lose ≈ the MAF we know). */
+/* v19 same-CPU law (the p110 fleet law applied to the ANE lane): the v18
+   round lost its race with UNPINNED threads — a drifting pump thread can
+   land on a different CPU's magazine than the ANE's pop, so pump kmsgs can
+   NEVER be neighbors of the crossing element. Pin the tap thread AND the
+   pump thread to the same affinity tag = one magazine for the whole race. */
+static void p099_pin(void) {
+    thread_affinity_policy_data_t aff;
+    aff.affinity_tag = 1;
+    (void)thread_policy_set(mach_thread_self(), THREAD_AFFINITY_POLICY,
+                            (thread_policy_t)&aff, THREAD_AFFINITY_POLICY_COUNT);
+    (void)pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0);
+}
 static volatile int g_p099_pumpRun;
 static void *p099_pump_thread(void *unused) {
+    p099_pin();   /* v19: same magazine as the fire */
+    while (g_p099_pumpRun) {
     while (g_p099_pumpRun) {
         p099_fire_pump(4);
         usleep(25000);   /* 160/s pump cadence ≈ the reload window's alloc rate */
@@ -488,6 +503,7 @@ static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
         [LabDeviceProfile stampLastTap:@"p099"];
 
         // ---- v6 dial: Documents/p099_victim.txt "portkind=N" (last N victims as door rounds) ----
+        p099_pin();   /* v19: the tap's main thread = the pump's magazine */
         g_p099_portkindN = 0;
         {
             NSString *dialP = [docs stringByAppendingPathComponent:@"p099_victim.txt"];
@@ -683,7 +699,7 @@ static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
                                 L(@"[fire %d] model reloaded (fresh ANE compile session)", t);
                             }
                             err = nil;
-                            if (!t) { p099_pump_start(); L(@"[v18] pump thread armed (2 kmsgs/40ms, racing the ANE's pops through the reload+fire window)"); }
+                            if (!t) { p099_pump_start(); L(@"[v19] pump thread armed SAME-CPU (tag 1 — the p110 fleet law; pump 4/25ms racing the ANE's pops in ONE magazine)"); }
                             id<MLFeatureProvider> pred =
                                 [model predictionFromFeatures:provider error:&err];
                             if (pred) {
