@@ -349,12 +349,12 @@ static void p099_fire_pump(uint32_t batch) {
    record area's element, and our pump keeps that top stocked with LIVE
    door kmsgs (win ≈ every pop the pump takes; lose ≈ the MAF we know). */
 static volatile int g_p099_pumpRun;
-static void p099_pump_thread(void *unused) {
+static void *p099_pump_thread(void *unused) {
     while (g_p099_pumpRun) {
         p099_fire_pump(4);
         usleep(25000);   /* 160/s pump cadence ≈ the reload window's alloc rate */
     }
-    return;
+    return NULL;
 }
 static void p099_pump_start(void) { g_p099_pumpRun = 1; pthread_t t; if (pthread_create(&t, NULL, p099_pump_thread, NULL)) g_p099_pumpRun = 0; else pthread_detach(t); }
 static void p099_pump_stop(void) { g_p099_pumpRun = 0; L(@"[v18] pump thread stopped (total=%u)", g_p099_pumpSent); }
