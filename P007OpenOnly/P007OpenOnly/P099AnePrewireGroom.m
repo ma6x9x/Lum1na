@@ -445,10 +445,12 @@ static void p099_recv_portkind_door(mach_port_t port, uint32_t idx) {
                    sideloads, so refresh it when dialver mismatches. */
                 NSString *cur = [NSString stringWithContentsOfFile:dialP
                     encoding:NSUTF8StringEncoding error:nil];
-                if (cur && ![cur containsString:@"dialver=10"]
-                    && ["dialver=10\nportkind=96\n" writeToFile:dialP
-                        atomically:YES encoding:NSUTF8StringEncoding error:nil])
-                    L(@"[v10] dial default refreshed → portkind=96 (dialver=10)");
+                if (cur && ![cur containsString:@"dialver=10"]) {
+                    NSString *defref = @"dialver=10\nportkind=96\n";
+                    if ([defref writeToFile:dialP atomically:YES
+                            encoding:NSUTF8StringEncoding error:nil])
+                        L(@"[v10] dial default refreshed → portkind=96 (dialver=10)");
+                }
             }
             if ([fm99 fileExistsAtPath:dialP]) {
                 NSString *dial = [NSString stringWithContentsOfFile:dialP
