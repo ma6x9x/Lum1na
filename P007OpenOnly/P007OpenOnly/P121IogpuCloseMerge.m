@@ -43,27 +43,28 @@
 #define P121_BUILD  @"p121-closemerge-v1"
 #define P121_TIME   10.0
 
-typedef io_object_t io_service_t;
-typedef io_object_t io_connect_t;
+typedef mach_port_t p_ioobject_t;
+typedef p_ioobject_t p_ioservice_t;
+typedef mach_port_t p_ioconnect_t;
 typedef CFMutableDictionaryRef (*IOServiceMatching_t)(const char *);
-typedef io_service_t (*IOServiceGetMatchingService_t)(mach_port_t, CFDictionaryRef);
-typedef kern_return_t (*IOObjectRelease_t)(io_object_t);
-typedef kern_return_t (*IOServiceCS_t)(io_connect_t);
-typedef kern_return_t (*IOServiceOpen_t)(io_service_t, task_port_t, uint32_t, io_connect_t *);
+typedef p_ioservice_t (*IOServiceGetMatchingService_t)(mach_port_t, CFDictionaryRef);
+typedef kern_return_t (*IOObjectRelease_t)(p_ioobject_t);
+typedef kern_return_t (*IOServiceCS_t)(p_ioconnect_t);
+typedef kern_return_t (*IOServiceOpen_t)(p_ioservice_t, task_port_t, uint32_t, p_ioconnect_t *);
 typedef kern_return_t (*IOConnectCallMethod_t)(
     mach_port_t, uint32_t,
     const uint64_t *, uint32_t,
     const void *, size_t,
     uint64_t *, uint32_t *,
     void *, size_t *);
-typedef void *(*DevCreate_t)(io_service_t);
+typedef void *(*DevCreate_t)(p_ioservice_t);
 typedef uint32_t (*GetConn_t)(void *);
 typedef void (*DevRelease_t)(void *);
 
 static NSMutableString *g_buf;
 static int g_fd = -1;
 static IOConnectCallMethod_t gp_call;
-static io_connect_t g_conn;
+static p_ioconnect_t g_conn;
 static uint32_t g_ins, g_dsel, g_typeId;
 static atomic_int g_stop;
 static atomic_ulong g_cr_ok, g_dr_ok, g_cr_fail, g_dr_fail, g_extra_ok;
@@ -160,8 +161,8 @@ static void *p121_blitter(void *u) {
     GetConn_t pGetConn = NULL;
     DevRelease_t pDevRelease = NULL;
     mach_port_t *pMainPort = NULL;
-    io_service_t svc = 0;
-    io_connect_t conn = MACH_PORT_NULL;
+    p_ioservice_t svc = 0;
+    p_ioconnect_t conn = MACH_PORT_NULL;
     void *dev = NULL;
     uint32_t typeId = 0;
     pthread_t ta, tb;

@@ -54,22 +54,23 @@
 #define P120_IN_SZ   0x400
 #define P120_OUT_SZ  0x80
 
-typedef io_object_t io_service_t;
-typedef io_object_t io_connect_t;
+typedef mach_port_t p_ioobject_t;
+typedef p_ioobject_t p_ioservice_t;
+typedef mach_port_t p_ioconnect_t;
 typedef CFMutableDictionaryRef (*IOServiceMatching_t)(const char *);
-typedef io_service_t (*IOServiceGetMatchingService_t)(mach_port_t, CFDictionaryRef);
-typedef kern_return_t (*IOObjectRelease_t)(io_object_t);
-typedef kern_return_t (*IOServiceOpen_t)(io_service_t, task_port_t, uint32_t, io_connect_t *);
+typedef p_ioservice_t (*IOServiceGetMatchingService_t)(mach_port_t, CFDictionaryRef);
+typedef kern_return_t (*IOObjectRelease_t)(p_ioobject_t);
+typedef kern_return_t (*IOServiceOpen_t)(p_ioservice_t, task_port_t, uint32_t, p_ioconnect_t *);
 typedef kern_return_t (*IOConnectCallMethod_t)(
     mach_port_t, uint32_t,
     const uint64_t *, uint32_t,
     const void *, size_t,
     uint64_t *, uint32_t *,
     void *, size_t *);
-typedef void *(*DevCreate_t)(io_service_t);
+typedef void *(*DevCreate_t)(p_ioservice_t);
 typedef kern_return_t (*DevRelease_t)(void *);
 typedef uint32_t (*GetConn_t)(void *);
-typedef void (*IOServiceClose_t)(io_connect_t);
+typedef void (*IOServiceClose_t)(p_ioconnect_t);
 
 static NSMutableString *g_buf;
 static int g_fd = -1;
@@ -90,7 +91,7 @@ static void Lf(NSString *fmt, ...) {
     L(line);
 }
 
-static kern_return_t p120_newRes(IOConnectCallMethod_t call, io_connect_t conn,
+static kern_return_t p120_newRes(IOConnectCallMethod_t call, p_ioconnect_t conn,
                                  uint32_t resType, uint32_t cacheMode,
                                  uint32_t flags, uint64_t size,
                                  void *inBuf, void *outBuf) {
@@ -106,13 +107,13 @@ static kern_return_t p120_newRes(IOConnectCallMethod_t call, io_connect_t conn,
     return call(conn, 8, NULL, 0, inBuf, P120_IN_SZ, NULL, &sc, outBuf, &osz);
 }
 
-static kern_return_t p120_del(IOConnectCallMethod_t call, io_connect_t conn,
+static kern_return_t p120_del(IOConnectCallMethod_t call, p_ioconnect_t conn,
                               uint32_t id) {
     uint64_t in = id;
     return call(conn, 9, &in, 1, NULL, 0, NULL, NULL, NULL, NULL);
 }
 
-static kern_return_t p120_fn4(IOConnectCallMethod_t call, io_connect_t conn,
+static kern_return_t p120_fn4(IOConnectCallMethod_t call, p_ioconnect_t conn,
                               uint32_t id, uint64_t *out) {
     uint64_t in[3] = { id, 0, 1 };   /* (id, 0, 1) = the 23G71-passing shape */
     uint64_t o = 0; uint32_t ocnt = 1; size_t osz = 8;
@@ -152,8 +153,8 @@ static kern_return_t p120_fn4(IOConnectCallMethod_t call, io_connect_t conn,
     GetConn_t pGetConn = NULL;
     DevRelease_t pDevRelease = NULL;
     mach_port_t *pMainPort = NULL;
-    io_service_t svc = 0;
-    io_connect_t conn = MACH_PORT_NULL;
+    p_ioservice_t svc = 0;
+    p_ioconnect_t conn = MACH_PORT_NULL;
     void *dev = NULL;
     if (!iokit || !iogpu) { L(@"[-] STOP dlopen"); goto done; }
     pMatching = dlsym(iokit, "IOServiceMatching");
