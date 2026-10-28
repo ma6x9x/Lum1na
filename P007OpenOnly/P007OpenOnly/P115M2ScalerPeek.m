@@ -80,6 +80,10 @@ static void p115_snap(mach_port_name_t *names, int *n) {
     }
 }
 
+/* forward declarations (v1.2: scanNew calls fingerprint — declare before
+   use; the missing forward decl was the third red Lum1na-Debug layer) */
+static void p115_fingerprint(mach_port_t port, NSMutableString *outLine, BOOL *found);
+
 /* diff + fingerprint the ADDED SEND-only ports (bounded: one sel-8 call) */
 static void p115_scanNew(const char *tag, mach_port_name_t *before, int nB,
                          mach_port_name_t *after, int nA,
