@@ -50,7 +50,7 @@
 #import <stdio.h>
 #import <string.h>
 
-#define P115_BUILD @"p115-m2scaler-peek-v1.7-p001guard"
+#define P115_BUILD @"p115-m2scaler-peek-v1.8-nobridge"
 
 static NSMutableString *g_log = nil;
 static int g_fd = -1;
@@ -233,7 +233,12 @@ static void p115_fingerprint(mach_port_t port, NSMutableString *outLine, BOOL *f
                                           NULL, &pbLive);
         if (cv == kCVReturnSuccess && pbLive) {
             p115_snap(B, &nB);
-            uintptr_t objs[2] = { (uintptr_t)(__bridge void *)pbLive, 0 };
+            /* v1.8: NO __bridge on video-framework opaque structs — the iOS
+               toolchain rejects __bridge for CVPixelBufferRef/VTCompressionSessionRef
+               (plain struct pointers, not bridgeable CF types); the p001
+               guard pattern used __bridge only on id<MTLDevice> objc objects.
+               Plain (void *) casts are correct here and compile on both. */
+            uintptr_t objs[2] = { (uintptr_t)(void *)pbLive, 0 };
             p115_scanNew("iosurface-create", A, nA, B, nB, objs, 1, fp, &nNew, &found);
         } else {
             Lf(@"[iosurface-create] CVPixelBuffer cv=%d (skipped)", (int)cv);
@@ -252,8 +257,8 @@ static void p115_fingerprint(mach_port_t port, NSMutableString *outLine, BOOL *f
             Lf(@"[vt-encode] create=0x%x prepare=0x%x", (unsigned)st, (unsigned)prep);
             if (prep == noErr) {
                 p115_snap(C, &nC);
-                uintptr_t objs2[3] = { (uintptr_t)(__bridge void *)sesLive,
-                                       (uintptr_t)(__bridge void *)pbLive, 0 };
+                uintptr_t objs2[3] = { (uintptr_t)(void *)sesLive,
+                                       (uintptr_t)(void *)pbLive, 0 };
                 p115_scanNew("vt-session", A, nA, C, nC, objs2, 2, fp, &nNew, &found);
                 CVPixelBufferRef pb = NULL;
                 CVReturn cv = CVPixelBufferCreate(kCFAllocatorDefault, 1280, 720,
