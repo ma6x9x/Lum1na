@@ -122,37 +122,61 @@ struct ContentView: View {
         .sheet(isPresented: $showMore) {
             NavigationStack {
                 List {
-                    Section("NEW") {
-                        moreRow("P103. M2Scaler user_* census (opens-only; sel 8/11 semantics + boundary denials; NO transforms)", "p103")
-                        moreRow("P106. JPEG teardown ORACLE (sel5 +0x30=0 two-call; JpegRequest view ktflag 0x64; 2 requests NO fuzz)", "p106")
-                        moreRow("P107. AVE2 wrap-dims create/prepare-ONLY (v1's encode is p035-law FORBIDDEN; kext +0xdc cite = static; p035 already swept this ceiling)", "p107")
-                        moreRow("P105. IOSurface gates census (framework-level; global-warn/lookup/protection-bits/pool oracle; NO iopl — 64749 closed)", "p105")
-                        moreRow("P104. AppleSEPKeyStore census (163-sel; sels 7/17/31 handle-0 gate expect 0xfffffffa; benign shapes; watch aks klog lines)", "p104")
-                        moreRow("P108. DiskImages kernel-backed census (AppleDiskImages2 / IOHDIXHDDriveInKernel / KDIDiskImageNubUserClient opens + sels 0..24; 84552 attach doors; notes 255)", "p108")
-                                moreRow("P113. DescForge CONTROL (KRW krw hand-forged desc -> recv oracle; A13 rig)", "p113")
-                        moreRow("P109 v4. ANE sel sweep w/ Stage-B oracle — 23F77 + T8150/27.x (H16 names + types 0..4, sels 0..213; the direct-UC reachability answer for 43748-out-of-framework + 112696/84494)", "p109")
-                        moreRow("AVE47VT. CVE-2026-64747 via VT (raw UC open is 2e2 — VT is the app path): control 720p encode + wrap-dims Create/Prepare + tiny 64x64 encodes; LIVE on 12/23F77 (fixed 26.6); panic = kernel attestation — DO NOT re-tap", "ave47vt")
-                        moreRow("AVE47VTW. 64747 TRUE 32-bit CalcBufSize wrap (align32(w)*(h>>5) >= 2^32) Create+Prepare ONLY, no encode — SAFE ceiling inventory before ave47vt", "ave47vtw")
-                        moreRow("P110. IOSurface swap-claim probe (270 design; sibling-client reclaim after owner death, prefill(6)+2 same-CPU pop, 64 rounds; three-outcome honest verdicts; T8101 23F77 + T8150 24A435; STANDALONE — Family-B is a target outcome)", "p110")
-                        moreRow("P112. cgshading — CG Type-5 shading OOB oracle (112611 port; in-process oracle PDF built at-tap + CGPDFDocument render; chosen-double value-control sweep 1.0/2.0/4.0/8.0; honest 3-outcome; far = chosen-bits + structural offset; one sweep per tap)", "p112")
+                    // 2026-10-28 hand-reorder (note 283) — every implemented tap
+                    // has a visible row; buckets: platform → learner → active
+                    // KRW → escape → groom → census → ABI/legacy/parked/stop.
+                    Section("A · Platform") {
+                        moreRow("0. Device identity + prove matrix", "ident")
+                        moreRow("Board JSON + hasKread (p007_board.json)", "board")
+                    }
+                    Section("B · Learner / intel") {
+                        moreRow("P118. BOOT-LEARNER — one tap = one training event (per-boot offsets.json via p090's resolver + the entitlement map + the LabBandit ledger's bootId attribution; READ-ONLY; the auto-port pipeline's input pair)", "p118")
                         moreRow("P117. Entitlement ECHO — what the KERNEL sees of the rig's plist (SecTaskCopyValueForEntitlement, type+value per key; NIL = stripped by free-profile AMFI); gates every kernel-side entitlement experiment", "p117")
-                        moreRow("P116. sandbox_extension NOFOLLOW TOCTOU (CVE-class file-read escape; deterministic, live on 23F77..24B119; port of speedyfriend433/sandbox_extension-TOCTOU-bug): control in-container read + 7 bounded out-of-container targets (/etc + prefs); tokens never logged; READ-ONLY", "p116")
-                        moreRow("P115. M2Scaler framework-path PEEK (the tpeek law): bounded CSC battery (IOSurface control + one VT 720p encode), diff the task's SEND ports after each op, fingerprint new ports for the M2Scaler sel-8 no-queue signature (2bf). A framework-opened UC owns a REAL queue — no QueueCreate grammar needed. READ-ONLY", "p115")
+                        moreRow("INTEL. merged offset DB + ladder cross-check (read-only)", "intel")
+                        moreRow("P090. momentarius census v1 (offsets DB vs live kernel + kbase sanity + allproc scan, READ-ONLY, rig)", "p090")
+                        moreRow("P100. AutoLearn (READ-ONLY learner — unknown devices, chip tag + door census + LEARN PACKET)", "p100")
+                        moreRow("HT149041. 26.7 chain map (print only)", "ht149041")
+                    }
+                    Section("C · ACTIVE KRW — 43748 / M2Scaler / 64788 / T020") {
+                        moreRow("P119. T020 STALE-UPL port (new-build reopen of the wire×replace lane): stage0 calibrate → stage1 re-ordered race (detach-idle → wirer commit → replace) → stage2 staging oracle (paints 0x41/0x11/0x43 vs FOREIGN) → stage3 reclaim-spray 0xE0 read-through. PANIC-POSSIBLE — one tap per force-quit; hasKread stays NO", "p119")
+                        moreRow("P120. 64788 new-resource DOOR (23F77 sel-map byte-verified on-disk: sel8 var-struct newRes / sel9 delete / sel36 fn4 / naked +0x90 getter) — resType-0 calibrate, then the oversized create-fail-after-insert ladder + post-fail leftover-id sweep. PANIC-POSSIBLE", "p120")
+                        moreRow("P121. iogpu_close × merge REOPEN (new build vs the P040-ABI): create(sel6)/destroy(sel7) calibrate on THIS device, then the close-vs-merge race (destroy ping-pong × Metal blit commits, 10s). PANIC-POSSIBLE", "p121")
                         moreRow("P114. M2ScalerCSC sel-8 leak tap — SOLO leak law validation (p110 v2 pairing gate; {u64} 8B in, serializer records stride 0x7c, rec+0x18 raw KV; N=8 captures + KV table + honest KVA-disclosure class; READ-ONLY; no race)", "p114")
+                        moreRow("P115. M2Scaler framework-path PEEK (the tpeek law): bounded CSC battery (IOSurface control + one VT 720p encode), diff the task's SEND ports after each op, fingerprint new ports for the M2Scaler sel-8 no-queue signature (2bf). A framework-opened UC owns a REAL queue — no QueueCreate grammar needed. READ-ONLY", "p115")
+                        moreRow("P116. sandbox_extension NOFOLLOW TOCTOU (CVE-class file-read escape; deterministic, live on 23F77..24B119; port of speedyfriend433/sandbox_extension-TOCTOU-bug): control in-container read + 7 bounded out-of-container targets (/etc + prefs); tokens never logged; READ-ONLY", "p116")
+                        moreRow("P110. IOSurface swap-claim probe (270 design; sibling-client reclaim after owner death, prefill(6)+2 same-CPU pop, 64 rounds; three-outcome honest verdicts; T8101 23F77 + T8150 24A435; STANDALONE — Family-B is a target outcome)", "p110")
+                        moreRow("P088. 43748 forged OUTPUT-record write hop v8 (prewire OOB confirmed at the pc: entry 192 = +0xC00; err=-1 = downstream reject, content check is the signal; ourBand census per D2 hit; bandit 4-arm volley)", "p088")
                         moreRow("P099. 43748 ANE prewire GROOMED (espresso/CoreML primary, 254-in addchain; STANDALONE ONLY — real OOB, never in chain)", "p099")
-                        moreRow("P098. M2ScalerCSC iosaDiag census (sel 8, honest input shape, READ-ONLY)", "p098")
-                        moreRow("P097. console-sec gRegistryRoot leak (CVE-2026-65371, READ-ONLY — lock/unlock once while it waits)", "p097")
+                        moreRow("CS2. VERBATIM Dopamine core (A13 22G100 KRW — one tap)", "cs2")
+                        moreRow("LSWORD ARM. calib-licensed cs2 on patched trains (toggle arm file)", "lswarm")
+                        moreRow("CS KRW. mapped theory (runKRW, 23F77 offsets)", "cskrw")
+                        moreRow("CS calib. phys_oob race only (not KRW)", "cscali")
+                        moreRow("P122 SwordForge. combined 64788 KRW test (freer→reclaim→read)", "swordforge")
+                        moreRow("P123 ShapeCensus. kalloc.3072 victims with KRW vision (mini/libkrw)", "shapecensus")
+                        moreRow("KREAD. commitSlide kread32(kbase)==MH_MAGIC_64", "kreadtest")
+                        moreRow("P070 five-door chain census + persist HOLD", "p070")
+                        moreRow("P113. DescForge CONTROL (KRW krw hand-forged desc -> recv oracle; A13 rig)", "p113")
                         moreRow("P094. kernproc derive + ucred ladder (READ-ONLY, sysctl anchor + allproc walk; v3 fold runs P095's ladder in the same tap — one boot, unlocks elevate)", "p094")
                         moreRow("P095. ucred ladder standalone (READ-ONLY; also runs inside P094 since v3 — use for a ladder re-check without re-deriving)", "p095")
-                        moreRow("P102. Titan write TEST (MapMemory IORVBAR look-for + CacheMode canary; SKIPs MMIO without window; no titan.m ROP)", "p102")
-                        moreRow("P101. 43684 dmaCommand FIRE (bounded reuse IOMD+0x68; one setup + one reuse; isolate from T7)", "p101")
-                        moreRow("P100. AutoLearn (READ-ONLY learner — unknown devices, chip tag + door census + LEARN PACKET)", "p100")
-                        moreRow("P090. momentarius census v1 (offsets DB vs live kernel + kbase sanity + allproc scan, READ-ONLY, rig)", "p090")
-                        moreRow("P088. 43748 forged OUTPUT-record write hop v8 (prewire OOB confirmed at the pc: entry 192 = +0xC00; err=-1 = downstream reject, content check is the signal; ourBand census per D2 hit)", "p088")
-                        moreRow("P087. 84607 reclaim observer (race -> refill -> attributed drain)", "p087")
-                        moreRow("P086. 43684 dmaCommand fingerprint sweep (3 UCs, no fires)", "p086")
-                        moreRow("P085. 84607 Close-vs-async racer (UNPARKED — kernel gap, videocodecd)", "p085")
+                    }
+                    Section("D · Escape lanes") {
+                        moreRow("AVE47VT. CVE-2026-64747 via VT (raw UC open is 2e2 — VT is the app path): control 720p encode + wrap-dims Create/Prepare + tiny 64x64 encodes; LIVE on 12/23F77 (fixed 26.6); panic = kernel attestation — DO NOT re-tap", "ave47vt")
+                        moreRow("AVE47VTW. 64747 TRUE 32-bit CalcBufSize wrap (align32(w)*(h>>5) >= 2^32) Create+Prepare ONLY, no encode — SAFE ceiling inventory before ave47vt", "ave47vtw")
+                        moreRow("AVE47MAP. 64747 raw-UC MAP (raw open = 2e2 on-device; kept for re-check)", "ave47map")
+                        moreRow("AVE47CTL. 64747 raw-UC CONTROL (control battery only)", "ave47ctl")
+                        moreRow("P112. cgshading — CG Type-5 shading OOB oracle (112611 port; in-process oracle PDF built at-tap + CGPDFDocument render; chosen-double value-control sweep 1.0/2.0/4.0/8.0; honest 3-outcome; far = chosen-bits + structural offset; one sweep per tap)", "p112")
+                        moreRow("P076. 86950 glyph trigger (CVE-2026-86950, userspace OOB, NOT KRW)", "p076")
+                        moreRow("P076c. control-only (no trigger — display-crash discriminator)", "p076c")
+                        moreRow("P022GC v34. Game Center path oracle (not KRW)", "p022GC")
+                        moreRow("P097. console-sec gRegistryRoot leak (CVE-2026-65371, READ-ONLY — lock/unlock once while it waits)", "p097")
+                        moreRow("P065 Facet A 64788 oracle (0xe00002be, not kread)", "p065")
+                        moreRow("P067 AppleAVD reach (65407, no bitstream fire)", "p067")
+                    }
+                    Section("E · Groom / race family") {
+                        moreRow("P044. 43748 v61 addchain-191 B1 (on-device ANECCompile of the handwritten 191-in MIL, count=192 exactly in-bounds; OUTPUT-SID lane + census stillness + out-entry scan; override file p044_model.txt = model NAME, p044_req_in.txt = N inputs — one file = one deliberate fire; notes 149/127/130)", "p044")
                         moreRow("P084. pmap-tte PUAF port (65,537-map refcount wrap, 64 dangling PTEs, A14 untested)", "p084")
+                        moreRow("P085. 84607 Close-vs-async racer (UNPARKED — kernel gap, videocodecd)", "p085")
+                        moreRow("P087. 84607 reclaim observer (race -> refill -> attributed drain)", "p087")
                         moreRow("P083. ANE staging hunt + injection + y attribution", "p083")
                         moreRow("P082. copyout dump of fetched sids (x_i=sid, OUR output; IOMD leak vs value echo)", "p082")
                         moreRow("P081. ANE foreign-sid probe (bias isolation + cross-process fetch gate)", "p081")
@@ -160,84 +184,122 @@ struct ContentView: View {
                         moreRow("P079. 43748 y-craft pad (3in/126ops ANE-scheduled + engagement gate)", "p079")
                         moreRow("P078. 43748 y-craft 3-in (all-valid records reach output; write door)", "p078")
                         moreRow("P077. 43748 y-craft (crafted y = output record sid; write door)", "p077")
-                        moreRow("P076. 86950 glyph trigger (CVE-2026-86950, userspace OOB, NOT KRW)", "p076")
-                        moreRow("P076c. control-only (no trigger — display-crash discriminator)", "p076c")
                         moreRow("P075. 43748 KRW v2 SAFE (pre-load sid_C groom; read+write doors)", "p075")
                         moreRow("P074. 43748 consume (count-gate pass, no overflow, not hasKread)", "p074")
                         moreRow("CONV. P073 43748 second-table conversion bar (not hasKread)", "conv")
                         moreRow("P073. 43748 second-table conversion (v46 parity + detectors)", "p073")
-                        moreRow("KREAD. commitSlide kread32(kbase)==MH_MAGIC_64", "kreadtest")
+                        moreRow("P086. 43684 dmaCommand fingerprint sweep (3 UCs, no fires)", "p086")
+                        moreRow("P101. 43684 dmaCommand FIRE (bounded reuse IOMD+0x68; one setup + one reuse; isolate from T7)", "p101")
+                        moreRow("P102. Titan write TEST (MapMemory IORVBAR look-for + CacheMode canary; SKIPs MMIO without window; no titan.m ROP)", "p102")
+                        moreRow("P010 qleak. Queue leak word1=+0x558 (K− only)", "p010qleak")
+                    }
+                    Section("F · Census / map") {
+                        moreRow("P109 v4. ANE sel sweep w/ Stage-B oracle — 23F77 + T8150/27.x (H16 names + types 0..4, sels 0..213; the direct-UC reachability answer for 43748-out-of-framework + 112696/84494)", "p109")
+                        moreRow("P103. M2Scaler user_* census (opens-only; sel 8/11 semantics + boundary denials; NO transforms)", "p103")
+                        moreRow("P098. M2ScalerCSC iosaDiag census (sel 8, honest input shape, READ-ONLY)", "p098")
+                        moreRow("P106. JPEG teardown ORACLE (sel5 +0x30=0 two-call; JpegRequest view ktflag 0x64; 2 requests NO fuzz)", "p106")
+                        moreRow("P107. AVE2 wrap-dims create/prepare-ONLY (v1's encode is p035-law FORBIDDEN; kext +0xdc cite = static; p035 already swept this ceiling)", "p107")
+                        moreRow("P105. IOSurface gates census (framework-level; global-warn/lookup/protection-bits/pool oracle; NO iopl — 64749 closed)", "p105")
+                        moreRow("P104. AppleSEPKeyStore census (163-sel; sels 7/17/31 handle-0 gate expect 0xfffffffa; benign shapes; watch aks klog lines)", "p104")
+                        moreRow("P108. DiskImages kernel-backed census (AppleDiskImages2 / IOHDIXHDDriveInKernel / KDIDiskImageNubUserClient opens + sels 0..24; 84552 attach doors; notes 255)", "p108")
+                        moreRow("71. P032 ANE OPEN only", "p032")
+                        moreRow("72. P033 CoreML 1-in/1-out", "p033")
+                        moreRow("73. P034 kmsg 0x820 occupancy", "p034")
+                        moreRow("W− 83. P038 W-hunt OPEN only", "p038")
+                        moreRow("D  84. P040 ns dest create/destroy", "p040")
+                        moreRow("P041. 43724 dest MAP only (no #536)", "p041")
+                        moreRow("P042. IOGPU type1 sel kptr scan (not #536)", "p042")
+                        moreRow("P043. write-class dests + ANE reach", "p043")
+                        moreRow("P045. APFS VNOP coverage census v16 (not kread)", "p045")
+                        moreRow("P046. leftover MAP v2 (43722/24, G71 caps, no fire)", "p046")
                         moreRow("P062 NEON exception-state self-test (not KRW, not hasKread)", "p062")
                         moreRow("P057 AKS 65343 sel16 feeder (not 163-sel, not hasKread)", "p057")
                         moreRow("P050 buflet UAF v3 (not 65349)", "p050")
-                        moreRow("P019 64749 iopl MAP (size mismatch, not 65349)", "p019")
                         moreRow("P051 gamed census v6 (in-cache only, no WVEK/TrollRestore)", "p051")
                         moreRow("P052 nstream extend — CLOSED (EFBIG)", "p052")
                         moreRow("P053 NECP connect×close v2", "p053")
                         moreRow("P054 APFS reap list", "p054")
                         moreRow("P055 IOSurface UPL (43684 MAP)", "p055")
                         moreRow("P063 aio84530 kn_sdata HEAP leak (not kslide, not hasKread)", "aio84530")
-                        moreRow("P064 HT149041 26.7 chain map (print only)", "ht149041")
-                        moreRow("P065 Facet A 64788 oracle (0xe00002be, not kread)", "p065")
                         moreRow("P066 EncType/AVE MAP (one VT session, no Close-vs-async)", "p066")
-                        moreRow("P067 AppleAVD reach (65407, no bitstream fire)", "p067")
                         moreRow("P068 chroot/seteuid MAP (43689, errno only)", "p068")
                         moreRow("P069 dmaCommand MAP (43684, one map)", "p069")
-                        moreRow("P070 five-door chain census + persist HOLD", "p070")
+                        moreRow("P019 64749 iopl MAP (size mismatch, not 65349)", "p019")
                         moreRow("P071 65408 ANE overflow MAP (DeviceOpen only, not 43748)", "p071")
                         moreRow("P072 file-parser census (dlopen + 1x1 PNG, not ACE)", "p072")
                     }
-                    /* v61b dedupe: the "HT149041 iOS 26.7 leftovers" section
-                       rendered 15 rows that ALL exist elsewhere (P070/P063-P072/
-                       P053/P055/P054 in NEW; P039 in Parked; P045 in Prove) -
-                       every id now renders exactly once. */
-                    Section("ClearSword KRW (phys_oob → PCB)") {
-                        moreRow("CS2. VERBATIM Dopamine core (A13 22G100 KRW — one tap)", "cs2")
-                        moreRow("LSWORD ARM. calib-licensed cs2 on patched trains (toggle arm file)", "lswarm")
-                        moreRow("INTEL. merged offset DB + ladder cross-check (read-only)", "intel")
-                        moreRow("CS KRW. mapped theory (runKRW, 23F77 offsets)", "cskrw")
-                        moreRow("CS calib. phys_oob race only (not KRW)", "cscali")
-                        moreRow("P122 SwordForge. combined 64788 KRW test (freer→reclaim→read)", "swordforge")
-                        moreRow("P123 ShapeCensus. kalloc.3072 victims with KRW vision (mini/libkrw)", "shapecensus")
-                    }
-                    Section("Prove (23F77 live — Ident first)") {
-                        moreRow("0. Device identity + prove matrix", "ident")
-                        moreRow("Board JSON + hasKread (p007_board.json)", "board")
+                    Section("G · P009 / 64788 ABI") {
                         moreRow("F  82. P009 PathB detach+replace", "p009pathb")
-                        moreRow("H  64. p017v2 holder/install", "p017v2")
-                        moreRow("K− 62. P010 qleak word1=+0x558", "p010qleak")
-                        moreRow("D  84. P040 ns dest create/destroy", "p040")
-                        moreRow("W− 83. P038 W-hunt OPEN only", "p038")
-                        moreRow("43724 dest MAP only (no #536)", "p041")
-                        moreRow("P042. IOGPU type1 sel kptr scan (not #536)", "p042")
-                        moreRow("P043. write-class dests + ANE reach", "p043")
-                        moreRow("P046. leftover MAP v2 (43722/24, G71 caps, no fire)", "p046")
-                        moreRow("P045. APFS VNOP coverage census v16 (not kread)", "p045")
-                        moreRow("P022GC v34. Game Center path oracle (not KRW)", "p022GC")
-                    }
-                    Section("ANE / occupancy") {
-                        moreRow("71. P032 ANE OPEN only", "p032")
-                        moreRow("72. P033 CoreML 1-in/1-out", "p033")
-                        moreRow("73. P034 kmsg 0x820 occupancy", "p034")
-                        moreRow("P044. 43748 v61 addchain-191 B1 (on-device ANECCompile of the handwritten 191-in MIL, count=192 exactly in-bounds; OUTPUT-SID lane + census stillness + out-entry scan; override file p044_model.txt = model NAME, p044_req_in.txt = N inputs — one file = one deliberate fire; notes 149/127/130)", "p044")
-                    }
-                    Section("64788 ABI extras") {
                         moreRow("F½ 4. P009 detach only (no OOL)", "p009detach")
                         moreRow("80. P009 ranges 0x82", "p009ranges")
                         moreRow("81. P009 types inventory", "p009types")
                     }
-                    Section("Parked — do not grind") {
+                    Section("H · p017v2 / Prove") {
+                        moreRow("H  64. p017v2 holder/install", "p017v2")
+                    }
+                    Section("I · Legacy probes (XR-era / superseded)") {
+                        moreRow("P013. A14 AVE dim ladder", "p013ave")
+                        moreRow("P001. A13 VT ladder (A13 rig)", "p001a13vt")
+                        moreRow("P001 dim. dim probe", "p001dim")
+                        moreRow("P001 proc. process probe", "p001proc")
+                        moreRow("P001 cap. cap boundary", "p001cap")
+                        moreRow("P001 ladder. full ladder", "p001ladder")
+                        moreRow("P001 conn. VT conn hunt", "p001conn")
+                        moreRow("P001 xref. cross-ref", "p001xref")
+                        moreRow("P001 ports. new-port sweep", "p001ports")
+                        moreRow("VT SMOKE. AVE open smoke", "vt_smoke")
+                        moreRow("SPAWNATTRS. spawn attribute map (not KRW)", "spawnattrs")
+                        moreRow("JPEG DEST. dest+timeout oracle (framework-side)", "jpeg_dest")
+                        moreRow("JPEG FW. framework decode smoke", "jpeg_fw")
+                        moreRow("P016. sout dest unlock", "p016")
+                        moreRow("P018. sout mach port", "p018")
+                        moreRow("P020. magazine-aware reclaim", "p020")
+                        moreRow("P020v2. magazine drain", "p020v2")
+                        moreRow("P021. AGX stage mask", "p021")
+                        moreRow("P022. cpu0 drain delay", "p022")
+                        moreRow("P023. VT extreme", "p023")
+                        moreRow("P025. NECP string spray", "p025")
+                        moreRow("P026. Metal NQ cite", "p026")
+                        moreRow("P027. Metal callback", "p027")
+                        moreRow("P028. reentry A", "p028")
+                        moreRow("P029. hammer", "p029")
+                        moreRow("P030. two queue", "p030")
+                        moreRow("P031. reclaim hit", "p031")
+                        moreRow("IOPL. 64749-class leak (CLOSED — re-check only)", "iopl")
+                        moreRow("AIO. aio UAF", "aio")
+                        moreRow("T018. COW trunc race", "t018")
+                        moreRow("T018 shadow. shadow race", "t018shadow")
+                        moreRow("T018 ver. version race", "t018ver")
+                        moreRow("P010 qspray. queue spray", "p010qspray")
+                        moreRow("P010 remain. remaining-fire", "p010remain")
+                        moreRow("P010 leak. queue leak", "p010leak")
+                        moreRow("B1P1. map + latch", "b1p1")
+                        moreRow("B1P2. unmap + reclaim", "b1p2")
+                        moreRow("B1P3. latched kick", "b1p3")
+                        moreRow("B1P4. verify reclaim", "b1p4")
+                        moreRow("Luminakrw. mapped theory (runKRW)", "luminakrw")
+                    }
+                    Section("J · Parked — do not grind") {
                         moreRow("79. P039 AVE (sandbox wall)", "p039")
                         moreRow("35. P035 AVE wrap", "p035")
                         moreRow("18. P024 NECP (socket lock)", "p024")
                         moreRow("31. P005 JIT disclose", "p005")
                     }
-                    Section("Intercepted — tap returns STOP") {
-                        moreRow("40. IOGPU close (XR sel)", "iogpu_close")
+                    Section("K · Intercepted — tap returns STOP") {
+                        moreRow("40. IOGPU close (XR sel) — REOPENED as p121", "iogpu_close")
                         moreRow("54. T014 serial (XR)", "t014a")
                         moreRow("61. P014 close (XR)", "p014close")
                         moreRow("1. P010obj last-ref SURVIVED", "p010obj")
                         moreRow("53. T019 Lookup-nil SURVIVED", "t019")
+                        moreRow("p009iopl leftover (STOP)", "p009iopl")
+                        moreRow("p011v3 leftover wire race (STOP — reopened as p119)", "p011v3")
+                        moreRow("p011v10 leftover wire race (STOP)", "p011v10")
+                        moreRow("p012ctx leftover (STOP)", "p012ctx")
+                        moreRow("p010krwv2 leftover UAF (STOP)", "p010krwv2")
+                        moreRow("p010twoconn leftover UAF (STOP)", "p010twoconn")
+                        moreRow("p014ane leftover (STOP)", "p014ane")
+                        moreRow("p015 leftover (STOP)", "p015")
+                        moreRow("p017 legacy conf-deputy (STOP)", "p017")
                     }
                 }
                 .navigationTitle("All probes")
@@ -421,6 +483,10 @@ struct ContentView: View {
             "p116": "p116_sandboxext_toctou_log.txt",
             "p117": "p117_entecho_log.txt",
             "p114": "p114_surfaceleak_log.txt",
+            "p118": "p118_bootlearn_log.txt",
+            "p119": "p119_staleupl_log.txt",
+            "p120": "p120_newresource_log.txt",
+            "p121": "p121_closemerge_log.txt",
             "cgshading": "p112_cgshading_log.txt"
         ]
 
@@ -1071,6 +1137,19 @@ struct ContentView: View {
                         named: "p114_surfaceleak_log.txt",
                         missing: "p114 finished but log missing")
                 }
+            case "p118", "bootlearn":
+                result = P118BootLearn.tap()
+                if result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    result = Self.readFreshLog(
+                        named: "p118_bootlearn_log.txt",
+                        missing: "p118 finished but log missing")
+                }
+            case "p119", "staleupl":
+                result = P119StaleUpl.tap()
+            case "p120", "newresource":
+                result = P120NewResourceDoor.tap()
+            case "p121", "closemerge":
+                result = P121IogpuCloseMerge.tap()
             case "p099", "anegroom":
                 result = P099AnePrewireGroom.tap()
                 if result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

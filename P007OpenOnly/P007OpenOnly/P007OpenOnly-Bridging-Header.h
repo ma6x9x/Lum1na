@@ -114,3 +114,7 @@
 #import "P115M2ScalerPeek.h"
 #import "P116SandboxExtTocTou.h"
 #import "P117EntEcho.h"
+#import "P118BootLearn.h"
+#import "P119StaleUpl.h"
+#import "P120NewResourceDoor.h"
+#import "P121IogpuCloseMerge.h"
