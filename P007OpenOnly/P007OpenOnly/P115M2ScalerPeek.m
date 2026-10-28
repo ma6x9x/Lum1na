@@ -37,6 +37,7 @@
 #import <fcntl.h>
 #import <unistd.h>
 #import <mach/mach.h>
+#import <mach/mach_port.h>
 #import <CoreMedia/CoreMedia.h>
 #import <CoreVideo/CoreVideo.h>
 #import <VideoToolbox/VideoToolbox.h>
@@ -65,7 +66,6 @@ static void Lf(NSString *fmt, ...) {
 }
 
 /* ---- port snapshot (the p001 NewPortSweep shape, SEND-only set) ------- */
-typedef mach_port_array_t PNames;
 static kern_return_t p115_snapshot(NSMutableSet **outSet) {
     mach_port_name_array_t names = NULL;
     mach_port_type_array_t types = NULL;
@@ -132,22 +132,11 @@ static BOOL p115_fingerprint(NSString *tag, mach_port_t port, NSMutableString *o
     return sig;
 }
 
-/* ---- encode plumbing (the ave47 control receipt, synchronous-ish) ------ */
-static NSMutableArray<NSData *> *g_samples = nil;
-static void p115_flushCB(void *refCon, CMTimeScaleFlags flags, void *resv) { (void)flags; (void)resv; (void)refCon; }
-static void p115_encCB(void *refCon, OSStatus st, VTEncodeInfoFlags fl,
-                       CMSampleBufferRef sb) {
-    (void)refCon; (void)fl;
-    if (st != noErr || !sb || !CMSampleBufferIsValid(sb)) return;
-    CMBlockBufferRef bb = CMSampleBufferGetDataBuffer(sb);
-    if (!bb) return;
-    size_t len = 0;
-    if (CMBlockBufferGetDataLength(bb, &len) != kCMBlockBufferNoErr || len == 0) return;
-    char *base = NULL;
-    if (CMBlockBufferGetDataPointer(bb, 0, NULL, &len, &base) != kCMBlockBufferNoErr || !base) return;
-    [g_samples addObject:[NSData dataWithBytes:base length:len]];
-    Lf(@"    encode cb ok size=%zu", len);
-}
+/* ---- encode plumbing (ave47 control receipt, output discarded) -------- */
+/* VT output callback = NULL (outputs discarded) — kills the flushCB/encCB
+   scaffolding entirely (the 2026-10-15 lesson: wrong callback signature =
+   red gate; nothing here needs the encoded bytes, the encode frame is only
+   the op whose port side-effects the sweep fingerprints). */
 
 @implementation P115M2ScalerPeek
 
@@ -184,7 +173,6 @@ static void p115_encCB(void *refCon, OSStatus st, VTEncodeInfoFlags fl,
     Lf(@"[baseline] SEND-only ports: %lu", (unsigned long)snap.count);
 
     /* op 1: IOSurface create (control) */
-    g_samples = [NSMutableArray array];
     {
         CVPixelBufferRef pb = NULL;
         CVReturn cv = CVPixelBufferCreate(kCFAllocatorDefault, 1280, 720,
@@ -199,14 +187,13 @@ static void p115_encCB(void *refCon, OSStatus st, VTEncodeInfoFlags fl,
         }
     }
 
-    /* op 2: VT encode 720p (AVE path; produces a real encoded sample) */
+    /* op 2: VT encode 720p (AVE path) — output callback NULL (discarded) */
     {
         L(@"[vt-encode] 1280x720 H.264 one-frame (ave64747_vt control receipt shape)");
         VTCompressionSessionRef ses = NULL;
         OSStatus st = VTCompressionSessionCreate(kCFAllocatorDefault, 1280, 720,
                                                  kCMVideoCodecType_H264,
-                                                 NULL, NULL, NULL, p115_flushCB,
-                                                 (__bridge void *)self, &ses);
+                                                 NULL, NULL, NULL, NULL, NULL, &ses);
         if (st == noErr && ses) {
             OSStatus prep = VTCompressionSessionPrepareToEncodeFrames(ses);
             Lf(@"[vt-encode] create=0x%x prepare=0x%x", (unsigned)st, (unsigned)prep);
@@ -224,8 +211,7 @@ static void p115_encCB(void *refCon, OSStatus st, VTEncodeInfoFlags fl,
                                                                  NULL, NULL, NULL);
                     Lf(@"[vt-encode] frame status=0x%x", (unsigned)e);
                     OSStatus c = VTCompressionSessionCompleteFrames(ses, kCMTimeInvalid);
-                    Lf(@"[vt-encode] complete=0x%x samples=%lu", (unsigned)c,
-                       (unsigned long)g_samples.count);
+                    Lf(@"[vt-encode] complete=0x%x", (unsigned)c);
                     CVPixelBufferRelease(pb);
                 }
             }
