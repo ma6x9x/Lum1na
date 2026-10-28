@@ -50,7 +50,7 @@
 #import <stdio.h>
 #import <string.h>
 
-#define P115_BUILD @"p115-m2scaler-peek-v1"
+#define P115_BUILD @"p115-m2scaler-peek-v1.6-gstonly"
 
 static NSMutableString *g_log = nil;
 static int g_fd = -1;
@@ -132,7 +132,13 @@ static BOOL p115_dlsym(void) {
     g_rel   = (Rel_t)dlsym(h, "IOObjectRelease");
     mach_port_t *mp = (mach_port_t *)dlsym(h, "kIOMainPortDefault");
     if (mp) g_main = *mp;
-    return g_match && g_get && g_open && g_st && g_rel && g_main;
+    return g_st != NULL;   /* v1.6: the PEEK flow uses ONLY IOConnectCallStruct
+                              Method (g_st) — the p114 sibling's dlsym gate
+                              required six symbols incl. kIOMainPortDefault,
+                              which isn't always resolvable on 23F77-class
+                              trains; the 09:24 run stopped honestly because
+                              of that strictness. The peek never opens a
+                              service, so only the fingerprint sym matters. */
 }
 
 /* fingerprint: M2Scaler's sel-8 no-queue shape = 2bf (out buffer sized) */
