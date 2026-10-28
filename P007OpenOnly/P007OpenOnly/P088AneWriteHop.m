@@ -172,6 +172,7 @@
 #import "LabDeviceProfile.h"
 #import "LabLocalTime.h"
 #import "P007Board.h"
+#import "LabBandit.h"   /* v22: the shared self-improvement law (domain p088) */
 
 #import <CoreML/CoreML.h>
 #import <dlfcn.h>
@@ -181,7 +182,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P088_BUILD @"p088-write-hop-v19-b-consume"
+#define P088_BUILD @"p088-write-hop-v22-bandit"
 
 /* kernel-target tap: 0 = in-process T (safe-ish), 1 = kernel sid (PANIC) */
 #define P088_KERNEL_TARGET 0
@@ -944,6 +945,34 @@ static NSString *p088_yfmt(double y) {
     BOOL   aOK = NO;       /* v7: A completed with err=none at least once */
     NSString *lastAErr = @"none"; /* v8: last round's A error for the verdict */
 
+    /* v21: the SHARED LabBandit domain "p088" — the volley schedule is
+       arm-owned (the user's "every test self-improves" law). Arms =
+       schedule shapes over the SAME race body; nothing in the race/B
+       bodies changes. One pick per tap; one summary record at the verdict
+       (open round stays open if the tap dies = the dirty-boot attribution
+       law credits it on the next tap). */
+    static const char *const p088Arms[] = {
+        "conv24-early70",    /* the current v19/v21 law: 24 x 0.7, base 0.3 */
+        "dense24-atA",       /* 24 x 0.3 centered on A's measured fill time */
+        "wide16-early130",   /* 16 x 1.3 wide hunt from 0.3                */
+        "dense32-atA",       /* 32 x 0.25 tight burst around A's fill      */
+    };
+    char p088Attr[192] = "";
+    int p088AttrRc = LabBanditRegister("p088", p088Arms, 4,
+                                       NULL, 0, "note275/276; no numeric seeds — arms explored first",
+                                       "crash", "survived",
+                                       p088Attr, (int)sizeof p088Attr);
+    if (p088Attr[0]) p088_log(@"[bandit] %@", [NSString stringWithUTF8String:p088Attr]);
+    char p088PickLine[128] = "";
+    int p088Arm = LabBanditPick("p088", p088PickLine, (int)sizeof p088PickLine);
+    const char *p088ArmName = LabBanditArmName("p088", p088Arm);
+    p088_log(@"[bandit] %@", [NSString stringWithUTF8String:p088PickLine]);
+    p088_log(@"[bandit] arm=%s (%s)", p088ArmName,
+             p088Arm == 0 ? @"conv24-early70: 24 fires x 0.7ms from 0.3 (the v19 law)" :
+             p088Arm == 1 ? @"dense24-atA: 24 x 0.3ms centered on A's measured fill" :
+             p088Arm == 2 ? @"wide16-early130: 16 x 1.3ms wide hunt" :
+                            @"dense32-atA: 32 x 0.25ms tight burst");
+
     /* --- v5-inherited: build the sentinel run ONCE. v4 rebuilt it every round and
        the rebuild reversed the freelist, walking the fill target +1 per
        round (28->29->30->31) so a calibrated pair could never lock. --- */
@@ -1030,6 +1059,17 @@ static NSString *p088_yfmt(double y) {
         uint32_t nFires = (conv || P088_B_IN_MEASURE) ? P088_VOL_CONV : 0;
         double stepMs   = P088_VOL_CONV_STEP;
         double baseMs   = P088_VOL_FIRST_MS;
+        /* v22: the bandit-owned schedule (arm applied per round; the
+           dense-atA arms re-center on A's measured fill each round) */
+        if (p088Arm == 1 || p088Arm == 3) {
+            nFires = (p088Arm == 1) ? 24u : 32u;
+            stepMs = (p088Arm == 1) ? 0.3 : 0.25;
+            baseMs = (lastATms > 1.5) ? (lastATms - 1.5) : 0.2;  /* dense window wraps the fill */
+        } else if (p088Arm == 2) {
+            nFires = P088_VOL_WIDE;
+            stepMs = P088_VOL_WIDE_STEP;
+            baseMs = P088_VOL_FIRST_MS;
+        }
 
         p088_log(@"[r%u] %s: fires=%u step=%.1fms first@%.2fms (A prior %.1fms)%s",
                  r, conv ? "CONV" : "MEASURE", nFires, stepMs, baseMs, lastATms,
@@ -1343,6 +1383,12 @@ static NSString *p088_yfmt(double y) {
         p088_log(@"Kernel-target volley: fires=%u anomalies=%u. Inconclusive.", bFires, bAnom);
     }
 #else
+    /* v22: THE SHARED-LAW BANDIT RECORD (one summary per tap, mapped onto
+       the shared reward classes — honest, no claim beyond the print):
+       touch/write-hop = WIN (1.0, the destination-control door class);
+       fill-hit ours/ourBand>0 = MID (0.5, occupancy the volley owns);
+       B-anomaly only = MID; clean miss / foreign-only = MISS (0.25);
+       panic (attribution next tap) = CRASH (0.0). */
     if (touches > 0) {
         p088_log(@"WRITE-HOP PROVEN (in-process): ANE wrote into T (sid %u) chosen by", tSid);
         p088_log(@"a FORGED record sid across the 43748 spill. Content control was");
@@ -1389,6 +1435,24 @@ static NSString *p088_yfmt(double y) {
     p088_log(@"Honesty: hasKread=NO. It flips ONLY on kread32(kbase)==0xfeedfacf via");
     p088_log(@"Lum1naSocketKRW verify (Chain 4 kvad supply). A surface diff NEVER");
     p088_log(@"sets it. Conversion bar untouched. One TAP per force-quit; fresh boot next.");
+
+    /* v22: the bandit summary record for this arm (per the classes above) +
+       the scores line; RoundClose stamps the summary into the ledger. */
+    {
+        /* map onto the shared reward keys exactly (LabBanditReward's
+           table: door/claim-won/ok/fault-with-far = 1.0; maf/family-b =
+           0.0; abort/fires = 0.5; everything else = 0.25): */
+        const char *outClass =
+            (touches > 0) ? "ok" :          /* the destination-control door class = WIN */
+            (fillHits > 0) ? "fires" :      /* occupancy landed but not converted = MID */
+            (bAnom > 0) ? "fires" :         /* smash reached B outside the run = MID */
+                            "lost";         /* clean / foreign-only = MISS */
+        char scores[512];
+        LabBanditRecord("p088", p088Arm, outClass);
+        if (LabBanditScores("p088", scores, (int)sizeof scores) > 0)
+            p088_log(@"[bandit] %@", [NSString stringWithUTF8String:scores]);
+        LabBanditRoundClose("p088", outClass);
+    }
 
     p088_free_surfs(gs, nGs);
     CFRelease(T);
