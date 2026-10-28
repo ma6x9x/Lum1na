@@ -135,6 +135,7 @@ struct ContentView: View {
                         moreRow("AVE47VTW. 64747 TRUE 32-bit CalcBufSize wrap (align32(w)*(h>>5) >= 2^32) Create+Prepare ONLY, no encode — SAFE ceiling inventory before ave47vt", "ave47vtw")
                         moreRow("P110. IOSurface swap-claim probe (270 design; sibling-client reclaim after owner death, prefill(6)+2 same-CPU pop, 64 rounds; three-outcome honest verdicts; T8101 23F77 + T8150 24A435; STANDALONE — Family-B is a target outcome)", "p110")
                         moreRow("P112. cgshading — CG Type-5 shading OOB oracle (112611 port; in-process oracle PDF built at-tap + CGPDFDocument render; chosen-double value-control sweep 1.0/2.0/4.0/8.0; honest 3-outcome; far = chosen-bits + structural offset; one sweep per tap)", "p112")
+                        moreRow("P116. sandbox_extension NOFOLLOW TOCTOU (CVE-class file-read escape; deterministic, live on 23F77..24B119; port of speedyfriend433/sandbox_extension-TOCTOU-bug): control in-container read + 7 bounded out-of-container targets (/etc + prefs); tokens never logged; READ-ONLY", "p116")
                         moreRow("P115. M2Scaler framework-path PEEK (the tpeek law): bounded CSC battery (IOSurface control + one VT 720p encode), diff the task's SEND ports after each op, fingerprint new ports for the M2Scaler sel-8 no-queue signature (2bf). A framework-opened UC owns a REAL queue — no QueueCreate grammar needed. READ-ONLY", "p115")
                         moreRow("P114. M2ScalerCSC sel-8 leak tap — SOLO leak law validation (p110 v2 pairing gate; {u64} 8B in, serializer records stride 0x7c, rec+0x18 raw KV; N=8 captures + KV table + honest KVA-disclosure class; READ-ONLY; no race)", "p114")
                         moreRow("P099. 43748 ANE prewire GROOMED (espresso/CoreML primary, 254-in addchain; STANDALONE ONLY — real OOB, never in chain)", "p099")
@@ -416,6 +417,7 @@ struct ContentView: View {
             "p110": "p110_swapclaim_log.txt",
             "p112": "p112_cgshading_log.txt",
             "p115": "p115_m2peek_log.txt",
+            "p116": "p116_sandboxext_toctou_log.txt",
             "p114": "p114_surfaceleak_log.txt",
             "cgshading": "p112_cgshading_log.txt"
         ]
@@ -1038,6 +1040,13 @@ struct ContentView: View {
                     result = Self.readFreshLog(
                         named: "p112_cgshading_log.txt",
                         missing: "p112 finished but log missing")
+                }
+            case "p116", "tocnou":
+                result = P116SandboxExtTocTou.tap()
+                if result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    result = Self.readFreshLog(
+                        named: "p116_sandboxext_toctou_log.txt",
+                        missing: "p116 finished but log missing")
                 }
             case "p115", "m2peek":
                 result = P115M2ScalerPeek.tap()
