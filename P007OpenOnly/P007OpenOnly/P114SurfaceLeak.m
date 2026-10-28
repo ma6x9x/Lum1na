@@ -32,7 +32,7 @@
 #import "LabLocalTime.h"
 #import "LabRuntimeOffsets.h"
 
-#define P114_BUILD @"p114-surfaceleak-v1"
+#define P114_BUILD @"p114-surfaceleak-v1.2"
 
 #import <Foundation/Foundation.h>
 #import <CoreFoundation/CoreFoundation.h>
@@ -226,17 +226,15 @@ static void p114_hexdump(size_t maxn) {
         }
 
         /* queue FIRST (p098 v5 law) — LabOff() row size */
-        /* v1.1 FIX (the 17:59 23F77 round): the queue_create_size LabOff row
-           is the IOGPU queue row (0x410), NOT the M2Scaler one — the
-           derived M2Scaler in-struct = 0xfa8 (m2scaler.queue_sz law,
-           M2Scaler hunter correction). Use that on the A14 class. On 24A435
-           the same-kext UC open is closed to free accounts (kr 0x10000003) —
-           p114 is 23F77-only by app visibility. */
-        const LabOffTab *off = LabOff();
-        uint32_t qsz = off ? (uint32_t)off->queue_create_size : 0;
-        if (!qsz) qsz = 0x408u;
-        if (qsz > 0xFA8u) qsz = 0xFA8u;
-        if (off && off->ane_table_size == 0x820u) qsz = 0xFA8u;  /* A14/23F77: M2Scaler-specific size law */
+        /* v1.2 law (2026-10-27, byte-verified on-disk on BOTH builds): the
+           M2Scaler kext's own dispatch table (12 rows, stride 0x30, in-size
+           at row+0x20) says sel=6 (QueueCreate) in-struct = 0xFA8 on 23F77
+           AND on 24A435 (table 0xfffffe00080efcd8, sel-6 row in=0xfa8). The
+           LabOff queue_create_size row is the IOGPU queue (0x410/0x408), NOT
+           M2Scaler — the 21:54 17-side run proved it (stIn=0x408 -> 2c2 with
+           open conn=61699). Sel-8 in = {u64} 8 B confirmed on 24A435 too
+           (sel-8 row in=8). */
+        uint32_t qsz = 0xFA8u;
         static uint8_t qBuf[0xFA8];
         memset(qBuf, 0, sizeof(qBuf));
         size_t qOutLen = sizeof(qBuf);

