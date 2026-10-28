@@ -50,7 +50,7 @@
 #import <stdio.h>
 #import <string.h>
 
-#define P115_BUILD @"p115-m2scaler-peek-v1.6-gstonly"
+#define P115_BUILD @"p115-m2scaler-peek-v1.7-p001guard"
 
 static NSMutableString *g_log = nil;
 static int g_fd = -1;
@@ -89,9 +89,14 @@ static void p115_snap(mach_port_name_t *names, int *n) {
    use; the missing forward decl was the third red Lum1na-Debug layer) */
 static void p115_fingerprint(mach_port_t port, NSMutableString *outLine, BOOL *found);
 
-/* diff + fingerprint the ADDED SEND-only ports (bounded: one sel-8 call) */
+/* the p001 GUARD law, restored (v1.7): NEVER MIG-probe a new SEND port
+   unless its port NUMBER appears in our own framework objects' memory —
+   the 09:32 runs EXC_GUARD'd exactly as p001's comment predicted ("not in
+   obj memory (skip — XPC risk)"). The objects stay ALIVE through the
+   fingerprint phase (holding pb/session refs until after the scan). */
 static void p115_scanNew(const char *tag, mach_port_name_t *before, int nB,
                          mach_port_name_t *after, int nA,
+                         uintptr_t *objs, int nObjs,
                          NSMutableString *fp, int *nNew, BOOL *found) {
     Lf(@"[diff %s] scanning added ports", tag);
     for (int i = 0; i < nA; i++) {
@@ -100,9 +105,23 @@ static void p115_scanNew(const char *tag, mach_port_name_t *before, int nB,
         if (old) continue;
         mach_port_type_t pt = 0;
         if (mach_port_type(mach_task_self(), after[i], &pt) != KERN_SUCCESS) continue;
-        Lf(@"  +port %u pt=0x%x", after[i], (unsigned)pt);
         if (pt != 0x10000) continue;             /* SEND-only only */
         (*nNew)++;
+        int inObj = 0;
+        for (int oi = 0; oi < nObjs && !inObj; oi++) {
+            if (!objs[oi]) continue;
+            for (ptrdiff_t off = 0; off < 4096 && !inObj; off += 8) {
+                uintptr_t val = *(uintptr_t *)(objs[oi] + off);
+                if (val == (uintptr_t)after[i]) {
+                    inObj = 1;
+                    Lf(@"  +port %u pt=0x%x in obj[%d]+0x%tx", after[i], (unsigned)pt, oi, off);
+                }
+            }
+        }
+        if (!inObj) {
+            Lf(@"  +port %u pt=0x%x NOT in obj mem (skip — the p001 XPC-risk law)", after[i], (unsigned)pt);
+            continue;
+        }
         p115_fingerprint(after[i], fp, found);
     }
 }
@@ -200,58 +219,63 @@ static void p115_fingerprint(mach_port_t port, NSMutableString *outLine, BOOL *f
     NSMutableString *fp = [NSMutableString string];
     int nNew = 0;
     BOOL found = NO;
+    CVPixelBufferRef pbLive = NULL;   /* kept alive until AFTER the scans */
+    VTCompressionSessionRef sesLive = NULL;
 
     p115_snap(A, &nA);
     Lf(@"[baseline] SEND-only ports: %d", nA);
 
-    /* op 1: IOSurface create (control) */
+    /* op 1: IOSurface create (control) — pb held alive (the p001 guard's
+       obj-memory cross-ref needs the refs through the fingerprint phase) */
     {
-        CVPixelBufferRef pb = NULL;
         CVReturn cv = CVPixelBufferCreate(kCFAllocatorDefault, 1280, 720,
                                           kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
-                                          NULL, &pb);
-        if (cv == kCVReturnSuccess && pb) {
+                                          NULL, &pbLive);
+        if (cv == kCVReturnSuccess && pbLive) {
             p115_snap(B, &nB);
-            p115_scanNew("iosurface-create", A, nA, B, nB, fp, &nNew, &found);
-            CVPixelBufferRelease(pb);
+            uintptr_t objs[2] = { (uintptr_t)(__bridge void *)pbLive, 0 };
+            p115_scanNew("iosurface-create", A, nA, B, nB, objs, 1, fp, &nNew, &found);
         } else {
             Lf(@"[iosurface-create] CVPixelBuffer cv=%d (skipped)", (int)cv);
         }
     }
 
-    /* op 2: VT encode 720p (AVE path) — output callback NULL (discarded) */
+    /* op 2: VT encode 720p (AVE path) — output callback NULL (discarded);
+       the session is held alive through op 2's scan + encode + final fp */
     {
         L(@"[vt-encode] 1280x720 H.264 one-frame (ave64747_vt control receipt shape)");
-        VTCompressionSessionRef ses = NULL;
         OSStatus st = VTCompressionSessionCreate(kCFAllocatorDefault, 1280, 720,
                                                  kCMVideoCodecType_H264,
-                                                 NULL, NULL, NULL, NULL, NULL, &ses);
-        if (st == noErr && ses) {
-            OSStatus prep = VTCompressionSessionPrepareToEncodeFrames(ses);
+                                                 NULL, NULL, NULL, NULL, NULL, &sesLive);
+        if (st == noErr && sesLive) {
+            OSStatus prep = VTCompressionSessionPrepareToEncodeFrames(sesLive);
             Lf(@"[vt-encode] create=0x%x prepare=0x%x", (unsigned)st, (unsigned)prep);
             if (prep == noErr) {
                 p115_snap(C, &nC);
-                p115_scanNew("vt-session", A, nA, C, nC, fp, &nNew, &found);
+                uintptr_t objs2[3] = { (uintptr_t)(__bridge void *)sesLive,
+                                       (uintptr_t)(__bridge void *)pbLive, 0 };
+                p115_scanNew("vt-session", A, nA, C, nC, objs2, 2, fp, &nNew, &found);
                 CVPixelBufferRef pb = NULL;
                 CVReturn cv = CVPixelBufferCreate(kCFAllocatorDefault, 1280, 720,
                                                   kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
                                                   NULL, &pb);
                 if (cv == kCVReturnSuccess && pb) {
-                    OSStatus e = VTCompressionSessionEncodeFrame(ses, pb,
+                    OSStatus e = VTCompressionSessionEncodeFrame(sesLive, pb,
                                                                  CMTimeMake(0, 300),
                                                                  CMTimeMake(1, 300),
                                                                  NULL, NULL, NULL);
                     Lf(@"[vt-encode] frame status=0x%x", (unsigned)e);
-                    OSStatus c = VTCompressionSessionCompleteFrames(ses, kCMTimeInvalid);
+                    OSStatus c = VTCompressionSessionCompleteFrames(sesLive, kCMTimeInvalid);
                     Lf(@"[vt-encode] complete=0x%x", (unsigned)c);
                     CVPixelBufferRelease(pb);
                 }
             }
-            VTCompressionSessionInvalidate(ses); CFRelease(ses);
+            VTCompressionSessionInvalidate(sesLive); CFRelease(sesLive); sesLive = NULL;
         } else {
             Lf(@"[vt-encode] create st=0x%x (honest skip)", (unsigned)st);
         }
     }
+    if (pbLive) CVPixelBufferRelease(pbLive);   /* the guard's objects released AFTER the scans */
 
     /* op 3: VT decompress WITH CSC output format — HONEST SKIP this version:
        a decompression session needs a real format description + sample
