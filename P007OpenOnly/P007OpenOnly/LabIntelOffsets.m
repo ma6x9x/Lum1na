@@ -323,6 +323,8 @@ const LabIntelEntry LabIntelTab[] = {
     { "mini17.kbase.live",      "iPhone13,1 17.3 21D50 (Dopamine rootless)", 0, "LADDER", "12 mini = the 21D50 reference class; ladder-only (link base + info.c 23.1 branch); KRW via libkrw, NOT the T1/43748 chains" },
 };
 
+const int LabIntelCount = (int)(sizeof(LabIntelTab) / sizeof(LabIntelTab[0]));
+
 uint64_t LabIntelValue(const char *name, const char *family) {
     if (!name) return 0;
     for (int i = 0; i < LabIntelCount; i++) {
