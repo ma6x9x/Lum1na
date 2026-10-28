@@ -130,7 +130,9 @@ struct ContentView: View {
                         moreRow("P104. AppleSEPKeyStore census (163-sel; sels 7/17/31 handle-0 gate expect 0xfffffffa; benign shapes; watch aks klog lines)", "p104")
                         moreRow("P108. DiskImages kernel-backed census (AppleDiskImages2 / IOHDIXHDDriveInKernel / KDIDiskImageNubUserClient opens + sels 0..24; 84552 attach doors; notes 255)", "p108")
                                 moreRow("P113. DescForge CONTROL (KRW krw hand-forged desc -> recv oracle; A13 rig)", "p113")
-                        moreRow("P109. ANE sel sweep w/ Stage-B kernel oracle (H11ANEIn + LoadBalancer, types 0/1, sels 0..63, DEADBEEF pattern; 2f0 = the Stage-B door; notes 258/259)", "p109")
+                        moreRow("P109 v4. ANE sel sweep w/ Stage-B oracle — 23F77 + T8150/27.x (H16 names + types 0..4, sels 0..213; the direct-UC reachability answer for 43748-out-of-framework + 112696/84494)", "p109")
+                        moreRow("AVE47VT. CVE-2026-64747 via VT (raw UC open is 2e2 — VT is the app path): control 720p encode + wrap-dims Create/Prepare + tiny 64x64 encodes; LIVE on 12/23F77 (fixed 26.6); panic = kernel attestation — DO NOT re-tap", "ave47vt")
+                        moreRow("AVE47VTW. 64747 TRUE 32-bit CalcBufSize wrap (align32(w)*(h>>5) >= 2^32) Create+Prepare ONLY, no encode — SAFE ceiling inventory before ave47vt", "ave47vtw")
                         moreRow("P110. IOSurface swap-claim probe (270 design; sibling-client reclaim after owner death, prefill(6)+2 same-CPU pop, 64 rounds; three-outcome honest verdicts; T8101 23F77 + T8150 24A435; STANDALONE — Family-B is a target outcome)", "p110")
                         moreRow("P112. cgshading — CG Type-5 shading OOB oracle (112611 port; in-process oracle PDF built at-tap + CGPDFDocument render; chosen-double value-control sweep 1.0/2.0/4.0/8.0; honest 3-outcome; far = chosen-bits + structural offset; one sweep per tap)", "p112")
                         moreRow("P114. M2ScalerCSC sel-8 leak tap — SOLO leak law validation (p110 v2 pairing gate; {u64} 8B in, serializer records stride 0x7c, rec+0x18 raw KV; N=8 captures + KV table + honest KVA-disclosure class; READ-ONLY; no race)", "p114")
@@ -281,6 +283,8 @@ struct ContentView: View {
             "p022GC": "p022_gc_escape_log.txt",
             "ave47map": "ave64747_map_log.txt",
             "ave47ctl": "ave64747_control_log.txt",
+            "ave47vt": "ave64747_vt.txt",
+            "ave47vtw": "ave64747_truewrap.txt",
             "p035": "p035_ave_wrap_log.txt",
             "p036": "p036_ave_paint_log.txt",
             "p037": "p037_ave_paint_log.txt",
@@ -661,6 +665,8 @@ struct ContentView: View {
             case "aio":         result = AVEOpenSmoke.runAIOUAF()
             case "ave47map":    result = AVEOpenSmoke.runAVE64747Map()
             case "ave47ctl":    result = AVEOpenSmoke.runAVE64747Control()
+            case "ave47vt":     result = AVEVTSmoke.perform64747VTWrap()
+            case "ave47vtw":    result = AVEVTSmoke.perform64747VTTrueWrap()
             case "p035":        result = P035AVEWrapProbe.tap()
             case "p036":        result = P036AVEPaintProbe.tap()
             case "p037":        result = P037AVEPaintProbe.tap()

