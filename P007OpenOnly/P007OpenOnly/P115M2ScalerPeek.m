@@ -50,7 +50,7 @@
 #import <stdio.h>
 #import <string.h>
 
-#define P115_BUILD @"p115-m2scaler-peek-v1.8-nobridge"
+#define P115_BUILD @"p115-m2scaler-peek-v1.9-immediate"
 
 static NSMutableString *g_log = nil;
 static int g_fd = -1;
@@ -87,7 +87,7 @@ static void p115_snap(mach_port_name_t *names, int *n) {
 
 /* forward declarations (v1.2: scanNew calls fingerprint — declare before
    use; the missing forward decl was the third red Lum1na-Debug layer) */
-static void p115_fingerprint(mach_port_t port, NSMutableString *outLine, BOOL *found);
+static void p115_fingerprint(mach_port_t port, BOOL *found);
 
 /* the p001 GUARD law, restored (v1.7): NEVER MIG-probe a new SEND port
    unless its port NUMBER appears in our own framework objects' memory —
@@ -97,7 +97,7 @@ static void p115_fingerprint(mach_port_t port, NSMutableString *outLine, BOOL *f
 static void p115_scanNew(const char *tag, mach_port_name_t *before, int nB,
                          mach_port_name_t *after, int nA,
                          uintptr_t *objs, int nObjs,
-                         NSMutableString *fp, int *nNew, BOOL *found) {
+                         int *nNew, BOOL *found) {
     Lf(@"[diff %s] scanning added ports", tag);
     for (int i = 0; i < nA; i++) {
         int old = 0;
@@ -122,7 +122,7 @@ static void p115_scanNew(const char *tag, mach_port_name_t *before, int nB,
             Lf(@"  +port %u pt=0x%x NOT in obj mem (skip — the p001 XPC-risk law)", after[i], (unsigned)pt);
             continue;
         }
-        p115_fingerprint(after[i], fp, found);
+        p115_fingerprint(after[i], found);
     }
 }
 
@@ -160,9 +160,12 @@ static BOOL p115_dlsym(void) {
                               service, so only the fingerprint sym matters. */
 }
 
-/* fingerprint: M2Scaler's sel-8 no-queue shape = 2bf (out buffer sized) */
-static void p115_fingerprint(mach_port_t port, NSMutableString *outLine, BOOL *found) {
-    if (!g_st) { [outLine appendFormat:@"\n    port %u: no callStruct", port]; return; }
+/* fingerprint: M2Scaler's sel-8 no-queue shape = 2bf (out buffer sized).
+   v1.9: PRINTS IMMEDIATELY (the 09:43 v1.6 crash ate every fp line because
+   they were buffered in one string that only printed at the verdict — a
+   mid-loop death loses the whole loop's results; fsync'd per line now). */
+static void p115_fingerprint(mach_port_t port, BOOL *found) {
+    if (!g_st) { Lf(@"    port %u: no callStruct", port); return; }
     uint64_t in8 = 0;
     static uint8_t out8[0x1000];
     memset(out8, 0, sizeof(out8));
@@ -170,9 +173,9 @@ static void p115_fingerprint(mach_port_t port, NSMutableString *outLine, BOOL *f
     IOReturn kr8 = g_st((mach_port_t)port, 8, &in8, 8, out8, &olen);
     BOOL sig = (kr8 == 0xe00002bf);
     if (sig) *found = YES;
-    [outLine appendFormat:@"\n    port %u sel8={0}8B kr=0x%08x outLen=%zu %@",
-        (unsigned)port, (unsigned)kr8, olen,
-        sig ? @"  <-- M2SCALER FINGERPRINT (2bf no-queue)" : @""];
+    Lf(@"    port %u sel8={0}8B kr=0x%08x outLen=%zu%@",
+       (unsigned)port, (unsigned)kr8, olen,
+       sig ? @"  <-- M2SCALER FINGERPRINT (2bf no-queue)" : @"");
 }
 
 /* ---- encode plumbing (ave47 control receipt, output discarded) -------- */
@@ -216,7 +219,6 @@ static void p115_fingerprint(mach_port_t port, NSMutableString *outLine, BOOL *f
 
     mach_port_name_t A[kP115Cap], B[kP115Cap], C[kP115Cap];
     int nA = 0, nB = 0, nC = 0;
-    NSMutableString *fp = [NSMutableString string];
     int nNew = 0;
     BOOL found = NO;
     CVPixelBufferRef pbLive = NULL;   /* kept alive until AFTER the scans */
@@ -239,7 +241,7 @@ static void p115_fingerprint(mach_port_t port, NSMutableString *outLine, BOOL *f
                guard pattern used __bridge only on id<MTLDevice> objc objects.
                Plain (void *) casts are correct here and compile on both. */
             uintptr_t objs[2] = { (uintptr_t)(void *)pbLive, 0 };
-            p115_scanNew("iosurface-create", A, nA, B, nB, objs, 1, fp, &nNew, &found);
+            p115_scanNew("iosurface-create", A, nA, B, nB, objs, 1, &nNew, &found);
         } else {
             Lf(@"[iosurface-create] CVPixelBuffer cv=%d (skipped)", (int)cv);
         }
@@ -259,7 +261,7 @@ static void p115_fingerprint(mach_port_t port, NSMutableString *outLine, BOOL *f
                 p115_snap(C, &nC);
                 uintptr_t objs2[3] = { (uintptr_t)(void *)sesLive,
                                        (uintptr_t)(void *)pbLive, 0 };
-                p115_scanNew("vt-session", A, nA, C, nC, objs2, 2, fp, &nNew, &found);
+                p115_scanNew("vt-session", A, nA, C, nC, objs2, 2, &nNew, &found);
                 CVPixelBufferRef pb = NULL;
                 CVReturn cv = CVPixelBufferCreate(kCFAllocatorDefault, 1280, 720,
                                                   kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
@@ -291,7 +293,6 @@ static void p115_fingerprint(mach_port_t port, NSMutableString *outLine, BOOL *f
 
     /* verdict */
     Lf(@"new SEND-only probed: %d", nNew);
-    Lf(@"[fp] accumulated fingerprint lines:%@", fp.length ? fp : @" (none)");
     L(@"=== VERDICT (honest) ===");
     if (found) {
         L(@"FINGERPRINT HIT: a framework-opened AppleM2ScalerCSCDriver UC is in THIS");
