@@ -245,7 +245,7 @@ static void p115_fingerprint(mach_port_t port, NSMutableString *outLine, BOOL *f
 
     /* verdict */
     Lf(@"new SEND-only probed: %d", nNew);
-    L(@"[fp] accumulated fingerprint lines:%@", fp.length ? fp : @" (none)");
+    Lf(@"[fp] accumulated fingerprint lines:%@", fp.length ? fp : @" (none)");
     L(@"=== VERDICT (honest) ===");
     if (found) {
         L(@"FINGERPRINT HIT: a framework-opened AppleM2ScalerCSCDriver UC is in THIS");
