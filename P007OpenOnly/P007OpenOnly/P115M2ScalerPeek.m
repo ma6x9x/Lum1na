@@ -65,30 +65,39 @@ static void Lf(NSString *fmt, ...) {
     L(line);
 }
 
-/* ---- port snapshot (the p001 NewPortSweep shape, SEND-only set) ------- */
-static kern_return_t p115_snapshot(NSMutableSet **outSet) {
-    mach_port_name_array_t names = NULL;
-    mach_port_type_array_t types = NULL;
-    mach_msg_type_number_t nn = 0, nt = 0;
-    kern_return_t kr = mach_port_names(mach_task_self(), &names, &nn, &types, &nt);
-    NSMutableSet<NSNumber *> *s = [NSMutableSet set];
-    if (kr == KERN_SUCCESS && names && types) {
-        for (mach_msg_type_number_t i = 0; i < nn && i < nt; i++) {
-            if ((types[i] & MACH_PORT_TYPE_SEND) && !(types[i] & MACH_PORT_TYPE_RECEIVE))
-                [s addObject:@(names[i])];
-        }
+/* ---- port snapshot (the PROVEN p001 shape: mach_port_type brute scan
+   over 0x100..0x10000 into fixed arrays — mach_port_names + vm_deallocate
+   was the compile-risk path; AVEVTSmoke's scan compiled and ran on device) */
+enum { kP115Cap = 256 };
+static void p115_snap(mach_port_name_t *names, int *n) {
+    *n = 0;
+    for (mach_port_name_t pn = 0x100; pn < 0x10000 && *n < kP115Cap; pn++) {
+        mach_port_type_t pt = 0;
+        if (mach_port_type(mach_task_self(), pn, &pt) != KERN_SUCCESS) continue;
+        if (((pt >> 16) & 0x1) == 0) continue;   /* SEND */
+        if (((pt >> 16) & 0x8))      continue;   /* DEAD */
+        names[(*n)++] = pn;
     }
-    if (names) (void)vm_deallocate(mach_task_self(), (vm_address_t)names, nn * sizeof(mach_port_name_t));
-    if (types) (void)vm_deallocate(mach_task_self(), (vm_address_t)types, nt * sizeof(mach_port_type_t));
-    *outSet = s;
-    return kr;
 }
 
-static void p115_diff(NSString *tag, NSMutableSet *before, NSMutableSet *after, NSMutableSet *newPorts) {
-    for (NSNumber *p in after) if (![before containsObject:p]) [newPorts addObject:p];
-    Lf(@"[diff %@] new SEND-only ports (%lu): %@", tag, (unsigned long)newPorts.count,
-       [newPorts.allObjects componentsJoinedByString:@" "]);
+/* diff + fingerprint the ADDED SEND-only ports (bounded: one sel-8 call) */
+static void p115_scanNew(const char *tag, mach_port_name_t *before, int nB,
+                         mach_port_name_t *after, int nA,
+                         NSMutableString *fp, int *nNew, BOOL *found) {
+    Lf(@"[diff %s] scanning added ports", tag);
+    for (int i = 0; i < nA; i++) {
+        int old = 0;
+        for (int j = 0; j < nB; j++) if (before[j] == after[i]) { old = 1; break; }
+        if (old) continue;
+        mach_port_type_t pt = 0;
+        if (mach_port_type(mach_task_self(), after[i], &pt) != KERN_SUCCESS) continue;
+        Lf(@"  +port %u pt=0x%x", after[i], (unsigned)pt);
+        if (pt != 0x10000) continue;             /* SEND-only only */
+        (*nNew)++;
+        p115_fingerprint(after[i], fp, found);
+    }
 }
+
 
 /* ---- IOKit dlsym (p098 local shape) ----------------------------------- */
 typedef CFMutableDictionaryRef (*Match_t)(const char *);
@@ -118,18 +127,18 @@ static BOOL p115_dlsym(void) {
 }
 
 /* fingerprint: M2Scaler's sel-8 no-queue shape = 2bf (out buffer sized) */
-static BOOL p115_fingerprint(NSString *tag, mach_port_t port, NSMutableString *outLine) {
-    if (!g_st) { [outLine appendFormat:@" port %u: no callStruct", port]; return NO; }
+static void p115_fingerprint(mach_port_t port, NSMutableString *outLine, BOOL *found) {
+    if (!g_st) { [outLine appendFormat:@"\n    port %u: no callStruct", port]; return; }
     uint64_t in8 = 0;
     static uint8_t out8[0x1000];
     memset(out8, 0, sizeof(out8));
     size_t olen = sizeof(out8);
     IOReturn kr8 = g_st((mach_port_t)port, 8, &in8, 8, out8, &olen);
     BOOL sig = (kr8 == 0xe00002bf);
+    if (sig) *found = YES;
     [outLine appendFormat:@"\n    port %u sel8={0}8B kr=0x%08x outLen=%zu %@",
-        port, (unsigned)kr8, olen,
+        (unsigned)port, (unsigned)kr8, olen,
         sig ? @"  <-- M2SCALER FINGERPRINT (2bf no-queue)" : @""];
-    return sig;
 }
 
 /* ---- encode plumbing (ave47 control receipt, output discarded) -------- */
@@ -165,12 +174,14 @@ static BOOL p115_fingerprint(NSString *tag, mach_port_t port, NSMutableString *o
         goto finish;
     }
 
-    NSMutableSet *snap = nil, *after = nil, *newP = [NSMutableSet set];
+    mach_port_name_t A[kP115Cap], B[kP115Cap], C[kP115Cap];
+    int nA = 0, nB = 0, nC = 0;
     NSMutableString *fp = [NSMutableString string];
+    int nNew = 0;
     BOOL found = NO;
 
-    (void)p115_snapshot(&snap);
-    Lf(@"[baseline] SEND-only ports: %lu", (unsigned long)snap.count);
+    p115_snap(A, &nA);
+    Lf(@"[baseline] SEND-only ports: %d", nA);
 
     /* op 1: IOSurface create (control) */
     {
@@ -179,8 +190,8 @@ static BOOL p115_fingerprint(NSString *tag, mach_port_t port, NSMutableString *o
                                           kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
                                           NULL, &pb);
         if (cv == kCVReturnSuccess && pb) {
-            (void)p115_snapshot(&after);
-            (void)p115_diff(@"iosurface-create", snap, after, newP);
+            p115_snap(B, &nB);
+            p115_scanNew("iosurface-create", A, nA, B, nB, fp, &nNew, &found);
             CVPixelBufferRelease(pb);
         } else {
             Lf(@"[iosurface-create] CVPixelBuffer cv=%d (skipped)", (int)cv);
@@ -198,8 +209,8 @@ static BOOL p115_fingerprint(NSString *tag, mach_port_t port, NSMutableString *o
             OSStatus prep = VTCompressionSessionPrepareToEncodeFrames(ses);
             Lf(@"[vt-encode] create=0x%x prepare=0x%x", (unsigned)st, (unsigned)prep);
             if (prep == noErr) {
-                (void)p115_snapshot(&after);
-                (void)p115_diff(@"vt-encode", snap, after, newP);
+                p115_snap(C, &nC);
+                p115_scanNew("vt-session", A, nA, C, nC, fp, &nNew, &found);
                 CVPixelBufferRef pb = NULL;
                 CVReturn cv = CVPixelBufferCreate(kCFAllocatorDefault, 1280, 720,
                                                   kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
@@ -226,17 +237,11 @@ static BOOL p115_fingerprint(NSString *tag, mach_port_t port, NSMutableString *o
        plumbing; faking a sample buffer violates the no-fake law. The
        grammar lattice keeps priority. */
     L(@"[vt-csc] decompression-scaffold deferred — CSC leg HONEST SKIP this version");
-    L(@"  (no fake buffers; op battery = IOSurface control + one VT encode frame).");
-
-    /* fingerprint every new port (bounded: sel-8 only) */
-    (void)p115_snapshot(&after);
-    L(@"[fp] fingerprinting all new ports bounded sel-8 {u64 0} 8B:");
-    for (NSNumber *p in newP) {
-        if (p115_fingerprint(@"", (mach_port_t)p.unsignedInt, fp)) found = YES;
-    }
-    L(fp.length ? fp : @"    (no new ports to fingerprint)");
+    L(@"  (no fake buffers; op battery = IOSurface control + one VT session).");
 
     /* verdict */
+    Lf(@"new SEND-only probed: %d", nNew);
+    L(@"[fp] accumulated fingerprint lines:%@", fp.length ? fp : @" (none)");
     L(@"=== VERDICT (honest) ===");
     if (found) {
         L(@"FINGERPRINT HIT: a framework-opened AppleM2ScalerCSCDriver UC is in THIS");
