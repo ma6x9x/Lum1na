@@ -180,7 +180,13 @@ static void p115_fingerprint(mach_port_t port, NSMutableString *outLine, BOOL *f
 
     if (!p115_dlsym()) {
         L(@"[-] IOKit dlsym incomplete — honest stop, nothing probed.");
-        goto finish;
+        /* v1.5: the ARC law — no goto over retainable declarations; the
+           single early exit inlines the finish block (the goto-forward-
+           over-initialized-locals error was the SIXTH red layer, and the
+           only non-cascade one left) */
+        if (g_fd >= 0) { (void)fcntl(g_fd, F_FULLFSYNC); (void)close(g_fd); g_fd = -1; }
+        NSString *ret = g_log; g_log = nil;
+        return ret;
     }
 
     mach_port_name_t A[kP115Cap], B[kP115Cap], C[kP115Cap];
@@ -267,7 +273,6 @@ static void p115_fingerprint(mach_port_t port, NSMutableString *outLine, BOOL *f
     L(@"HONESTY: READ-ONLY peek. hasKread=NO hasKwrite=NO. The battery ops are the");
     L(@"same class as a normal app session (IOSurface create + one encode frame).");
 
-finish:
     if (g_fd >= 0) { (void)fcntl(g_fd, F_FULLFSYNC); (void)close(g_fd); g_fd = -1; }
     NSString *ret = g_log; g_log = nil;
     return ret;
