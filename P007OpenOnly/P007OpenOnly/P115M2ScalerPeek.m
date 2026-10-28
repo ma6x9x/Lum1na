@@ -38,6 +38,11 @@
 #import <unistd.h>
 #import <mach/mach.h>
 #import <mach/mach_port.h>
+/* v1.4: the IOKit types (io_service_t/io_connect_t/IOReturn) are NOT in the
+   SDK transitively on iOS — the macOS SDK resolves them transitively and
+   gave the local clang check a FALSE PASS. Import IOKitLib.h like the p114
+   sibling (the proven p098 shape). */
+#import <IOKit/IOKitLib.h>
 #import <CoreMedia/CoreMedia.h>
 #import <CoreVideo/CoreVideo.h>
 #import <VideoToolbox/VideoToolbox.h>
