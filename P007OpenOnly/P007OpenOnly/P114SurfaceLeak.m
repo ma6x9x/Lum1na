@@ -226,11 +226,18 @@ static void p114_hexdump(size_t maxn) {
         }
 
         /* queue FIRST (p098 v5 law) — LabOff() row size */
+        /* v1.1 FIX (the 17:59 23F77 round): the queue_create_size LabOff row
+           is the IOGPU queue row (0x410), NOT the M2Scaler one — the
+           derived M2Scaler in-struct = 0xfa8 (m2scaler.queue_sz law,
+           M2Scaler hunter correction). Use that on the A14 class. On 24A435
+           the same-kext UC open is closed to free accounts (kr 0x10000003) —
+           p114 is 23F77-only by app visibility. */
         const LabOffTab *off = LabOff();
         uint32_t qsz = off ? (uint32_t)off->queue_create_size : 0;
         if (!qsz) qsz = 0x408u;
-        if (qsz > 0x410u) qsz = 0x410u;
-        static uint8_t qBuf[0x410];
+        if (qsz > 0xFA8u) qsz = 0xFA8u;
+        if (off && off->ane_table_size == 0x820u) qsz = 0xFA8u;  /* A14/23F77: M2Scaler-specific size law */
+        static uint8_t qBuf[0xFA8];
         memset(qBuf, 0, sizeof(qBuf));
         size_t qOutLen = sizeof(qBuf);
         uint64_t qOut[4] = {0};
