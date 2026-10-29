@@ -585,7 +585,12 @@ static NSString *p010_finish(void) {
     // Summary
     // ================================================================
     p010_log(@"");
-    p010_log(@"=== SUMMARY ===");
+    p010_log(@"word1 band shift law (2026-10-29 boot pair): boot A band 0x8024XXX, "
+             @"boot B band 0x902eXXX, delta ~0x1009A43 = a SLIDE-SHAPED quantum "
+             @"across boots. w1 = a truncated (low-32) kernel-side value tracking "
+             @"the slide = the p010 promotion: TRUNCATED-KVA LEAK CANDIDATE (the "
+             @"KASLR-class read prong). The top word is NOT leaked (u32 field). "
+             @"Not a hasKread flip.");
     p010_log(@"total kernel pointer hits: %d", total_hits);
     p010_log(@"word1 is *(CommandQueue+0x%x) on 23F77. Device 2026-08-31 + FKT 0.6.1: not kptr.",
              [LabDeviceProfile queueLeakOff]);
