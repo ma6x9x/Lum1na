@@ -24,6 +24,7 @@
 #import "P125KernIpcRace.h"
 #import "LabDeviceProfile.h"
 #import "LabLocalTime.h"
+#import "LabBandit.h"
 
 #import <Foundation/Foundation.h>
 #import <CoreFoundation/CoreFoundation.h>
@@ -37,7 +38,7 @@
 #import <time.h>
 #import <unistd.h>
 
-#define P125_BUILD       @"p125-kernipcrace-v2"
+#define P125_BUILD       @"p125-kernipcrace-v3"
 #define P125_SECONDS     5.0
 #define P125_WORKERS     4
 #define P125_BUDGET      6000
@@ -207,6 +208,14 @@ static void *p125_worker(void *arg) {
     return NULL;
 }
 
+static void P125_rec(const char *outcome) {
+    static const char *arms[1] = { "main" };
+    LabBanditSeedRow sr = { "main", "ok", 0 };
+    char attr[288];
+    LabBanditRegister("p125", arms, 1, &sr, 0, "p125 auto-learn", "ok", "survived", attr, sizeof attr);
+    LabBanditRecord("p125", 0, outcome);
+}
+
 @implementation P125KernIpcRace
 
 + (NSString *)tap {
@@ -257,6 +266,8 @@ static void *p125_worker(void *arg) {
     L(@"  demonstrate the fault; do not count it toward KRW receipts.");
     L(@"hasKread=NO. Composition note: this is the kernel-UAF WRITE-adjacent");
     L(@"  class; pairs with p126 (the decmpfs read prong) and p044 (EMBERFORGE).");
+    P125_rec("survived");   /* auto: the tap survived the ring; a panic = the
+                               attribution law credits it on the next boot */
     return g_buf ?: @"(no p125 log)";
 }
 

@@ -690,8 +690,17 @@ struct ContentView: View {
 
         guard !running else { return }
         running = true
-        // Keep main-thread work tiny while race owns the CPUs.
-        text = "Running \(id)…\nDon't touch UI. Classify ips after reboot.\n"
+        // The Oracle's fleet plan rides every tap's console (the auto-lane:
+        // each probe's verdict class feeds the bandit ledger; this line =
+        // the ranked cross-domain plan BEFORE the tap runs).
+        var planBuf = [CChar](repeating: 0, count: 4096)
+        _ = LabBanditPlan(&planBuf, 4096)
+        let planText = String(cString: planBuf)
+        if !planText.isEmpty {
+            text = "[PLAN]\n" + planText + "Running \(id)…\nDon't touch UI. Classify ips after reboot.\n"
+        } else {
+            text = "Running \(id)…\nDon't touch UI. Classify ips after reboot.\n"
+        }
         logTap(id)
 
         // 8BADF00D postmortem (P007OpenOnly-2026-10-24-181415/184530 ips):

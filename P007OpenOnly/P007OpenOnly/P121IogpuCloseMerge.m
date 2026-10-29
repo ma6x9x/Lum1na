@@ -25,6 +25,7 @@
 #import "LabDeviceProfile.h"
 #import "LabIOGPUQueue.h"
 #import "LabLocalTime.h"
+#import "LabBandit.h"
 
 #import <Metal/Metal.h>
 #import <CoreFoundation/CoreFoundation.h>
@@ -40,7 +41,7 @@
 #import <stdlib.h>
 #import <unistd.h>
 
-#define P121_BUILD  @"p121-closemerge-v2"
+#define P121_BUILD  @"p121-closemerge-v3"
 #define P121_TIME   10.0
 
 typedef mach_port_t p_ioobject_t;
@@ -134,6 +135,14 @@ static void *p121_blitter(void *u) {
         usleep(50);
     }
     return NULL;
+}
+
+static void P121_rec(const char *outcome) {
+    static const char *arms[1] = { "main" };
+    LabBanditSeedRow sr = { "main", "ok", 0 };
+    char attr[288];
+    LabBanditRegister("p121", arms, 1, &sr, 0, "p121 auto-learn", "ok", "survived", attr, sizeof attr);
+    LabBanditRecord("p121", 0, outcome);
 }
 
 @implementation P121IogpuCloseMerge
@@ -285,6 +294,10 @@ static void *p121_blitter(void *u) {
             L(@"- a panic = the kernel ate the inconsistent close = the note-276");
             L(@"  merge-window candidate ATTESTED (decode the ips to the fn).");
             L(@"hasKread=NO. No claims beyond the shapes above.");
+            {
+                if (atomic_load(&g_extra_ok) > 0) P121_rec("ok");
+                else                               P121_rec("survived");
+            }
         }
     }
 

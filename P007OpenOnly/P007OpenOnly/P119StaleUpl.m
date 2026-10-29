@@ -39,6 +39,7 @@
 #import "P119StaleUpl.h"
 #import "LabDeviceProfile.h"
 #import "LabLocalTime.h"
+#import "LabBandit.h"
 
 #import <Metal/Metal.h>
 #import <CoreFoundation/CoreFoundation.h>
@@ -57,7 +58,7 @@
 #import <unistd.h>
 #import <sys/mman.h>
 
-#define P119_BUILD      @"p119-staleupl-v5"
+#define P119_BUILD      @"p119-staleupl-v6"
 
 /* the P069 prototype law: mach_vm has no SDK header for these decls */
 kern_return_t mach_vm_map(vm_map_t target_task, mach_vm_address_t *address,
@@ -180,6 +181,15 @@ static void *p119_wirer(void *u) {
     return NULL;
 }
 
+static void p119_rec(const char *outcome) {
+    LabBanditSeedRow sr = { "main", "ok", 0 };
+    char attr[288];
+    static const char *p119_arms[1] = { "main" };
+    int attrr = LabBanditRegister("p119", p119_arms, 1, &sr, 0, "p119 auto-learn",
+                                  "ok", "survived", attr, sizeof attr);
+    (void)attrr;
+    LabBanditRecord("p119", 0, outcome);
+}
 static NSString *p119_finish(void) {
     if (g_data) { free(g_data); g_data = NULL; }
     g_mbuf = nil; g_stage = nil; g_q = nil; g_dev = nil; g_ref = NULL;
@@ -592,6 +602,13 @@ static NSString *p119_finish(void) {
     L(@"hasKread=NO. The GPU-DMA physical read (if any) is device-side evidence,");
     L(@"  not a kernel read primitive. no claims above the oracle classes.");
 
+    /* v6 AUTO-CONTRIBUTION: the verdict class = one bandit record per tap */
+    {
+        if (atomic_load(&g_e0_hits) > 0)      p119_rec("ok");        /* the read-through receipt */
+        else if (atomic_load(&g_for_hits) > 0) p119_rec("ok");
+        else if (atomic_load(&g_rep_ok) > 0)  p119_rec("survived");
+        else                                   p119_rec("lost");
+    }
     return p119_finish();
 }
 

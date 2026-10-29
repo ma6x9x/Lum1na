@@ -24,6 +24,7 @@
 #import "P126DecmpfsLeak.h"
 #import "LabDeviceProfile.h"
 #import "LabLocalTime.h"
+#import "LabBandit.h"
 
 #import <Foundation/Foundation.h>
 #import <CoreFoundation/CoreFoundation.h>
@@ -35,7 +36,7 @@
 #import <stdlib.h>
 #import <unistd.h>
 
-#define P126_BUILD @"p126-decmpfsleak-v2"
+#define P126_BUILD @"p126-decmpfsleak-v3"
 
 typedef struct { uint8_t *d; size_t n, cap; } p126buf;
 static void p126_bneed(p126buf *b, size_t extra) {
@@ -119,6 +120,14 @@ static void Lf(NSString *fmt, ...) {
 }
 
 static BOOL p126_kernel_ptr(uint64_t v) { return v >= 0xFFFFFFE000000000ULL; }
+
+static void P126_rec(const char *outcome) {
+    static const char *arms[1] = { "main" };
+    LabBanditSeedRow sr = { "main", "ok", 0 };
+    char attr[288];
+    LabBanditRegister("p126", arms, 1, &sr, 0, "p126 auto-learn", "ok", "lost", attr, sizeof attr);
+    LabBanditRecord("p126", 0, outcome);
+}
 
 @implementation P126DecmpfsLeak
 
@@ -216,6 +225,7 @@ static BOOL p126_kernel_ptr(uint64_t v) { return v >= 0xFFFFFFE000000000ULL; }
         L(@"  or the decoder zero-fills. 27.2's fix class per Cinder27 = re-run");
         L(@"  on the 17's 24A435: the negative control confirms the version law.");
     }
+    P126_rec(cumulative_hits > 0 ? "ok" : "lost");
     L(@"hasKread=NO. READ-ONLY: xattr + file read on our container only.");
     return g_buf ?: @"(no p126 log)";
 }

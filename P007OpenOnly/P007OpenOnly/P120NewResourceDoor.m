@@ -38,6 +38,7 @@
 #import "P120NewResourceDoor.h"
 #import "LabDeviceProfile.h"
 #import "LabLocalTime.h"
+#import "LabBandit.h"
 
 #import <CoreFoundation/CoreFoundation.h>
 #import <Foundation/Foundation.h>
@@ -72,6 +73,7 @@ typedef kern_return_t (*DevRelease_t)(void *);
 typedef uint32_t (*GetConn_t)(void *);
 typedef void (*IOServiceClose_t)(p_ioconnect_t);
 
+static int g_leftover_receipts;
 static NSMutableString *g_buf;
 static int g_fd = -1;
 
@@ -89,6 +91,14 @@ static void Lf(NSString *fmt, ...) {
     NSString *line = [[NSString alloc] initWithFormat:fmt arguments:ap];
     va_end(ap);
     L(line);
+}
+
+static void P120_rec(const char *outcome) {
+    static const char *arms[1] = { "main" };
+    LabBanditSeedRow sr = { "main", "ok", 0 };
+    char attr[288];
+    LabBanditRegister("p120", arms, 1, &sr, 0, "p120 auto-learn", "ok", "lost", attr, sizeof attr);
+    LabBanditRecord("p120", 0, outcome);
 }
 
 static kern_return_t p120_newRes(IOConnectCallMethod_t call, p_ioconnect_t conn,
@@ -259,6 +269,7 @@ static kern_return_t p120_fn4(IOConnectCallMethod_t call, p_ioconnect_t conn,
         }
         Lf(@"[*] stage-C: leftover deletions=%d (0 = no dangling insert this ladder)",
            leftover);
+        g_leftover_receipts = leftover;
 
         /* ---------- Stage D: sel40 s_create_resource_iosurface ladder --------- */
         /* v2 (2026-10-28, after the v1 device round: calibrate CARRIED
@@ -374,11 +385,24 @@ static kern_return_t p120_fn4(IOConnectCallMethod_t call, p_ioconnect_t conn,
         L(@"hasKread=NO. No claims beyond the receipts above.");
     }
 
-    if (pClose && conn) pClose(conn);
-    if (dev && pDevRelease) pDevRelease(dev);
-    pRelease(svc);
+    /* v3: the tail release = the done: block (single-owner, ordered);
+       no second release here */
 
-done:
+    /* v4 AUTO-CONTRIBUTION */
+    {
+        if (g_leftover_receipts > 0) P120_rec("ok");
+        else                          P120_rec("lost");
+    }
+done:   ;   /* the tail = v3 release-order hardening: every step guarded and
+                 NULL-checked; the id-space cleanup ran INSIDE the stages, so
+                 the tail releases only what THIS tap owns — the crash class
+                 (the app-death the v1 device round showed at the verdict
+                 tail) = the release-of-borrowed-refs class; ordering:
+                 close the conn FIRST (the UC's last ref goes with it), THEN
+                 the device object, THEN the io_service. */
+    if (pClose && conn && conn != MACH_PORT_NULL) pClose(conn);
+    if (dev && pDevRelease) pDevRelease(dev);
+    if (pRelease && svc) pRelease(svc);
     if (g_fd >= 0) { (void)fcntl(g_fd, F_FULLFSYNC); (void)close(g_fd); g_fd = -1; }
     NSString *ret = g_buf ?: @"(no p120 log)";
     g_buf = nil;
