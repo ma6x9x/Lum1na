@@ -334,7 +334,6 @@ static void p115_fingerprint(mach_port_t port, BOOL *found) {
             if (src) {
                 CGImageRef dec = CGImageSourceCreateImageAtIndex(src, 0, NULL);
                 if (dec) {
-                    (void)pb2_unused_marker;   /* the CGImage/src = the primary objs */
                     mach_port_name_t B2[kP115Cap]; int nB2 = 0;
                     p115_snap(B2, &nB2);
                     uintptr_t objs2[2] = { (uintptr_t)(void *)src,
