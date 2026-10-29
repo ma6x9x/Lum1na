@@ -107,4 +107,35 @@ double LabBanditReward(const char *outcome);
 /* human-readable UCB1 score line: "<arm> n=%u mean=%.3f ucb=%.3f | ..." */
 int    LabBanditScores(const char *domain, char *out, int cap);
 
+/* ---- v2 ("the Oracle"): evidence-classed, cost-aware Thompson brain ---- */
+
+/* Evidence classes. The ledger stores CLASS-WEIGHTED counts:
+   device = 1.0 (a real probe tap: the only class that moves the plan at
+   full strength), emu = 0.5 (Kernellab offline emulation verdicts),
+   map = 0.3 (static/Ghidra decode receipts). A fractional count is an
+   honest downweight, never an extra claim. */
+#define LABB_E_DEVICE "device"
+#define LABB_E_EMU    "emu"
+#define LABB_E_MAP    "map"
+
+/* Record with an evidence class (counts carry the class weight).
+   LabBanditRecord == RecordE(..., LABB_E_DEVICE). */
+void   LabBanditRecordE(const char *domain, int armIndex,
+                        const char *outcome, const char *evidenceClass);
+
+/* Pick (Thompson sampling over Beta posteriors with the crash-penalty):
+   same contract as the UCB1 pick (skips manual*; round_open + last_arm
+   fsync'd). lineOut gets "oracle: <pick> (Thompson, boot=<m>m)".
+   Cold boots (< 10 min uptime) draw exploration-favorable posteriors;
+   long sessions converge onto the EV-best arm (the panic-cost law). */
+int    LabBanditPick2(const char *domain, char *lineOut, int lineCap);
+
+/* THE PLAN: scan every domain in the ledger, rank each domain's best
+   non-manual arm by deterministic EV (mean - crash-rate penalty), print
+   the ranked cross-domain table. lineOut gets lines:
+     "plan: <domain> -> <arm> ev=%.3f n=%.1f"
+   Returns the number of domains ranked (0 = none). This is the hunt
+   scheduler: run nothing before it says so, or run the top line. */
+int    LabBanditPlan(char *lineOut, int lineCap);
+
 #endif /* LabBandit_h */
