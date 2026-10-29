@@ -251,6 +251,7 @@ struct ContentView: View {
                         moreRow("P001 conn. VT conn hunt", "p001conn")
                         moreRow("P001 xref. cross-ref", "p001xref")
                         moreRow("P001 ports. new-port sweep", "p001ports")
+                        moreRow("P001 T3. lying-backing SENTINEL (4096 over 1MB + sentinel pages): encode 1 frame, decode it back, scan for the constants. Zero = encoder clamps (law closed). Hits = OOB READ disclosure with walk shape. PANIC-POSSIBLE; one tap", "p001t3")
                         moreRow("VT SMOKE. AVE open smoke", "vt_smoke")
                         moreRow("SPAWNATTRS. spawn attribute map (not KRW)", "spawnattrs")
                         moreRow("JPEG DEST. dest+timeout oracle (framework-side)", "jpeg_dest")
@@ -740,6 +741,7 @@ struct ContentView: View {
             case "p001conn":    result = AVEVTSmoke.performP001VTConnHunt()
             case "p001xref":    result = AVEVTSmoke.performP001CrossRefProbe()
             case "p001ports":   result = AVEVTSmoke.performP001NewPortSweep()
+            case "p001t3":      result = AVEVTSmoke.performP001T3Sentinel()
             case "spawnattrs":  result = SpawnAttrsProbe.runSpawnAttrsProbe()
             case "p010krwv2", "p010pduaf", "p010twoconn", "p010pdsweep":
                 result = "STOP \(id) intercepted — leftover P010 UAF. Use p010qleak (K− only)."

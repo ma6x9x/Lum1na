@@ -16,7 +16,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P107_BUILD @"p107-ave-wrap-dims-v1"
+#define P107_BUILD @"p107-ave-wrap-dims-v3"
 
 static NSMutableString *g_log = nil;
 static int g_fd = -1;
@@ -90,7 +90,10 @@ static void p107_session(NSString *tag, int32_t w, int32_t h, BOOL doEncode) {
        wrap dims, all SessionCreate 0 + Prepare 0). So this tap v2 =
        create/prepare ONLY; the kernel alloc cite lives at kext +0xdc =
        the STATIC queue (note 234's #3 GOLDMINE-B twin). */
-    /* control: 16384*8192*10 = 1.34e9 < 2^31 — in-range, no wrap */
+    /* v3 note: the 17's 2026-10-29 run printed the SAME ses pointer for
+       both shapes = the allocator handed back the freed address (free +
+       same-size malloc). NOT a stale/retained session — annotate rather
+       than misread. */
     p107_session(@"control", 16384, 8192, NO);
     /* wrap candidate: 16384*16384*10 = 2.68e9 > 2^31 — int32 wrap */
     p107_session(@"wrap", 16384, 16384, NO);

@@ -34,6 +34,12 @@ NS_ASSUME_NONNULL_BEGIN
 /// then under-alloc encode at 4096 (last working Process size).
 + (NSString *)performP001CrossRefProbe NS_SWIFT_NAME(performP001CrossRefProbe());
 
+/// T3 SENTINEL: 4096 claimed over a 1MB mmap whose next 8 pages carry flat
+/// constants; encode one frame, decode the sample, scan decoded Y for the
+/// constants. Zero = encoder clamps (law). Hits = OOB READ disclosure with
+/// the walk shape. Bounded 1 frame + 1 decode. PANIC-POSSIBLE. Not KRW.
++ (NSString *)performP001T3Sentinel NS_SWIFT_NAME(performP001T3Sentinel());
+
 /// Probe ONLY new SEND-only ports (pt=0x10000) after Metal then VT.
 /// Skip SEND|RECEIVE (0x30000) local ports. Bounded set vs full-task scan crash.
 + (NSString *)performP001NewPortSweep NS_SWIFT_NAME(performP001NewPortSweep());

