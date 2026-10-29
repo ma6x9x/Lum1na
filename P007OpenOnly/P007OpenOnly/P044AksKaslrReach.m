@@ -2851,7 +2851,7 @@ static void *watch_worker(void *arg) {
                         ? " — chosen per-slot pattern armed"
                         : ((p044FillPatternCount <= 1)
                            ? " — single/uniform tile (chosen UNIFORM output; the multi-byte lane off)"
-                           : " — duplicates present (the written pattern still matches tile-by-tile)"));
+                           : " — duplicates present (the written pattern still matches tile-by-tile)"]);
             }
         }
     }
