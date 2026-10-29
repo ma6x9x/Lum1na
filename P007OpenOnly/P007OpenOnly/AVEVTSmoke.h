@@ -34,10 +34,13 @@ NS_ASSUME_NONNULL_BEGIN
 /// then under-alloc encode at 4096 (last working Process size).
 + (NSString *)performP001CrossRefProbe NS_SWIFT_NAME(performP001CrossRefProbe());
 
-/// T3 SENTINEL: 4096 claimed over a 1MB mmap whose next 8 pages carry flat
-/// constants; encode one frame, decode the sample, scan decoded Y for the
-/// constants. Zero = encoder clamps (law). Hits = OOB READ disclosure with
-/// the walk shape. Bounded 1 frame + 1 decode. PANIC-POSSIBLE. Not KRW.
+/// T3 SENTINEL v2: the T2-exact BGRA recipe (32BGRA claim bpr=256 + session
+/// created on 32BGRA srcAttrs) with gradient rows over 1MB and 0x00/0xFF
+/// sentinel pages AFTER. Encode 1 frame, decode it back, scan decoded Y for
+/// the 0x10/0xEB classes (baseline ~4096 px each from gradient rows 0/255).
+/// Over-baseline = AVE trusted the claimed width over the stride = OOB READ
+/// disclosure with walk shape. Overread-free = law closed. Bounded.
+/// PANIC-POSSIBLE. Not KRW.
 + (NSString *)performP001T3Sentinel NS_SWIFT_NAME(performP001T3Sentinel());
 
 /// Probe ONLY new SEND-only ports (pt=0x10000) after Metal then VT.
