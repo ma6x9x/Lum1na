@@ -182,13 +182,11 @@ static void labb_arm_stats(NSDictionary *arms, NSString *armName,
             if (![a[k] isKindOfClass:[NSNumber class]]) continue;
             double c = [a[k] doubleValue];
             if (c <= 0) continue;
-            double w = 1.0;
-            NSRange colon = [k rangeOfString:@":"];
-            if (colon.location != NSNotFound && colon.location > 0) {
-                w = labb_ev_weight([[k substringToIndex:colon.location] UTF8String]);
-                k = [k substringFromIndex:colon.location + 1];
-            }
-            double r = LabBanditReward(k.UTF8String);
+            NSString *ok = k;
+            NSRange colon = [ok rangeOfString:@":"];
+            if (colon.location != NSNotFound && colon.location > 0)
+                ok = [ok substringFromIndex:colon.location + 1];
+            double r = LabBanditReward(ok.UTF8String);
             /* the crash cost = the reboot: only the crash/maf class goes
                negative (-0.25); MISS/MID keep their honest low rewards */
             double rEff = (r <= 0.001) ? -0.25 : r;
