@@ -2822,6 +2822,34 @@ static void *watch_worker(void *arg) {
           all-equal list = uniform pattern — the honest note, never silent).
        3. target round-trip/alias = already gated at arm time (v57 SID-ALIAS
           + v62 round-trip BROKEN drops) — nothing new to add there. */
+    /* v78 EMBER AUTO-ARM: Documents/p044_ember.txt (any content, consumed)
+       = the whole copyout round from ONE file, zero host-side pushes:
+       model forced to XVRC27_127in_copyout, req_in forced 127, fill =
+       127 in-code distinct tiles (0x4141 + i*0x111), target = census
+       auto-pick (pre-creation band). The v77 guards still validate;
+       the guest sid (when provided) rides p044_target.txt as before.
+       HONESTY (the privileges question): no privilege is minted by this
+       mode — the write prong is THIS fire, the read prong is p116's
+       sandbox-escape (read-only); both run inside the free set. */
+    {
+        NSString *efDocs = NSSearchPathForDirectoriesInDomains(
+            NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+        NSString *efPath = [efDocs stringByAppendingPathComponent:@"p044_ember.txt"];
+        if ([[NSFileManager defaultManager] fileExistsAtPath:efPath]) {
+            unlink(efPath.fileSystemRepresentation);
+            g_modelNameOverride  = @"XVRC27_127in_copyout";
+            p044ReqInOverride    = 127u;
+            for (int i = 0; i < 127; i++)
+                p044FillPattern[i] = (uint16_t)(0x4141 + i * 0x111);
+            p044FillPatternCount = 127;
+            p044FillTileValid    = 1;
+            p044FillTile         = p044FillPattern[0];
+            [out appendString:@"  [v78] EMBER AUTO-ARM: copyout + 127 + 127-code-tiles armed IN-CODE; "
+                              @"zero host files; census auto-pick; the v77 guards ride unchanged\n"];
+            [out appendString:@"  [v78] privileges honesty: read prong = p116 escape (read-only), "
+                              @"write prong = this fire; no privilege minted beyond the free set\n"];
+        }
+    }
     {
         NSString *mn = p044_model_name();
         if ([mn rangeOfString:@"copyout"].location != NSNotFound) {
