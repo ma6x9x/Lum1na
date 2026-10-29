@@ -58,7 +58,7 @@
 #import <unistd.h>
 #import <sys/mman.h>
 
-#define P119_BUILD      @"p119-staleupl-v7"
+#define P119_BUILD      @"p119-staleupl-v8"
 
 /* the P069 prototype law: mach_vm has no SDK header for these decls */
 kern_return_t mach_vm_map(vm_map_t target_task, mach_vm_address_t *address,
@@ -276,6 +276,13 @@ static NSString *p119_finish(void) {
     }
     void *cpu = g_mbuf.contents;
     if (cpu) memset(cpu, P119_FILL_OLD, MIN((size_t)g_mbuf.length, slen));
+
+    /* v8: the staging buffer MUST exist before the v7 lazy-backing blit
+       (the v7 crash = my ordering bug: copy to a nil target). Create it
+       here — sized from GVALen (the same size the old Stage-0 spot used). */
+    g_stage = [g_dev newBufferWithLength:(NSUInteger)(gvaLen ? gvaLen : slen)
+                                 options:MTLResourceStorageModeShared];
+    if (g_stage) memset(g_stage.contents, P119_FILL_STG, (size_t)(gvaLen ? gvaLen : slen));
 
     /* v7 LAZY-BACKING LAW (the bridge decompile, 27.0-RC, 2026-10-29:
        IOGPUResource::detach_backing returns 0xe00002e2 when the resource's
