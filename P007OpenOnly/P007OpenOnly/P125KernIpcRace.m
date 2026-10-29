@@ -37,7 +37,7 @@
 #import <time.h>
 #import <unistd.h>
 
-#define P125_BUILD       @"p125-kernipcrace-v1"
+#define P125_BUILD       @"p125-kernipcrace-v2"
 #define P125_SECONDS     5.0
 #define P125_WORKERS     4
 #define P125_BUDGET      6000
@@ -89,6 +89,7 @@ static void record(kern_return_t kr) {
     if (slot >= 0) gp_stat.err_counts[slot]++;
     pthread_mutex_unlock(&gp_stat.lock);
 }
+
 
 typedef struct { long alloc, notify, send, dealloc; } p125ring;
 
@@ -239,17 +240,21 @@ static void *p125_worker(void *arg) {
     Lf(@"    deallocations=%ld refused=%ld budget_exhausted=%d",
        gp_stat.deallocations, gp_stat.notifications_refused, gp_stat.budget_exhausted);
     for (int i = 0; i < gp_stat.nerrs; i++)
-        Lf(@"    err 0x%08x x%ld", gp_stat.err_codes[i], gp_stat.err_counts[i]);
+        Lf(@"    err 0x%08x (%s) x%ld", gp_stat.err_codes[i],
+           mach_error_string(gp_stat.err_codes[i]) ?: "?", gp_stat.err_counts[i]);
 
     L(@"");
-    L(@"=== VERDICT (honest) ===");
-    L(@"- refused>0 while the budget was NOT exhausted = the request-table");
-    L(@"  consumers hitting the stale-index class = the candidate signal.");
-    L(@"- clean err census (all expected classes, budget drained) = the ring");
-    L(@"  survived: needs the tightened interleave or a longer soak — the");
-    L(@"  panic (if one landed) IS the UAF attestation; decode it to the fn.");
-    L(@"- 112507's own oracle per Cinder27 = the err distribution shift across");
-    L(@"  boots; re-tap after reboot to compare distributions.");
+    L(@"=== VERDICT (honest — the Cinder27 recorded-oracle semantics) ===");
+    L(@"- their own twin's printed verdict = 'survived the interleaving, no");
+    L(@"  request-table fault surfaced' AND 'this platform does not allow");
+    L(@"  notification registration on own ports — the path cannot be armed'.");
+    L(@"- our all-notify-rejected + survived = the SAME class as their twin:");
+    L(@"  the ring is FAITHFUL; the CVE's DEVICE-REACHABLE arming = still the");
+    L(@"  open question (no public PoC has shown the fault on-device).");
+    L(@"- a request-table PANIC (if one ever lands) = the UAF attestation;");
+    L(@"  err-distribution shifts across boots = the weak oracle re-check.");
+    L(@"hasKread=NO. Honest: this probe documents the class, it does not");
+    L(@"  demonstrate the fault; do not count it toward KRW receipts.");
     L(@"hasKread=NO. Composition note: this is the kernel-UAF WRITE-adjacent");
     L(@"  class; pairs with p126 (the decmpfs read prong) and p044 (EMBERFORGE).");
     return g_buf ?: @"(no p125 log)";

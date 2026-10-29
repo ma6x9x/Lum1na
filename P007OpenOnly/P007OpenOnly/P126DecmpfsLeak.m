@@ -35,7 +35,7 @@
 #import <stdlib.h>
 #import <unistd.h>
 
-#define P126_BUILD @"p126-decmpfsleak-v1"
+#define P126_BUILD @"p126-decmpfsleak-v2"
 
 typedef struct { uint8_t *d; size_t n, cap; } p126buf;
 static void p126_bneed(p126buf *b, size_t extra) {
@@ -197,6 +197,11 @@ static BOOL p126_kernel_ptr(uint64_t v) { return v >= 0xFFFFFFE000000000ULL; }
     }
 
     L(@"");
+    L(@"[twin-law] Cinder27's recorded oracle (their C twin, macOS): ");
+    L(@"  'no kernel pointers surfaced (read was served plain)' — the SAME");
+    L(@"  zero as ours on-device; the port is faithful. The CVE's leak needs");
+    L(@"  iOS's transparent decompression to ENGAGE on the crafted file;");
+    L(@"  our 0 = the class's honest miss on 23F77/24A435 (or engage-dependent)");
     L(@"=== VERDICT (honest) ===");
     if (cumulative_hits > 0) {
         Lf(@"- hits=%ld = the kernel heap reached the reader through the decmpfs", cumulative_hits);
