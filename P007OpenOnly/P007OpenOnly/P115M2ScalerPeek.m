@@ -33,6 +33,9 @@
 #import "LabLocalTime.h"
 
 #import <Foundation/Foundation.h>
+#import <ImageIO/ImageIO.h>
+#import <CoreVideo/CoreVideo.h>
+#import <CoreGraphics/CoreGraphics.h>
 #import <dlfcn.h>
 #import <fcntl.h>
 #import <unistd.h>
@@ -50,7 +53,7 @@
 #import <stdio.h>
 #import <string.h>
 
-#define P115_BUILD @"p115-m2scaler-peek-v1.9-immediate"
+#define P115_BUILD @"p115-m2scaler-peek-v2.0-jpegleg"
 
 static NSMutableString *g_log = nil;
 static int g_fd = -1;
@@ -292,6 +295,66 @@ static void p115_fingerprint(mach_port_t port, BOOL *found) {
     L(@"  (no fake buffers; op battery = IOSurface control + one VT session).");
 
     /* verdict */
+    /* v2 op 3: the IMAGEIO/CoreImage JPEG DECODE leg — the 2026-10-29 17 log
+       showed the JPEG framework decode opened +30 SEND ports while the
+       vt-encode opened none: the decode = the port-opener. Diff + fingerprint
+       the decode's ports with the DECODE'S OWN objects in the p001 obj-mem
+       guard (the CGImageSource/CGImage/CVPixelBuffer refs — the rights they
+       legitimately own). */
+    {
+        L(@"[jpeg-decode] 8x8 one-frame battery (the jpeg_fw decode class)");
+        mach_port_name_t A2[kP115Cap]; int nA2 = 0;
+        p115_snap(A2, &nA2);
+        NSMutableData *jpg = [NSMutableData data];
+        CGColorSpaceRef cs2 = CGColorSpaceCreateDeviceRGB();
+        CGContextRef cx = CGBitmapContextCreate(NULL, 8, 8, 8, 32, cs2,
+                                               kCGImageAlphaPremultipliedLast);
+        if (cx) {
+            CGContextSetRGBFillColor(cx, 0.2, 0.4, 0.6, 1.0);
+            CGContextFillRect(cx, CGRectMake(0, 0, 8, 8));
+            CGImageRef img = CGBitmapContextCreateImage(cx);
+            if (img) {
+                CGImageDestinationRef dst = CGImageDestinationCreateWithData(
+                    (__bridge CFMutableDataRef)jpg, CFSTR("public.jpeg"), 1, NULL);
+                if (dst) {
+                    CGImageDestinationAddImage(dst, img, NULL);
+                    CGImageDestinationFinalize(dst);
+                    CFRelease(dst);
+                }
+                CFRelease(img);
+            }
+            CFRelease(cx);
+        }
+        CGColorSpaceRelease(cs2);
+        if (jpg.length < 32) {
+            L(@"[jpeg-decode] could not make a tiny JPEG — honest skip");
+        } else {
+            CGImageSourceRef src = CGImageSourceCreateWithData(
+                (__bridge CFDataRef)jpg, NULL);
+            if (src) {
+                CGImageRef dec = CGImageSourceCreateImageAtIndex(src, 0, NULL);
+                if (dec) {
+                    (void)pb2_unused_marker;   /* the CGImage/src = the primary objs */
+                    mach_port_name_t B2[kP115Cap]; int nB2 = 0;
+                    p115_snap(B2, &nB2);
+                    uintptr_t objs2[2] = { (uintptr_t)(void *)src,
+                                           (uintptr_t)(void *)dec };
+                    int nNew2 = 0;
+                    p115_scanNew("jpeg-decode", A2, nA2, B2, nB2, objs2, 2,
+                                 &nNew2, &found);
+                    Lf(@"[jpeg-decode] jpg=%zu bytes; new ports probed this leg",
+                       (size_t)jpg.length);
+                    if (dec) CFRelease(dec);
+                } else {
+                    L(@"[jpeg-decode] CGImageSourceCreateImageAtIndex failed");
+                }
+                CFRelease(src);
+            } else {
+                L(@"[jpeg-decode] CGImageSourceCreateWithData failed");
+            }
+        }
+        (void)pbLive; (void)sesLive; (void)found;
+    }
     Lf(@"new SEND-only probed: %d", nNew);
     L(@"=== VERDICT (honest) ===");
     if (found) {
