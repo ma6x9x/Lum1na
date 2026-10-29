@@ -2827,31 +2827,31 @@ static void *watch_worker(void *arg) {
         if ([mn rangeOfString:@"copyout"].location != NSNotFound) {
             uint32_t ri = p044_req_in();
             if (ri != 127u) {
-                [out appendFormat:@"  [v77] COPYOUT GUARD: req_in=%u != 127 for %@ — "
-                                  @"FORCED to 127 (the model's grammar; the misfit request would be a silent misfire)\n",
+                [out appendFormat:@"  [v77] COPYOUT GUARD: req_in=%u != 127 for %@ - FORCED to 127 (the model's grammar; the misfit request would be a silent misfire)\n",
                     ri, mn];
                 p044ReqInOverride = 127u;
             } else {
                 [out appendString:@"  [v77] COPYOUT GUARD: req_in=127 matches the copyout grammar\n"];
             }
             {
-                int dup = 0, seenIdx = 0;
+                int dupecnt = 0, seenIdx = 0;
                 uint16_t seen[127];
                 memset(seen, 0, sizeof seen);
                 for (int i = 0; i < p044FillPatternCount && i < 127; i++) {
                     int was = 0;
                     for (int k = 0; k < seenIdx; k++)
                         if (seen[k] == p044FillPattern[i]) { was = 1; break; }
-                    if (was) dup++;
+                    if (was) dupecnt++;
                     else if (seenIdx < 127) seen[seenIdx++] = p044FillPattern[i];
                 }
-                [out appendFormat:@"  [v77] FILL PATTERN distinct: %d distinct / %d slots (dup=%d)%s\n",
-                    seenIdx, p044FillPatternCount, dup,
-                    (p044FillPatternCount >= 2 && dup == 0)
-                        ? " — chosen per-slot pattern armed"
-                        : ((p044FillPatternCount <= 1)
-                           ? " — single/uniform tile (chosen UNIFORM output; the multi-byte lane off)"
-                           : " — duplicates present (the written pattern still matches tile-by-tile)"]);
+                [out appendFormat:@"  [v77] FILL PATTERN distinct: %d distinct / %d slots (dup=%d)\n",
+                    seenIdx, p044FillPatternCount, dupecnt];
+                if (p044FillPatternCount >= 2 && dupecnt == 0)
+                    [out appendString:@"  [v77] FILL distinct full: chosen per-slot pattern armed\n"];
+                else if (p044FillPatternCount <= 1)
+                    [out appendString:@"  [v77] FILL single/uniform tile: chosen UNIFORM output; the multi-byte lane off\n"];
+                else
+                    [out appendString:@"  [v77] FILL duplicates present: the written pattern still matches tile-by-tile\n"];
             }
         }
     }
