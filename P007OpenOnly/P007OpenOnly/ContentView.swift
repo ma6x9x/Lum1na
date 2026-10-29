@@ -141,6 +141,8 @@ struct ContentView: View {
                         moreRow("P119. T020 STALE-UPL port (new-build reopen of the wire×replace lane): stage0 calibrate → stage1 re-ordered race (detach-idle → wirer commit → replace) → stage2 staging oracle (paints 0x41/0x11/0x43 vs FOREIGN) → stage3 reclaim-spray 0xE0 read-through. PANIC-POSSIBLE — one tap per force-quit; hasKread stays NO", "p119")
                         moreRow("P120. 64788 new-resource DOOR (23F77 sel-map byte-verified on-disk: sel8 var-struct newRes / sel9 delete / sel36 fn4 / naked +0x90 getter) — resType-0 calibrate, then the oversized create-fail-after-insert ladder + post-fail leftover-id sweep. PANIC-POSSIBLE", "p120")
                         moreRow("P121. iogpu_close × merge REOPEN (new build vs the P040-ABI): create(sel6)/destroy(sel7) calibrate on THIS device, then the close-vs-merge race (destroy ping-pong × Metal blit commits, 10s). PANIC-POSSIBLE", "p121")
+                        moreRow("P125. kern.ipc REQUEST-TABLE race (CVE-2026-112507 port, Cinder27): 4-thread mach-namespace alloc/notify/teardown interleave, bounded 5s/6000; 27.2 ships the fix = pre-fix live on 26.5/27.0; refused-notifications = the stale-index candidate signal. PANIC-POSSIBLE", "p125")
+                        moreRow("P126. decmpfs KERNEL HEAP DISCLOSURE (CVE-2026-113910 port): crafted com.apple.decmpfs chunked-zlib xattr under-produces vs its chunk table; read-back scan for kernel pointers (>= 0xFFFFFFE000000000). READ-ONLY; hits = a kernel-content READ from a free app (the read prong receipt class)", "p126")
                         moreRow("P114. M2ScalerCSC sel-8 leak tap — SOLO leak law validation (p110 v2 pairing gate; {u64} 8B in, serializer records stride 0x7c, rec+0x18 raw KV; N=8 captures + KV table + honest KVA-disclosure class; READ-ONLY; no race)", "p114")
                         moreRow("P115. M2Scaler framework-path PEEK (the tpeek law): bounded CSC battery (IOSurface control + one VT 720p encode), diff the task's SEND ports after each op, fingerprint new ports for the M2Scaler sel-8 no-queue signature (2bf). A framework-opened UC owns a REAL queue — no QueueCreate grammar needed. READ-ONLY", "p115")
                         moreRow("P116. sandbox_extension NOFOLLOW TOCTOU (CVE-class file-read escape; deterministic, live on 23F77..24B119; port of speedyfriend433/sandbox_extension-TOCTOU-bug): control in-container read + 7 bounded out-of-container targets (/etc + prefs); tokens never logged; READ-ONLY", "p116")
@@ -487,6 +489,8 @@ struct ContentView: View {
             "p119": "p119_staleupl_log.txt",
             "p120": "p120_newresource_log.txt",
             "p121": "p121_closemerge_log.txt",
+            "p125": "p125_kernipcrace_log.txt",
+            "p126": "p126_decmpfsleak_log.txt",
             "cgshading": "p112_cgshading_log.txt"
         ]
 
@@ -1150,6 +1154,10 @@ struct ContentView: View {
                 result = P120NewResourceDoor.tap()
             case "p121", "closemerge":
                 result = P121IogpuCloseMerge.tap()
+            case "p125", "kernipc":
+                result = P125KernIpcRace.tap()
+            case "p126", "decmpfs":
+                result = P126DecmpfsLeak.tap()
             case "p099", "anegroom":
                 result = P099AnePrewireGroom.tap()
                 if result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
