@@ -1228,6 +1228,18 @@ static void t3_release(void *refCon, const void *baseAddress) {
     munmap((void *)(uintptr_t)baseAddress, T3_MAPSZ);
 }
 
+/* T3 v3: the v2 run gave "status=0 sample=NO" because the v2 session
+   create passed NULL as the OUTPUT callback (the sample went nowhere).
+   v3 = a real capture callback installed at session create. */
+typedef struct { CMSampleBufferRef sb; OSStatus st; } T3CapCtx;
+static void t3_capcb(void *refCon, void *srcRefCon, OSStatus s,
+                     VTEncodeInfoFlags f, CMSampleBufferRef sb) {
+    (void)srcRefCon; (void)f;
+    T3CapCtx *c = (T3CapCtx *)refCon;
+    c->st = s;
+    if (s == noErr && sb) { CFRetain(sb); c->sb = sb; }
+}
+
 + (NSString *)performP001T3Sentinel NS_SWIFT_NAME(performP001T3Sentinel()) {
     NSMutableString *out = [NSMutableString string];
     NSString *docs = NSSearchPathForDirectoriesInDomains(
@@ -1247,7 +1259,7 @@ static void t3_release(void *refCon, const void *baseAddress) {
     vt647Log(fd, out, @"(white) clusters; baselines ~4096 px each (gradient");
     vt647Log(fd, out, @"rows 0 and 255) -- report only >8192 per class.");
     vt647Log(fd, out, @"PANIC-POSSIBLE. One tap per force-quit. Not KRW.");
-    vt647Log(fd, out, @"START T3v2");
+    vt647Log(fd, out, @"START T3v3");
 
     size_t after = (size_t)T3_PAGES_AFTER * 4096;
     uint8_t *map = mmap(NULL, T3_BACKING + after, PROT_READ | PROT_WRITE,
@@ -1274,11 +1286,12 @@ static void t3_release(void *refCon, const void *baseAddress) {
         (id)kCVPixelBufferHeightKey: @(T3_H),
     };
     VTCompressionSessionRef enc = NULL;
+    T3CapCtx capCtx = { NULL, noErr };
     OSStatus st = VTCompressionSessionCreate(kCFAllocatorDefault, T3_W, T3_H,
                                              kCMVideoCodecType_H264,
                                              NULL,
                                              (__bridge CFDictionaryRef)srcAttrs,
-                                             NULL, NULL, NULL, &enc);
+                                             NULL, t3_capcb, &capCtx, &enc);
     vt647Log(fd, out, @"  encode session create=%d (0x%x)", (int)st, (unsigned)st);
     if (st != noErr || !enc) {
         munmap(map, T3_BACKING + after);
@@ -1306,23 +1319,16 @@ static void t3_release(void *refCon, const void *baseAddress) {
         return out;
     }
 
-    __block CMSampleBufferRef capSample = NULL;
-    __block OSStatus capStatus = noErr;
-    void (^cap)(void *, void *, OSStatus, VTEncodeInfoFlags, CMSampleBufferRef) =
-        ^(void *rc, void *sfc, OSStatus s, VTEncodeInfoFlags f, CMSampleBufferRef sb) {
-            (void)rc; (void)sfc; (void)f;
-            capStatus = s;
-            if (sb) { if (capSample) CFRelease(capSample); capSample = sb; CFRetain(capSample); }
-        };
     OSStatus es = VTCompressionSessionEncodeFrame(
-        enc, pb, CMTimeMake(0, 600), CMTimeMake(1, 600), NULL,
-        (__bridge void *)cap, NULL);
+        enc, pb, CMTimeMake(0, 600), CMTimeMake(1, 600), NULL, NULL, NULL);
     vt647Log(fd, out, @"  EncodeFrame=%d (0x%x)", (int)es, (unsigned)es);
     OSStatus cs = VTCompressionSessionCompleteFrames(enc, kCMTimeInvalid);
     vt647Log(fd, out, @"  CompleteFrames=%d (0x%x)", (int)cs, (unsigned)cs);
     [NSThread sleepForTimeInterval:0.5];   /* bounded settle for the async cb */
     CVPixelBufferRelease(pb);              /* t3_release = munmap; encoder settled */
 
+    CMSampleBufferRef capSample = capCtx.sb;
+    OSStatus capStatus = capCtx.st;
     if (es != noErr || capStatus != noErr || !capSample) {
         vt647Log(fd, out, @"  callback status=%d sample=%@ — honest stop (no sample to decode)",
                  (int)capStatus, capSample ? @"yes" : @"NO");
