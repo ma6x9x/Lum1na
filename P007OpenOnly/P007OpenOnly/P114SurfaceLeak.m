@@ -32,7 +32,7 @@
 #import "LabLocalTime.h"
 #import "LabRuntimeOffsets.h"
 
-#define P114_BUILD @"p114-surfaceleak-v1.11-sidbank"
+#define P114_BUILD @"p114-surfaceleak-v1.12-open8"
 
 #import <Foundation/Foundation.h>
 #import <CoreFoundation/CoreFoundation.h>
@@ -219,18 +219,28 @@ static void p114_hexdump(size_t maxn) {
         }
         (void)g_p114_objRelease(svc);
         g_p114_svc = svc;   /* recorded (log/reference only) */
-        /* v1.5 open-retry: the M2Scaler IOServiceOpen FLAPS per boot on the
-           fleet (0x10000003 on some boots from tap #1; 2026-10-27: 21:54 ok,
-           22:26/22:28 rejected same evening). Bounded 3 attempts, 500 ms
-           apart — catches the per-boot window without a retry storm. */
+        /* v1.12 open-retry (the 27.0 flake widened): the M2Scaler open flaps
+           MORE on 24A435 (2026-10-29: 0x10000003 x3 at 500ms = still closed).
+           The class = the IOKit open transient (driver start-in-flight / DEXT
+           busy), NOT an entitlement wall (the selector-level opens = fine).
+           Widen: 8 attempts, backoff 250ms -> 1s, RE-LOOKUP the service each
+           try (a start-in-flight service = the old svc handle stale). */
         kern_return_t krO = 0;
-        for (int o_try = 0; o_try < 3; o_try++) {
+        for (int o_try = 0; o_try < 8; o_try++) {
+            if (m && svc) (void)g_p114_objRelease(svc);
+            g_p114_svc = 0;
+            CFMutableDictionaryRef m2 = g_p114_match("AppleM2ScalerCSCDriver");
+            io_service_t s2 = m2 ? g_p114_getsvc(g_p114_main, m2) : 0;
+            m = m2; svc = s2;
+            if (!svc) { usleep(400000); continue; }
+            g_p114_svc = svc;
             krO = g_p114_open(svc, mach_task_self(), 0, &g_p114_conn);
-            (void)g_p114_objRelease(svc);   /* release AFTER each open (+1 ref) */
+            (void)g_p114_objRelease(svc);
             if (krO == KERN_SUCCESS && g_p114_conn) break;
             g_p114_conn = 0;
-            Lf(@"[*] IOServiceOpen try %d kr=0x%x (bounded retry, 500 ms)", o_try + 1, krO);
-            if (o_try < 2) (void)usleep(500000);
+            Lf(@"[*] IOServiceOpen try %d kr=0x%x (v1.12: 8x, re-lookup, backoff)",
+               o_try + 1, krO);
+            usleep((useconds_t)(250000 + o_try * 100000));   /* 250ms..950ms */
         }
         Lf(@"[*] IOServiceOpen AppleM2ScalerCSCDriver type=0 kr=0x%x conn=%d",
            krO, g_p114_conn);
