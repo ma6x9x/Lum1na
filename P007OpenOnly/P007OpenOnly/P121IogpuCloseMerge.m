@@ -40,7 +40,7 @@
 #import <stdlib.h>
 #import <unistd.h>
 
-#define P121_BUILD  @"p121-closemerge-v1"
+#define P121_BUILD  @"p121-closemerge-v2"
 #define P121_TIME   10.0
 
 typedef mach_port_t p_ioobject_t;
@@ -110,7 +110,10 @@ static void *p121_closer(void *u) {
             kern_return_t dr2 = gp_call(g_conn, g_dsel, &dsc, 1, NULL, 0, NULL, NULL, NULL, NULL);
             if (dr2 == 0) atomic_fetch_add(&g_extra_ok, 1);
         }
-        usleep(500);
+        /* v2: NO sleep — full-rate destroy→immediate-recreate = the
+         * freed-record reuse race (the v1 500us pace = 10k clean closes;
+         * the untested window = the async teardown/reuse at max rate).
+         * Bounded by the 10s wall clock. */
     }
     return NULL;
 }

