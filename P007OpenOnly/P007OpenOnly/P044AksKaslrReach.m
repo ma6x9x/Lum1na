@@ -2573,7 +2573,7 @@ static void *watch_worker(void *arg) {
                     g_aneModelOk = 0;
                     g_aneReqOk = 0;
                     g_guestHoldANE = 0;
-                    [out appendString:@"  [v66] ANE lane released (hold observed; process may suspend again)\n"];
+                    [out appendString:@"  [v76] ANE lane released (hold observed; process may suspend again)\n"];
                 }
                 p044_write_log(out);
                 return out;
@@ -2808,6 +2808,51 @@ static void *watch_worker(void *arg) {
                swallow the override again. ASCII only (em-dash mojibakes
                through the log channel). Log-only, no behavior change. */
             [out appendFormat:@"  [v61b] MODEL-FLAG MISS: Documents/p044_model.txt not found — default = addchain-191 B1 (in-bounds primitive test; no override needed). Override is OPTIONAL: write ONE bundled .mlmodelc NAME (e.g. XVRC27_254in_passthrough) into this exact path via SSH/Filza, force-quit, then tap again:\n    %@\n", flagPath];
+        }
+    }
+
+    /* v66 copyout-lane GUARDS (pre-fire; the round cannot silently misfire
+       or bind a recycled/alias sid):
+       1. copyout model selected => req_in FORCED to 127 (the model's fixed
+          127-in + 1-out = exactly 128 records = the consumer's ceiling;
+          anything else = a misfit request the consumer would reject — or
+          worse, a request whose grammar the copyout model does not define).
+          Loud, in-tap, honest.
+       2. FILL-PATTERN distinctness census printed BEFORE the fire (a
+          all-equal list = uniform pattern — the honest note, never silent).
+       3. target round-trip/alias = already gated at arm time (v57 SID-ALIAS
+          + v62 round-trip BROKEN drops) — nothing new to add there. */
+    {
+        NSString *mn = p044_model_name();
+        if ([mn rangeOfString:@"copyout"].location != NSNotFound) {
+            uint32_t ri = p044_req_in();
+            if (ri != 127u) {
+                [out appendFormat:@"  [v77] COPYOUT GUARD: req_in=%u != 127 for %@ — "
+                                  @"FORCED to 127 (the model's grammar; the misfit request would be a silent misfire)\n",
+                    ri, mn];
+                p044ReqInOverride = 127u;
+            } else {
+                [out appendString:@"  [v77] COPYOUT GUARD: req_in=127 matches the copyout grammar\n"];
+            }
+            {
+                int dup = 0, seenIdx = 0;
+                uint16_t seen[127];
+                memset(seen, 0, sizeof seen);
+                for (int i = 0; i < p044FillPatternCount && i < 127; i++) {
+                    int was = 0;
+                    for (int k = 0; k < seenIdx; k++)
+                        if (seen[k] == p044FillPattern[i]) { was = 1; break; }
+                    if (was) dup++;
+                    else if (seenIdx < 127) seen[seenIdx++] = p044FillPattern[i];
+                }
+                [out appendFormat:@"  [v77] FILL PATTERN distinct: %d distinct / %d slots (dup=%d)%s\n",
+                    seenIdx, p044FillPatternCount, dup,
+                    (p044FillPatternCount >= 2 && dup == 0)
+                        ? " — chosen per-slot pattern armed"
+                        : ((p044FillPatternCount <= 1)
+                           ? " — single/uniform tile (chosen UNIFORM output; the multi-byte lane off)"
+                           : " — duplicates present (the written pattern still matches tile-by-tile)"));
+            }
         }
     }
 
@@ -3729,7 +3774,7 @@ static void *watch_worker(void *arg) {
            owner is alive — teardown releases them, released surfaces
            may unbind from the shared registry). Lane objects are
            released at the OBSERVE tap instead. */
-        [out appendString:@"  [v66] ANE lane KEPT ALIVE with the hold (request/program still attached; released at the OBSERVE tap)\n"];
+        [out appendString:@"  [v76] ANE lane KEPT ALIVE with the hold (request/program still attached; released at the OBSERVE tap)\n"];
     } else {
         g_aneReq = nil;
         g_aneBReq = nil;
