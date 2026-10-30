@@ -149,6 +149,7 @@ struct ContentView: View {
                         moreRow("P130. THE FUSION (fence × p073 LANDING ENGINE): p127/p128/p129 falsified every reproducible pair; only p073 produces record LANDINGS (positioned 0x820 prefill, 254-in post-marshal, translation bar on 23H30). Thread A = fence churn racing thread B = [P073 tap] — the historical 0x984fcc8 condition reproduced. PANIC-POSSIBLE; one tap per force-quit", "p130")
                         moreRow("P131. QUICKLOOK DETOUR (calif chain stage 2): the 86950 trigger PDF through the quicklookd handoff (QLThumbnailGenerator) — the daemon receipts land in crash logs, not in-app. Stage control = benign PDF QL + in-process ImageIO replica. PANIC-POSSIBLE; one tap per force-quit", "p131")
                         moreRow("P132. THE CHAIN FRAME (anchor→fence→write→landing→gate): the receipts interlock, so the frame runs them in ONE session — aio anchor, fence churn live for the whole session (the 20:20 delayed-abort condition), p112 chosen-write receipt UNDER that churn, p073 landing flag-gated (p132_land.txt), then the honest kread32 gate + 45s late watcher. PANIC-POSSIBLE; one tap per force-quit", "p132")
+                        moreRow("P133. THE READ FRAME (p010 WHERE → p114 WHAT → echo-classified candidates → gate): the queue-object KVA names where; the sel-8 serializer pull is the content pull — rec 0 = our echo calibration row, later records = kernel-refilled = the relative-read receipt. Echo law separates provenance. READ-ONLY; one tap per force-quit", "p133")
                         moreRow("P114. M2ScalerCSC sel-8 leak tap — SOLO leak law validation (p110 v2 pairing gate; {u64} 8B in, serializer records stride 0x7c, rec+0x18 raw KV; N=8 captures + KV table + honest KVA-disclosure class; READ-ONLY; no race)", "p114")
                         moreRow("P115. M2Scaler framework-path PEEK (the tpeek law): bounded CSC battery (IOSurface control + one VT 720p encode), diff the task's SEND ports after each op, fingerprint new ports for the M2Scaler sel-8 no-queue signature (2bf). A framework-opened UC owns a REAL queue — no QueueCreate grammar needed. READ-ONLY", "p115")
                         moreRow("P116. sandbox_extension NOFOLLOW TOCTOU (CVE-class file-read escape; deterministic, live on 23F77..24B119; port of speedyfriend433/sandbox_extension-TOCTOU-bug): control in-container read + 7 bounded out-of-container targets (/etc + prefs); tokens never logged; READ-ONLY", "p116")
@@ -1187,6 +1188,8 @@ struct ContentView: View {
                 result = P131QuickLookDetour.tap()
             case "p132", "chainframe":
                 result = P132ChainFrame.tap()
+            case "p133", "readframe":
+                result = P133ReadFrame.tap()
             case "p099", "anegroom":
                 result = P099AnePrewireGroom.tap()
                 if result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
