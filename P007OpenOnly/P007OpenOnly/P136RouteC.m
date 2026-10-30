@@ -37,7 +37,7 @@
 #import <stdlib.h>
 #import <unistd.h>
 
-#define P136_BUILD   @"p136-routec-v1"
+#define P136_BUILD   @"p136-routec-v2-nowait"
 #define P136_SURF_W  64
 #define P136_SURF_H  64
 #define P136_RECYCLE 8
@@ -105,7 +105,13 @@ static void *p136_fencer(void *u) {
                sourceSize:MTLSizeMake(P136_SURF_W, P136_SURF_H, 1)
                toTexture:tex[1] destinationSlice:0 destinationLevel:0
                destinationOrigin:MTLOriginMake(0,0,0)];
-            [e endEncoding]; [cb commit]; [cb waitUntilCompleted];
+            /* v2: NO waitUntilCompleted — the x9 NQ NULL-ctx userland bug
+               fires on the SetDispatchQueue/completion path armed by
+               waited blits; every long fence session died to it (the
+               throttle). Commit-only + a bounded sleep keeps the fence
+               machinery hot without arming the completion dispatch. */
+            [e endEncoding]; [cb commit];
+            [NSThread sleepForTimeInterval:0.001];
             atomic_fetch_add(&ga_commits, 1);
             r++; atomic_store(&ga_rounds, r);
         }
