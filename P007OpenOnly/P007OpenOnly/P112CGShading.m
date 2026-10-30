@@ -37,7 +37,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P112_BUILD @"p112-cgshading-v1.2-chosenmap"
+#define P112_BUILD @"p112-cgshading-v1.3-geomknob"
 
 /* Oracle constants, pinned to the generator (analysis §3-4):
    BPCOORD 32 ∈ {1,2,4,8,12,16,24,32}; BPCOMP 8 ∈ {1,2,4,8,12,16}; VPR 2.
@@ -89,6 +89,14 @@ static void p112_close_fd(void) {
    above already names the sweep round and its expected pattern.             */
 
 static uint64_t g_p112_pat;   /* the in-flight sweep's chosen-double bits     */
+/* v1.3 GEOMETRY KNOB: the last-vertex raw coordinate (u32, decoded via
+   /Decode [0 200 ...]). The far(chosen) constant (2^-10-shaped, chosen-
+   and SKU-independent) falsified the function-output knob — the smashed
+   spill value comes from the MESH GEOMETRY (the last record's fields are
+   exactly what walks past the count, per the site law). far(gx) moving
+   with this knob = the real value-control law; far constant again =
+   the smashed slot is a different record field (which one = decode).  */
+static uint32_t g_p112_geom = 0x20000000u;
 
 /* ---- v1.1 bandit (LabBandit shared harness): the sweep ORDER arms --------
    Both arms sweep the same four chosen doubles — only the ORDER differs,
@@ -203,9 +211,10 @@ static NSMutableData *p112_build_pdf(int range_dim, double value) {
     static const uint8_t raw_hdr[5] = {0xe2, 0xe3, 0xcf, 0xd3, 0x0a};
 
     /* 2 rows x 2 vertices; t = 0 -> every function output equals C0 exactly.
-       Same raw coordinates as the generator (0x10000000 / 0x20000000).      */
-    static const uint32_t vx[4] = {0x10000000u, 0x20000000u, 0x10000000u, 0x20000000u};
-    static const uint32_t vy[4] = {0x10000000u, 0x10000000u, 0x20000000u, 0x20000000u};
+       v1.3: vertex[3] (the LAST vertex = the last record past the count,
+       the site-law walk) carries the geometry knob g_p112_geom.           */
+    uint32_t vx[4] = {0x10000000u, 0x20000000u, 0x10000000u, g_p112_geom};
+    uint32_t vy[4] = {0x10000000u, 0x10000000u, 0x20000000u, g_p112_geom};
     for (vi = 0; vi < 4; vi++) vlen += p112_pack_vertex(vstream + vlen, vx[vi], vy[vi], 0x00);
 
     /* the double knob: one %g per dim, decimal (CG parses it back exactly
@@ -438,6 +447,27 @@ static int p112_render(NSMutableData *pdf, NSString *tag) {
        ? [NSString stringWithFormat:@"SINGLE chosen=%.17g (one render this tap; "
          @"one far(chosen) row per force-quit)", chosen1]
        : @"LEGACY 4-double sweep");
+
+    /* v1.3 geometry knob: Documents/p112_geom.txt = HEX u32 applied to
+       vertex[3] (x and y). One row per force-quit; far(gx) is the map. */
+    {
+        NSString *gpath = [[NSString alloc] initWithContentsOfFile:
+            [[NSSearchPathForDirectoriesInDomains(NSDocumentDirectory,
+             NSUserDomainMask, YES) firstObject]
+             stringByAppendingPathComponent:@"p112_geom.txt"]
+                          encoding:NSUTF8StringEncoding error:nil];
+        NSString *t = [gpath stringByTrimmingCharactersInSet:
+            [NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if (t.length) {
+            uint32_t gx = (uint32_t)strtoul(t.UTF8String, NULL, 16);
+            if (gx) {
+                g_p112_geom = gx;
+                Lf(@"[v1.3] GEOMETRY KNOB: vertex[3] x=y=0x%08x (decode "
+                   @"/Decode [0 200] -> %.17g). far(gx) row this tap.",
+                   gx, 200.0 * (double)gx / 4294967296.0);
+            }
+        }
+    }
 
     /* ---- CONTROL: R = nc (in-bounds; passes the 27.2 gate on every build;
        same render path) — the p076 discriminator law: proves the harness
