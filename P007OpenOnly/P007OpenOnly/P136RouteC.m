@@ -37,11 +37,11 @@
 #import <stdlib.h>
 #import <unistd.h>
 
-#define P136_BUILD   @"p136-routec-v2-nowait"
+#define P136_BUILD   @"p136-routec-v3-tight"
 #define P136_SURF_W  64
 #define P136_SURF_H  64
-#define P136_RECYCLE 8
-#define P136_WATCH_S 30
+#define P136_RECYCLE 64
+#define P136_WATCH_S 10
 
 typedef void *(*IOSurfaceCreate_t)(CFDictionaryRef);
 typedef uint32_t (*IOSurfaceGetID_t)(void *);
@@ -111,7 +111,7 @@ static void *p136_fencer(void *u) {
                throttle). Commit-only + a bounded sleep keeps the fence
                machinery hot without arming the completion dispatch. */
             [e endEncoding]; [cb commit];
-            [NSThread sleepForTimeInterval:0.001];
+            [NSThread sleepForTimeInterval:0.005];
             atomic_fetch_add(&ga_commits, 1);
             r++; atomic_store(&ga_rounds, r);
         }
