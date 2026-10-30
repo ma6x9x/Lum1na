@@ -37,7 +37,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P112_BUILD @"p112-cgshading-v1.1-bandit"
+#define P112_BUILD @"p112-cgshading-v1.2-chosenmap"
 
 /* Oracle constants, pinned to the generator (analysis §3-4):
    BPCOORD 32 ∈ {1,2,4,8,12,16,24,32}; BPCOMP 8 ∈ {1,2,4,8,12,16}; VPR 2.
@@ -417,6 +417,28 @@ static int p112_render(NSMutableData *pdf, NSString *tag) {
     static const double sweepF77 [P112_SWEEP_MAX] = {2.0, 1.0, 4.0, 8.0};
     const double *sweep = (g_p112_arm == 1) ? sweepF77 : sweepFixed;
 
+    /* ---- v1.2 SINGLE-CHOSEN MODE: Documents/p112_chosen.txt = one decimal
+       double (e.g. "1.0"). Present -> CONTROL + ONE oracle render at that
+       chosen value only: one tap per force-quit builds one far(chosen)
+       data point per boot; after N boots the far table IS the value-
+       control map. Absent -> the legacy 4-double sweep (bounded). The
+       v1.1 receipts keep their attribution either way.                  */
+    double chosen1 = 0.0; BOOL singleMode = NO;
+    {
+        NSString *cpath = [[NSString alloc] initWithContentsOfFile:
+            [[NSSearchPathForDirectoriesInDomains(NSDocumentDirectory,
+             NSUserDomainMask, YES) firstObject]
+             stringByAppendingPathComponent:@"p112_chosen.txt"]
+                          encoding:NSUTF8StringEncoding error:nil];
+        NSString *t = [cpath stringByTrimmingCharactersInSet:
+            [NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if (t.length) { chosen1 = t.doubleValue; if (chosen1 > 0) singleMode = YES; }
+    }
+    Lf(@"[v1.2] mode: %@", singleMode
+       ? [NSString stringWithFormat:@"SINGLE chosen=%.17g (one render this tap; "
+         @"one far(chosen) row per force-quit)", chosen1]
+       : @"LEGACY 4-double sweep");
+
     /* ---- CONTROL: R = nc (in-bounds; passes the 27.2 gate on every build;
        same render path) — the p076 discriminator law: proves the harness
        first, so any oracle fault is attributable to the R != nc OOB.       */
@@ -444,7 +466,34 @@ static int p112_render(NSMutableData *pdf, NSString *tag) {
       @"-> CGContextDrawPDFPage path works — oracle faults below are attributable to the "
       @"R=136 != nc=1 OOB, not the harness.");
 
-    /* ---- THE VALUE-CONTROL SWEEP: R=136, four chosen doubles ---- */
+    /* ---- THE VALUE-CONTROL SWEEP: R=136 ---- */
+    if (singleMode) {
+        double v = chosen1;
+        uint64_t pat;
+        memcpy(&pat, &v, sizeof(pat));
+        g_p112_pat = pat;
+
+        NSMutableData *pdf = p112_build_pdf(P112_RANGE_DIM, v);
+        Lf(@"[v1.2 row] ORACLE built (%lu bytes): /Range R=%d vs nc=%d, "
+           @"/C0=/C1=%.17g (chosen=%.17g, bits 0x%016llx)",
+           (unsigned long)[pdf length], P112_RANGE_DIM, P112_NC, v, v,
+           (unsigned long long)pat);
+        Lf(@"[v1.2 row] IN FLIGHT — rendering chosen=%.17g (bits 0x%016llx). "
+           @"IF THIS SESSION ENDS ON THIS LINE: outcome (b) far=0x%016llx+small "
+           @"offset — the far(chosen) MAP ROW for this value. Crash = evidence.",
+           v, (unsigned long long)pat, (unsigned long long)pat);
+        {
+            char infl[128];
+            snprintf(infl, sizeof infl, "v1.2 row IN FLIGHT chosen=%.17g bits=0x%016llx",
+                     v, (unsigned long long)pat);
+            LabBanditNote("p112", infl);
+        }
+        p112_render(pdf, [NSString stringWithFormat:@"oracle-%.17g", v]);
+        Lf(@"[v1.2 row] OUTCOME (a) SURVIVED: chosen=%.17g did not fault this boot "
+           @"(on a gated build this is EXPECTED; no success claim).", v);
+        LabBanditRecord("p112", g_p112_arm, "survived");
+        pdf = nil;
+    } else {
     int k;
     for (k = 0; k < P112_SWEEP_MAX; k++) {
         double v = sweep[k];
@@ -497,6 +546,7 @@ static int p112_render(NSMutableData *pdf, NSString *tag) {
         }
         pdf = nil;
     }
+    }   /* end legacy-sweep branch */
 
     /* ---- verdict (honest) ---- */
     L(@"=== VERDICT (honest) ===");

