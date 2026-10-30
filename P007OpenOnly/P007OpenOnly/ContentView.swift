@@ -153,6 +153,7 @@ struct ContentView: View {
                         moreRow("P134 ROUTE A. ENGINE-ARMED K2K FILL DISCLOSURE: sel-6's ARMED branch (UC+0x154) writes kernel results INTO the caller's 0xfa8 struct (count +0, record ptrs +0x608..+0x614). VT encode battery BETWEEN two row-6 sends on the SAME conn; KVA-CAND scan on every response. PANIC-POSSIBLE; one tap", "p134")
                         moreRow("P135 ROUTE B. TAMING THE NQ NULL-CTX WINDOW (our ×5 bug): groom the freed-ctx zone with 0x42-class pattern, then the p027 trap ×2 — far 0x10 again = window NULL (law); far in 0x42-class = THE NULL TAMED = kernel read at a chosen slot. PANIC-POSSIBLE BY DESIGN; one tap", "p135")
                         moreRow("P136 ROUTE C. FENCE CHURN × STALE-GVA RECLAIM KICK: the b1b2 engine (map → unmap+spray → latched kick → verify reclaim) with the p127 fence thread LIVE all session — the aimable-write state; phase4 non-own reclaim = the candidate. PANIC-POSSIBLE; one tap", "p136")
+                        moreRow("P137 ROUTE C-LATCH. THE REAL LATCHED KICK: held-blit UAF by the b1b2 laws — encode 0xBB fill → HOLD commit → drop the buffer (pages live by the noop-deallocator law) → 0xCC spray → COMMIT the held command → verdict by where 0xBB lands (our old pages = stale GVA survived; spray = reclaim won = AIMABLE-WRITE STATE). PANIC-POSSIBLE; one tap", "p137")
                         moreRow("P114. M2ScalerCSC sel-8 leak tap — SOLO leak law validation (p110 v2 pairing gate; {u64} 8B in, serializer records stride 0x7c, rec+0x18 raw KV; N=8 captures + KV table + honest KVA-disclosure class; READ-ONLY; no race)", "p114")
                         moreRow("P115. M2Scaler framework-path PEEK (the tpeek law): bounded CSC battery (IOSurface control + one VT 720p encode), diff the task's SEND ports after each op, fingerprint new ports for the M2Scaler sel-8 no-queue signature (2bf). A framework-opened UC owns a REAL queue — no QueueCreate grammar needed. READ-ONLY", "p115")
                         moreRow("P116. sandbox_extension NOFOLLOW TOCTOU (CVE-class file-read escape; deterministic, live on 23F77..24B119; port of speedyfriend433/sandbox_extension-TOCTOU-bug): control in-container read + 7 bounded out-of-container targets (/etc + prefs); tokens never logged; READ-ONLY", "p116")
@@ -1199,6 +1200,8 @@ struct ContentView: View {
                 result = P135RouteB.tap()
             case "p136", "routec":
                 result = P136RouteC.tap()
+            case "p137", "latch":
+                result = P137RouteCLatch.tap()
             case "p099", "anegroom":
                 result = P099AnePrewireGroom.tap()
                 if result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
