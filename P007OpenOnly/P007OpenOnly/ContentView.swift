@@ -147,6 +147,7 @@ struct ContentView: View {
                         moreRow("P128. CO-DRIVER RACE (fence × queue): p127 proved fence churn ALONE is clean (3×~21k commits); the 2/2 aborts had allocator churn concurrent — thread A = IOSurface Metal blit churn + surface recycle, thread B = full-rate IOGPU QueueCreate/destroy ping-pong, 12s bounded race. PANIC-POSSIBLE; one tap per force-quit", "p128")
                         moreRow("P129. LAST CO-DRIVER CELL (fence × FILL): thread A = p127 fence churn racing thread B = the REAL P044 fill battery (mlmodel compile + ember rounds, serialized). The 2/2 fence-append aborts carried fill-staging sids in x5 — this pair is what was actually live. PANIC-POSSIBLE; one tap per force-quit", "p129")
                         moreRow("P130. THE FUSION (fence × p073 LANDING ENGINE): p127/p128/p129 falsified every reproducible pair; only p073 produces record LANDINGS (positioned 0x820 prefill, 254-in post-marshal, translation bar on 23H30). Thread A = fence churn racing thread B = [P073 tap] — the historical 0x984fcc8 condition reproduced. PANIC-POSSIBLE; one tap per force-quit", "p130")
+                        moreRow("P131. QUICKLOOK DETOUR (calif chain stage 2): the 86950 trigger PDF through the quicklookd handoff (QLThumbnailGenerator) — the daemon receipts land in crash logs, not in-app. Stage control = benign PDF QL + in-process ImageIO replica. PANIC-POSSIBLE; one tap per force-quit", "p131")
                         moreRow("P114. M2ScalerCSC sel-8 leak tap — SOLO leak law validation (p110 v2 pairing gate; {u64} 8B in, serializer records stride 0x7c, rec+0x18 raw KV; N=8 captures + KV table + honest KVA-disclosure class; READ-ONLY; no race)", "p114")
                         moreRow("P115. M2Scaler framework-path PEEK (the tpeek law): bounded CSC battery (IOSurface control + one VT 720p encode), diff the task's SEND ports after each op, fingerprint new ports for the M2Scaler sel-8 no-queue signature (2bf). A framework-opened UC owns a REAL queue — no QueueCreate grammar needed. READ-ONLY", "p115")
                         moreRow("P116. sandbox_extension NOFOLLOW TOCTOU (CVE-class file-read escape; deterministic, live on 23F77..24B119; port of speedyfriend433/sandbox_extension-TOCTOU-bug): control in-container read + 7 bounded out-of-container targets (/etc + prefs); tokens never logged; READ-ONLY", "p116")
@@ -1181,6 +1182,8 @@ struct ContentView: View {
                 result = P129FenceFill.tap()
             case "p130", "fusesecond":
                 result = P130FenceSecondTable.tap()
+            case "p131", "qldetour":
+                result = P131QuickLookDetour.tap()
             case "p099", "anegroom":
                 result = P099AnePrewireGroom.tap()
                 if result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
