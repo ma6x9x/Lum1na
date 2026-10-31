@@ -168,3 +168,61 @@ no frida) = the remaining path for tonight's object read.
 - Method for the next scouting round: for each candidate, decode the
   UC sMethods table + any entitlement gates in the 23F77 kernelcache
   (the 26.5-relevant side), and check the p018-style root-UC lane.
+
+
+## THE AKS-ANALYTICS KEXT DECODE + the fleet entitlement-gate map (23F77)
+
+User opened AKSAnalytics (23F77 kext) in the Ghidra program. Decoded:
+
+- AKSAnalytics = the **DataProtection analytics kext** (not ANE): DPSerializedEvent,
+  kauth-vnode hooks, dataprotect policy config; service class = `AKSKernelServices`,
+  UC = `AKSAnalyticsUserClient` (gate `com.apple.keystore.analytics` — VOID for
+  free-profile, p117 law).
+- `sendDataToUser` = the dataQueue CONSUMER path ([self+0xe8] dataQueue,
+  [+0xe0] client conn, [+0xf0] bit0 enable flag; send = vt+0x90 has-space gate)
+  — bounded, no OOB shape.
+- `dataprotect_internal_entitlements` = a PEBL sysctl config flag (0x8080b20
+  reads five dataprotect_policy_* boot/config switches) — a kernel-side config,
+  not a user hook.
+
+### THE ENTITLEMENT-GATE CENSUS (new fleet law, 23F77 kernelcache-wide)
+Pattern: every gate-carrying UC carries the string `IOUserClientEntitlements`
+followed by its key list — **20 UCs total on 23F77**:
+  IOHDIX(root-removable?), AKSAnalytics(keystore.analytics),
+  AppleARMSPIDevice(spi.device.user-access), VT-hw-video-decoder(videotoolbox.
+  hardwarevideodecoder), AFKSharedMemory(afk.shmem-user), AppleGPIO
+  (applegpio-access), AHS.Power(ahs.poweruserclientaccess), JPEGDriver(2 keys),
+  ApplePMGR(private.ApplePMGRUserClient.access), AppleSMC-ACAM, GNSS-SPU(2),
+  GasGauge(private.gasgauge-update), AppleSmartIO2, **Stockholm/hammerfest
+  (nfc.disableentitlements flag + com.apple.stockholm.kext.entitlement +
+  com.apple.hammerfest.kext.entitlement)**, IOPort(iokit.IOPortFamily),
+  PSVR2-FastPath, HID-fastpath(2), **IOSurfaceRootUserClient = only 4 keys
+  (iosurfaceinfo / private.gpu-restricted / developer.gpu-restricted /
+  IOSurface.protected-access)**, TimeSync(timesync.clocksync).
+
+### The laws this census pins
+- **H11ANEIn's row carries NO key after IOUserClientEntitlements** = the ANE
+  user client has NO gate key in this mechanism = statically explains why the
+  ANE lanes open at type 1/4 on every device (p109 precedent). The ANE family
+  = the no-wall lane; the 2c7/2e2 walls we see = OTHER mechanisms (procIdx, program
+  policy).
+- IOSurfaceRootUserClient's 4 keys = info/protected-access gates, NOT an open
+  gate (p018 opened fine) — surface lanes stay open.
+- Everything else on the map = VOID for our signature (keys stripped).
+  The kext-scouting grid = decode each of the 20 rows' KEY-VOID status first;
+  only key-void or non-gated kexts remain as primitive candidates.
+
+
+### 21-D50 cross-train census (the mini's cache, same scan)
+21-D50 rows = **13** (vs 23F77's **20**). ABSENT on 21-D50: AKSAnalytics,
+AppleGPIO, ApplePMGR, PSVR2-fastpath, Stockholm/hammerfest, AFK-renamed
+(afk.user on 21-D50 vs afk.shmem-user on 23F77), quadSPI (SPI variant
+naming changed), HID-fastpath renamed (FastPathHasEntitlement only).
+PRESENT on both: VT-hw-video-decoder (SAME key both trains), JPEGDriver,
+GasGauge, SmartIO2, IOPort, TimeSync, SPU.
+
+LAW (cross-train): the VT-hw-decoder key = train-stable; Stockholm's
+gates + PMGR's gate + GPIO's gate = POST-17.3 additions = **newer walls**.
+ANE = key-void on BOTH trains (the no-gate law carries). The primitive-
+candidate grid = the key-void set + the non-gated UC space, verified per
+train first (the 21-D50-first proof rule — user's directive).
