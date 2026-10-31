@@ -155,6 +155,7 @@ struct ContentView: View {
                         moreRow("P136 ROUTE C. FENCE CHURN × STALE-GVA RECLAIM KICK: the b1b2 engine (map → unmap+spray → latched kick → verify reclaim) with the p127 fence thread LIVE all session — the aimable-write state; phase4 non-own reclaim = the candidate. PANIC-POSSIBLE; one tap", "p136")
                         moreRow("P137 ROUTE C-LATCH. THE REAL LATCHED KICK: held-blit UAF by the b1b2 laws — encode 0xBB fill → HOLD commit → drop the buffer (pages live by the noop-deallocator law) → 0xCC spray → COMMIT the held command → verdict by where 0xBB lands (our old pages = stale GVA survived; spray = reclaim won = AIMABLE-WRITE STATE). PANIC-POSSIBLE; one tap", "p137")
                         moreRow("P138 ROUTE D. IOMD dmaref RETAIN-WRAP RUNNER (corpus-complete, zero entitlement walls): IOSurfaceCreateMachPort arm (P069-proven hop) → op-channel census (the w1=op<<24|subsel dispatcher law) → the op-2 ORACLE ([md+0x98] kernel-counter readback) → the op-3 retain ladder to the u16 2^16 WRAP → the op-6 receipt. PANIC-POSSIBLE (the underflow panic = the named receipt); one tap", "p138")
+                        moreRow("P139 BOOT INTEL COLLATOR (the Learner layer, one tap): the aio KVA family (+0xC0 law) + the console-sec leak + the p010 cursor+band + the ipc rows + the IOMD op-2 oracle — one dossier (p139_boot_intel.txt) with the slide-TRIANGULATION checks. Feeds every lane's boot-1 aim; never a receipt. READ-ONLY; one tap", "p139")
                         moreRow("P114. M2ScalerCSC sel-8 leak tap — SOLO leak law validation (p110 v2 pairing gate; {u64} 8B in, serializer records stride 0x7c, rec+0x18 raw KV; N=8 captures + KV table + honest KVA-disclosure class; READ-ONLY; no race)", "p114")
                         moreRow("P115. M2Scaler framework-path PEEK (the tpeek law): bounded CSC battery (IOSurface control + one VT 720p encode), diff the task's SEND ports after each op, fingerprint new ports for the M2Scaler sel-8 no-queue signature (2bf). A framework-opened UC owns a REAL queue — no QueueCreate grammar needed. READ-ONLY", "p115")
                         moreRow("P116. sandbox_extension NOFOLLOW TOCTOU (CVE-class file-read escape; deterministic, live on 23F77..24B119; port of speedyfriend433/sandbox_extension-TOCTOU-bug): control in-container read + 7 bounded out-of-container targets (/etc + prefs); tokens never logged; READ-ONLY", "p116")
@@ -1205,6 +1206,8 @@ struct ContentView: View {
                 result = P137RouteCLatch.tap()
             case "p138", "routed":
                 result = P138RouteD.tap()
+            case "p139", "bootintel":
+                result = P139BootIntel.tap()
             case "p099", "anegroom":
                 result = P099AnePrewireGroom.tap()
                 if result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
