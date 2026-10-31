@@ -90,3 +90,81 @@ Nothing tonight flips `hasKread` on the hunt-12 (23F77). The mini's
 receipt is its own device's gate, landed only after the lane is live. All
 mini numbers stay twin-CLASS/FIELD; `21-D50 = per-segment decode law`
 (memory) and VAs never paste.
+
+## THE ROOT-LANE RUN (frida + ssh, 2026-10-31 night) — instrument stack live
+
+Mac-side stack now proven: `iproxy <macport> 22` + keyless `ssh root@localhost
+-p <macport>`; frida 17.25 on BOTH ends; the app launches via frida
+`dev.spawn("ma6x9x.P007OpenOnly.V467U8LP46")`. Scripting laws (paid for):
+frida 17 = `Module.getGlobalExportByName` static is GONE from... (`sym(n)`
+shim: GlobalExportByName first, getExportByName(null) fallback);
+`mach_task_self` is a MACRO — resolve `mach_task_self_` and readU32;
+`kCFAllocatorDefault`/other const-pointers must READ their value
+(`.readPointer()`), only the callbacks struct passes as address;
+SecTaskCopyValueForEntitlement takes CFStringRef (never char*).
+
+### Laws landed tonight
+1. **THE ROOT RECEIPT**: libkrw-dopamine from a frida-spawned uid-0
+   process — `krw_initializer rv=0`, `kbase=0xfffffff016238000`
+   (KASLR re-slid from the 10-23 FKT run's 0xfffffff023060000),
+   **kread32(kbase)=0xfeedfacf PASS**. The mini's kernel-receipt
+   instrument = reproducible from the Mac tonight.
+2. **uid 0 DOES NOT lift the entitlement stripping** — the frida-root
+   process echoes p117 IDENTICALLY (all NULL; `platform-application`
+   returns typeid-21 OTHER, not NULL — a present-but-unmapped shape to
+   decode; the app's in-app p117 run prints the same NULL rows).
+   Capability on this rig = the TRUST CACHE / CS identity of the SPawner,
+   not the uid, not the host. The p117 verdict extends: our app's
+   entitlements would stay stripped even if the device were jb'd (the
+   hunt-12 question answered in miniature).
+3. **libkrw loads + initializes INSIDE the free-signed app** (rv=0 — the
+   dlopen survives the sandbox) but kbase()/kread return nothing: the
+   jbserver mach-lookup dies under the app's sandbox profile. Honest
+   wall NAMED (mach-lookup class), not yet broken.
+4. `IOSurfaceCreate` works in-app under frida (surface ref back);
+   `IOSurfaceCreateMachPort` access-violates in the frida-spawned context
+   (AV tail 0x...f001300 identical across 3 runs = one fixed field read,
+   isolatable). Normal-launch comparison (user opens app, attach frida,
+   tap p138/p137) = the pending isolation.
+
+### Next (ordered)
+- User opens the app normally; attach frida + user taps p138 → compare
+  vs the frida-spawned AV (isolates the spawn-suspend law).
+- The p140 IPA tap on the mini (own receipt row + object read WITHOUT
+  frida).
+- If IOSurfaceCreateMachPort AV persists in-app via frida: the locator
+  fallback = kobject on ANY port class the app holds (p090's ipc rows +
+  IOConnect ports) — the FIELD# law needs a locator per class, not per
+  object.
+- LightSword: same-boot og-poc.c vs calib-v10 A/B (the gencnt law
+  +0x110 caveat; the 0x5800 budget).
+
+
+### The IOSurfaceRoot rows (user's nudge — tested from the ROOT host)
+IOKit route from root, IOSurfaceRoot service = FOUND (class decoded
+`IOSurfaceRoot`):
+- `IOServiceOpen` type 0 → **kr=0xe00002e2 (EXCLUSIVE ACCESS)** — the
+  root UC type-0 slot is exclusively held on this boot (the graphics
+  server's client); NO in-app comparison yet on the mini.
+- types 1/2 → 0xe00002c7 (resource conflict).
+- Framework `IOSurfaceCreate` from root = 0x0 (the framework's client
+  setup does not complete in the CLI context).
+Conclusion so far: the ROOT host cannot open the surface lanes itself;
+the p138 census therefore still needs the APP host for creation +
+ROOT lane only for reads. p140's in-app tap (locator + lane reads,
+no frida) = the remaining path for tonight's object read.
+
+### The future-version kext scout (first pass, Mac-side)
+- `kext_inventory_23F77.txt` = 218 load rows; 24A437 = 301 fileset
+  entries. Smallest 25 ranked (relative order). Candidates that sit in
+  BOTH inventories and are tiny: **AKSAnalytics** (the ANE family's
+  sibling — our existing lane family), AOPTouchKext, ASIOKit, AUC,
+  AppleA7IOP, AppleALSColorSensor, AppleAOPAudio, AppleARMIISAudio,
+  AppleARMPMU, AppleARMPlatform, AppleARMWatchdogTimer, AppleAVD,
+  AppleAVE2, AppleActuatorDriver, AppleAstrisGpioProbe (new class,
+  GPIO-probe-shaped), AGXFirmwareKextRTBuddy64.
+- New on 24A437 only (G18P generation = 17-device): AOPaudio2,
+  AppleAOP2, AFKHIDTBDevice, AGXG18P.
+- Method for the next scouting round: for each candidate, decode the
+  UC sMethods table + any entitlement gates in the 23F77 kernelcache
+  (the 26.5-relevant side), and check the p018-style root-UC lane.
