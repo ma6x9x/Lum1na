@@ -834,3 +834,35 @@ the corrections). The remaining = TWO naming decodes (the mask-intake
    link fields = sibling pointers).
 6. **physRW conversion = NO** (honest): no path to physmap/kpages.
 7. The panic-caller kernel frame = 0xB4351F8-class ("panic caller" row).
+
+## AGENT-#1's REPORT — THE MASK-INTAKE KNOB NAMED (24A435)
+**The userland knob for [ctx+0x110] = AppleAVE2UserClient SELECTOR 2
+("IO_Config")**: structIn = EXACTLY 0x38 bytes, scalarIn/Out = 0,
+structOut = 0x20; the mask = the RAW u64 at structIn+0x30; Config
+(0x88d3b90) stores it UNVALIDATED into [session+0x110]
+(stp/str @0x88d4008-10; only size checks; [0x118..0x140] zeroed).
+NO VT property reaches this intake (the property-parse hypothesis
+REFUTED — the temporal strings belong to the GOP parse only); NO
+entitlement/policy strings anywhere in the row-fn region.
+- **The TRUE sMethods (the 16-row pin's SHAPE corrected)**: 16 rows
+  stride 0x28 at __DATA_CONST 0x7f902d0 = {method, scalarIn@+8,
+  structIn@+0xc, structOut@+0x14}: row0 IO_Open(0x88d24e4, in 0x768/out
+  0x38), row1 IO_Close, **row2 IO_Config(0x88d3804, 0x38/0x20)**, row3
+  IO_Prepare(0x88d40c4, 0x12c08/0x20!), row4 IO_Start(0x12c18/0x150),
+  row5 IO_Stop, row6 IO_Process, row7 IO_Complete, row8 IO_Flush,
+  row9 IO_Reset, row10 IO_Print, row11 IO_PowerOn, row12 IO_PowerOff,
+  row13 IO_StartUp, row14 IO_ShutDown (names from the "%s::%s" xrefs;
+  the t8150.ave2.uc_methods pin = a bridge-only spelling).
+- **The consumer = the ENCODE LOOP's map step**: per-surface mapper
+  0x87734f0 calls chk 0x8879dc8 with mask = **0xffffffffffffffff** and
+  [session+0x110] AND-masked in → the object-list walker 0x8777d2c from
+  the 8-site encode-map family (0x880b6ec..0x880c278) = the mask =
+  consumed whenever the session maps surfaces (IO_Prepare/Start/Process
+  rows → CreateSurface CRSR1/CRSR2 → the configure chain's rows).
+- chk's gates: selIdx<=3, "surface is not created", [ctx+0x119] bit2,
+  the 2-bit-per-index rights read at ctx+0x120; the mapper intake
+  itself = ungated (the write-through: *(u64*)(*(u64*)(syndrome+
+  slot*8)+0x20) |= bit).
+- Also: the state machine's gates on IO_Config = "IO_Open first"
+  (m_pcIODrv != null && the notification port == 0).
+- AVE2 fileset: LC_FILESET_ENTRY idx 35; the fixup law re-proved.
