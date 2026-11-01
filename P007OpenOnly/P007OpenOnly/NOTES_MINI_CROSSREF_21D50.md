@@ -388,3 +388,39 @@ NEXT: the failing log = the 12's cs2_krw_log.txt — the pull HUNG
 (device off USB). Replug the 12, pull, and match the loop lines against
 the four law candidates above (marker law / exec-name law / window
 law / offsets — offsets already cleared).
+
+
+## The hunt-12's cs2 verbatim run (23F77, 2026-11-01 00:38) — FULLY DECODED, ret=5 explained
+
+This run answers the ret=5 differential. The failure is NOT the ret-5's
+"pe" fallback: everything upstream of it = one named law.
+
+Rows:
+- The spray + gencnt law FINE on 26.5: gencnt[0..2] = 0x8/0xa/0xc
+  (small sequential) ✓; budget 0x5800 ✓; pcb id range 0x8..0xb006 ✓.
+  -> the PIDFILEPORTSOCKETINFO blob+0x110 gencnt law = train-stable.
+- **THE OOB WINDOW: `oob try0: w=4096 errno=60 (win-cap=0)` ×many,
+  `oob_read kr=0x5` ×6, scan exhausted "oob_read kr-fails=65528"** —
+  the fileport-backed vnode window = ZERO contiguous capacity on 26.5.
+- The fallback kernel_base walk = exhausted after 0x4001 pages (the
+  early-kread probe = nothing readable — expected with no window).
+- `cs2_pe failed: (os/kern) failure (5)` = the ret-5 = just the final
+  echo of the empty window.
+
+LAW (the whole differential in one line): **the lab's own hop-1 law —
+"cluster_*_contig EINVAL since 26.1" — IS the cs2-on-23F77 failure**: the
+contiguous fileport window died on 26.x-era trains, the pcb scan reads
+an empty window, and every stage after (scan / corrupt / kernel_base
+walk / pe) cascades from it. The 21-D50 (17.3) still has the contig
+window = the whole engine works there. NOT a new bug, NOT wrong offsets,
+NOT wrong gencnt — the contig hop = the single point.
+
+The fix paths (per the skill's existing plan):
+- the Rocket (Relaxin) class: the SPTM-era PTE alias window in MIT code
+  = the replacement window; on 27.x ports the Rocket plan says 15 gfx
+  keys + 10 symbols from a fresh import; on 23F77 the same class =
+  the PTE-alias window decode.
+- OR a non-contig OOB window law (the fileport read page-walk =
+  decode whether adjacency without contiguity is obtainable).
+- The mini-first proof rule = SATISFIED for this class (21-D50 = the
+  whole engine verbatim-working = the proof the algorithm is sound).
