@@ -733,3 +733,40 @@ MIE-dependent; the chain composition note stays in the ledger.
 - B0nus: the kext's assert strings name every s_ handler (s_new_resource
   0x79944a6, s_submit_command_buffers 0x799461d, ...) — the row-by-row
   sel naming = derivable (the fnnames script pattern, /tmp/gpu120/).
+
+## THE AVE2 DECODE REPORT (agent #2, 24A435 cache) — THE MECHANISM DECODED
+Corrections (honest):
+- Our pinned (pc,lr) pair = FAKE-NEIGHBOR class (the slide-pair law!): the
+  pc row = `mov w0,#0xc4` (non-faulting); the panic fn = 0x8722d30 (the
+  slice-header syntax-writer wrapper; its `str w8,[x22]` at +0x597c = the
+  far==param_6 row); the 0x88485dc = a LOG-CATEGORY gate (0xc4 = category
+  byte, not a size!). The far-law `0x59+(N-163)<<32` = a PROJECTION
+  (0x404F appears nowhere in the kext) — the RAW truth = far=0x59, x19=1
+  at N=16463.
+**The COUNT-SCALED FILL = the DPB cluster — fully decoded:**
+- ManageDPBBuffer 0x8738514: pool base = ctx+0x2e0, stride 0x80 (LSL#7),
+  index = the RAW count field [ctx+0xb64], **NO capacity check**; the
+  0x2bad/0xc8a2 csel pairs = pointer-tag idioms, NOT bounds checks.
+- The DPB-pool INIT: `ldr w8,[ctx,#0xb60]` (count N from [cfg+0x55c]);
+  loop i=0..N: entry = pool + i*0x80, ~16 stores/entry + the double
+  linking. Bound = the raw config count ONLY.
+- **THE OOB CLASS = THE SIZE/FILL MISMATCH**: if the pool was SIZED from
+  the clamped count (our readback=1 row!) but FILLED by the raw N =>
+  the destination is unbounded relative to the allocation = the OOB
+  write class — THE MECHANISM OF OUR REPRO, decoded at instruction level.
+- far=0x59 read: the DPB entry store `*(u8*)(entry+0x5a) = *(frameSettings
+  +0x7572)` gives far = entry+0x5a = 0x59 when entry = the -1-sentinel
+  slot ✓ (the fn's own -1 law: IndexLongTermReferenceFrameToBeReplaced).
+- The property: sSessionCfg.sEnc.sAlgCfg.sGOP.iNumOfTemporalLayer; the
+  ONLY existing check ("0<=&&N-1<=7", assert 0x72ffd47) lives in the
+  DecideNumOfTemporalLayer path — THE FILL PATH HAS NO SUCH CHECK.
+**The second cluster = the WRITE-THROUGH-POINTER (the aimable candidate):**
+- The unvalidated intake: [ctx+0x110] = a raw u64 arg (no range/mask).
+- The mapper 0x87a4b4c: iterates ALL 64 mask bits; slot = raw
+  array[bit]; addresses ctx+0x20+slot*8 / syndrome+slot*8 (id*8, no
+  size check); FINALLY the write: `*(u64*)(*(u64*)(syndrome+slot*8)
+  +0x20) |= bit` — an indirect write through an OOB-loadable pointer,
+  no bound beyond the ctx+0x110 AND anywhere. ESR/far fits.
+**AIMABILITY = YES on both knobs**: (primary) the count = our repro
+path; (secondary) the raw u64 mask → the mapper's indirect write —
+which VT property feeds it = the next selector-arg naming hop.
