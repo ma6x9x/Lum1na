@@ -27,17 +27,19 @@
 
 #define P141_BUILD @"p141-usbstockholm-v1"
 
-typedef io_object_t p_ioservice_t; typedef io_object_t p_iosvc_t;
-typedef io_object_t p_iosvc_m;
+/* p138 law: all ports via mach_port_t; io_object_t is NOT re-declared
+   (the modules build requires it imported, not re-typed). */
+typedef mach_port_t p_ioservice_t; typedef mach_port_t p_iosvc_t;
+typedef mach_port_t p_iosvc_m;
 typedef CFMutableDictionaryRef (*IOServiceMatching_t)(const char *);
 typedef p_iosvc_t (*GetSVC_t)(mach_port_t, CFDictionaryRef);
-typedef kern_return_t (*IOOpen_t)(p_iosvc_m, task_port_t, uint32_t, p_iosvc_m *);
+typedef kern_return_t (*IOOpen_t)(p_iosvc_m, mach_port_t, uint32_t, p_iosvc_m *);
 typedef IOReturn (*IOClose_t)(p_iosvc_m);
 typedef void (*IORel_t)(mach_port_t);
 typedef kern_return_t (*IOConnectCallMethod_t)(
     mach_port_t, uint32_t, const uint64_t *, uint32_t, const void *, size_t,
     uint64_t *, uint32_t *, void *, size_t *);
-typedef kern_return_t (*IOGetClass_t)(p_iosvc_m, io_name_t);
+typedef kern_return_t (*IOGetClass_t)(p_iosvc_m, char *);
 
 static NSMutableString *g_buf; static int g_fd = -1;
 static void L(NSString *s) {
@@ -107,7 +109,7 @@ static void p141_census(IOConnectCallMethod_t call, mach_port_t conn) {
         Lf(@"=== LANE %d: match '%s' ===", li + 1, lanes[li]);
         CFMutableDictionaryRef md = pM(lanes[li]);
         if (!md) { L(@"  NO match dictionary"); continue; }
-        p_ioservice_t svc = pG(kIOMasterPortDefault, md);
+        p_ioservice_t svc = pG(0 /* main port */, md);
         if (!svc || svc >= 0xffffff00) {
             L(@"  NO SERVICE visible from this app (the in-app reachability row)"); continue;
         }
@@ -117,7 +119,7 @@ static void p141_census(IOConnectCallMethod_t call, mach_port_t conn) {
            ckr == 0 ? nm : "?", (unsigned)ckr);
         for (uint32_t t = 0; t < 2; t++) {
             p_ioservice_t conn = 0;
-            kern_return_t okr = pO(svc, mach_task_self(), t, &conn);
+            kern_return_t okr = pO(svc, mach_task_self_, t, &conn);
             Lf(@"    open t%u kr=0x%08x conn=0x%08x", t, (unsigned)okr,
                (unsigned)conn);
             if (okr == 0 && conn) {
