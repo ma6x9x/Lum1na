@@ -770,3 +770,18 @@ Corrections (honest):
 **AIMABILITY = YES on both knobs**: (primary) the count = our repro
 path; (secondary) the raw u64 mask → the mapper's indirect write —
 which VT property feeds it = the next selector-arg naming hop.
+
+## THE TRIPLE-CONFIRMED PANIC LAW (2 new .ips, 2026-11-01)
+- panic 121707: pc 0xfffffe0050bab188, Kernel slide 0x48488000 →
+  unslid = 0x8723188 ✓
+- panic 122649: pc 0xfffffe003fa13188, Kernel slide 0x372f0000 →
+  unslid = 0x8723188 ✓
+- + the first pair's = THE SAME UNSLID PC **0x8723188** in AppleAVE2
+  __TEXT_EXEC (the panic fn 0x8722d30-class), far/x0 = 0x59, x19 = 1,
+  esr 0x96000046 (write) — **the register fingerprint IDENTICAL on
+  every repro across boots with DIFFERENT slides** = the single-site
+  law is now boot-independent (the KASLR-invariance of the bug's own
+  path = the reproducibility receipt class).
+- The slide law REFINED (the agent's corrections + these rows): for a
+  kext-band/unslid decode = use the panic's OWN "Kernel slide" row
+  (0x48488000/0x372f0000-class), NOT the text-exec slide.
