@@ -136,3 +136,4 @@
 #import "P139BootIntel.h"
 #import "P140GroundTruth.h"
 #import "P141UsbStockholm.h"
+#import "P142AVETemporal.h"

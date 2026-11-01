@@ -108,3 +108,33 @@ compatibility claims as unverified until installed.
 4. Kernel/kext lane stays pre-gate honest: `hasKread` per SKU first
    (rig: YES via cs2core; hunt 26.5: NO — four live leak/reach doors
    from CASESTUDIES.md are the working set).
+
+
+## ios27-jb-tracker (iMaxTomas) — borrowed 2026-11-01 (clone: jb-sources/)
+
+The 32-claim fact-check DB for the Calif/Chollima iOS 27.0.1 demo (Hexacon
+2026) + the iPhone Duo release-day pop. NO tools in the repo — documentation
+only. Borrowed rows (EN summary):
+
+- **V17 (HIGH, verified) = OUR LEAD**: MMdAS independently reproduced
+  **CVE-2026-112705** — VideoToolbox session with **NumberOfTemporalLayers
+  = 16463** (16462 survives) → first encode → AppleAVE2 kernel OOB WRITE
+  panic at +0xDA78, far=0x59, x0=0x100000059 (N=16464 → 0x100000001-class);
+  fixed in 27.2 (24B119) with a -12900 pre-check. Repo:
+  MchinaMd57764/AVETemporalPoC-CVE-2026-112705. **Our tap = P142** (the
+  knob battery; likely-live on 23F77's AVE2 913.43-class, the 17's 24A435
+  = the sibling class).
+- V7/V8 (medium/high): an INDEPENDENT SPTM bypass works ≤27.0.1 (patched
+  27.2b3, unverified) — the community's version of our wall law:
+  ClearSword/DarkSword kernel bugs cover ≤26.0.1 only; >26.0.1 needs a new
+  kernel bug = the lab's standing verdict, third-party pinned.
+- O1 (high): Dopamine 3.0 = A12/A13 only, ≤26.0.1; A14/A15 have ZERO on any
+  26.x — the A14 cap = **iOS 17.3.1** = explains our mini's OS exactly
+  (21-D50 = ON the cap).
+- V5: usbliter8 = Paradigm Shift's 2026-06-18 disclosure, A12/A13+ S4/S5
+  SecureROM, unpatchable-via-OS, physical — matches our rig memory.
+- V15/V20: 27.0.1 still signing as of 10-24 ("countdown"); the community
+  expects Calif's write-up after 27.1 stops signing; the bottleneck =
+  disclosure timing, not tech.
+- V19 (medium): Calif's bare SHA-256 hash commitment (unverified meaning).
+- V18 (low): ikotas00's 27.2 root demo = image-only, unverified.
