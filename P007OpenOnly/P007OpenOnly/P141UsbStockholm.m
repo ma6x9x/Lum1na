@@ -34,7 +34,7 @@ typedef mach_port_t p_iosvc_m;
 typedef CFMutableDictionaryRef (*IOServiceMatching_t)(const char *);
 typedef p_iosvc_t (*GetSVC_t)(mach_port_t, CFDictionaryRef);
 typedef kern_return_t (*IOOpen_t)(p_iosvc_m, mach_port_t, uint32_t, p_iosvc_m *);
-typedef IOReturn (*IOClose_t)(p_iosvc_m);
+typedef kern_return_t (*IOClose_t)(p_iosvc_m);
 typedef void (*IORel_t)(mach_port_t);
 typedef kern_return_t (*IOConnectCallMethod_t)(
     mach_port_t, uint32_t, const uint64_t *, uint32_t, const void *, size_t,
