@@ -528,3 +528,14 @@ The fix paths (per the skill's existing plan):
   the panic point (the PoC's window-class device).
 - Train law so far: 17.3 absent / 26.5+27.0-clamp-in-the-feature-path /
   the 27.0-raw path = the PoC's / 27.2 = -12900 reject.
+
+
+### ATTRIBUTION correction (user's note, 2026-11-01)
+The mini's hasKread/hasKwrite receipt (kslide 0x22a2c000, kbase
+0xfffffff029a30000) came from the **cs2 verbatim** run (the Dopamine
+ClearSword core, the contig-window train), NOT from the gate/lane
+machinery or the lab's own lanes. The p142-v3 board-first gate change =
+still the right fix (its gate now prints PASS via the board's committed
+slide = cs2's landed state = the honest attribution); the lab's own
+lane work tonight = the walls, the decode grid, and the tap rows —
+NOT a KRW delivery on any device.
