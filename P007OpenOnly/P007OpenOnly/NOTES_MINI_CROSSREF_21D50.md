@@ -226,3 +226,34 @@ gates + PMGR's gate + GPIO's gate = POST-17.3 additions = **newer walls**.
 ANE = key-void on BOTH trains (the no-gate law carries). The primitive-
 candidate grid = the key-void set + the non-gated UC space, verified per
 train first (the 21-D50-first proof rule — user's directive).
+
+
+## AMFI opened (23F77 the user's Ghidra program) — the workaround map
+
+Static shape: AMFI's own UC (AppleMobileFileIntegrityUserClient) = 5 gated
+selectors (can-set-denylist / can-load-trust-cache / can-load-cdhash /
+developer-mode-control / garbage-collect-profiles) — all platform-only.
+The execve hook chain + the OSEntitlements API family (getOSEntitlements /
+copyOSEntitlements / getOSEntitlementsFromProcSecure, config node
+iokit.OSEntitlements) = the kernel-side ENT SOURCE the p117 law reflects.
+
+### The workaround verdict (honest, in-scope)
+1. Entitlement stripping = at the AMFI-PROFILE stage (our signature), not
+   in-process: nothing an app can flip from inside. Confirmed cross-device
+   AND cross-host (root-uid lift = NULL rows, tonight's frida receipt).
+2. The per-UC gates consult the CLIENT's AMFI entitlement view per KEY:
+   a missing key = refusal at open/selector. So the in-scope workaround =
+   pick lanes whose gate key-list is VOID:
+   - ANE family = key-void BOTH trains (tonight's census row) — the
+     opened-at-1/4 law, statically explained.
+   - IOSurfaceRootUC = open (its 4 keys gate info/protected-access SURFACES,
+     not the connect; 21-D50 does not even carry the row).
+3. The check CHAIN for the record: IOServiceOpen → IOUserClient::start →
+   the UC's declared IOUserClientEntitlements key list vs the client's
+   AMFI entitlement dict → refusal (2c2/2e2-family), which the app
+   sandbox compounds for the jbserver lookup (the mini's live wall).
+4. Mini v2 plan: 21-D50 AMFI static decode (the mini's cache is on disk:
+   kernels/21D50/21D50__iPhone13,1/kernelcache.release.iPhone13,1) →
+   locate getOSEntitlementsFromProcSecure + the gOSDict/ent table →
+   via the ROOT lane kcall = the kernel-side ENT dump for any pid
+   (our app vs a jb tweak vs SpringBoard) = the p117 law's ground truth.
