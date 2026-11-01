@@ -24,6 +24,7 @@ struct HomeView: View {
     var body: some View {
         ZStack {
             CircuitBoardView(heroFrame: heroFrame, snapshot: model.boardSnapshot)
+                .ignoresSafeArea(edges: .top)
             VStack(spacing: 8) {
                 HeaderView(
                     showsDone: activePanel != nil,
