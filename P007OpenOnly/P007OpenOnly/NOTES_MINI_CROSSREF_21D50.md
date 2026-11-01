@@ -560,3 +560,23 @@ reached by our session shape); Prepare=0; ENCODE[0] st=0 clean → panic.
 - The .ips = the Settings > Analytics pull (panic-decode law: kslide =
   KernelCache-slide + 0x8000; the videocodecd task's writer-PC = the
   AVE2 band check).
+
+
+### p142 v4 on the 17 = INSTANT PANIC AGAIN (clean boot, first-tap, repeatable)
+Clean isolation run: SAME panic after a clean boot, p142 v4 alone =
+**REPRODUCIBLE kernel panic on the 17 (24A435)** — the lab's first
+repeatable panic on that device. Same logs: readback=1 (the count still
+clamped!), the 12 (23F77) does NOT panic with the identical code.
+
+Laws this pins:
+- The trigger = the stage9 shape on T8150/24A435: the EncoderUsage=1 +
+  RealTime=FALSE offline path (the RCMode row = refused = an off-shape
+  config) — reproducible, first-tap, clean-boot = a REAL bug lead
+  (the 112705 writer site OR a sibling offline-path bug).
+- Train divergence: 24A435 (T8150) PANICS, 23F77 (T8101) survives the
+  exact same session shape and count (both readback=1) = chip-or-train
+  differential — decode the .ips writer-PC to name which.
+- Next: the .ips via Settings>Analytics = panic_decode.py (the slide
+  0x8000 law) → the writer-PC's segment + the site's disasm via
+  capstone (the 24A435 kexts on disk incl. AppleAVE2/AVEVTSmoke class
+  = the local decode ready).
