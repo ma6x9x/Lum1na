@@ -462,3 +462,38 @@ The fix paths (per the skill's existing plan):
   slide_page/physmap-band twin of the 27.x b3e7440 translator + the
   43724 STORE's user-reachable caller hunt (the parked P054/P046-class
   oracle).
+
+
+## THE FULL HUNT (2026-11-01, capstone installed — 23F77 offline disasm live)
+
+### A. The 43722/43724 walker = ONE fn, ops 1..5
+0x9f1f204 (pacibsp): op-dispatch w9 {1..5}:
+- **op-5 = the STORE path (43724's mirror)**: `and x,#0x3ffffffff` frame
+  bits + `add x20, x10, x9` = base+PA = the physmap-band PTE write,
+  NO clamp; the `tbnz #0x3f`-class bit tests; the csel-branch bfi rows = the
+  flag/acc paths; `and x8,x22,#0x3ff8` = the 0x3ff8-mask class = the same
+  law the lab pinned in the intel table.
+- **op-2 = the u16-array LOAD (43722's mirror)**: the ldrh-uxtw#1 rows +
+  the route-in6-shaped unions = the *(u16*)(info+i*2+info[2]) class.
+- **caller census = ONE direct bl in the whole 38MB __TEXT_EXEC**:
+  `0x9f208cc` = the 16KB-strided VM/page loop (the pager-side caller;
+  16KB = A14 page stride ✓). ZERO data-pointer refs (no fixups to it).
+  => the walker = pager-internal; the user-reachable-caller question =
+  one level up (find the pager loop's OWN callers next decode).
+
+### B. Stockholm (the user's gold hunch) — the ENT-Void path + the SPMI door
+- **`nfc.disableentitlements` (PEBL, read in UCD::start 0x8ef1b30)**:
+  set => the UC registers **IOUserClientEntitlements = 0** =
+  the kext's OWN gate-void path (the workaround-entitlements answer).
+  Class = boot-arg/kernel-config — settable root-only via NVRAM = the
+  CFW/tethered stage (the usbliter8 boot-arg patch step).
+- The kext = the **NFC<->SE channel over SPMI** (`_txSPMIData/_rxSPMIData`,
+  gates com.apple.spmi.nfc[.hammerfest]) = a REAL hardware-bus I/O lane.
+  With the flag voiding the ents, the SPMI UC = the ungated bus door
+  (a T7-adjacent MMIO/hardware path — decode its uc methods per train).
+- The Stockholm gate row = ABSENT on 21-D50 (the 17.3 train either lacks
+  the kext or the gate) = the mini-first oracle = the P141 tap runs BOTH
+  lanes per device; the 12/17's rows = the fleet comparison.
+- The UCD method census for Stockholm = the next static decode (the
+  default-locking mode carries the assertless methods; the fuzz surface =
+  once an open lands in-app, the 16-sel sweep names the talking sel).
