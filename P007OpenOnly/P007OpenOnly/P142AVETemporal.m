@@ -32,7 +32,7 @@
 #import <stdlib.h>
 #import <unistd.h>
 
-#define P142_BUILD   @"p142-avetemporal-v3-boardgate"
+#define P142_BUILD   @"p142-avetemporal-v4-stage9"
 #define P142_KEY     @"NumberOfTemporalLayers"
 #define P142_DEFAULT 16463         /* the PoC's trigger threshold */
 #define P142_SURVIVE 16462         /* the PoC's surviving value */
@@ -99,8 +99,10 @@ static void p142_bandit(const char *outcome) {
     id<NSObject> nothing = nil; (void)nothing;   /* clang tidy */
 
     /* ---- the session (AVEVTSmoke law) ---- */
-    /* v2 faithful: HEVC (the PoC's codec) + the property order with
-       BaseLayerFrameRate BEFORE the count (the layer-array feeder). */
+    /* v4 = the PoC's stage9 law VERBATIM: EncoderUsage=1, RCMode=20,
+       RealTime=FALSE, the bare count — the RAW path that skips the
+       layer-feature pipeline's clamp-to-1 (v2's clamped row = the class
+       difference both trains showed). 4 frames max, break on error. */
     VTCompressionSessionRef session = NULL;
     OSStatus st = VTCompressionSessionCreate(
         kCFAllocatorDefault, 1280, 720, kCMVideoCodecType_HEVC,
@@ -110,54 +112,42 @@ static void p142_bandit(const char *outcome) {
            (unsigned)st);
         p142_bandit("nocreate"); return P142R();
     }
-    L(@"[1] session created (HEVC 1280x720)");
+    L(@"[1] session created (HEVC 1280x720, the stage9 mode)");
 
+    OSStatus sUsage = VTSessionSetProperty(session,
+        (__bridge CFStringRef)@"EncoderUsage",
+        (__bridge CFTypeRef)@1);
+    OSStatus sRC = VTSessionSetProperty(session,
+        (__bridge CFStringRef)@"RCMode",
+        (__bridge CFTypeRef)@20);
     VTSessionSetProperty(session, kVTCompressionPropertyKey_RealTime,
-                         kCFBooleanTrue);
-    VTSessionSetProperty(session, kVTCompressionPropertyKey_AllowFrameReordering,
-                         kCFBooleanTrue);
-    VTSessionSetProperty(session, kVTCompressionPropertyKey_AllowTemporalCompression,
-                         kCFBooleanTrue);
-    OSStatus stEfr = VTSessionSetProperty(session,
-        kVTCompressionPropertyKey_ExpectedFrameRate,
-        (__bridge CFTypeRef)@30);
-    int32_t blr = 15;
-    CFNumberRef nblr = CFNumberCreate(kCFAllocatorDefault, kCFNumberSInt32Type, &blr);
-    OSStatus stBlr = VTSessionSetProperty(session, (__bridge CFStringRef)@"BaseLayerFrameRate", nblr);
-    CFRelease(nblr);
-    Lf(@"[2a] frame-rate law set: Efr st=%d Blr st=%d", (int)stEfr, (int)stBlr);
-
+                         kCFBooleanFalse);
     CFStringRef key = (__bridge CFStringRef)P142_KEY;
     CFNumberRef val = CFNumberCreate(kCFAllocatorDefault,
                                      kCFNumberSInt32Type, &(int32_t){ (int32_t)layers });
     st = VTSessionSetProperty(session, key, val);
     CFRelease(val);
-    Lf(@"[2b] SetProperty(NumberOfTemporalLayers=%ld) st=%d (0 = set;"
-       @" -12900 = not-supported/pre-check row; -12912/-6662 = the caps",
-       layers, (int)st);
+    Lf(@"[2] usage st=%d rc st=%d SetProperty(NumberOfTemporalLayers=%ld)"
+       @" st=%d", (int)sUsage, (int)sRC, layers, (int)st);
 
-    /* the readback: what did the session store? */
+    /* the readback: the stage9 row */
     {
         void *rb = NULL;
-        st = VTSessionCopyProperty(session, key, kCFAllocatorDefault, &rb);
-        if (st == 0 && rb) {
+        OSStatus rst = VTSessionCopyProperty(session, key,
+                                             kCFAllocatorDefault, &rb);
+        if (rst == 0 && rb) {
             int32_t rv = 0; CFNumberGetValue((CFNumberRef)rb,
                                              kCFNumberSInt32Type, &rv);
-            Lf(@"[2c] readback = %d (0 = the session DROPPED it)", rv);
+            Lf(@"[2c] readback = %d (16463 = the RAW path accepted it;"
+               @" 1 = the clamp law; 0 = dropped)", rv);
             CFRelease(rb);
         } else {
-            Lf(@"[2c] readback st=%d", (int)st);
+            Lf(@"[2c] readback st=%d", (int)rst);
         }
     }
 
     st = VTCompressionSessionPrepareToEncodeFrames(session);
     Lf(@"[3] Prepare st=%d", (int)st);
-    if (st != noErr) {
-        L(@"    Prepare refused = the pre-encode wall (the 27.2-class law");
-        L(@"    may already exist on this train — the honest row regardless)");
-        VTCompressionSessionInvalidate(session); CFRelease(session);
-        p142_bandit("prepare-refused"); return P142R();
-    }
 
     CVPixelBufferRef pb = NULL;
     st = CVPixelBufferCreate(kCFAllocatorDefault, 1280, 720,
@@ -169,15 +159,17 @@ static void p142_bandit(const char *outcome) {
         p142_bandit("nopb"); return P142R();
     }
 
-    L(@"[4] the ENCODE battery (the PoC's mode: 40 frames, bounded)");
     OSStatus firstSt = 0;
-    for (int i = 0; i < 40; i++) {
+    for (int i = 0; i < 4; i++) {
         VTEncodeInfoFlags flags = 0;
         OSStatus est = VTCompressionSessionEncodeFrame(session, pb,
             CMTimeMake(i, 30), kCMTimeInvalid, NULL, NULL, &flags);
         if (i == 0) firstSt = est;
+        if (i == 0) L(@"[4] ENCODE[0] = the PoC's panic point (IN FLIGHT)");
+        if (est != 0) break;
     }
-    Lf(@"[4] encode battery returned; first st=%d", (int)firstSt);
+    Lf(@"[4] battery returned; first st=%d (a clean return + a nonzero"
+       @" readback = the RAW count law landed)", (int)firstSt);
     VTCompressionSessionCompleteFrames(session, kCMTimeInvalid);
 
     CVPixelBufferRelease(pb);
