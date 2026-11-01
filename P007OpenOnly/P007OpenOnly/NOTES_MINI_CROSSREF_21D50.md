@@ -641,3 +641,9 @@ The consumer trio + the filler decoded at 0xa03d88c..0xa03da58:
   resource/owner attach to this connect (the ioGpuUserClientTypeStatic
   row = 0x7f20260 via the gtype-slot fn), then sel 0x24 with the REAL
   pair. Door talk = the submit; door silence = the 2c2 wall named.
+
+## THE 17-KRW PIN BATCH (2026-11-01, the first-jailbreak program)
+- p143's device row: IOGPU t1 connect = LIVE (0x6f13); the sel census (zeros) = the owner-gate 2c2 reply class; next hop = the real-owner call.
+- The gtype-slot fn (0x84f2124) byte-decoded: the class ctor = the metaclass 0x7f30218 + classSize 0x138 + the singleton store 0xb8a6440 (the ioGpuUserClientTypeStatic law's fn shape); the pacda-cda1 store row = the fleet PAC law again.
+- The AVE2 panic = 5+ reproducibles, SAME pc every time (user-confirmed) = the single-site law = the 112705 writer cluster's twin live on 24A435.
+- The KRW self-test = universal already (the board-gate code runs on every device): what the 17 needs = a REAL primitive behind its own lane; the Rocket owner-hop = the door's remaining decode.
