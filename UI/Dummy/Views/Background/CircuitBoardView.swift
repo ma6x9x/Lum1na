@@ -7,9 +7,9 @@ import SwiftUI
 /// lit state crossfades between run steps instead of animating.
 struct CircuitBoardView: View {
     /// Background-only drop. Tiles and the star stay put; the PCB hub moves
-    /// down into the 2×2 gap. 64pt (40–80 pass, 2026-11-01). Bump this if the
-    /// hub is still high on device.
-    static let hubDrop: CGFloat = 64
+    /// down into the 2×2 gap. 128pt (was 64, still high on device, 2026-11-01).
+    /// Bump this if the hub is still above the star.
+    static let hubDrop: CGFloat = 128
 
     /// Hero frame in global coordinates; `nil` centres a default hero (sheets).
     var heroFrame: CGRect?
@@ -29,7 +29,12 @@ struct CircuitBoardView: View {
             Palette.boardBase(for: scheme)
             if let layout {
                 Group {
-                    BoardStaticLayer(layout: layout, generation: generation, isDark: scheme == .dark)
+                    BoardStaticLayer(
+                        layout: layout,
+                        generation: generation,
+                        isDark: scheme == .dark,
+                        hubDrop: appliesHubDrop ? Self.hubDrop : 0
+                    )
                         .equatable()
                     if animated {
                         energy(layout)
@@ -76,6 +81,11 @@ struct CircuitBoardView: View {
     private var layoutKey: [Int] {
         let hero = localHeroRect
         return [boardFrame.width, boardFrame.height, hero.minX, hero.minY, hero.width, hero.height].map { Int($0.rounded()) }
+    }
+
+    /// Home passes a real hero frame. Sheets pass nil and keep the fallback.
+    private var appliesHubDrop: Bool {
+        (heroFrame?.width ?? 0) > 1
     }
 
     private var localHeroRect: CGRect {

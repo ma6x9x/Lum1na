@@ -22,48 +22,49 @@ struct HomeView: View {
     @State private var heroFrame: CGRect = .zero
 
     var body: some View {
-        ZStack {
-            CircuitBoardView(heroFrame: heroFrame, snapshot: model.boardSnapshot)
-                .ignoresSafeArea(edges: .top)
-            VStack(spacing: 8) {
-                HeaderView(
-                    showsDone: activePanel != nil,
-                    onSettings: openPanel(.settings),
-                    onDone: closePanel
-                )
-                .padding(.horizontal, 18)
+        VStack(spacing: 8) {
+            HeaderView(
+                showsDone: activePanel != nil,
+                onSettings: openPanel(.settings),
+                onDone: closePanel
+            )
+            .padding(.horizontal, 18)
 
-                if let panel = activePanel {
-                    panelView(panel)
-                        .frame(maxWidth: panel == .console ? .infinity : 560)
-                        .padding(.horizontal, 18)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .transition(.opacity.combined(with: .scale(scale: 0.96)))
-                } else {
-                    CircuitHeroView()
-                        .frame(maxHeight: 300)
-                        .onGeometryChange(for: CGRect.self) { proxy in
-                            proxy.frame(in: .global)
-                        } action: { frame in
-                            // Ignore teardown frames so the board does not
-                            // jump while a panel covers the hero.
-                            guard frame.width > 8, frame.height > 8 else { return }
-                            heroFrame = frame
-                        }
-
-                    VStack(spacing: 8) {
-                        ConsoleCardView(onExpand: openPanel(.console))
-                        Spacer(minLength: 4)
-                        ActionButtonsView()
-                        DeviceProgressBar()
-                            .padding(.bottom, 6)
-                    }
+            if let panel = activePanel {
+                panelView(panel)
+                    .frame(maxWidth: panel == .console ? .infinity : 560)
                     .padding(.horizontal, 18)
-                    .frame(maxHeight: .infinity)
-                    .transition(.opacity)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .transition(.opacity.combined(with: .scale(scale: 0.96)))
+            } else {
+                CircuitHeroView()
+                    .frame(maxHeight: 300)
+                    .onGeometryChange(for: CGRect.self) { proxy in
+                        proxy.frame(in: .global)
+                    } action: { frame in
+                        // Ignore teardown frames so the board does not
+                        // jump while a panel covers the hero.
+                        guard frame.width > 8, frame.height > 8 else { return }
+                        heroFrame = frame
+                    }
+
+                VStack(spacing: 8) {
+                    ConsoleCardView(onExpand: openPanel(.console))
+                    Spacer(minLength: 4)
+                    ActionButtonsView()
+                    DeviceProgressBar()
+                        .padding(.bottom, 6)
                 }
+                .padding(.horizontal, 18)
+                .frame(maxHeight: .infinity)
+                .transition(.opacity)
             }
-            .padding(.top, 4)
+        }
+        .padding(.top, 4)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background {
+            CircuitBoardView(heroFrame: heroFrame, snapshot: model.boardSnapshot)
+                .ignoresSafeArea()
         }
         .animation(Motion.adaptive(Motion.smooth, motion: motion), value: activePanel)
     }

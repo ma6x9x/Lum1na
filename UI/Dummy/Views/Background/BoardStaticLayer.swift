@@ -8,6 +8,8 @@ struct BoardStaticLayer: View, Equatable {
     let layout: BoardLayout
     let generation: Int
     let isDark: Bool
+    /// Home shifts the hub down by this much. The console fade stays put.
+    var hubDrop: CGFloat = 0
 
     nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.generation == rhs.generation && lhs.isDark == rhs.isDark
@@ -89,10 +91,9 @@ struct BoardStaticLayer: View, Equatable {
         for finger in layout.fingers { fingers.addRect(finger) }
         context.fill(fingers, with: .color(colors.pin))
 
-        // Top wash removed: it was a near-opaque band from the screen top
-        // through the wordmark, so the status bar read as plain dark.
-        // Traces already run to y = 0; the board ignores the top safe area.
-        let fadeStart = hero.bounds.maxY - 30
+        // No top wash — traces run to y = 0 under the status bar and wordmark.
+        // Fade stays on the unshifted hero so the console does not sit on raw traces.
+        let fadeStart = hero.bounds.maxY - 30 - hubDrop
         context.fill(Path(CGRect(x: 0, y: fadeStart, width: size.width, height: size.height - fadeStart)), with: .linearGradient(
             Gradient(colors: [colors.base.opacity(0), colors.base.opacity(0.55)]),
             startPoint: CGPoint(x: 0, y: fadeStart), endPoint: CGPoint(x: 0, y: fadeStart + 70)
