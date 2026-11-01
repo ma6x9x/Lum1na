@@ -71,5 +71,14 @@
 #define T8150_24A435_AVE2_CODEC_TEARDOWN    0xFFFFFE00087913B4ULL  /* 3 slots @ ctx+0x147b0 */
 #define T8150_24A435_AVE2_DPB_INIT          0xFFFFFE0008735E34ULL  /* inline pool ctx+0x2e0 0x80 */
 #define T8150_24A435_AVE2_MANAGEDPB         0xFFFFFE0008738514ULL  /* idx [ctx+0xb64]*0x80 unchecked */
+/* --- the params-blob decode (2026-11-01): the DPB count's intake cluster ---
+    VERBATIM: cfg+0x55c == structIn+0x55c (NO remap) = sGOP.iNumOfTemporalLayer;
+    +0x560 = its duplicate; the count-copy = UNBOUNDED (walls below). */
+#define T8150_24A435_AVE2_GOP_D5VERIFIER    0xFFFFFE000873358CULL  /* HARD 0xe00002bc; <2 needs long-term */
+#define T8150_24A435_AVE2_GOP_CHECKINFO     0xFFFFFE000878E670ULL  /* the [0,8] assert — LOG-GATED */
+#define T8150_24A435_AVE2_GOP_COUNTSET      0xFFFFFE0008735FD4ULL  /* cfg+0x55c -> ctx+0xb60 (THE COUNT) */
+#define T8150_24A435_AVE2_GOP_CLAMP16       0xFFFFFE00088BA5DCULL  /* m_MaxDpbSizeForThisProfileAndLevel clamp */
+#define T8150_24A435_AVE2_GOP_DEDUPE        0xFFFFFE00088BA790ULL  /* copies +0x560 -> +0x55c; caller 0x889c234 */
+#define T8150_24A435_AVE2_POOLINIT_CALLER   0xFFFFFE000889F894ULL  /* per-FRAME pool init (6-cond gate) */
 
 #endif /* T8150_24A435_LabOffsets_h */

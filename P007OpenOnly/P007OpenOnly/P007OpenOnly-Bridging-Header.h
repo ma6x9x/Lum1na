@@ -142,3 +142,4 @@
 #import "P145Composition.h"
 #import "P146KnobSetter.h"
 #import "P147Lifecycle.h"
+#import "P148AVE2Prepare.h"
