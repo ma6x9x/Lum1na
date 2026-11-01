@@ -907,3 +907,19 @@ entitlement/policy strings anywhere in the row-fn region.
    in ONE spot (row 0x19+... the = (the = the = (the).
    The capstone tool notes: adrp imm = SIGNED; restart-on-undecodable
    walkers required; full-fn-bound scans (the ret-stop miss law).
+
+## THE 17-JAILBREAK PREP BOARD (2026-11-01, the "one build away" snapshot)
+- The taps that exist now, all shipped: p143 v5 (the door: the qid law
+  + the entry-content ladder + the reply-byte stride), p144 (the AVE2
+  mask intake: IO_Config), p142 v4 (the reproducible trigger), p134/
+  p135/p136 (the route map), p093 (the DB), p116 (the sandbox receipt).
+- The offset table (T8150_24A435) = BOTH apps synced (the real pins).
+- The static decode state: the door's userland law = complete (the
+  submit shape/stride/entry/out laws); the mask intake = named; the
+  panic chain = the UAF+fill composition; the slide law = KCS-fixed.
+- The gate + the post-KRW pipeline = built, receipt-controlled.
+- THE REMAINING (all bounded): (1) p143 v5's device row (the run) —
+  the entry-content rows = the last 2c2 candidate; (2) if the submit
+  still refuses: the config-echo decode (out+0x20's pair = the stride
+  law's own source candidate); (3) the AGX UC table (queued); (4) the
+  row-name heuristics for rows 1-24.
