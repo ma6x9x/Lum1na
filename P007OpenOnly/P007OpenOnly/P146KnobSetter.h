@@ -7,9 +7,10 @@
 NS_ASSUME_NONNULL_BEGIN
 
 @interface P146KnobSetter : NSObject
-/// Reads the ladder from Documents/p146_set.txt (decimal; blank/absent
-/// = 18), writes it into Documents/p142_layers.txt (the p142/p145
-/// composition knob), reads it back, and prints the verify row — the
+/// Reads the ladder from Documents/p146_set.txt (line-per-knob: line 1 =
+/// p142_layers.txt, line 2 = p147_cycles.txt, line 3 = p148_gop.txt;
+/// single line = the legacy p142 row; absent = defaults 18/24/2), writes
+/// each knob file, reads them back, prints the VERIFY rows — the
 /// afc-bypass law (the Documents channel on a given device can be
 /// wedged; the app writes its own flags at runtime = the same class
 /// p131's stage-3 flag uses). Also prints the current values of the

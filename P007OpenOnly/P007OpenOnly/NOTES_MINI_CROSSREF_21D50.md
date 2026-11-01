@@ -1002,3 +1002,21 @@ door/stride laws; the p110 claim rows.
 - **THE LIVE LADDER tonight**: p147 teardown-cycle (the stale-slot UAF window), the p110
   (b)-row falsify re-tap (leakgate-on arm), and the blob+0x55c intake law above.
   NO cross-lane mashups.
+
+## 2026-11-01 18:5x — the evening device rows decoded: p147's calibration, p148's honest hold, the %s bug, p146 v2
+- **p147 v1 (24A435, 18:36:31) — the CALIBRATION row**: the FULL 24-cycle battery ran in ~1.0 s
+  (~25-30 ms/cycle, all st=0 rows) with the 80-page spray LIVE; the discriminator = CLEAN
+  (0 foreign bytes in 0/64 + 0/16 pages); the gate FAIL/HOLD (hasKread stays NO). The cycle
+  rate = the ladder's calibration point — the knob (p147_cycles.txt) now scales the battery.
+- **THE MOJIBAKE = MY BUG, not corruption**: the cycle line's last arg = an NSString printed
+  with `%s` — CFString dereferences the OBJECT POINTER as a C string and prints the isa bytes
+  after "ms" (the same stable garbage per line = the constant-string address). Log-only;
+  NO evidence bytes affected. FIXED v1.1: %s -> %@ (clang-checked).
+- **p148 v1 (18:39:12) — the REACH row, as designed**: AppleAVE2Driver open t0 = 0xe00002bd
+  (not-privileged), t1/t2 = 0xe00002e2 (exclusive — the VT/hevc services hold the encoder),
+  'AppleAVE2' = NO SERVICE. The honest HOLD = the direct-UC blob arm stays decoder's work;
+  the blob+0x55c law's userland reach = the p142/p145/p147 property-composed lane for now.
+- **p146 v2 (the line-per-knob setter)**: p146_set.txt line1 -> p142_layers.txt (18),
+  line2 -> p147_cycles.txt (24), line3 -> p148_gop.txt (2) — each with the readback VERIFY;
+  single-line = the legacy row; defaults on absent. (The user's catch: v1 wrote only
+  p142_layers.txt.)

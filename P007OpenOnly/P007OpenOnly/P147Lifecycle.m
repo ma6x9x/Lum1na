@@ -185,7 +185,7 @@ static void *p147_cycler(void *ctx) {
           else
               ns = at1; }
         Lf(@"[s2] cycle %ld/%ld: create st=%d (0x%x), prepare st=%d, "
-           @"encode st=%d, elapsed %llu.%02llu ms%s",
+           @"encode st=%d, elapsed %llu.%02llu ms%@",
            c + 1, g_cycles, (int)cst,
            (unsigned)((uint32_t)cst), (int)pst2, (int)est,
            (unsigned long long)(ns / 1000000ULL),
