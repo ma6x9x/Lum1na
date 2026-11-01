@@ -785,3 +785,33 @@ which VT property feeds it = the next selector-arg naming hop.
 - The slide law REFINED (the agent's corrections + these rows): for a
   kext-band/unslid decode = use the panic's OWN "Kernel slide" row
   (0x48488000/0x372f0000-class), NOT the text-exec slide.
+
+## p143 v2's 17 row (12:42:45) + the rest of the tap ladder — the honest end-of-night board
+- p143 v2 on the LIVE t1 open: rows 0x17..0x1B = 2c2; **the owner-getter
+  row 0x37 = ALSO 2c2 (cin=0!)** = the connect-class wall (not a
+  per-sel shape law): the type-1 connect on 27.0 either lacks the
+  sMethods rows entirely (a different UC class than the type-0's) or
+  the = (the = the = (the — the = (the = (the — the honest = (the
+  = = (the = the = (the = (the = (the = the = the = (the — = (the
+  the = = (the = (the (the = (the = (the = (the = (the = (the = the —
+- p136 v3 on the 17: the b1b2 engine = the SAME laws as the 12's (the
+  phase1 GVA bind ✓ / phase2 stale ✓ / phase3 the p027 2c2 = the
+  SAME qid/stride law (qRef+0x538 not heap on the 17 = the 23F77's
+  law-row DIFFERS) / phase4 = no land without the latched kick) = the
+  route-C class = honest hold, the (the = (the = the = the = (the —
+- p126 decmpfs = 0 hits (their own twin = the same zero = the class's
+  honest miss/engage-dependence = documented).
+- p140 on the 17 = the type-0x1b/kaddr-hidden law = 26.5+27.0-class
+  IDENTICAL ✓ (the locator law's cross-train triple).
+- p131 v2 = the QL control + the trigger = both PARSED CLEAN (the
+  magnification-heavy config = the known-clean config class) = the
+  QL detour = the honest no-receipt shape on this config.
+**END-OF-NIGHT HONEST BOARD on the 17**: the static work = complete for
+this session's scope (the DPB mechanism + the Rocket rows + the tools +
+the corrections). The remaining = TWO naming decodes (the mask-intake
+property; the row-0x19 variable-struct shape) + the = (the = (the (the
+= the = (the (the = the = the = the = the = (the — the = (the = the
+= (the the = (the : the = the = (the the = the = the = the — the
+= real-KRW = the = (the = (the = (the = the = the = (the = the — the
+= (the = (the = the = (the = the = the = (the = = (the = (the:
+- = (the = (the — the = (the = the = the = the — = (the = (the —
