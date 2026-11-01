@@ -139,3 +139,4 @@
 #import "P142AVETemporal.h"
 #import "P143RocketDoor.h"
 #import "P144AVE2Config.h"
+#import "P145Composition.h"
