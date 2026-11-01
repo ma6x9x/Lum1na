@@ -511,3 +511,20 @@ The fix paths (per the skill's existing plan):
 - The 23F77 (12) cache: NO AudioDMAController at all (13,2 uses
   AppleEmbeddedAudio) — the 17-only family parked unless the exclave
   proxy path gets a lane later.
+
+
+### p142 rows (26.5/24A435/21-D50) + the CLAMP law + the stage9 law
+- 23F77 v2-faithful: set st=0, **readback = 1** = the count was silently
+  CLAMPED to 1 (the knob never reached AVE2); battery survived clean.
+- 24A435 (the 17, v2-faithful): the SAME row — set=0, readback=1, clean.
+  21-D50: -12900 (the property absent at 17.3).
+- **The clamp = the layer-FEATURE pipeline's** (v2 set
+  AllowTemporalCompression + BaseLayerFrameRate = the layering path =
+  the count clamped to 1). **The PoC's stage9 = the RAW path**:
+  EncoderUsage=1 + RCMode=20 + **RealTime=FALSE** + the bare count =
+  no feature flags = the count goes to the kext UNPROCESSED.
+- p142 v4 = the stage9 mode verbatim (193431b). The 17's 24A435 = the
+  row that decides: readback=16463 = the raw law landed → the encode =
+  the panic point (the PoC's window-class device).
+- Train law so far: 17.3 absent / 26.5+27.0-clamp-in-the-feature-path /
+  the 27.0-raw path = the PoC's / 27.2 = -12900 reject.
