@@ -29,7 +29,7 @@
 #import <stdlib.h>
 #import <unistd.h>
 
-#define P143_BUILD @"p143-rocketdoor-v1"
+#define P143_BUILD @"p143-rocketdoor-v2-ownerlaw"
 
 /* P069 no-header law: local prototypes only */
 typedef mach_port_t p_ioservice_t; typedef mach_port_t p_ioconnect_t;
@@ -131,32 +131,39 @@ static void p143_bandit(const char *outcome) {
                  return P143R(); }
     L(@"[2] surface armed (the live-resource law)");
 
-    /* ---- stage 3: the sel-0x24 submit row ---- */
-    L(@"[3] sel 0x24 (submit): scIn={owner=0, resource=0} first row — the");
-    L(@"    honest shape: the REAL owner lives at UC+0x120 kernel-side; the");
-    L(@"    call with zeros = the door's reply-class census (2c2/2d8 =");
-    L(@"    the gate-class reply; 0 = the submit ACCEPTED (then the");
-    L(@"    state-machine run = the honest in-flight row).");
+    /* ---- stage 3: the OWNER-LAW census (the decode-correction batch) --
+       24A435 decode: the owner = minted at OPEN time by
+       deviceUserClientStart (0xa024970; vt+0x588 blraa with the task
+       token from [uc+0xd8]) — NO userland selector writes [uc+0x120].
+       The submit fn = row 0x19 (0xa02299c; the pinned 0x24 = off by
+       11 rows, fn VA right, index wrong), kind=4, checkIn=variable,
+       out=1; NO entitlement check in the row (size/overflow asserts
+       only). [uc+0x103] = the gpu-restricted table-choice bit.
+       CENSUS: rows 0x17..0x1B + the owner-reader row 0x37 (cin=0). */
+    L(@"[3] the owner-law census on the LIVE open: submit-row 0x19 +");
+    L(@"    the neighbors + the owner-getter 0x37 (cin=0/out=scalar).");
     {
-        uint64_t in[4] = { 0, 0, 0, 0 };
-        uint64_t out[8]; memset(out, 0, sizeof out);
+        uint64_t inB[4] = { 0, 0, 0, 0 };
+        uint64_t outB[8]; memset(outB, 0, sizeof outB);
         uint32_t nout = 8;
-        uint64_t st[16]; memset(st, 0, sizeof st);
-        size_t nsc = sizeof st;
-        kern_return_t kr = call(conn, 0x24, in, 4, NULL, 0, out, &nout, st, &nsc);
-        Lf(@"    sel 0x24 kr=0x%08x out=[%llu %llu %llu %llu] struct=%zu",
-           (unsigned)kr, (unsigned long long)out[0], (unsigned long long)out[1],
-           (unsigned long long)out[2], (unsigned long long)out[3], nsc);
-        for (uint32_t s = 0x20; s <= 0x29; s++) {
-            nout = 8;
-            kern_return_t k2 = call(conn, s, in, 4, NULL, 0, out, &nout, st, &nsc);
-            Lf(@"    sel 0x%x kr=0x%08x", s, (unsigned)k2);
+        uint64_t stB[16]; memset(stB, 0, sizeof stB);
+        size_t nsc = sizeof stB;
+        for (uint32_t s = 0x17; s <= 0x1B; s++) {
+            nout = 8; nsc = sizeof stB;
+            kern_return_t k2 = call(conn, s, inB, 4, NULL, 0, outB, &nout, stB, &nsc);
+            Lf(@"    sel 0x%x kr=0x%08x out0=0x%llx out1=0x%llx struct=%zu",
+               s, (unsigned)k2, (unsigned long long)outB[0],
+               (unsigned long long)outB[1], nsc);
         }
+        nout = 4; nsc = sizeof stB;
+        kern_return_t k37 = call(conn, 0x37, NULL, 0, NULL, 0, outB, &nout, stB, &nsc);
+        Lf(@"    sel 0x37 (owner-reader row; [owner+0xfc] bit0's vt chain)"
+           @" kr=0x%08x out0=0x%llx struct=%zu",
+           (unsigned)k37, (unsigned long long)outB[0], nsc);
     }
-    L(@"[3] the census rows above = the door's reply-class per sel (the");
-    L(@"    Rocket battery's honest start; the owner-carrying call = the");
-    L(@"    next decode hop with the REAL owner from the ioGpuUserClient-");
-    L(@"    typeStatic row).");
+    L(@"[3] the door's real gate = the INPUT shape: kind=4 + variable");
+    L(@"    struct-in (the cmdBufArgSize/total-overflow assert laws = the");
+    L(@"    struct-carrying call = v3's row; the empty-in = the census).");
     p143_bandit("ran");
 
     Lf(@"[end] board: %@", [[P007Board shared] kreadSignal]);
