@@ -1,0 +1,21 @@
+//
+//  P146KnobSetter.h — the in-app KNOB FILE SETTER. p146.
+//
+
+#import <Foundation/Foundation.h>
+
+NS_ASSUME_NONNULL_BEGIN
+
+@interface P146KnobSetter : NSObject
+/// Reads the ladder from Documents/p146_set.txt (decimal; blank/absent
+/// = 18), writes it into Documents/p142_layers.txt (the p142/p145
+/// composition knob), reads it back, and prints the verify row — the
+/// afc-bypass law (the Documents channel on a given device can be
+/// wedged; the app writes its own flags at runtime = the same class
+/// p131's stage-3 flag uses). Also prints the current values of the
+/// other composition flags (p131_stage3.txt, lswkrw_arm.txt presence).
+/// HONESTY: no IOKit, no Metal, no state — a file utility between taps.
++ (NSString *)tap;
+@end
+
+NS_ASSUME_NONNULL_END

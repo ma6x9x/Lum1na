@@ -161,6 +161,7 @@ struct ContentView: View {
                         moreRow("P143 ROCKET SUBMIT DOOR (the 17, 24A435; the state-band DERIVED: record array {ptr,+8 u32,+0x10 valid} @0x18 at PP+0x48, owner UC+0x120, the 0xcda1 fleet PAC law — static chain CLOSED): the IOGPU UC open + the sel-0x24 submit-row census with the real-resource law. PANIC-POSSIBLE; one tap", "p143")
                         moreRow("P144 AVE2 IO_Config MASK INTAKE (the agent-named knob, 24A435): row 2 = IO_Config (structIn 0x38; the u64 at +0x30 = the RAW mask, unvalidated store) after IO_Open; the mask consumer = the encode-loop map step to the boundless write-through mapper. State-machine rows; PANIC-POSSIBLE; one tap", "p144")
                         moreRow("P145 COMPOSITION (the composition row): 64 held IOSurface-backed Metal buffers painted 0x41 + a 16-surface 0x53 marker group, then the p142 stage9 AVE2 fill session (EncoderUsage=1, RCMode-20, RealTime=FALSE, HEVC 1280x720) composed INSIDE the live spray on a second thread, then the overshoot discriminator marker-vs-bytes on every held page. PANIC-POSSIBLE; one tap per force-quit", "p145")
+                        moreRow("P146 KNOB SETTER (the afc-bypass law): tap = write p142_layers.txt = the p146_set.txt ladder (default 18) + the readback VERIFY row + the composition flags state. A file utility between taps (no IOKit/Metal/state)", "p146")
                         moreRow("P140 MINI GROUND-TRUTH VERIFIER (21-D50 cross-ref rig): mach_port_kobject = the SKU-free port→kaddr locator, then — lane live — DIRECT kread of the p138 oracle slots ([+0x98] gate, [+0x34] dmaref, [+0x80] the 21-D50 MD twin slot): the 2c2 op-channel census answered by kernel READ, not by port-guessing. Receipt = kread32(kbase); hunt board NEVER flipped. READ-ONLY", "p140")
                         moreRow("P114. M2ScalerCSC sel-8 leak tap — SOLO leak law validation (p110 v2 pairing gate; {u64} 8B in, serializer records stride 0x7c, rec+0x18 raw KV; N=8 captures + KV table + honest KVA-disclosure class; READ-ONLY; no race)", "p114")
                         moreRow("P115. M2Scaler framework-path PEEK (the tpeek law): bounded CSC battery (IOSurface control + one VT 720p encode), diff the task's SEND ports after each op, fingerprint new ports for the M2Scaler sel-8 no-queue signature (2bf). A framework-opened UC owns a REAL queue — no QueueCreate grammar needed. READ-ONLY", "p115")
@@ -1226,6 +1227,8 @@ struct ContentView: View {
                 result = P144AVE2Config.tap()
             case "p145", "composition":
                 result = P145Composition.tap()
+            case "p146", "knobsetter":
+                result = P146KnobSetter.tap()
             case "p099", "anegroom":
                 result = P099AnePrewireGroom.tap()
                 if result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

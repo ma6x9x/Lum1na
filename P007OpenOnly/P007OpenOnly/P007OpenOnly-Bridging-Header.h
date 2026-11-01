@@ -140,3 +140,4 @@
 #import "P143RocketDoor.h"
 #import "P144AVE2Config.h"
 #import "P145Composition.h"
+#import "P146KnobSetter.h"
