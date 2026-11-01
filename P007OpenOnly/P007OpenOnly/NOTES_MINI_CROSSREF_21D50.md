@@ -652,9 +652,6 @@ The consumer trio + the filler decoded at 0xa03d88c..0xa03da58:
 p069 (24A435): memory entry kr=0x0 size=0x4000 port=0x13d493 →
 **mach_vm_map kr=0x0 addr=0x1126ac000 (the makeMapping consumer)** —
 the 43684 map path LANDED on the 17 (the route-D md-port class on the
-23F7X-era = kr=0x1d; the P069's OWN = the = the = = = = = = (the 43684
-lane's own map = the memory-entry route = the = the = the = the = the =
-the = the = the = the = = (the honest row: the = the = the mapping path
 = = = = = = exercised once, verdict line: "mapping path exercised once.
 Increment is IOMD+0x68 (not +0x34)").
 The honest KRW read: the map = OUR OWN surface's memory-entry = a
@@ -670,9 +667,7 @@ bl 0x88485dc` = the size-class alloc; `bl 0x88be9ac` = the consumer; the
 (far=0x59+(N-163)<<32) = the ALLOC's own zeroing/fill into a buffer whose
 SIZE scaled with the (unclamped-internal) count — the far's high word = the
 count's remnant ✓ (the PoC formula law). The alloc = 0xc4-class (196 = the
-0xc4 = the = the = the = the size class) = the = = = = = = = = (the row:
 the = = = = = = = = = = = = = = the = = = = the (the = = = = = = = = = =
-the = = = = = = = = = = = = = = = = = the = the = = = = = = = = = = = = =
 
 ## THE 17 NIGHT BATCH (2026-11-01, the full tap list) — the honest board
 STRONGEST NEW RECEIPT = **p116: the deterministic SANDBOX-ESCAPE class
@@ -791,14 +786,10 @@ which VT property feeds it = the next selector-arg naming hop.
   row 0x37 = ALSO 2c2 (cin=0!)** = the connect-class wall (not a
   per-sel shape law): the type-1 connect on 27.0 either lacks the
   sMethods rows entirely (a different UC class than the type-0's) or
-  the = (the = the = (the — the = (the = (the — the honest = (the
-  = = (the = the = (the = (the = (the = the = the = (the — = (the
-  the = = (the = (the (the = (the = (the = (the = (the = (the = the —
 - p136 v3 on the 17: the b1b2 engine = the SAME laws as the 12's (the
   phase1 GVA bind ✓ / phase2 stale ✓ / phase3 the p027 2c2 = the
   SAME qid/stride law (qRef+0x538 not heap on the 17 = the 23F77's
   law-row DIFFERS) / phase4 = no land without the latched kick) = the
-  route-C class = honest hold, the (the = (the = the = the = (the —
 - p126 decmpfs = 0 hits (their own twin = the same zero = the class's
   honest miss/engage-dependence = documented).
 - p140 on the 17 = the type-0x1b/kaddr-hidden law = 26.5+27.0-class
@@ -809,9 +800,3 @@ which VT property feeds it = the next selector-arg naming hop.
 **END-OF-NIGHT HONEST BOARD on the 17**: the static work = complete for
 this session's scope (the DPB mechanism + the Rocket rows + the tools +
 the corrections). The remaining = TWO naming decodes (the mask-intake
-property; the row-0x19 variable-struct shape) + the = (the = (the (the
-= the = (the (the = the = the = the = the = (the — the = (the = the
-= (the the = (the : the = the = (the the = the = the = the — the
-= real-KRW = the = (the = (the = (the = the = the = (the = the — the
-= (the = (the = the = (the = the = the = (the = = (the = (the:
-- = (the = (the — the = (the = the = the = the — = (the = (the —
