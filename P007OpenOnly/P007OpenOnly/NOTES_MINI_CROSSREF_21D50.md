@@ -539,3 +539,24 @@ still the right fix (its gate now prints PASS via the board's committed
 slide = cs2's landed state = the honest attribution); the lab's own
 lane work tonight = the walls, the decode grid, and the tap rows —
 NOT a KRW delivery on any device.
+
+
+### p142 v4 on the 17 (24A435) — INSTANT PANIC, the honest read
+Preface (user): p100 + p090 + p018 ran FIRST this boot (dirty-state
+candidate). The log: EncoderUsage=1 st=0; **RCMode(-12900) = the string
+key refused on 24A435**; RealTime=FALSE; count set=0; **readback = 1**
+(the count CLAMPED on the raw path too — the 112705 count vector NOT
+reached by our session shape); Prepare=0; ENCODE[0] st=0 clean → panic.
+
+- NOT the 112705 count law as armed: count=1 (clamped), and the earlier
+  v2 run on the SAME device SURVIVED the same count. The differences vs
+  the survivor = (a) the stage9 property pack (EncoderUsage=1 +
+  RealTime=false = the raw/offline path; RCMode refused), (b) the DIRTY
+  BOOT (p100/p090/p018 first this boot).
+- The isolation = reboot clean → p142 v4 ALONE: panic => the stage9
+  shape's ingredient (the usage/offline path — a NEW lead class);
+  survive => the dirty-boot law (the lab's own cumulative-state class,
+  matching the one-tap-per-force-quit law's premise).
+- The .ips = the Settings > Analytics pull (panic-decode law: kslide =
+  KernelCache-slide + 0x8000; the videocodecd task's writer-PC = the
+  AVE2 band check).
