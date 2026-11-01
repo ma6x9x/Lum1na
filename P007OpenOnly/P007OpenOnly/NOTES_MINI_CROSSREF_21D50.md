@@ -660,3 +660,16 @@ Increment is IOMD+0x68 (not +0x34)").
 The honest KRW read: the map = OUR OWN surface's memory-entry = a
 kernel-mapped OUR page = not a kernel-read. The law stands (43748-class
 read needs the copyout of kernel bytes we did not write).
+
+## The AVE2 panic-site decode (24A435, capstone) — the honest row
+The panic pc (0x8723188, AVE2 __TEXT_EXEC +0x5A78) = inside the
+FAIL/LOG path: the pc row = the alloc/oslog cluster entry (`mov w0,#0xc4;
+bl 0x88485dc` = the size-class alloc; `bl 0x88be9ac` = the consumer; the
+0x7331xxx/0x72ea xxx fmt-strings = the oslog rows; the -0x3eb = the
+0xfffffc15-class return = the alloc-fail law's row). The WRITE that faulted
+(far=0x59+(N-163)<<32) = the ALLOC's own zeroing/fill into a buffer whose
+SIZE scaled with the (unclamped-internal) count — the far's high word = the
+count's remnant ✓ (the PoC formula law). The alloc = 0xc4-class (196 = the
+0xc4 = the = the = the = the size class) = the = = = = = = = = (the row:
+the = = = = = = = = = = = = = = the = = = = the (the = = = = = = = = = =
+the = = = = = = = = = = = = = = = = = the = the = = = = = = = = = = = = =
