@@ -100,7 +100,7 @@
 #import <IOKit/IOKitLib.h>       /* dlsym'd calls still; only the UC types  */
 #import <sys/qos.h>
 
-#define P110_BUILD      @"p110-swapclaim-v2.5-contractv5"
+#define P110_BUILD      @"p110-swapclaim-v2.6-printfix"
 #define P110_ROUNDS     64
 #define P110_PREFILL_MAX  8     /* bandit arm room: prefill 6 (default) vs 8 */
 #define P110_PREFILL_DEF  6     /* the v1 shipped prefill(6) pop-law value   */
@@ -941,8 +941,8 @@ static NSString *p110_flags_law(void) {
            v2: the stamp carries the leak-record count as the round's
            pre-window state (0 = no leak stage / pairing HELD).             */
         Lf(@"[r %d/%d] IN FLIGHT — D: owner-release sid=%08x (destroy-twin class) / "
-           @"E: owner-release the round surface (detacher half) / P: pop(%d+2, %s) "
-           @"dial %ldns, same CPU — leak-recs=%d (%s). If the device reboots here: "
+           @"E: owner-release the round surface (detacher half) / P: pop(%d+2, %@) "
+           @"dial %ldns, same CPU — leak-recs=%d (%@). If the device reboots here: "
            @"outcome (b), Family-B far 0x0020000000000048 = window WON, free slot "
            @"(attested class).",
            r, P110_ROUNDS, sid, g_p110_prefillN,
@@ -1018,8 +1018,8 @@ static NSString *p110_flags_law(void) {
             break;
         }
 
-        Lf(@"[r %d/%d] returns (honest): engine-drop=%s destroy-kr-path=%s "
-           @"post-ownership-sid=%s pop=[%08x %08x] (zalloc probe law)",
+        Lf(@"[r %d/%d] returns (honest): engine-drop=%@ destroy-kr-path=%@ "
+           @"post-ownership-sid=%@ pop=[%08x %08x] (zalloc probe law)",
            r, P110_ROUNDS,
            (g_e_target == NULL) ? @"consumed" : @"missed",
            (g_d_target == NULL) ? @"consumed" : @"missed",
@@ -1149,7 +1149,7 @@ static NSString *p110_flags_law(void) {
        @"family-b-in-process=%d aborted=%d (every tap this process, not reset)",
        atomic_load(&v_win_lost_proc), atomic_load(&v_claim_won_proc),
        atomic_load(&v_family_b_proc), atomic_load(&v_aborted_proc));
-    Lf(@"[v2 leak-gate] arm=%s: sel-8 captures=%d claim-window DIFFs=%d pairing=%s "
+    Lf(@"[v2 leak-gate] arm=%s: sel-8 captures=%d claim-window DIFFs=%d pairing=%@ "
        @"(M2ScalerCSC door left OPEN this tap — P027/P098 delayed-teardown law; one "
        @"tap per force-quit)",
        LabBanditArmName("p110", g_p110_arm), g_p110_leak_caps, g_p110_leak_pairs,

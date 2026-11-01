@@ -233,7 +233,7 @@ static void p147_discriminate(void) {
             pagesA++;
             totalA += foreign;
             Lf(@"[s3] OVERSHOOT RECEIPT row: 0x41-group[%02d] foreign"
-               @" bytes=%u, byte class=%s (receipt-class evidence of a"
+               @" bytes=%u, byte class=%@ (receipt-class evidence of a"
                @" write we did not author)", i, foreign,
                (distinct == 1) ? @"single-class" : @"multi-class");
         }
@@ -253,7 +253,7 @@ static void p147_discriminate(void) {
             pagesB++;
             totalB += foreign;
             Lf(@"[s3] OVERSHOOT RECEIPT row: 0x53-group[%02d] foreign"
-               @" bytes=%u, byte class=%s (receipt-class evidence of a"
+               @" bytes=%u, byte class=%@ (receipt-class evidence of a"
                @" write we did not author)", i, foreign,
                (distinct == 1) ? @"single-class" : @"multi-class");
         }

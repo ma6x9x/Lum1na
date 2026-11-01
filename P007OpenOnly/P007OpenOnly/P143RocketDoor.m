@@ -200,7 +200,7 @@ static void p143_bandit(const char *outcome) {
                 uint32_t nout = 1;
                 kern_return_t kr = call(conn, 0x19, inS, 4, ent, cnt * stride,
                                         out, &nout, NULL, NULL);
-                Lf(@"    submit qid=%llu count=1 stride=0x%x ent=%s kr=0x%08x"
+                Lf(@"    submit qid=%llu count=1 stride=0x%x ent=%@ kr=0x%08x"
                    @" out0=%llu (0=CLEAN, 8=fail-sentinel)",
                    (unsigned long long)ourQid, stride,
                    row == 1 ? @"CONTENT" : @"zero", (unsigned)kr,

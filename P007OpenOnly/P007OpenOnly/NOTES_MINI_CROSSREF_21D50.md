@@ -1033,3 +1033,32 @@ door/stride laws; the p110 claim rows.
 - **p147 18:45:34 = the second calibration row (identical shape)**: 24 cycles, all st=0,
   ~25-32 ms/cycle, discriminator CLEAN again (0 foreign bytes in 0/64 + 0/16; the clean
   row class twice in a row), gate FAIL/HOLD. The ladder's climbs = the x60/x120/x200 rows.
+
+## 2026-11-01 18:47-18:53 — the 18:50 fleet batch decoded (the 17: p110's (b) AGAIN, p122's ceiling row, p147 clean x2)
+- **p110 v2.5 (18:47, THE 17 — second on-device (b))**: the dial0 arm; 58/64 rounds (c)
+  claim-won-candidate, 6 (a), then the ROUND-64 alias-path FAULT = outcome (b) AGAIN —
+  window-WON now caught on the 17 TOO (the 12 caught its own ~18:14). The class repeats
+  across SKUs/boots = the attestation reproduced. STILL NOT KRW (the note-270 law).
+- **THE (c)-DETECTOR'S HONEST REFRAME (the saturation law)**: this boot's sids cycled
+  {0x107,0x108,0x10b,0x10c} — pop sid == victim sid nearly every round = SID-NUMBER reuse
+  (the counter's own recycle), NOT strong slot-reuse proof; the 62-63/64 (c)-rate = detector
+  saturation. The marker-divergence law NEVER fired. The (c) class = proxy-class ALWAYS;
+  per-round (c) rows near 100% = the detector ceiling, not 58 windows.
+- **p110's own %s-on-NSString bug class**: the IN-FLIGHT/returns/pairing lines printed
+  (¿KÎÏ) — the same CFString %s-object bug (the log-only class). p110 v2.6 fixed (%@),
+  plus p143/p145/p147's receipt-row "byte class=%s" -> %@ (the fix matters because the
+  receipt row is exactly when the garbage would print). All clang-checked.
+- **p122 (18:50) — the ceiling row REAFFIRMED on the 17**: 2000/2000 raced sel36 reads
+  out of the freed slot = user-class (kshape=0); the zone's natural population measured
+  user-class on-device; verdict honest (hasKread=NO by law).
+- **p147 18:53:57 = the third clean calibration (all st=0, ~25-32 ms/cycle)**.
+- **THE BANDIT DATA: leakgate-on n=0 — NEVER SAMPLED.** The untried arms (popearly /
+  leakgate-on / leakgate-off, ucb=1e9) = the next p110 re-taps' picks — leakgate-on =
+  the KVA-disclosure pairing = the LIVE next device step.
+- WHAT IS LEFT FOR KRW (honest): (1) p110 re-taps until the bandit samples leakgate-on
+  (the sel-8 pairing = kernel-range KVAs arriving in OUR output buffer = disclosure class
+  = the material, never kread); (2) the p147 x60/x120/x200 ladder; (3) the p148 fresh-boot
+  re-tap (the 2e2 holder may be momentary); (4) the honesty work (the (c)-saturation law
+  is now the detector's own caveat). Parked/stopped: PATH A (lsabc D ran+missed), PATH B
+  (the operator's kalloc.3072 STOP), the direct-UC blob (exclusivity). hasKread stays NO
+  by law tonight unless a kread32 receipt lands.
