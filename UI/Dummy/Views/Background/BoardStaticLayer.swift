@@ -89,12 +89,9 @@ struct BoardStaticLayer: View, Equatable {
         for finger in layout.fingers { fingers.addRect(finger) }
         context.fill(fingers, with: .color(colors.pin))
 
-        // Scrims: calm the board behind the header and the controls.
-        let top = hero.bounds.minY + 8
-        context.fill(Path(CGRect(x: 0, y: 0, width: size.width, height: top)), with: .linearGradient(
-            Gradient(colors: [colors.base.opacity(0.78), colors.base.opacity(0)]),
-            startPoint: .zero, endPoint: CGPoint(x: 0, y: top)
-        ))
+        // Top wash removed: it was a near-opaque band from the screen top
+        // through the wordmark, so the status bar read as plain dark.
+        // Traces already run to y = 0; the board ignores the top safe area.
         let fadeStart = hero.bounds.maxY - 30
         context.fill(Path(CGRect(x: 0, y: fadeStart, width: size.width, height: size.height - fadeStart)), with: .linearGradient(
             Gradient(colors: [colors.base.opacity(0), colors.base.opacity(0.55)]),

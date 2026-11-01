@@ -1,11 +1,16 @@
 import SwiftUI
 
 /// Full-screen procedural circuit board. Geometry is generated once per size
-/// and aligned to the hero (whose global frame is passed in), so buses land on
-/// the SwiftUI chip and stage nodes. A static `Canvas` draws the unlit board;
+/// from the hero frame, then shifted down by `hubDrop` (background only).
+/// A static `Canvas` draws the unlit board;
 /// `BoardEnergyLayer` animates on top. Under Reduce Motion / Motion Off the
 /// lit state crossfades between run steps instead of animating.
 struct CircuitBoardView: View {
+    /// Background-only drop. Tiles and the star stay put; the PCB hub moves
+    /// down into the 2×2 gap. 64pt (40–80 pass, 2026-11-01). Bump this if the
+    /// hub is still high on device.
+    static let hubDrop: CGFloat = 64
+
     /// Hero frame in global coordinates; `nil` centres a default hero (sheets).
     var heroFrame: CGRect?
     var snapshot = BoardSnapshot()
@@ -78,7 +83,7 @@ struct CircuitBoardView: View {
             let height = boardFrame.height * 0.42
             return CGRect(x: 0, y: boardFrame.height * 0.08, width: boardFrame.width, height: height)
         }
-        return heroFrame.offsetBy(dx: -boardFrame.minX, dy: -boardFrame.minY)
+        return heroFrame.offsetBy(dx: -boardFrame.minX, dy: -boardFrame.minY + Self.hubDrop)
     }
 
     private func rebuild() {
