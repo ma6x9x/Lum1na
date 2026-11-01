@@ -297,3 +297,35 @@ The lab's USB hangs during earlier sessions decode against this kext's
 _commandGate/_classCommandTimer pair (the timer-driven UC). When the
 hang .ips class gets triaged, match writer-PC/thread against 0x98bc6d0
 (the timer) and 0x98bec80 (the command mux) FIRST.
+
+
+## THE IOSURFacEROOT/USB REACHABILITY ORACLE (the user's pick) — mini-first
+
+Run twice per host, mini 21-D50 (frida root lane + the app host):
+
+- `"IOUSBDeviceInterface"` = **SERVICE VISIBLE from the app** (uid 501,
+  sandboxed: svc=0x1803 class=IOUSBDeviceInterface decoded) — the family's
+  service match + get-matching-service = PERMITTED in-app.
+- **IOServiceOpen type 0 AND type 1 = kr=0xe00002e2 (EXCLUSIVE ACCESS) from
+  BOTH hosts** — sandbox-independent, uid-independent. A 60-open async
+  hammer from root = 60×2e2 (no land); a second sweep = all 2e2. NO open
+  landed during any window (no replug was performed — the run never saw a
+  re-enumeration).
+- The IOSurfaceRoot row (same instrument, root) = type-0 2e2 + 1/2 2c7 = the
+  SAME exclusivity shape — a UC-class owner-held law, not a lane law.
+
+### Honest verdict for the tethered-path idea
+The device-mode UC family is KEY-VOID (no entitlement walls) and the
+service matches in-app, but the OPEN is owner-held (2e2) — the tethered
+path is NOT unlocked by this tonight. The remaining levers:
+1. **who owns it**: the UCD's exclusivity shape = decode in Ghidra (the
+   kext's 2e2 throw sites + the owner process), or kread the UC's owning
+   task/port via the root lane once the kobject locator's lane isolation
+   lands (p140 tap).
+2. **IOUSBDeviceControlRequest** = the OTHER door in the family (the
+   vendor/command-request class; service = the class itself) — the same
+   oracle run against it.
+3. A real re-enumeration window was NEVER tested (the user replugged
+   nothing yet) — the hammer + replug A/B = still possible.
+4. The 26.5 (23F77) in-app oracle = the IPA tap (the p018 law runs there
+   TODAY for IOSurfaceRoot; the USB row = the same tap's neighbor).
