@@ -800,3 +800,37 @@ which VT property feeds it = the next selector-arg naming hop.
 **END-OF-NIGHT HONEST BOARD on the 17**: the static work = complete for
 this session's scope (the DPB mechanism + the Rocket rows + the tools +
 the corrections). The remaining = TWO naming decodes (the mask-intake
+
+## AGENT-#3's REPORT — the night's decisive corrections (24A435)
+1. **THE SLIDE LAW WAS MINE-ERROR**: the correct unslid = value − the
+   **KernelCache slide** row (the "Kernel slide" row's VALUE = KCS+0x8000
+   — the memory's law describes the row value, not the constant!). All
+   prior cluster VAs = +0x8000-shifted (real fns, mislabeled frames).
+   For bug_type-210: use KCS + the discriminator "unslid pc must MATCH
+   far/esr-Set" (the cheap check).
+2. **The TRUE (pc, lr) = 0x872B188 / 0x88410C4** (bit-identical across
+   boots; 17 backtrace frames unslide identically under KCS). The pc
+   row = `stp x0,x0,[x0]` — an intrusive-LIST-INIT write with x0 = 0x59
+   = 1+0x58 ✓✓ (x19=1 = the GARBAGE object; far = x19+0x58 ✓).
+3. **THE TRUE CHAIN (innermost→out, ALL AVE2)**: leaf list-init 0x872b180
+   ← session-object reset 0x8840fec (re-inits lists at obj+0x58/+0x78;
+   obj = x19 = 1 = GARBAGE!) ← wrapper 0x88411ec ← codec-instance
+   teardown 0x87913b4 (3 slots at ctx+0x147b0; slot0 HELD 1) ← codec
+   stop/close 0x8794328 ← release 0x8795390 ← fn 0x88da9a8 (row16)
+   ← ... ← kernel. **The class = the codec-instance array's STALE slot
+   (a failed-instance sentinel/UAF shape) surviving into teardown = a
+   real dangling-pointer UAF on the same kext** — the slots created in
+   0x8790cec (3 sites), config feeds the SETUP only; the slot VALUE =
+   never a config field = the 1 = a stale/bogus pointer.
+4. **The DPB pool = an INLINE ctx array** (base ctx+0x2e0, stride 0x80,
+   legit capacity ~17 entries before the bookkeeping at ctx+0xb60); the
+   fill = UNBOUNDED (no clamp; only the lower/sign guards) = over-capacity
+   fills MARCH INTO the ctx's own fields (first the bookkeeping, then —
+   larger — the ctx's pointer-bearing fields: ctx+0x2d0 sub-object, the
+   ctx+0x147b0 slots, ctx+0x1f60 flags, ctx+0x2270...). = a linear,
+   kernel-pointer-shaped clobber = a REAL corruption primitive.
+5. **The DPB entry's +0x58 = a CONFIG-SUPPLIED u64 (userland knob)**
+   (the +0x68/+0x70/+0x78 = in-kext object-tagged copies; the fill's
+   link fields = sibling pointers).
+6. **physRW conversion = NO** (honest): no path to physmap/kpages.
+7. The panic-caller kernel frame = 0xB4351F8-class ("panic caller" row).
