@@ -7,9 +7,9 @@ import SwiftUI
 /// lit state crossfades between run steps instead of animating.
 struct CircuitBoardView: View {
     /// Background-only drop. Tiles and the star stay put; the PCB hub moves
-    /// down into the 2×2 gap. 128pt (was 64, still high on device, 2026-11-01).
-    /// Bump this if the hub is still above the star.
-    static let hubDrop: CGFloat = 128
+    /// down into the 2×2 gap. 88pt splits 64 (still high) and 128 (way below
+    /// the star). Bump or cut this if the hub is still off.
+    static let hubDrop: CGFloat = 88
 
     /// Hero frame in global coordinates; `nil` centres a default hero (sheets).
     var heroFrame: CGRect?
