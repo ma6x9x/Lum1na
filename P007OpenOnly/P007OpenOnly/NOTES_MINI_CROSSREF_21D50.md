@@ -904,7 +904,7 @@ entitlement/policy strings anywhere in the row-fn region.
    AGXDeviceUserClient table (ctor 0x84f21b4/gMeta 0x7f356e8 named,
    not decoded); the *(0x82fea78) tail-object's identity; the
    [uc+0x100]-before-submit ordering proof; agent-1's row-list differs
-   in ONE spot (row 0x19+... the = (the = the = (the).
+   in ONE spot (row 0x19+... the = the).
    The capstone tool notes: adrp imm = SIGNED; restart-on-undecodable
    walkers required; full-fn-bound scans (the ret-stop miss law).
 
@@ -945,17 +945,60 @@ door/stride laws; the p110 claim rows.
    HONESTY: the count values only in-bounds first (4/8/16 — the real
    session shapes; the 16463-class = the PANIC row = the receipt tap,
    separate, one tap per boot, never composed with the spray).
-3. **The discriminator**: post-session, the = (the — the honest rows:
+3. **The discriminator**: post-session — three honest rows:
    the spray pages' content diff (a 0xBB/0x41-class marker landed where
-   a fill wrote = the = (the — the = (the — [the honest read: any
+   a fill wrote: any non-spray-value bytes = the fill's overshoot receipt — the honest read: any
    non-spray-value bytes in a held page AFTER a count-session = the
    fill's overshoot receipt-class = the aimability row].
 4. **p110's pairing**: run the claim-window round INSIDE the same boot
-   (the = (the — the = the honest shape: the p110 round + the
+   (the honest shape: the p110 round + the
    fill-session = the two proven behaviors in ONE window = the
    composition's second axis.
 5. **The gate**: the kread32 receipt law ALWAYS.
 ### Not tonight's (honest OWE list)
 - The door's stride value (the = [q+0x530]+0x260 read = needs the read;
   the config-echo decode = the out+0x20 pair).
-- The AGX GC table + the = (the = (the.
+- The AGX GC table + the *(0x82fea78) tail-object identity.
+
+## 2026-11-01 late — params-blob decode INTEGRATED + the kill-shot triage (the canon 25 cross-ref)
+
+### The params-blob agent's report (a2185c0f; 62 tool-uses, 23F77+24A435 caches) — the DPB count's TRUE intake
+- **VERBATIM: cfg+0x55c == structIn+0x55c — NO REMAP.** The pool-init's site reads the count
+  DIRECTLY from the userland struct-in blob pointer (IO_Prepare, the 0x12c08 blob). The count
+  = sSessionCfg.sEnc.sAlgCfg.sGOP.iNumOfTemporalLayer; +0x560 = its duplicate
+  (AVE_GOP_DecideNumOfTemporalLayer 0x88ba790 str-copies +0x560 -> +0x55c; called once from
+  0x889c234). The VT property path was a different, GOP-path rewrite of the same slot — the
+  BLOB FIELD is the speakable one, not the property.
+- **The setter chain**: cfg+0x550+0x554 pair -> ctx+0xb68; **cfg+0x55c -> ctx+0xb60 (THE
+  COUNT)**; cfg+0x558 -> ctx+0xb70; index=0 (the str site @0x8735fd4-class).
+- **The 3-validator envelope**: (i) the [0,8] CheckInfo assert = LOG-GATED (the weakest —
+  scope disarmed = it only logs); (ii) the D5 verifier 0x873358c (num_ref_frame vs
+  m_MaxDpbSizeForThisProfileAndLevel [clamp16 @0x88ba5dc]; >=17 FAIL; <2 && no-long-term FAIL
+  = HARD 0xe00002bc; [ctx+0x14] bit0 = the <2-skip door candidate) = HARD; (iii) the
+  count-copy itself UNBOUNDED (no capacity check — the pool's only walls = those 3 rows).
+- **The fill transform**: pool entries 0x80-stride from cfg's 0x50-stride records
+  (cfg+0x40 = the first record field) — mapped field-for-field.
+- **Pool-init caller**: FUN_0x889f894 (per-FRAME encode path; 6-condition gate;
+  ctx = frameCtx+0xcb8, pool = frameCtx+0xf98).
+- **BUILDER NEXT (owes)**: a blob-first tap under the no-guessed-shape law — the sGOP
+  section shaped lawfully; the REST of the 0x12c08 blob from the validator-decode notes,
+  never invented. Offsets pins go into T8150_24A435_LabOffsets.h WITH the tap.
+
+### The kill-shot triage (the user's cross-ref push, answered against the corpus 25 canon)
+- "P122 kill-shot" IS in the app (both): rig row `swordforge` — "P122 SwordForge. combined
+  64788 KRW test (freer-reclaim-read)" — and main "P122 SwordForge (combined 64788 KRW test)".
+  Chained by design (freer P009 -> same-CPU mag reclaim -> sel36 raced read -> consumer
+  pending -> gate); lawful verdict: hasKread=NO by law (glue doc: user<->user IOMD;
+  install != KRW; Shape-1 measured 0).
+- The pending row "combined p110-claim + p122-raced-reader on the SAME reclaimed slot
+  (one tap)" = **RETIRED BY CANON**: the 25 note pins the 64788 RECLAIM zone =
+  IOGeneralMemoryDescriptor 0xb0 (variant A) and states NOT variant C (IOSurface+0x30 =
+  a DIFFERENT class) — the two lanes free different classes; a same-slot composition =
+  a guessed shape (the no-guess law). NOT building it.
+- The canon's real PATH A "unrun" kill-shot = LightSword **lsabc D** — RUN + MISSED
+  2026-10-15 (FUTURE.md: spyConfirmed=1 "alias GART is not independent"; [D] vm_remap
+  "not GPU-shared" = 3 independent proofs) -> LightSword PARKED on its own kill-shot miss.
+  PATH A is a parked lane, not an open step.
+- **THE LIVE LADDER tonight**: p147 teardown-cycle (the stale-slot UAF window), the p110
+  (b)-row falsify re-tap (leakgate-on arm), and the blob+0x55c intake law above.
+  NO cross-lane mashups.
