@@ -599,3 +599,34 @@ TTBAT context = the app never reaches it). The SPTM's callers = the
 SPTM-call interface (EL2, SMC-class) = app-unreachable.
 The KRW-on-17's honest lane stays the ROCKET door (the state-band fields =
 the capstone session = next) + the AVE2-class conversion geometry.
+
+
+## THE ROCKET STATE-BAND DERIVATION (24A435 disk cache, capstone) — the pin batch for the FIRST LUM1NA JAILBREAK ON THE 17
+
+The consumer trio + the filler decoded at 0xa03d88c..0xa03da58:
+
+- **the record array**: base = PP+0x48 ([x20+0x48]), count = PP+0x50
+  (u32), stride **0x18**; record row = {+0: tagged ptr (the 0xc8a2
+  tag-check law, eor/prefiltered), +8: u32 value (STR w19), +0x10: u8
+  valid (STRB #1)}.
+- **the filler loop** (0xa03d92c): for i in 0..count: PAC-tag check on
+  the entry ptr; store w19 at [+8]; store 1 at [+0x10]. w19 = the
+  caller's value (the submit's per-entry datum).
+- **the dispatch wrapper above it** (0xa03d8b0): [uc+0x160] lock take
+  (0xa05ebb0/0xa05ebf0 pair), the walker over [uc+0x168] list: PAC
+  autda #0xcda1 + blraa via [vt+0x90]! — **the SAME PAC-dispatch LAW
+  as the IOSurface vt48_setter and the fence chain (the 0xcda1
+  modifier is FLEET-CLASS, on every kext's vt-dispatch)**; per-node
+  call + [node+0x30] next; then the fill loop.
+- **the readback trio**: idx = [entry+0x424] (sxtw); base = PP+0x48;
+  off = idx*0x18 + {8, 0xC}; PAC-safe csel (the 0x2bad modifier on
+  the OOB-catch); fn A returns [+8], fn B returns [+0xC].
+- DERIVATION VERDICT: the state-band's own field set = the record
+  {ptr, value, valid} trio at 0x18 stride; the 17.x/26.x stateControl/
+  stateLength/stateSubmitObject/stateAddressBias names map onto it
+  CLASS-WISE (per the FIELD# law: match by class + stride + slot
+  index, never by KVA). The submit chain (sel 0x24 → owner → 0x88 →
+  res → state 0x530 → PP 0x158 → PP+0x48 array) = CLOSED statically.
+- NEXT: the device row (the Rocket submit sel-0x24 on the 17 via the
+  P045/P065-class UC call with a REAL owner = the tap to build: the
+  sel24 call + the state/readback census = the door's device proof).
