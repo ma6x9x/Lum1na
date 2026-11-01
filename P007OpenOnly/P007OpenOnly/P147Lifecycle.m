@@ -130,6 +130,7 @@ static void p147_spray(id<MTLDevice> mtl) {
 
 /* ---- stage 2: the TEARDOWN-CYCLE BATTERY on a worker pthread ---- */
 static long g_cycles = P147_DEFAULT;  /* the knob — NO temporal-layers property */
+static long g_preset  = 0;            /* the row-preset arm (consume-once)      */
 static NSString *g_refConObj = nil;   /* RETAINED — the ARC-thread law */
 static void *g_refCon = NULL;         /* bare pointer into g_refConObj   */
 static int g_batteryRan = 0;
@@ -295,24 +296,35 @@ static void p147_discriminate(void) {
     L(@"  kread32-gated.");
 
     /* the knob: the cycle count (Documents/p147_cycles.txt, decimal,
-     * default 24, cap 200) */
+     * default 24, cap 200). The ROW-PRESET law: an explicit preset row
+     * (setPresetCycles:) OVERRIDES the file for THIS tap — consume-once,
+     * the source named honestly (the afc-wedge ladder arm: the p146
+     * ladder's push channel is the wedged one; the preset rows need
+     * NO push). */
     long cycles = P147_DEFAULT;
-    NSString *knob = [NSString stringWithContentsOfFile:
-        [docs stringByAppendingPathComponent:@"p147_cycles.txt"]
-        encoding:NSUTF8StringEncoding error:nil];
-    if (knob) {
-        long v = strtol(knob.UTF8String, NULL, 10);
-        if (v > 0) cycles = v;
-        if (cycles > P147_CAP) {
-            Lf(@"[*] knob file present: cycles=%ld > cap — CLAMPED to"
-               @" %d", cycles, P147_CAP);
-            cycles = P147_CAP;
-        } else {
-            Lf(@"[*] knob file present: cycles=%ld", cycles);
-        }
+    if (g_preset > 0) {
+        cycles = g_preset;
+        Lf(@"[*] ROW PRESET: cycles=%ld (overrides the knob file;"
+           @" consume-once — the no-push ladder arm)", cycles);
+        g_preset = 0;
     } else {
-        Lf(@"[*] no knob file: cycles=%ld (the lifecycle default)",
-           cycles);
+        NSString *knob = [NSString stringWithContentsOfFile:
+            [docs stringByAppendingPathComponent:@"p147_cycles.txt"]
+            encoding:NSUTF8StringEncoding error:nil];
+        if (knob) {
+            long v = strtol(knob.UTF8String, NULL, 10);
+            if (v > 0) cycles = v;
+            if (cycles > P147_CAP) {
+                Lf(@"[*] knob file present: cycles=%ld > cap — CLAMPED to"
+                   @" %d", cycles, P147_CAP);
+                cycles = P147_CAP;
+            } else {
+                Lf(@"[*] knob file present: cycles=%ld", cycles);
+            }
+        } else {
+            Lf(@"[*] no knob file: cycles=%ld (the lifecycle default)",
+               cycles);
+        }
     }
     g_cycles = cycles;
 
@@ -384,6 +396,13 @@ static void p147_discriminate(void) {
     }
     Lf(@"=== p147 end %@ ===", LabLocalMilitaryNow());
     return P147R();
+}
+
+/* ---- the row-preset arm (the no-push ladder; consume-once) ---- */
++ (void)setPresetCycles:(long)v {
+    if (v <= 0) { g_preset = 0; return; }
+    if (v > P147_CAP) v = P147_CAP;   /* the cap law holds for presets too */
+    g_preset = v;
 }
 
 @end

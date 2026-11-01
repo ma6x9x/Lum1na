@@ -1020,3 +1020,16 @@ door/stride laws; the p110 claim rows.
   line2 -> p147_cycles.txt (24), line3 -> p148_gop.txt (2) — each with the readback VERIFY;
   single-line = the legacy row; defaults on absent. (The user's catch: v1 wrote only
   p142_layers.txt.)
+
+## 2026-11-01 18:4x — p146 v2's device row + the NO-PUSH LADDER arm (the user's catch, fixed)
+- **p146 v2 (18:44:41)**: the ladder ABSENT -> defaults 18/24/2 written + all three VERIFY
+  rows clean; lswkrw_arm.txt = SET (the leakgate-on class armed); the flags state printed.
+- **The catch: p146's ladder needs a PUSH — and the push channel = the wedged one**
+  (p146_set.txt absent on-device). The setter bypasses the pull-side wedge, not the push-side.
+- **The fix = the ROW-PRESET arm (no push at all)**: dedicated rig rows call
+  P147Lifecycle.setPresetCycles:(v) then tap; the preset OVERRIDES the knob file for exactly
+  one tap (consume-once, cap 200, the source named in the log). Shipped rows: x60, x120,
+  x200 (the cap). The afc push law stays documented as the alternative channel.
+- **p147 18:45:34 = the second calibration row (identical shape)**: 24 cycles, all st=0,
+  ~25-32 ms/cycle, discriminator CLEAN again (0 foreign bytes in 0/64 + 0/16; the clean
+  row class twice in a row), gate FAIL/HOLD. The ladder's climbs = the x60/x120/x200 rows.

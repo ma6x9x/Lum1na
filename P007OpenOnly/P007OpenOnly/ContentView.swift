@@ -164,6 +164,9 @@ struct ContentView: View {
                         moreRow("P146 KNOB SETTER v2 (the afc-bypass law; line-per-knob): p146_set.txt line1 → p142_layers.txt (default 18), line2 → p147_cycles.txt (default 24), line3 → p148_gop.txt (default 2) — each with its readback VERIFY row + the composition flags state. A file utility between taps (no IOKit/Metal/state)", "p146")
                         moreRow("P147 LIFECYCLE (the STALE-SLOT UAF teardown battery): 64 held 0x41 IOSurface-backed Metal buffers + a 16-surface 0x53 marker group, then N FAST VTCompressionSession create→prepare→encode→complete→invalidate cycles (HEVC 1280x720, the stage9 property pack VERBATIM) on a worker thread with the spray LIVE — the codec-instance teardown chase at rate; then the discriminator marker-vs-bytes on every held page. Knob = the CYCLE COUNT (Documents/p147_cycles.txt, default 24, cap 200); the temporal-layers property is RETIRED on this lane. PANIC-POSSIBLE; one tap per force-quit", "p147")
                         moreRow("P148 AVE2 BLOB INTAKE (the params-blob decode, VERBATIM +0x55c = sGOP.iNumOfTemporalLayer, cfg+0x55c == structIn+0x55c NO remap): direct-UC open census -> row0 IO_Open -> row2 IO_Config zero-shape -> row3 IO_Prepare ladder {0,2,4,8} + p148_gop.txt knob IF in [0,8] — a ZEROED 0x12c08 blob whose ONLY set field = +0x55c; the kr verdicts name WHICH hard wall fires first (D5 0xe00002bc class) on the sparse shape. Values >8 = OUT-LAW (refused in-app; the 16463 panic class guarded). PANIC-POSSIBLE; one tap per force-quit", "p148")
+                        moreRow("P147 LADDER x60 (the no-push ladder arm; the row preset 60 OVERRIDES the knob file — consume-once — the teardown chase's first climb; PANIC-POSSIBLE)", "p147x60")
+                        moreRow("P147 LADDER x120 (the row preset 120; the second climb)", "p147x120")
+                        moreRow("P147 LADDER x200 (the row preset 200 = the CAP; the top climb)", "p147x200")
                         moreRow("P140 MINI GROUND-TRUTH VERIFIER (21-D50 cross-ref rig): mach_port_kobject = the SKU-free port→kaddr locator, then — lane live — DIRECT kread of the p138 oracle slots ([+0x98] gate, [+0x34] dmaref, [+0x80] the 21-D50 MD twin slot): the 2c2 op-channel census answered by kernel READ, not by port-guessing. Receipt = kread32(kbase); hunt board NEVER flipped. READ-ONLY", "p140")
                         moreRow("P114. M2ScalerCSC sel-8 leak tap — SOLO leak law validation (p110 v2 pairing gate; {u64} 8B in, serializer records stride 0x7c, rec+0x18 raw KV; N=8 captures + KV table + honest KVA-disclosure class; READ-ONLY; no race)", "p114")
                         moreRow("P115. M2Scaler framework-path PEEK (the tpeek law): bounded CSC battery (IOSurface control + one VT 720p encode), diff the task's SEND ports after each op, fingerprint new ports for the M2Scaler sel-8 no-queue signature (2bf). A framework-opened UC owns a REAL queue — no QueueCreate grammar needed. READ-ONLY", "p115")
@@ -1232,6 +1235,15 @@ struct ContentView: View {
             case "p146", "knobsetter":
                 result = P146KnobSetter.tap()
             case "p147", "lifecycle":
+                result = P147Lifecycle.tap()
+            case "p147x60":
+                P147Lifecycle.setPresetCycles(60)
+                result = P147Lifecycle.tap()
+            case "p147x120":
+                P147Lifecycle.setPresetCycles(120)
+                result = P147Lifecycle.tap()
+            case "p147x200":
+                P147Lifecycle.setPresetCycles(200)
                 result = P147Lifecycle.tap()
             case "p148", "aveblob":
                 result = P148AVE2Prepare.tap()

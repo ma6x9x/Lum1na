@@ -28,6 +28,10 @@ NS_ASSUME_NONNULL_BEGIN
 /// foreign-value row = receipt-class evidence, NEVER a KRW claim;
 /// hasKread stays kread32-gated. One tap per force-quit.
 + (NSString *)tap;
+/// THE ROW-PRESET ARM (the no-push ladder; the afc-wedge law): an
+/// explicit preset row OVERRIDES the knob file for exactly one tap
+/// (consume-once; the log names the source). 0 = none; capped 200.
++ (void)setPresetCycles:(long)v;
 @end
 
 NS_ASSUME_NONNULL_END
