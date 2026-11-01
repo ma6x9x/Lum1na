@@ -132,3 +132,48 @@ Ordering lesson from their Blocker 1: a patch that is right for one build
 can be actively wrong on the next; pre-image guards are not bureaucracy,
 they are what prevents a live kernel corruption. This is exactly the class
 of bug the socket_usecount=0x254 ladder fill fixed for us (2026-10-14).
+---
+
+## The TETHERED-FIRST architecture (2026-10-31 night, user's frame)
+
+**Idea**: the first jailbreak = set up by getting something via the tethered
+USB connection which then feeds our app; untethered after, if possible.
+
+### What the fleet supports TODAY
+- **The 11 Pro Max (A13/T8030) = the tethered platform**: usbliter8 → pwned
+  DFU (bootrom DWC2, iOS-version-independent) → CFW restore (24A446 =
+  "run"-grade per Xplo8E's table; 26.x unsigned → the restore needs the
+  tss_proxy or luck). Boot-permissive TXM = a full unrestricted kernel on
+  xnu-13432 family = the runtime extraction platform: sptm_ops/__DATA_SPTM/
+  kernproc/vm_page + live mach-trap-table (note 271's one-session list).
+- **The 12 mini (A14/T8101, 21-D50) = the ONLY live-KRW rig** (libkrw via
+  Dopamine): the calibration + the mini-first proof rule — our primitives
+  run fully on the mini BEFORE they aim at the hunt (user's directive).
+- **The hunt-12 (A14/T8101, 26.5/23F77) CANNOT be pwned-DFU'd** via
+  usbliter8 (no A14 dispatch — the checkm8 class ends at A12; T8101's
+  SecureROM has no published race). Its first-jailbreak road = the APP route
+  (the 23F77 lanes: the sel-25 raw-submit chain → the p137 stale-window raw
+  test after the vt+0x90 decode) — nothing in the tethered stack reaches A14.
+
+### Image4's role in this chain (decoded tonight, 23F77 AppleImage4 in bridge)
+- AppleImage4 = kernel-internal (no UC, no userland path found): the DER
+  tag-finder + the im4m dump path (BNCH digest length guard PANICS —
+  "panic: digest length overflow" = a guard-by-panic, DoS-shaped only if
+  some lane feeds a user-controlled blob; none found in-app).
+- The TICKET chain stays relevant for the TETHERED side: the 11 Pro Max's
+  CFW restore mints its own apticket via the local tss_proxy (the workflow
+  law: once signing drops, that CFW build = unusable — keep images).
+- Mini-lane fuzz (v2): kcall the image4 parse core ON THE MINI (kcall live
+  via libkrw) with crafted DER shapes — the parser is train-shared code, so
+  a found crash = cross-check the twin parser on 23F77 + find whether any
+  23F77 userland lane reaches it. Requires the 21-D50 AppleImage4 fn VA
+  static decode FIRST (per-segment law; 21-D50 'BNCH' sits at fileoff
+  0x3913b9, prelink-text band = va 0xfffffff0073953b9 is the string, NOT the
+  fn) — load the 21-D50 cache into Ghidra, decode, then the harness.
+
+### The untethered question
+Tethered = per-boot (CFW every boot from pwn DFU). Untethered-after =
+the PERSISTENCE lane (11_PERSISTENCE_HUNT.txt: NVRAM boot-command as app
+plant; USB/NVRAM; panicmedic can clear) — on the A14 hunt the untethered
+stage = AFTER the first app-lane KRW (trust-cache/CS changes = the same
+family the mini's libkrw chain implements; the pipeline = Lum1naBootstrap).
