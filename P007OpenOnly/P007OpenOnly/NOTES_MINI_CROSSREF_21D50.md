@@ -580,3 +580,22 @@ Laws this pins:
   0x8000 law) → the writer-PC's segment + the site's disasm via
   capstone (the 24A435 kexts on disk incl. AppleAVE2/AVEVTSmoke class
   = the local decode ready).
+
+
+## SPTM-t8150 opened (the user's loaded blob = sptm.t8150.release.bin's own Mach-O)
+The pins re-verified LIVE in the loaded session: remove_ctx_id 0x270b7ab0
+decompiles with the ttbat-lock GLOBAL +0x60/0x78/0x138 + the s3_6_c15_c11_1
+per-cpu + the flag-byte +0x1628 = the 820-era pins byte-true.
+Decoded body: ctxid u16 @+0x18, cap 0x3f (panic 0x4000019); the ctx-array
+in-use slot [+0x20 + ctx*0x18] must be ZERO else panic 0x4000016; the
+TTBAT entries (GLOBAL+0x78 + ctx*0x10) must BOTH be bit0-valid else panic
+"Valid context ID but the TTBAT already contains invalid entries"; the
+LOCK byte [+0x60] = panic 0x400001a if already set (the mutex shape!);
+then BOTH TTBAT validity bits get cleared, then [+0x80 bit0] branch.
+HONEST VERDICT: the SPTM = NOT the easier target. The fn's state machine =
+bounds+locks+in-use checks (the "ungated" part = only the missing DEKKER
+pair — a RACE shape, but it must be entered from kernel code holding the
+TTBAT context = the app never reaches it). The SPTM's callers = the
+SPTM-call interface (EL2, SMC-class) = app-unreachable.
+The KRW-on-17's honest lane stays the ROCKET door (the state-band fields =
+the capstone session = next) + the AVE2-class conversion geometry.
