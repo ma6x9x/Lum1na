@@ -6,10 +6,10 @@ import SwiftUI
 /// `BoardEnergyLayer` animates on top. Under Reduce Motion / Motion Off the
 /// lit state crossfades between run steps instead of animating.
 struct CircuitBoardView: View {
-    /// Background-only drop. Tiles and the star stay put; the PCB hub moves
-    /// down into the 2×2 gap. 128pt (was 64, still high on device, 2026-11-01).
-    /// Bump this if the hub is still above the star.
-    static let hubDrop: CGFloat = 128
+    /// Background-only drop from the original alignment (0). Tiles, star,
+    /// console, and PATCH stay put. 24pt is a tiny nudge down — 40 was still
+    /// low, and 88/128 pushed a second hub under the console.
+    static let hubDrop: CGFloat = 24
 
     /// Hero frame in global coordinates; `nil` centres a default hero (sheets).
     var heroFrame: CGRect?
