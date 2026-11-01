@@ -97,7 +97,7 @@ static void p145_spray(id<MTLDevice> mtl) {
         if (base) { memset(base, P145_FILL_A, P145_LEN); }
         g_hold[g_nHold] = b; g_holdBytes[g_nHold] = base;
         Lf(@"[s1] 0x41-group[%02d] buf=%p len=0x%x fill=0x41 hold=%d",
-           g_nHold, (void *)b, (unsigned)P145_LEN, ok);
+           g_nHold, (__bridge void *)b, (unsigned)P145_LEN, ok);
         g_nHold++;
     }
     for (int i = 0; i < P145_MARKERS; i++) {
@@ -113,7 +113,7 @@ static void p145_spray(id<MTLDevice> mtl) {
         if (base) { memset(base, P145_FILL_B, P145_LEN); }
         g_mark[g_nMark] = b; g_markBytes[g_nMark] = base;
         Lf(@"[s1] 0x53-group[%02d] buf=%p len=0x%x fill=0x53 hold=%d",
-           g_nMark, (void *)b, (unsigned)P145_LEN, ok);
+           g_nMark, (__bridge void *)b, (unsigned)P145_LEN, ok);
         g_nMark++;
     }
     Lf(@"[s1] spray HELD: %d x 0x41-group + %d x 0x53-group (released"
