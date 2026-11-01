@@ -32,7 +32,7 @@
 #import <stdlib.h>
 #import <unistd.h>
 
-#define P142_BUILD   @"p142-avetemporal-v2-faithful"
+#define P142_BUILD   @"p142-avetemporal-v3-boardgate"
 #define P142_KEY     @"NumberOfTemporalLayers"
 #define P142_DEFAULT 16463         /* the PoC's trigger threshold */
 #define P142_SURVIVE 16462         /* the PoC's surviving value */
@@ -185,23 +185,35 @@ static void p142_bandit(const char *outcome) {
     CFRelease(session);
     L(@"[5] session invalidated (a clean return = survived this count)");
 
-    /* the honest KRW self-test tail (survival only; never a read claim) */
+    /* the honest KRW self-test tail (survival only; never a read claim).
+       v3 gate law: the board-first route — the app-sandbox wall zeroes the
+       libkrw glue's kbase() (tonight's mini law), so the gate checks the
+       BOARD's committed slide + its registered kread32Fn, and falls back
+       to the lane API. */
     L(@"=== STAGE GATE (honest KRW self-test) ===");
-    if (!P007LaneLive()) {
-        L(@"  lane: CLOSED -> no receipt this session. Honest.");
-        p142_bandit(layers == P142_DEFAULT ? "lane-closed-poc-row" :
-                    "lane-closed-knob-row");
-    } else {
-        uint64_t kb = P007LaneKbase();
-        if (kb && P007LaneKRead32(kb) == 0xfeedfacfULL) {
+    {
+        P007Board *brd = [P007Board shared];
+        uint64_t kb = brd.kbase ? brd.kbase : P007LaneKbase();
+        P007Kread32Fn rfn = [brd kread32Fn];
+        BOOL pass = NO;
+        if (kb && rfn) {
+            BOOL okNo = NO;
+            pass = (rfn(kb, &okNo) == 0xfeedfacfULL) && okNo;
+        } else if (kb && P007LaneLive()) {
+            pass = (P007LaneKRead32(kb) == 0xfeedfacfULL);
+        }
+        if (pass) {
             Lf(@"  KRW SELF-TEST READ: PASS (kbase=%#llx)",
                (unsigned long long)kb);
             p142_bandit("selftest-read-pass");
         } else {
-            L(@"  KRW SELF-TEST READ: FAIL/HOLD");
+            Lf(@"  KRW SELF-TEST READ: FAIL/HOLD (board-kbase=%lld lane-kbase=%@)",
+               (long long)brd.kbase,
+               kb ? [NSString stringWithFormat:@"%#llx",
+                     (unsigned long long)kb] : @"0");
             p142_bandit("selftest-read-fail");
         }
-        Lf(@"  board: %@", [[P007Board shared] kreadSignal]);
+        Lf(@"  board: %@", [brd kreadSignal]);
     }
     Lf(@"=== p142 end %@ ===", LabLocalMilitaryNow());
     return P142R();
