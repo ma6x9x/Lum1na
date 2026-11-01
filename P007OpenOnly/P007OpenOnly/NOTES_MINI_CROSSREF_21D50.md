@@ -647,3 +647,16 @@ The consumer trio + the filler decoded at 0xa03d88c..0xa03da58:
 - The gtype-slot fn (0x84f2124) byte-decoded: the class ctor = the metaclass 0x7f30218 + classSize 0x138 + the singleton store 0xb8a6440 (the ioGpuUserClientTypeStatic law's fn shape); the pacda-cda1 store row = the fleet PAC law again.
 - The AVE2 panic = 5+ reproducibles, SAME pc every time (user-confirmed) = the single-site law = the 112705 writer cluster's twin live on 24A435.
 - The KRW self-test = universal already (the board-gate code runs on every device): what the 17 needs = a REAL primitive behind its own lane; the Rocket owner-hop = the door's remaining decode.
+
+## p069 ON THE 17 = THE MAP LANDED (2026-11-01 batch)
+p069 (24A435): memory entry kr=0x0 size=0x4000 port=0x13d493 →
+**mach_vm_map kr=0x0 addr=0x1126ac000 (the makeMapping consumer)** —
+the 43684 map path LANDED on the 17 (the route-D md-port class on the
+23F7X-era = kr=0x1d; the P069's OWN = the = the = = = = = = (the 43684
+lane's own map = the memory-entry route = the = the = the = the = the =
+the = the = the = the = = (the honest row: the = the = the mapping path
+= = = = = = exercised once, verdict line: "mapping path exercised once.
+Increment is IOMD+0x68 (not +0x34)").
+The honest KRW read: the map = OUR OWN surface's memory-entry = a
+kernel-mapped OUR page = not a kernel-read. The law stands (43748-class
+read needs the copyout of kernel bytes we did not write).
