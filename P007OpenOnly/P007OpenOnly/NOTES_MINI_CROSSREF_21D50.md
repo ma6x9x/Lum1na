@@ -424,3 +424,41 @@ The fix paths (per the skill's existing plan):
   decode whether adjacency without contiguity is obtainable).
 - The mini-first proof rule = SATISFIED for this class (21-D50 = the
   whole engine verbatim-working = the proof the algorithm is sound).
+
+
+## The 17's cs2 run + watchdog (2026-10-31/11-01) — the law now 3-device-pinned
+
+- The 17 (iPhone18,2 / 24A435 / T8150) cs2 verbatim = the IDENTICAL failure
+  mode as the hunt-12's: `oob try0: w=4096 errno=60 (win-cap=0)`,
+  `oob_read kr=0x5`, mappings 0x8000000 all scanned, log ends mid-run.
+  gencnts = 0x1ba2cac.. (large sequential — the gencnt law train-stable
+  there too). So the contig-window death = 12/23F77 + 17/24A435 both;
+  the 21-D50 mini = the ONLY train where the window is alive.
+- **The watchdog = the APP-side watchdog, not a kernel event**: the app's
+  main thread blocked inside the cs2 C loop = the 0x8badf00d-class abort;
+  no kernel receipt (no bug_type-110/110-class panic) from it. The cs2
+  body blocking the main thread = a probe-harness law — future cs2 runs
+  should run the C body on a WORKER thread (or the tap = the watchdog
+  kill mid-hammer every time).
+- T7 (krw7 phys-map, all passes) honest reading:
+  - MapMemory sweeps on IOGPU/IOSurfaceRoot/AppleCLCD2 + DART/AVE/AES:
+    maps_ok=0 everywhere (2c1/2c2) = NO MMIO window via those UCs.
+  - The ONLY window T7 landed = STEP 4's **PurpleGfxMem + IOSurface
+    CacheMode 0x100** (base+size rows every boot) — the
+    uncached-MMIO-mapping trick (Trigon logic) = the same WINDOW class
+    as the physmap STORE lane (CVE-2026-43724: physmap(PPN<<14)+acc,
+    NO acc clamp on 23F77 — the lab's own live-23F77 STORE family,
+    parked as "not app-reachable" since note 230).
+  - The tie-in that matters: T7's CacheMode lane and the 43724 physmap
+    lane = the SAME uncached-mapped-window class. If the 43724 lane
+    proves app-reachable on 23F77 (or the T7 window trick reaches the
+    physmap band), THAT = the first-jailbreak window answer the user
+    is pointing at honestly (write into the window = kernel memory of
+    the physmap band; 43722's LOAD = the kread mirror).
+  - The tethered CFW (11 Pro Max boot-permissive, TFP-unrestricted) =
+    the platform to validate the physmap-window MECHANICS once.
+- So the T7 direction = honest and live: the physmap-window lane = the
+  answer-holder candidate; next decode = the 23F77 physmap
+  slide_page/physmap-band twin of the 27.x b3e7440 translator + the
+  43724 STORE's user-reachable caller hunt (the parked P054/P046-class
+  oracle).
