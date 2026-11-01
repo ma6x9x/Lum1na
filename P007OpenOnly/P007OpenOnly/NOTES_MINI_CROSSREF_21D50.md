@@ -630,3 +630,14 @@ The consumer trio + the filler decoded at 0xa03d88c..0xa03da58:
 - NEXT: the device row (the Rocket submit sel-0x24 on the 17 via the
   P045/P065-class UC call with a REAL owner = the tap to build: the
   sel24 call + the state/readback census = the door's device proof).
+
+## p143's device row (17/24A435) — the door's census landed
+- [1] IOGPU open t1 = kr=0 (conn=0x6f13): t0 = 2c7, t1 = OURS (the live
+  IOGPU connect on 27.0 = the p115 real-queue class).
+- [3] the census: sel 0x24 + 0x20..0x29 = all 0xe00002c2 with the
+  zeros-in call = the OWNER-GATE reply class (the fn reads [uc+0x120]
+  first; NULL owner = bail = the designed reply row).
+- NEXT HOP = the owner-carrying call: populate [uc+0x120] via a REAL
+  resource/owner attach to this connect (the ioGpuUserClientTypeStatic
+  row = 0x7f20260 via the gtype-slot fn), then sel 0x24 with the REAL
+  pair. Door talk = the submit; door silence = the 2c2 wall named.
