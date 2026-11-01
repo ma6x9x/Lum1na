@@ -329,3 +329,27 @@ path is NOT unlocked by this tonight. The remaining levers:
    nothing yet) — the hammer + replug A/B = still possible.
 4. The 26.5 (23F77) in-app oracle = the IPA tap (the p018 law runs there
    TODAY for IOSurfaceRoot; the USB row = the same tap's neighbor).
+
+
+## p018 v3 receipts (A19 Pro = the 17 + A14 = the mini; the hunt-12 run still owed)
+
+- sel36 {id,0,0x1000} = SUCCESS on both (sout send right, refs=1).
+- **mach_port_kobject on the sout: type=0x1b, kr=0, addr=0** — the locator
+  returns the TYPE but HIDES the kaddr on modern iOS = the kaddr source
+  stays the kread/kcall class (the p140 plan holds; the locator-only hop
+  does NOT ship the object address).
+- AppleJPEGDriver OPENS in-app on both (conn=0xf133/0x6523); the
+  dest=surfaceID encode = `0xe00002cc` ×5 on both = the JPEG-dest CANNOT-
+  LOCK wall = **train-stable** (17 and mini, same wall).
+- GetBaseAddress = 0x0 before AND after IOSurfaceLock (kr=0) on both:
+  the surface stays kernel-only for our app even locked.
+- **IOSurfaceRoot IOServiceOpen = SUCCESS in-app on BOTH** (conn=0x f463/
+  0xbd03) — confirms the root-2e2 row = a context law (the frida-root CLI
+  sleep lacks something the GUI app has), NOT a fleet wall.
+- The root-UC method sweep sels 0-31, scIn 0/1(id) = ALL silent 2c2
+  (both hosts) = the grammar wrong per-method (blind = dead), matching
+  the K2K/contract law. The IOSurfaceRootUC's sMethods decode = the
+  Ghidra static step (IOSurface kext in the 23F77 cache) BEFORE any
+  further in-app sweeps.
+- p018 verdict rows: "WALL STANDS all attempts" = the IOSurfaceID-lane
+  stays closed on BOTH devices.
