@@ -29,7 +29,7 @@
 #import <stdlib.h>
 #import <unistd.h>
 
-#define P143_BUILD @"p143-rocketdoor-v3-lawshape"
+#define P143_BUILD @"p143-rocketdoor-v4-qidlaw"
 
 /* P069 no-header law: local prototypes only */
 typedef mach_port_t p_ioservice_t; typedef mach_port_t p_ioconnect_t;
@@ -150,10 +150,19 @@ static void p143_bandit(const char *outcome) {
         if (kr == 0) {
             for (uint32_t oi = 0; oi + 8 <= 0x40; oi += 8) {
                 uint64_t v; memcpy(&v, qob + oi, 8);
-                if (v && v <= 0xffffffffull && ourQid == 0) ourQid = v;
                 Lf(@"    out+%#x = 0x%016llx", oi, (unsigned long long)v);
             }
-            Lf(@"[3a] the 1-based qid candidate (first u32-shaped nonzero) = %llu",
+            /* v4 qid law (the two-boot rows): out+0x18 = 1 then 2
+               across boots = the boot-monotonic queue COUNTER - THE
+               QID (1-based = the owner table's index law). The v3
+               grab (out+0 = 0x4340) = the WRONG field - retired. */
+            memcpy(&ourQid, qob + 0x18, 8);
+            ourQid &= 0xffffffffull;
+            if (ourQid == 0) {
+                L(@"    +0x18 zero - falling back to qid=1 (the fresh boot law)");
+                ourQid = 1;
+            }
+            Lf(@"[3a] THE QID = out+0x18 = %llu (the boot-counter law)",
                (unsigned long long)ourQid);
         }
     }
