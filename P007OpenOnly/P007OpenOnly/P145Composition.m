@@ -123,7 +123,8 @@ static void p145_spray(id<MTLDevice> mtl) {
 
 /* ---- stage 2: the stage9 fill session ON A SECOND THREAD ---- */
 static int g_layers = P145_DEFAULT;
-static void *g_refCon = NULL;      /* the completion refCon (P142 law) */
+static NSString *g_refConObj = nil;   /* RETAINED — the ARC-thread law */
+static void *g_refCon = NULL;         /* bare pointer into g_refConObj   */
 static int g_fillRan = 0;
 
 static void *p145_filler(void *ctx) {
@@ -144,10 +145,10 @@ static void *p145_filler(void *ctx) {
 
     OSStatus sUsage = VTSessionSetProperty(session,
         (__bridge CFStringRef)@"EncoderUsage",
-        (__bridge CFTypeRef)@1);
+        (__bridge CFTypeRef)[NSNumber numberWithInt:1]);
     OSStatus sRC = VTSessionSetProperty(session,
         (__bridge CFStringRef)@"RCMode",
-        (__bridge CFTypeRef)@20);
+        (__bridge CFTypeRef)[NSNumber numberWithInt:20]);
     VTSessionSetProperty(session, kVTCompressionPropertyKey_RealTime,
                          kCFBooleanFalse);
     CFStringRef key = (__bridge CFStringRef)P145_KEY;
@@ -328,6 +329,10 @@ static void p145_discriminate(void) {
     }
     Lf(@"[s1] Metal device: %@ (IOSurface-backed buffers, 0x4000-class)",
        [mtl name]);
+    /* the refCon: RETAINED before the thread (the ARC-thread law — the
+       bare-bridge on the arc-local docs = the 0x10-release crash class) */
+    g_refConObj = [docs copy];
+    g_refCon = (__bridge void *)g_refConObj;
     p145_spray(mtl);
 
     /* ---- STAGE 2: the fill session INSIDE the live spray ---- */
@@ -336,10 +341,10 @@ static void p145_discriminate(void) {
         L(@"[s2] SKIPPED (the guard above) — no fill session composed");
     } else {
         pthread_t th;
-        g_refCon = (__bridge void *)docs;
         pthread_create(&th, NULL, p145_filler, NULL);
         pthread_join(th, NULL);
         g_refCon = NULL;
+        g_refConObj = nil;
         if (g_fillRan == 1) {
             p145_bandit("composed");
         } else {
