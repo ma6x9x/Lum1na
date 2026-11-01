@@ -353,3 +353,38 @@ path is NOT unlocked by this tonight. The remaining levers:
   further in-app sweeps.
 - p018 verdict rows: "WALL STANDS all attempts" = the IOSurfaceID-lane
   stays closed on BOTH devices.
+
+
+## The cs2 ret=5 differential (12-mini WORKS / newer dies) — first decode
+
+The user's frame: cs2 flips kread/kwrite on the mini but on the newer
+devices the engine "keeps going" and ends ret=5, Unable to find kaddr.
+
+Decoded chain (Exploit/ClearSwordCore/krw.c + socket.c + LightSword.m):
+1. `cs2_set_target_kaddr` (krw.c): the kwrite window = setsockopt
+   ICMP6_FILTER over the control socket; invalid-kaddr = the window
+   drifted (log-first-3 law in place).
+2. The DISCOVERY = `cs2_find_and_corrupt` (socket.c:87): OOB-reads the
+   mapped window, then `memmem(executable_name)` over the zone bytes,
+   then REVERSE-memmem back to `corrupted_filter_marker =
+   0x0000ffffffffffff` (= icmp6filt NULL + chksum -1 + hops -1), then
+   `pcb_start = filter_off − (icmp6filt + 8)`. Source comment:
+   "assume inpcb base = the 0x400-round-down, that's not true for < 17"
+   = the scan is LAYOUT-dependent (17.x-era law = 21-D50 ✓ WORKS).
+3. og info.c authority for the offsets on 26.5: inpcb rows INHERITED
+   from the 23.x branch — icmp6filt stays **0x148**, chksum 0x150,
+   list_next 0x20, socket 0x40; socket.usecount = **0x23c** (the iOS-26
+   branch). OUR A14_23F77 table matches (0x23c ✓) — the offsets are NOT
+   the ret-5 cause.
+4. So the ret-5 lives in the SCAN anchors on darwin-25: either the
+   corrupted-filter layout shifted (an added/moved field between
+   icmp6filt and hops — the xnu-12377 source IS on disk:
+   ios-xnu-hunt/xnu-src/xnu-12377 — struct-walk gives icmp6filt ≈
+   0x13c by MY hand sizes = imprecise, ±0xc off the device law) or the
+   executable_name member's position moved, or the mapped window
+   (IOSurface OOB map on 26.5) changed.
+
+NEXT: the failing log = the 12's cs2_krw_log.txt — the pull HUNG
+(device off USB). Replug the 12, pull, and match the loop lines against
+the four law candidates above (marker law / exec-name law / window
+law / offsets — offsets already cleared).
