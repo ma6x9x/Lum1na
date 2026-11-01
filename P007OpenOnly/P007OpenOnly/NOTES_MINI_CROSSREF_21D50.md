@@ -257,3 +257,43 @@ iokit.OSEntitlements) = the kernel-side ENT SOURCE the p117 law reflects.
    locate getOSEntitlementsFromProcSecure + the gOSDict/ent table →
    via the ROOT lane kcall = the kernel-side ENT dump for any pid
    (our app vs a jb tweak vs SpringBoard) = the p117 law's ground truth.
+
+
+## IOUSBDeviceFamily opened (23F77 kext via the bridge) — the device-side USB hunt
+
+Identity: kext band __text 0x98ad310-0x98d530f, cstrings 0x77a0e58+;
+the mini's cache carries the same family (AppleT7000USBOTGDevice rows) =
+both trains. It services the DEVICE-mode USB (the phone as a USB device =
+every afcclient/iproxy session) — matches the lab's USB-hang corpus.
+
+- **gate census: ZERO IOUserClientEntitlements rows in the whole kext band
+  (23F77)** and no USB row in the 21-D50 census either = the USB device
+  Family = **KEY-VOID / ungated UC space** (the gold the user predicted).
+- **IOUSBDeviceInterfaceUserClient::start = FUN_98bcb60**: NO entitlement
+  check at all — provider + WorkLoop + _commandGate + _classCommandTimer
+  (FUN_98bc6d0). A TIMER-DRIVEN polling UC = the lock/wait shape behind
+  the hang symptoms.
+- **handleUserlandCommand = FUN_98bec80**: the userland-command
+  multiplexer (visible branch = SetDebugFlag; flag store at [self+0x1dc],
+  commands carry vt-multiplexed subops; string = the dispatch log tag;
+  zero direct xrefs = vtable-dispatched = an index-reachable UC method).
+- The class family: IOUSBDeviceInterface (the service), IOUSBDevicePipe,
+  IOUSBDeviceControlRequest (+ its debug variant), IOUSBDeviceLib plugin
+  (the IOCFPlugIn the userspace side loads).
+- Ent keys touching USB in the cache: com.apple.developer.driverkit.
+  transport.usb (DriverKit-side, not app-relevant), com.apple.private.
+  usbdevice.setdescription, com.apple.usb.{authentication,externaldevice.,
+  hub.} — none = an IOUserClientEntitlements row for the FAMILY.
+
+### Reachability question (the next oracle)
+IOServiceMatching("IOUSBDeviceInterface") + IOServiceOpen type 0 from an
+app = UNKNOWN on both trains (device-mode nubs are often
+controller-owner-only; the answer = one bounded census tap). RISK NOTE:
+any USB wedge during the probe = the lab link itself (one open + bounded
+sel sweep; run on a device with no active afcclient session, or accept a
+possible reconnect).
+### The hang-panic cross-ref (do on the next corpus pass)
+The lab's USB hangs during earlier sessions decode against this kext's
+_commandGate/_classCommandTimer pair (the timer-driven UC). When the
+hang .ips class gets triaged, match writer-PC/thread against 0x98bc6d0
+(the timer) and 0x98bec80 (the command mux) FIRST.
