@@ -699,3 +699,37 @@ The night's misses (all honest, all now measured on the 17):
 MIE note: the MIE camp (the tracker's frame) = the demo-class device
 work; our live lanes tonight = kernel-object/VT/IOKit class = not
 MIE-dependent; the chain composition note stays in the ledger.
+
+## THE ROCKET DECODE REPORT (agent #1, 24A435 cache) — the corrections + the gap rows
+- **NO selector writes [uc+0x120]**: the owner = minted at OPEN time by
+  `deviceUserClientStart` (0xa024970): the value = the [uc+0xf8]-object's
+  vt+0x588 blraa return, args = the client task/token [uc+0xd8] +
+  [uc+0x128]; then 0xa05ed00 → [uc+0xe8]; then 0xa0403b8(owner) checks
+  "com.apple.private.gpu-restricted" / "developer.gpu-restricted" →
+  sets [uc+0x103] bit = the TABLE-CHOICE boolean (open-time, not a
+  per-submit gate).
+- **THE ROW-NUMBER CORRECTION (off-by-11)**: the submit fn 0xa02299c =
+  **sMethods row 0x19** (both tables; the pinned "sel 0x24" = the
+  index wrong, fn VA right). Row law: {fn (0x8030-AUTH-fixup), kind@+8,
+  checkIn@+0xc (0xffffffff = variable), out@+0x10, aux@+0x14}.
+  A[0x19]: kind=4, variable struct-in, out=1; the asserts name the
+  input laws ("cmdBufArgSize does not match config" / "total size
+  overflow (%llu * %llu)") — **the SAME assert-string set as the
+  23F77 sel-25 chain's = the 27.0's row-0x19 = the sel-25 machine's
+  TWIN (cross-train law)**.
+- **NO ENTITLEMENT CHECK in the submit row's first 0x150 bytes** — the
+  door's real gate = the INPUT SHAPE only. The owner-getter row 0x37
+  (0xa0240cc, cin=0/out=scalar, reads [owner+0xfc] bit0) = the closest
+  userland-visible owner row.
+- **THE VALIDATION GAPS (the new lead class on the SAME UC)**: (i)
+  0xa021afc = release-then-clear: the owner object RELEASED before
+  [uc+0x120] zeroed (+0x110/+0x108 same) and the release path's
+  locking vs the readers' device lock (the 0xa040878/0xa01fbf8 pair)
+  = not evidenced in-band = **the 64788 stalepage/wrapper-lifetime
+  family's shape on the SAME owner field**; (ii) deviceUserClientStart
+  writes the owner with no previous-value check (idempotence unverified);
+  (iii) [uc+0x128] consumed into the minting call, teardown zeroed
+  only — bound unestablished.
+- B0nus: the kext's assert strings name every s_ handler (s_new_resource
+  0x79944a6, s_submit_command_buffers 0x799461d, ...) — the row-by-row
+  sel naming = derivable (the fnnames script pattern, /tmp/gpu120/).
