@@ -138,3 +138,4 @@
 #import "P141UsbStockholm.h"
 #import "P142AVETemporal.h"
 #import "P143RocketDoor.h"
+#import "P144AVE2Config.h"

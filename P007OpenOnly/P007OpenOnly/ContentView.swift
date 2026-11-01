@@ -159,6 +159,7 @@ struct ContentView: View {
                         moreRow("P141 USB/STOCKHOLM REACHABILITY ORACLE (SKU-free): the USB device-mode family (IOUSBDeviceInterface match+open+census — the mini law: match OK in-app, open=2e2 owner-held) + the Stockholm/hammerfest control UC (the nfc.disableentitlements PEBL switch = the kext's OWN gate-void). One open per lane, census then close; any kr=0 = the fleet comparison row. READ-ONLY", "p141")
                         moreRow("P142 AVE2 TEMPORAL-KNOB (CVE-2026-112705, PUBLIC VECTOR, credited MMdAS/Calif): VT compression session with NumberOfTemporalLayers=16463 (16462 survives) then ONE encode — the AVE2 kernel OOB write at +0xDA78 with the count-scaled fault word = the lab's fill-store geometry with a LIVE knob. PANIC-POSSIBLE BY DESIGN = the count receipt; one value per tap (Documents/p142_layers.txt)", "p142")
                         moreRow("P143 ROCKET SUBMIT DOOR (the 17, 24A435; the state-band DERIVED: record array {ptr,+8 u32,+0x10 valid} @0x18 at PP+0x48, owner UC+0x120, the 0xcda1 fleet PAC law — static chain CLOSED): the IOGPU UC open + the sel-0x24 submit-row census with the real-resource law. PANIC-POSSIBLE; one tap", "p143")
+                        moreRow("P144 AVE2 IO_Config MASK INTAKE (the agent-named knob, 24A435): row 2 = IO_Config (structIn 0x38; the u64 at +0x30 = the RAW mask, unvalidated store) after IO_Open; the mask consumer = the encode-loop map step to the boundless write-through mapper. State-machine rows; PANIC-POSSIBLE; one tap", "p144")
                         moreRow("P140 MINI GROUND-TRUTH VERIFIER (21-D50 cross-ref rig): mach_port_kobject = the SKU-free port→kaddr locator, then — lane live — DIRECT kread of the p138 oracle slots ([+0x98] gate, [+0x34] dmaref, [+0x80] the 21-D50 MD twin slot): the 2c2 op-channel census answered by kernel READ, not by port-guessing. Receipt = kread32(kbase); hunt board NEVER flipped. READ-ONLY", "p140")
                         moreRow("P114. M2ScalerCSC sel-8 leak tap — SOLO leak law validation (p110 v2 pairing gate; {u64} 8B in, serializer records stride 0x7c, rec+0x18 raw KV; N=8 captures + KV table + honest KVA-disclosure class; READ-ONLY; no race)", "p114")
                         moreRow("P115. M2Scaler framework-path PEEK (the tpeek law): bounded CSC battery (IOSurface control + one VT 720p encode), diff the task's SEND ports after each op, fingerprint new ports for the M2Scaler sel-8 no-queue signature (2bf). A framework-opened UC owns a REAL queue — no QueueCreate grammar needed. READ-ONLY", "p115")
@@ -1220,6 +1221,8 @@ struct ContentView: View {
                 result = P142AVETemporal.tap()
             case "p143", "rocketdoor":
                 result = P143RocketDoor.tap()
+            case "p144", "ave2config":
+                result = P144AVE2Config.tap()
             case "p099", "anegroom":
                 result = P099AnePrewireGroom.tap()
                 if result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
