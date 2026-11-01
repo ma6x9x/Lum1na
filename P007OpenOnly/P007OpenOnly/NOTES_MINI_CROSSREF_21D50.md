@@ -497,3 +497,17 @@ The fix paths (per the skill's existing plan):
 - The UCD method census for Stockholm = the next static decode (the
   default-locking mode carries the assertless methods; the fuzz surface =
   once an open lands in-app, the 16-sel sweep names the talking sel).
+
+
+### The AudioDMAController hunt (17-only kexts, decoded)
+- AudioDMAController-T8150.macho (0x8410) = the DMA-engine driver
+  (ADMAChannel/StateMachine/TransferDescriptorBuilder/AXI-burst) — **NO
+  UserClient strings at all**.
+- AudioDMAFamily.macho = the M2M/ISOC/BULK stream family: aperture
+  VA/PA/length asserts, transfer-size gates, `setExclaveProxyServiceName`
+  = the EXCLAVE-proxy path (AppleEXC services), not a direct app UC.
+- Verdict: not a first-class app lane on the 17 either; the x2-speed
+  symptom = A/V timebase skew class (symptom note, not a lane).
+- The 23F77 (12) cache: NO AudioDMAController at all (13,2 uses
+  AppleEmbeddedAudio) — the 17-only family parked unless the exclave
+  proxy path gets a lane later.
