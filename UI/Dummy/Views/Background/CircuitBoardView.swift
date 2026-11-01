@@ -7,9 +7,9 @@ import SwiftUI
 /// lit state crossfades between run steps instead of animating.
 struct CircuitBoardView: View {
     /// Background-only drop from the original alignment (0). Tiles, star,
-    /// console, and PATCH stay put. 40pt is a slight nudge down from Kolby's
-    /// original shot — 88 and 128 pushed a second hub under the console.
-    static let hubDrop: CGFloat = 40
+    /// console, and PATCH stay put. 24pt is a tiny nudge down — 40 was still
+    /// low, and 88/128 pushed a second hub under the console.
+    static let hubDrop: CGFloat = 24
 
     /// Hero frame in global coordinates; `nil` centres a default hero (sheets).
     var heroFrame: CGRect?
