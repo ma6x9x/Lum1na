@@ -866,3 +866,44 @@ entitlement/policy strings anywhere in the row-fn region.
 - Also: the state machine's gates on IO_Config = "IO_Open first"
   (m_pcIODrv != null && the notification port == 0).
 - AVE2 fileset: LC_FILESET_ENTRY idx 35; the fixup law re-proved.
+
+## AGENT-#2's REPORT — the 2c2 mystery SOLVED + the door's full userland law
+1. **The all-2c2 = the PROBE's shape flaw**: every row validates its OWN
+   input counts in-band (s_submit: scalarInputCount != 4 → 2c2 directly;
+   the cin=0 rows reject a 4-scalar call!) — the uniform probe could
+   never satisfy two shapes. The asyncReference gate = also real.
+2. **THE GATE POLARITY = REVERSED**: gate fn 0xa024d94 (the vtable row
+   0x82f6378): [uc+0x103] bit0 SET → table B (the 0x82f69f0 stub-table:
+   rows 15-0x36 = the 2e2-stub fn 0xa0240d8!); bit0 CLEAR → table A
+   (0x82f64b0 = FULL). [uc+0x103] = set by deviceUserClientStart via
+   0xa0403b8 = the gpu-restricted PAIR of strings = "client IS
+   restricted" → the RESTRICTED app gets the stub! OUR UNRESTRICTED
+   app = bit0 clear = TABLE A FULL. [uc+0x100] bit0 = the
+   dispatch-armed law (0 = 0x2d8 NotReady — NOT 2c2).
+3. **THE TYPE LAW**: newUserClient 0xa04e5b0: ONLY type 1 = the
+   IOGPUDeviceUserClient (type 0 = 2c2-refused outright; type 0x21 =
+   the MemoryInfo UC). Our p143's type-1 connect = the right class.
+4. **THE SUBMIT'S USERLAND SHAPE (complete)**:
+   - scalars {s0 qid 1-based (0→lookup fail), s1 count, s2 stride,
+     s3 unused}; structIn = count×stride; **SIZE LAW: structureInputSize
+     == count*stride exactly** (else "bad structureInputSize").
+   - stride MUST == *(u32*)([queue+0x530]+0x260) ("cmdBufArgSize does
+     not match config") — THE 27.0 stride-law source pinned!
+   - entries: +0x10 u64, +0x18 u64 (both to the per-element submit;
+     +0x10 nonzero = the SECOND wait/copy via [q+0x430]), +0x20 u32
+     gate (nonzero = the refresh path via [q+0x488] then vtbl+0x80).
+   - lookup: owner [uc+0x120] → +0x88 registry → mutex @+0x20 → table
+     @+0x10, count @+0x28 (8-byte ptr array, 1-BASED).
+   - pre-checks: FUN_0xa050604([q+0x530],q) nonzero else 0x2d7 Offline;
+     q+0x428/q+0x488 non-null else 0x2bc.
+   - **OUTPUT: scalarOut[0] = (u32)*(q+0x520) — 8 = submit-creation
+     FAILED, 0 = CLEAN** (also stored into [cfg+0x2e0] after the loop).
+   - the 23F77's sel-25 4-scalar shape = the SAME machine (the cross-
+     train twin CONFIRMED; the stride-law's source = now pinned).
+5. Honest unknowns: rows 1-24's per-row names (heuristics only); the
+   AGXDeviceUserClient table (ctor 0x84f21b4/gMeta 0x7f356e8 named,
+   not decoded); the *(0x82fea78) tail-object's identity; the
+   [uc+0x100]-before-submit ordering proof; agent-1's row-list differs
+   in ONE spot (row 0x19+... the = (the = the = (the).
+   The capstone tool notes: adrp imm = SIGNED; restart-on-undecodable
+   walkers required; full-fn-bound scans (the ret-stop miss law).
