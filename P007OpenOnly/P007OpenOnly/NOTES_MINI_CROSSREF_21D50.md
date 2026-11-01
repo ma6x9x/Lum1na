@@ -673,3 +673,29 @@ count's remnant ✓ (the PoC formula law). The alloc = 0xc4-class (196 = the
 0xc4 = the = the = the = the size class) = the = = = = = = = = (the row:
 the = = = = = = = = = = = = = = the = = = = the (the = = = = = = = = = =
 the = = = = = = = = = = = = = = = = = the = the = = = = = = = = = = = = =
+
+## THE 17 NIGHT BATCH (2026-11-01, the full tap list) — the honest board
+STRONGEST NEW RECEIPT = **p116: the deterministic SANDBOX-ESCAPE class
+(6/7 out-of-container reads through an in-container extension)** —
+/etc/passwd + services + the GlobalPreferences + networkd reads = the
+NOFOLLOW gap's receipts on the 17; deterministic (zero race); the
+policy-unpatched law (upstream says live through 27.2). This = a REAL
+privilege-boundary chain ROW (not kernel; the honest class).
+The night's misses (all honest, all now measured on the 17):
+- p133: p010 = all-2c2 on the 17 (the 23F77's law-row differs);
+  p114 sel-8 = the 2bf+64KB class but ALL-ZERO payloads = the 17's
+  serializer = empty this boot (the "payload deeper" law falsified
+  on the 17 = honest).
+- p134 route A = no arm (the engine did not arm OUR conn class).
+- p122 (17!): freer + detach + replace = kr=0 both; 2000 raced reads =
+  ZERO kernel-shaped occupants = the zone's natural population =
+  user-class (the Shape-1 ceiling measured on the 17).
+- p125 Cinder27 = the faithful ring, all-notify-rejected = the class
+  documented, not armed (same verdict as their own twin).
+- p023/64747-VT = the create-OK-on-everything + the -10279 tiny-encode
+  soft-fail = the 64747 lane stays closed from the app (both devices).
+- p022GC v42 = H1 accepted-not-instantiated; H2 = the MAC-deny on any
+  fd path (the 0xa5d79d8 class) = the 536 lane's honest negative.
+MIE note: the MIE camp (the tracker's frame) = the demo-class device
+work; our live lanes tonight = kernel-object/VT/IOKit class = not
+MIE-dependent; the chain composition note stays in the ledger.
