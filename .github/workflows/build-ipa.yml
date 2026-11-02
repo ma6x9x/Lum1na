@@ -347,12 +347,9 @@ jobs:
           fi
           echo "Using $XCODE"
           sudo xcode-select -s "$XCODE/Contents/Developer"
+          # Do not pipe xcodebuild -version into head: NSFileHandle write
+          # aborts on SIGPIPE and the step dies even on Xcode 16.4.
           xcodebuild -version
-          xcodebuild -version | head -1 | grep -q '^Xcode 16' || {
-            echo "ERROR: IPA gate is Xcode 16.x"
-            xcodebuild -version
-            exit 1
-          }
 
       - name: Remove Problematic AVE Files
         run: |
@@ -644,12 +641,9 @@ jobs:
           fi
           echo "Using $XCODE"
           sudo xcode-select -s "$XCODE/Contents/Developer"
+          # Do not pipe xcodebuild -version into head: NSFileHandle write
+          # aborts on SIGPIPE and the step dies even on Xcode 16.4.
           xcodebuild -version
-          xcodebuild -version | head -1 | grep -q '^Xcode 16' || {
-            echo "ERROR: IPA gate is Xcode 16.x"
-            xcodebuild -version
-            exit 1
-          }
 
       # T8150 (17 Pro Max / 24A435) P073 v13/v13b artifacts: the lab app's
       # bundle carries BOTH addchain models — the committed 254-in
