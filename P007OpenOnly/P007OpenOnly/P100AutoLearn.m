@@ -15,6 +15,7 @@
 #import "P100AutoLearn.h"
 #import "LabDeviceProfile.h"
 #import "LabLocalTime.h"
+#import "LabLearn.h"
 #import "P007Board.h"
 
 #import <dlfcn.h>
@@ -413,6 +414,7 @@ typedef CFTypeRef (*al_iosCreate_t)(CFDictionaryRef properties);
                              detail:[NSString stringWithFormat:@"%@ | %@",
                                      chipTag ?: @"notag", verdict]
                              source:@"p100"];
+    [LabLearn ingestIdent:pkt];
 
     L(@"=== p100 end ===");
     return [g_al_buf copy];

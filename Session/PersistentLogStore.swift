@@ -27,6 +27,7 @@ public final class PersistentLogStore {
     public static let probeLogFiles: [String: String] = [
         "aks": consoleLogName,
         "p044": "p06x_p044_log.txt",
+        "conv": "p044_aks_kaslr_reach_log.txt",
         "p044chain": "p06x_ane254chain_log.txt",
         "swordforge": "p122_swordforge_log.txt",
         "p100autopilot": "p100_learn_log.txt",

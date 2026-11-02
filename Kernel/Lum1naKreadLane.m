@@ -77,3 +77,12 @@ ssize_t Lum1naLaneKReadBuf(uint64_t kaddr, void *buf, size_t len) {
     if (Lum1naCS2Core_IsLive()) return Lum1naCS2Core_KReadBuf(kaddr, buf, len) ? (ssize_t)len : (ssize_t)-1;
     return -1;
 }
+
+ssize_t Lum1naLaneKWriteBuf(uint64_t kaddr, const void *buf, size_t len) {
+    if (!buf || !len) return -1;
+    Lum1naSocketKRWContext *ctx = LaneSocketCtx();
+    if (ctx) return Lum1naSocketKRW_KWriteBuffered(ctx, kaddr, buf, len);
+    if (Lum1naLibkrw_IsLive()) return Lum1naLibkrw_KWriteBuf(kaddr, buf, len) ? (ssize_t)len : (ssize_t)-1;
+    if (Lum1naCS2Core_IsLive()) return Lum1naCS2Core_KWriteBuf(kaddr, buf, len) ? (ssize_t)len : (ssize_t)-1;
+    return -1;
+}

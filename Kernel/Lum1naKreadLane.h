@@ -25,5 +25,6 @@ bool     Lum1naLaneKWrite64(uint64_t kaddr, uint64_t v);
 bool     Lum1naLaneKWrite32(uint64_t kaddr, uint32_t v);
 /* Bulk read. Returns bytes read, -1 when the lane has no buffered path. */
 ssize_t  Lum1naLaneKReadBuf(uint64_t kaddr, void *buf, size_t len);
+ssize_t  Lum1naLaneKWriteBuf(uint64_t kaddr, const void *buf, size_t len);
 
 NS_ASSUME_NONNULL_END

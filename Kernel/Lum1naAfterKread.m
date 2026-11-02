@@ -7,6 +7,8 @@
 #import "Lum1naLibkrw.h"
 #import "Lum1naCS2Core.h"
 #import "P06xLog.h"
+#import "lumina_core.h"
+#import "DopaminePrimitives.h"
 
 #import <IOKit/IOKitLib.h>
 #import <string.h>
@@ -18,7 +20,7 @@
 #import <errno.h>
 
 #ifndef MH_MAGIC_64
-#define MH_MAGIC_64 0xfeedfacf
+#define MH_MAGIC_64 LUMINA_MH_MAGIC_64
 #endif
 
 extern char **environ;
@@ -38,6 +40,10 @@ typedef struct {
     uint32_t length;
     lum_tc_entry_v1 entries[];
 } __attribute__((packed)) lum_tc_file_v1;
+_Static_assert(sizeof(lum_tc_file_v1) == LUMINA_TC_HEADER_SIZE,
+               "Dopamine trustcache_file_v1 header is 24 bytes");
+_Static_assert(sizeof(lum_tc_entry_v1) == LUMINA_TC_ENTRY_SIZE,
+               "Dopamine trustcache_entry_v1 is 22 bytes");
 
 static void ak_log(NSMutableString *s, NSString *fmt, ...) {
     va_list ap;
@@ -346,12 +352,14 @@ static NSData *ak_loadTrustcacheBlob(NSMutableString *s) {
     }
     NSData *data = [NSData dataWithContentsOfFile:path];
     ak_log(s, @"[*] loaded %@ (%lu bytes)", path, (unsigned long)data.length);
-    if (data.length < sizeof(uint32_t) * 2 + sizeof(uuid_t)) {
-        ak_log(s, @"[-] basebin.tc too small for trustcache_file_v1");
+    lumina_tc_info info;
+    int rc = lumina_trustcache_parse(data.bytes, data.length, &info);
+    if (rc != 0 || !info.ok) {
+        ak_log(s, @"[-] basebin.tc parse FAIL rc=%d (Dopamine v1: header+length*22 == file)", rc);
         return nil;
     }
-    const lum_tc_file_v1 *tc = (const lum_tc_file_v1 *)data.bytes;
-    ak_log(s, @"[*] tc version=%u length=%u (Dopamine v1 layout)", tc->version, tc->length);
+    ak_log(s, @"[*] tc version=%u length=%u entries=%u (Dopamine v1, bounds OK)",
+           info.version, info.length, info.nentries);
     return data;
 }
 
@@ -438,26 +446,32 @@ static BOOL ak_krwSelfTest(NSMutableString *s) {
     /* Lane cascade: a stamped/dead krwContext must not block a live
        ClearSword core lane (2026-10-14 rig). The kread result decides. */
     uint32_t magic = ctx ? Lum1naSocketKRW_KRead32(ctx, kbase) : 0;
-    if (magic != MH_MAGIC_64 && Lum1naLibkrw_IsLive()) magic = Lum1naLibkrw_KRead32(kbase);
-    if (magic != MH_MAGIC_64 && Lum1naCS2Core_IsLive()) magic = Lum1naCS2Core_KRead32(kbase);
+    if (!lumina_mh_magic32_ok(magic) && Lum1naLibkrw_IsLive()) magic = Lum1naLibkrw_KRead32(kbase);
+    if (!lumina_mh_magic32_ok(magic) && Lum1naCS2Core_IsLive()) magic = Lum1naCS2Core_KRead32(kbase);
     ak_log(s, @"[*] KRW test kread32(kbase=0x%llx)=0x%08x (want MH_MAGIC_64 0xfeedfacf)",
            (unsigned long long)kbase, magic);
-    if (magic != MH_MAGIC_64) {
+    if (!lumina_mh_magic32_ok(magic)) {
         ak_log(s, @"[-] KRW test FAIL — kbase is not a Mach-O. hasKread is a lie; refuse inject.");
         return NO;
     }
     uint64_t typeinfo = ctx ? Lum1naSocketKRW_KRead64(ctx, kbase + 8) : 0;
-    if (typeinfo != 0x200000000ULL && typeinfo != 0xc00000002ULL && typeinfo != 0xcc0000002ULL && Lum1naLibkrw_IsLive()) {
+    if (!lumina_mh_typeinfo_ok(typeinfo) && Lum1naLibkrw_IsLive()) {
         typeinfo = Lum1naLibkrw_KRead64(kbase + 8);
     }
-    if (typeinfo != 0x200000000ULL && typeinfo != 0xc00000002ULL && typeinfo != 0xcc0000002ULL && Lum1naCS2Core_IsLive()) {
+    if (!lumina_mh_typeinfo_ok(typeinfo) && Lum1naCS2Core_IsLive()) {
         typeinfo = Lum1naCS2Core_KRead64(kbase + 8);
     }
     ak_log(s, @"[*] KRW test kread64(kbase+8)=0x%llx (want 0x200000000/0xc00000002/0xcc0000002)",
            (unsigned long long)typeinfo);
-    if (typeinfo != 0x200000000ULL && typeinfo != 0xc00000002ULL && typeinfo != 0xcc0000002ULL) {
+    if (!lumina_mh_typeinfo_ok(typeinfo)) {
         ak_log(s, @"[-] KRW test FAIL — kbase+8 is not a kernel Mach-O typeinfo");
         return NO;
+    }
+    if (Lum1naPrimitivesLive()) {
+        ak_log(s, @"[*] gLum1naPrimitives live — AfterKread uses page-split kreadbuf");
+    } else {
+        (void)Lum1naPrimitivesFill();
+        ak_log(s, @"[*] gLum1naPrimitives fill rc=%d", Lum1naPrimitivesLive());
     }
     ak_log(s, @"[+] KRW test PASS — Mach-O magic+cputype + kernel typeinfo. Injection may fire.");
     return YES;
@@ -551,7 +565,8 @@ static void ak_tryInstallPkgman(NSMutableString *s) {
      @"  4 inject via opainject 1 launchdhook + ElleKit TweakLoader.\n"
      @"  5 package managers: Sileo first, then Zebra (Documents/pkgman/*.deb).\n"
      @"  6 respring: jbctl respring (sbreload / backboardd SIGTERM).\n"
-     @"  7 persist/tempRoot/boot re-arm stays HOLD — novel Lum1na, later.\n"];
+     @"  7 persist/tempRoot/boot re-arm stays HOLD — novel Lum1na, later.\n"
+     @"  lumina_core C ABI: Mach-O bar, trustcache v1 bounds, page-split kreadbuf.\n"];
     if (!off) {
         [s appendString:@"HOLD: LabOff() is NULL (unknown SKU). AMFI/pmap pins unfired.\n"];
     } else if (off->tag && strcmp(off->tag, "A12X_23G71") == 0) {
@@ -673,6 +688,8 @@ static void ak_tryInstallPkgman(NSMutableString *s) {
     }
 
     ak_log(s, @"FIRING: KRW test PASS — Dopamine-shaped elevate + AMFI/pmap_cs + inject + Sileo + respring");
+    ak_log(s, @"[*] AfterKread next=%s (DOJailbreaker order)",
+           lumina_ak_step_name(lumina_ak_next_step(1, 1, 0, 0, 0)));
     [[Lum1naBoard shared] recordEvent:@"afterkread"
                                  kind:@"fire"
                                detail:@"hasKread=YES"

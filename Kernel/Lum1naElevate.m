@@ -9,6 +9,7 @@
 #import "Lum1naKreadLane.h"
 #import "../Exploit/LabRuntimeOffsets.h"
 #import "../Exploit/LabLocalTime.h"
+#import "../Exploit/lumina_core.h"
 
 #include <unistd.h>
 #include <stdlib.h>
@@ -55,10 +56,10 @@ static void el_bad(NSMutableString *s, NSString *fmt, ...) {
 /// allproc list head is static __DATA (0xFFFFFFF0...). The backward walk
 /// stops at the head this way.
 static BOOL el_looks_zone(uint64_t v) {
-    return v >= 0xFFFFFFE000000000ULL && v < 0xFFFFFFF000000000ULL;
+    return lumina_kptr_zone(v) != 0;
 }
 static BOOL el_looks_static(uint64_t v) {
-    return v >= 0xFFFFFFF000000000ULL;
+    return lumina_kptr_static(v) != 0;
 }
 
 @implementation Lum1naElevate

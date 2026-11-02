@@ -24,6 +24,7 @@
 //
 
 #import "LabBandit.h"
+#import "lumina_core.h"
 
 #import <Foundation/Foundation.h>
 #import <fcntl.h>
@@ -40,22 +41,7 @@
 #pragma mark - shared reward law
 
 double LabBanditReward(const char *outcome) {
-    if (!outcome || !*outcome) return 0.25;             /* conservative miss */
-    /* 1.0 WIN — the door/conversion/value-control receipts */
-    if (!strcmp(outcome, "door"))             return 1.0;
-    if (!strcmp(outcome, "claim-won"))        return 1.0;
-    if (!strcmp(outcome, "ok"))               return 1.0;
-    /* p112's (b): the value-control receipt IS the striking class the
-       ledger learns (not a crash from the ledger's point of view). */
-    if (!strcmp(outcome, "fault-with-far"))   return 1.0;
-    /* 0.0 CRASH — the auth-poison / panic classes */
-    if (!strcmp(outcome, "maf"))              return 0.0;
-    if (!strcmp(outcome, "family-b"))         return 0.0;
-    /* 0.5 MID — half-loss / landed-but-not-converted */
-    if (!strcmp(outcome, "abort"))            return 0.5;
-    if (!strcmp(outcome, "fires"))            return 0.5;
-    /* 0.25 MISS — fired-and-lost classes (default) */
-    return 0.25;
+    return lumina_bandit_reward(outcome);
 }
 
 #pragma mark - ledger state
@@ -548,10 +534,9 @@ int LabBanditScores(const char *domain, char *out, int cap) {
         labb_arm_stats(arms, order[i], &nArm[i], &mean[i]);
         nTotal += nArm[i];
     }
-    double lg = log(nTotal > 1.0 ? nTotal : 2.0);
+    double N = nTotal > 1.0 ? nTotal : 2.0;
     for (int i = 0; i < n; i++) {
-        double expl = nArm[i] > 0 ? sqrt(2.0 * lg / nArm[i]) : 1e9;
-        double ucb = mean[i] + expl;
+        double ucb = lumina_ucb1(mean[i], nArm[i], N);
         used += snprintf(out + used, (size_t)(cap - used), "%s%s n=%.0f mean=%.3f ucb=%.3f",
                          i ? " | " : "", [(NSString *)order[i] UTF8String] ?: "?",
                          nArm[i], mean[i], ucb);

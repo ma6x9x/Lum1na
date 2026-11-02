@@ -16,12 +16,14 @@
 #import "Lum1naLibkrw.h"
 #import "Lum1naCS2Core.h"
 #import "P06xLog.h"
+#import "lumina_core.h"
+#import "DopaminePrimitives.h"
 #import <fcntl.h>
 #import <string.h>
 #import <sys/sysctl.h>
 #import <unistd.h>
 
-#define MH_MAGIC_64_BOARD 0xfeedfacfu
+#define MH_MAGIC_64_BOARD LUMINA_MH_MAGIC_64
 
 // Forward declare SocketKRW function for commitSlide.
 // NOTE: actual signature takes Lum1naSocketKRWContext* — void* is ABI-compatible.
@@ -388,7 +390,7 @@ static int64_t LabBoardBootTime(void) {
         _d[@"slide_boot_uuid"] = LabBoardBootUUID();
         _d[@"slide_boot_time"] = [NSString stringWithFormat:@"%lld", LabBoardBootTime()];
 
-        if (slide > 0x100000000) {
+        if (!lumina_slide_in_range(slide)) {
             P06xLog(@"board", @"commitSlide FAIL slide out of range");
             return NO;
         }
@@ -426,13 +428,13 @@ static int64_t LabBoardBootTime(void) {
         if (_krwContext) {
             magic64 = Lum1naSocketKRW_kread64(_krwContext, kbase);
         }
-        if (magic64 != 0x100000CFEEDFACFULL && Lum1naLibkrw_IsLive()) {
+        if (!lumina_mh_magic64_ok(magic64) && Lum1naLibkrw_IsLive()) {
             magic64 = Lum1naLibkrw_KRead64(kbase);
         }
-        if (magic64 != 0x100000CFEEDFACFULL && Lum1naCS2Core_IsLive()) {
+        if (!lumina_mh_magic64_ok(magic64) && Lum1naCS2Core_IsLive()) {
             magic64 = Lum1naCS2Core_KRead64(kbase);
         }
-        if (magic64 != 0x100000CFEEDFACFULL) {
+        if (!lumina_mh_magic64_ok(magic64)) {
             P06xLogF(@"board", @"commitSlide FAIL kread kbase=0x%llx (no Mach-O magic+cputype)", magic64);
             return NO;
         }
@@ -440,13 +442,13 @@ static int64_t LabBoardBootTime(void) {
         if (_krwContext) {
             typeinfo = Lum1naSocketKRW_kread64(_krwContext, kbase + 8);
         }
-        if (typeinfo != 0x200000000ULL && typeinfo != 0xc00000002ULL && typeinfo != 0xcc0000002ULL && Lum1naLibkrw_IsLive()) {
+        if (!lumina_mh_typeinfo_ok(typeinfo) && Lum1naLibkrw_IsLive()) {
             typeinfo = Lum1naLibkrw_KRead64(kbase + 8);
         }
-        if (typeinfo != 0x200000000ULL && typeinfo != 0xc00000002ULL && typeinfo != 0xcc0000002ULL && Lum1naCS2Core_IsLive()) {
+        if (!lumina_mh_typeinfo_ok(typeinfo) && Lum1naCS2Core_IsLive()) {
             typeinfo = Lum1naCS2Core_KRead64(kbase + 8);
         }
-        if (typeinfo != 0x200000000ULL && typeinfo != 0xc00000002ULL && typeinfo != 0xcc0000002ULL) {
+        if (!lumina_mh_typeinfo_ok(typeinfo)) {
             P06xLogF(@"board", @"commitSlide FAIL kread kbase+8=0x%llx (bad typeinfo)", typeinfo);
             return NO;
         }
@@ -455,6 +457,9 @@ static int64_t LabBoardBootTime(void) {
         _kbase = kbase;
         _hasKread = YES;
         _hasKwrite = YES;
+        if (Lum1naPrimitivesFill() == 0) {
+            P06xLog(@"board", @"gLum1naPrimitives kreadbuf/kwritebuf filled (page-split lane)");
+        }
 
         P06xLogF(@"board", @"commitSlide OK kbase=0x%016llx magic=0x%llx typeinfo=0x%llx", _kbase, magic64, typeinfo);
 
@@ -534,6 +539,9 @@ static int64_t LabBoardBootTime(void) {
     [out appendFormat:@"=== lum1na kread test %@ ===\n", LabLocalMilitaryNow() ?: @"?"];
     [out appendString:@"Bar: kread32(kbase)==0xfeedfacf then commitSlide.\n"];
     [out appendString:@"P044 occupancy, IPS KernelCache slide, and heap leaks do not pass.\n"];
+    int coreSt = lumina_core_selftest();
+    [out appendFormat:@"lumina_core %s selftest=%d (0=PASS)\n",
+         lumina_core_version(), coreSt];
     [out appendString:[LabDeviceProfile identBlock]];
     [out appendFormat:@"%@\n", b.kreadSignal];
     [out appendFormat:@"krwContext=%@ hasKread=%@\n",
@@ -554,7 +562,7 @@ static int64_t LabBoardBootTime(void) {
         uint32_t mag = (uint32_t)mag64;
         [out appendFormat:@"kread64(staticBase=0x%llx) mag=0x%x (want 0xfeedfacf)\n",
             (unsigned long long)kbase, mag];
-        if (mag == MH_MAGIC_64_BOARD) {
+        if (lumina_mh_magic32_ok(mag)) {
             [out appendString:@"KREAD primitive reads MH_MAGIC_64 at staticBase.\n"];
             [out appendString:@"commitSlide still needs the live slide (nonzero) plus a kread of the kernel Mach-O header (magic+cputype, kbase+8 typeinfo).\n"];
         } else {

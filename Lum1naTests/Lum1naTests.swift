@@ -211,6 +211,7 @@ struct Lum1naOffsetTests {
         #expect(cls("p055") == "P055IOSurfaceUPL")
         #expect(cls("anvil").isEmpty == false)
         #expect(cls("p044") == "P044ExploitController")
+        #expect(cls("conv") == "P044AksKaslrReach")
         #expect(cls("p044chain") == "ANE254ChainController")
         #expect(cls("krw") == "KRWChainController")
         #expect(cls("krw2") == "KRWTheoryFacetA")
@@ -238,6 +239,7 @@ struct Lum1naOffsetTests {
         #expect(ids.contains("p072"))
         #expect(ids.contains("ht149041"))
         #expect(ids.contains("kreadtest"))
+        #expect(ids.contains("conv"))
         #expect(cls("p063") == "CVE_2026_84530_KASLR")
         #expect(cls("aio84530") == "CVE_2026_84530_KASLR")
         #expect(cls("p064") == "P064AVE84607Racer")
@@ -262,6 +264,7 @@ struct Lum1naOffsetTests {
         #expect(PersistentLogStore.probeLogFiles["lsabc"] == "p06x_lsabc_log.txt")
         #expect(PersistentLogStore.probeLogFiles["p055"] == "p055_iosurface_upl_log.txt")
         #expect(PersistentLogStore.probeLogFiles["p044"] == "p06x_p044_log.txt")
+        #expect(PersistentLogStore.probeLogFiles["conv"] == "p044_aks_kaslr_reach_log.txt")
         #expect(PersistentLogStore.probeLogFiles["p044chain"] == "p06x_ane254chain_log.txt")
         #expect(PersistentLogStore.probeLogFiles["krw"] == "p06x_krw_log.txt")
         #expect(PersistentLogStore.probeLogFiles["krw2"] == "p06x_krw2_log.txt")
@@ -300,5 +303,16 @@ struct Lum1naOffsetTests {
         let hits = (rows.first?["hits"] as? NSNumber)?.intValue ?? 0
         #expect(hits >= 2)
         #expect((rows.first?["detail"] as? String) == "second")
+    }
+
+    @Test func luminaCoreSelftest() {
+        #expect(lumina_core_selftest() == 0)
+        #expect(lumina_mh_magic32_ok(0xfeedfacf) != 0)
+        #expect(lumina_ane_req_in_for_arm("oob192") == 192)
+        #expect(lumina_ane_req_in_for_arm("small127") == 127)
+        #expect(lumina_bandit_reward("conversion") == 1.0)
+        #expect(lumina_bandit_reward("occupancy") == 0.5)
+        #expect(lumina_ak_next_step(0, 0, 0, 0, 0) == 0)
+        #expect(lumina_page_chunk(0x3000, 0x2000, 0x4000) == 0x1000)
     }
 }

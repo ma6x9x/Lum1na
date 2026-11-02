@@ -39,6 +39,12 @@ https://github.com/opa334/Dopamine
   details and per-component credits in `Resources/basebin/CREDITS.md`.
 - **Titan iorvbar intel** (A14 `0x206050000`) credited as received via the
   Dopamine tree; see `Resources/basebin/CREDITS.md` Home T7 note.
+- **AfterKread structure** (`DOJailbreaker.m` order: elevate → pmap_cs →
+  trustcache TXM → opainject → pkgman → respring). `trustcache_file_v1`
+  header+`length*22` bounds (`trustcache.c`). `enumerate_pages` 16K
+  chunking (`primitives.c`) in `lumina_core` / SocketKRW buffered I/O /
+  `gLum1naPrimitives`. Hop-1 / kfd / Fugu14 kcall / physrw bodies stay
+  in the Dopamine tree.
 
 ## leminlimez — Nugget — AGPL-3.0
 

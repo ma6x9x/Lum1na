@@ -78,6 +78,7 @@ jobs:
             "Exploit/P070ChainSequencer.h"
             "Exploit/P072FileParserMap.h"
             "Exploit/Lum1naKreadTest.h"
+            "Exploit/lumina_core.h"
           )
           for req in "${REQUIRED_IMPORTS[@]}"; do
             if ! grep -q "#import \"$req\"" "$BRIDGING_HEADER"; then
@@ -139,6 +140,10 @@ jobs:
             "Exploit/ANE254ChainController.m"
             "Exploit/KRWChainController.h"
             "Exploit/KRWChainController.m"
+            "Exploit/lumina_core.h"
+            "Exploit/lumina_core.c"
+            "Exploit/DopaminePrimitives.h"
+            "Exploit/DopaminePrimitives.m"
             "Exploit/P065FacetAOracle.h"
             "Exploit/P065FacetAOracle.m"
             "Exploit/P070ChainSequencer.h"

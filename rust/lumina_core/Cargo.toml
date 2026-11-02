@@ -1,0 +1,15 @@
+[package]
+name = "lumina_core"
+version = "0.1.0"
+edition = "2021"
+description = "C ABI parse/self-test helpers for Lum1na. IOKit stays ObjC."
+license = "MIT"
+publish = false
+
+[lib]
+crate-type = ["staticlib", "rlib"]
+
+[profile.release]
+lto = true
+panic = "abort"
+codegen-units = 1

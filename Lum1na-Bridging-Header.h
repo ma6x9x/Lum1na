@@ -128,8 +128,13 @@
 #import "Exploit/DopamineCompat.h"
 #import "Exploit/ANE254ChainController.h"
 #import "Exploit/KRWChainController.h"
+#import "Exploit/LabLearn.h"
+#import "Exploit/P044AksKaslrReach.h"
+#import "Exploit/P100AutoLearn.h"
+#import "Exploit/P139BootIntel.h"
 #import "Exploit/KRWTheoryChains.h"
 #import "Exploit/DopaminePrimitives.h"
+#import "Exploit/lumina_core.h"
 #import "Exploit/Lum1naLibkrw.h"
 
 

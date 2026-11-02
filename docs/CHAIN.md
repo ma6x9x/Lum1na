@@ -8,7 +8,7 @@ Seven isolated TAPs. Reboot + force-quit between T1–T4 and T7 GPU map. `ui-bui
 
 | Button | Catalog | Theory |
 | --- | --- | --- |
-| **T1 ANE** | `krw` | Occupancy ledger (P099 CLASS on A14). Confirmed WRITE. conversion HOLD. PATCH does not remaining-fire 254. Trigon logic: S1 occupancy write / T7 CacheMode, S2 IORVBAR reach, S3 SocketKRW.Arm. No CVE-2023-32434 copy. |
+| **T1 ANE** | `krw` | KERNEL sequencer (`sku-door-run-1`). A14: P044 N=192 conversion bar + P139 + P113 + kread32(kbase)==MH_MAGIC_64. Arm only after conversion CONFIRMED. Occupancy CLASS is not hasKread. T8150: P139 only (isolated p110/p142/p143). 12 mini: 127-in in-bounds, 43748 not live. No 254 remaining-fire. |
 | **T2 FACET** | `krw2` | 64788 1×65535 + Trap2 sel=3 oracle. |
 | **T3 SOCK** | `krw3` | 43748 then icmp6filt. Expected SKIP. |
 | **T4 LS** | `krw4` | Dual-wrap last-wire. 18:45 OOM sealed. |
@@ -16,9 +16,9 @@ Seven isolated TAPs. Reboot + force-quit between T1–T4 and T7 GPU map. `ui-bui
 | **T6 PPL** | `krw6` | Titan A14 / momentarius map. Always runs AfterKread; AMFI/opainject still HOLD without `hasKread`. |
 | **T7 PHYS** | `krw7` | `phys-map-3`: DeviceTree `reg` + CacheMode 0x100 dump + P069 `mach_vm_map` of that surface + read-only MapMemory on IOGPU/DART/IOMFB/IOSurface/ANE/AES. Needle `0x206050000`. No DMA/`+0x34` fire, no hop-1, no Titan write. |
 
-Credit: opa334 / Lars Fröder — Dopamine 3.0.10 (`primitives_external.h`, `DOJailbreaker.m`, Titan, momentarius, `physrw_pte.c`, `trustcache.c`). Copied into Lum1na: `Exploit/DopaminePrimitives.h` (vtable contract only). Hop-1 / kfd / multicast_bytecopy bodies stay in the Dopamine tree.
+Credit: opa334 / Lars Fröder — Dopamine 3.0.10 (`primitives_external.h`, `DOJailbreaker.m`, Titan, momentarius, `physrw_pte.c`, `trustcache.c`). Copied into Lum1na: `Exploit/DopaminePrimitives.h` (vtable) + page-split `kreadbuf` fill after `commitSlide`. Parse helpers live in `Exploit/lumina_core.c` (C ABI; Rust twin `rust/lumina_core`). Hop-1 / kfd / multicast_bytecopy bodies stay in the Dopamine tree.
 
-Solo `p044` / `staleentry` / `lightsword` stay All-stages. PATCH is SANDBOX BadQuery → KERNEL T1 occupancy ledger (no 254 remaining-fire) → AfterKread HOLD. Occupancy CLASS on A14 is P099 hunt. Conversion is a live `0x820` ANE neighbor or named Shape L. CVE-2026-86950 stays parked.
+Solo `p044` (254 controller) / `staleentry` / `lightsword` stay All-stages. PATCH is SANDBOX BadQuery → KERNEL T1 sequencer (P044AksKaslrReach N=192 + P139 + P113 + kread32) → AfterKread HOLD. Conversion is desc_type_forged OR (body_forged AND kptr). CVE-2026-86950 stays parked.
 
 Home also has **CHAINS** (`p070` census), **KREAD** (`kreadtest` commitSlide bar), **FILES** (`p072` parser census). Same processing contract as P007: TAP marker in `p011_tap_log.txt` before invoke, POSIX + `F_FULLFSYNC` probe logs, recover last TAP mapped log, `hasKread` only after `kread32(kbase)==MH_MAGIC_64`.
 
@@ -154,7 +154,7 @@ KRW self-test (must pass before inject): `kread32(kbase) == MH_MAGIC_64` and `kb
 
 A14 is **PPL**, not momentarius. Drop files into the app container, then re-tap **afterkread** after `hasKread`. Persist / tempRoot / boot-time re-arm stays later (novel Lum1na, not a Dopamine copy). See All stages → After-kread plan.
 
-Full Chain order: SANDBOX BadQuery → KERNEL T1 occupancy ledger (`KRWChainController` BUILD `occupancy-ledger-1`, no P044 v46 254 remaining-fire) → DAEMON P054 bounded (1 thread, 2s, 50 files — the 4×500×30s storm stays dead) → PATCHSET AfterKread HOLD (elevate → pmap_cs → AMFI → opainject → dpkg → respring only after `kread32(kbase)==MH_MAGIC_64`). Hunt auto-chain also skips LightSword last-wire and CS2 hop-1 (catalog T2/T4/cskrw stay isolated). P044 v46 stays All-stages isolated. Auto chain skips P051/P053. Parked All-stages: ColdForge, Rapier, p055, p058 JPEG open, p056/p061 AVE reach, Anvil open-only, P064AVE84607Racer remaining-fire, P065–P072 (invoke solo). Conversion TAP is Lum1na-Debug P044 N=192 / P073 after Game Mode notify=1.
+Full Chain order: SANDBOX BadQuery → KERNEL T1 sequencer (`KRWChainController` BUILD `sku-door-run-1`: P100 + P139 + P044 N=192 on A14 + P113 + kread32 self-test; LightSword Arm only after conversion CONFIRMED) → DAEMON P054 bounded (1 thread, 2s, 50 files — the 4×500×30s storm stays dead) → PATCHSET AfterKread HOLD (elevate → pmap_cs → AMFI → opainject → dpkg → respring only after `kread32(kbase)==MH_MAGIC_64`). Hunt auto-chain skips P099 254, P110/P142/P143, and CS2 hop-1. Catalog `conv` is P044AksKaslrReach. Auto chain skips P051/P053. Parked All-stages: ColdForge, Rapier, p055, p058 JPEG open, p056/p061 AVE reach, Anvil open-only, P064AVE84607Racer remaining-fire, P065–P072 (invoke solo).
 
 ## Not in this repo
 

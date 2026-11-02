@@ -12,10 +12,10 @@
 //                     "p073": {...} } }
 //
 //  One shared reward law (LabBanditReward — the shared reward-class helper):
-//      1.0  WIN   : door, claim-won, ok, fault-with-far
+//      1.0  WIN   : door, claim-won, ok, fault-with-far, conversion, magic
 //      0.0  CRASH : maf, family-b
-//      0.25 MISS  : nofire, lost, window-lost, miss-adjacency, survived
-//      0.5  MID   : abort, fires
+//      0.25 MISS  : nofire, lost, window-lost, miss-adjacency, survived, hold
+//      0.5  MID   : abort, fires, occupancy
 //      unknown    : 0.25 (conservative miss)
 //  UCB1 exactly as the p099 prototype did it (Auer 2002: mean +
 //  sqrt(2 ln N / n_i); unpicked arms explored first). No CoreML, no fancy

@@ -12,6 +12,10 @@ xcuserdata/
 .swiftpm/
 Package.resolved
 
+# Rust crate build
+rust/**/target/
+rust/**/Cargo.lock
+
 # Signing material and secrets
 *.p12
 *.mobileprovision

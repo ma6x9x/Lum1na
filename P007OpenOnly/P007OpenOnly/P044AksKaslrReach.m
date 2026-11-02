@@ -136,6 +136,7 @@
 #import "A14_23F77_LabOffsets.h"
 #import "LabDeviceProfile.h"
 #import "LabLocalTime.h"
+#import "LabLearn.h"
 
 #import <Foundation/Foundation.h>
 #import <CoreML/CoreML.h>
@@ -2302,6 +2303,7 @@ static void *watch_worker(void *arg) {
     pthread_mutex_unlock(&g_evLock);
     cls_reset();
     p044ReqInOverride = 0;
+    g_modelNameOverride = nil;
     p044UseDaemonLoad = 0;
 
     /* v58 REQ_IN sweep loader: p044_req_in.txt with a single "N" line
@@ -2332,8 +2334,15 @@ static void *watch_worker(void *arg) {
             }
             unlink(sweepPath.fileSystemRepresentation);
         } else {
-            [out appendFormat:@"  [v73] REQ_IN default=%u (1-record OOB). Documents/p044_req_in.txt ABSENT — HouseArrest not required. Write 191 for in-bounds.\n",
-             P044_REQ_IN];
+            uint32_t learned = [LabLearn aneReqIn];
+            if (learned >= 2) {
+                p044ReqInOverride = learned;
+                [out appendFormat:@"  [sku-model] REQ_IN=%u (LabLearn/SKU/bandit; file override wins). Hunt 23F77 default is 192 1-record OOB; 12 mini 21D50 is 127 in-bounds.\n",
+                 learned];
+            } else {
+                [out appendFormat:@"  [v73] REQ_IN default=%u (1-record OOB). Documents/p044_req_in.txt ABSENT — HouseArrest not required. Write 191 for in-bounds.\n",
+                 P044_REQ_IN];
+            }
         }
     }
     /* v75 Stage-B procIdx override: same consumed-file protocol as req_in.
@@ -2807,7 +2816,21 @@ static void *watch_worker(void *arg) {
                searched path so a wrong/stale container UUID can never
                swallow the override again. ASCII only (em-dash mojibakes
                through the log channel). Log-only, no behavior change. */
-            [out appendFormat:@"  [v61b] MODEL-FLAG MISS: Documents/p044_model.txt not found — default = addchain-191 B1 (in-bounds primitive test; no override needed). Override is OPTIONAL: write ONE bundled .mlmodelc NAME (e.g. XVRC27_254in_passthrough) into this exact path via SSH/Filza, force-quit, then tap again:\n    %@\n", flagPath];
+            NSString *learnedModel = [LabLearn aneModel];
+            if (learnedModel.length) {
+                NSURL *probe = [[NSBundle mainBundle] URLForResource:learnedModel
+                                                        withExtension:@"mlmodelc"];
+                if (probe) {
+                    g_modelNameOverride = [learnedModel copy];
+                    [out appendFormat:@"  [sku-model] MODEL=%@ (LabLearn/SKU/bandit). 12 mini uses 127-in min; hunt 23F77 keeps 191-in addchain unless the bandit picked small127.\n",
+                     learnedModel];
+                } else {
+                    [out appendFormat:@"  [sku-model] MODEL=%@ not in bundle — compile default kept (%@)\n",
+                     learnedModel, COREML_MODEL_NAME];
+                }
+            } else {
+                [out appendFormat:@"  [v61b] MODEL-FLAG MISS: Documents/p044_model.txt not found — default = addchain-191 B1 (in-bounds primitive test; no override needed). Override is OPTIONAL: write ONE bundled .mlmodelc NAME (e.g. XVRC27_254in_passthrough) into this exact path via SSH/Filza, force-quit, then tap again:\n    %@\n", flagPath];
+            }
         }
     }
 

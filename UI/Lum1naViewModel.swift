@@ -3,8 +3,8 @@
 //  Fully wired to UI console
 //
 //  WIRE (this copy):
-//   Home UI uses ExploitManager, not this type. KERNEL here is LightSword.
-//   P044 stays All-stages write-class. KRWBridge Prepare/Establish return NO.
+//   Home UI uses ExploitManager, not this type. KERNEL here is KRWChainController.
+//   P044 N=192 conversion TAP is inside T1. KRWBridge Prepare/Establish return NO.
 //
 
 import Foundation
@@ -132,33 +132,33 @@ class Lum1naViewModel: ObservableObject {
         isRunning = false
     }
     
-    // MARK: - KERNEL Stage (LightSword KRW head — P044 is not this stage)
+    // MARK: - KERNEL Stage (KRWChainController — real TAPs + kread32 self-test)
     private func executeKernel() async {
         exploitState = .executingKernel
-        log("[*] Stage: KERNEL (LightSword 64788-C → SocketKRW). P044 is write-class, All-stages only.", level: .info)
+        log("[*] Stage: KERNEL (T1 SKU door: P044/P139/P113 + kread32). LightSword only after conversion.", level: .info)
 
-        guard let lsClass = NSClassFromString("LightSword") as? NSObject.Type else {
-            log("[-] LightSword not found", level: .error)
-            exploitState = .failed("LightSword class not found")
+        guard let cls = NSClassFromString("KRWChainController") as? NSObject.Type else {
+            log("[-] KRWChainController not found", level: .error)
+            exploitState = .failed("KRWChainController class not found")
             return
         }
         let tapSel = NSSelectorFromString("tap")
-        let meta: AnyObject = lsClass.self as AnyObject
+        let meta: AnyObject = cls.self as AnyObject
         guard meta.responds(to: tapSel), let result = meta.perform(tapSel),
               let text = result.takeUnretainedValue() as? String, !text.isEmpty else {
-            log("[-] LightSword tap empty", level: .error)
-            exploitState = .failed("LightSword tap empty")
+            log("[-] KRWChainController tap empty", level: .error)
+            exploitState = .failed("KRWChainController tap empty")
             return
         }
         for line in text.components(separatedBy: "\n") where !line.isEmpty {
             log(line, level: .info)
         }
-        if text.contains("KRW LIVE") || text.contains("LightSword COMPLETE") {
-            log("[+] KERNEL: LightSword reported KRW + commitSlide", level: .success)
+        if text.contains("hasKread=YES") {
+            log("[+] KERNEL: kread32 self-test passed", level: .success)
             exploitState = .success
         } else {
-            log("[*] KERNEL tap done — hasKread stays false until SocketKRW verify + commitSlide", level: .info)
-            exploitState = .failed("LightSword did not obtain KRW")
+            log("[*] KERNEL tap done — occupancy/CLASS is not hasKread", level: .info)
+            exploitState = .failed("kread32 self-test did not pass")
         }
     }
     
@@ -212,7 +212,7 @@ class Lum1naViewModel: ObservableObject {
         
         await executePatchset()
         
-        log("[*] FULL CHAIN ended — kreadbuf not obtained unless LightSword commitSlide landed", level: .info)
+        log("[*] FULL CHAIN ended — kreadbuf not obtained unless T1 kread32 self-test passed", level: .info)
     }
     
     func reset() {

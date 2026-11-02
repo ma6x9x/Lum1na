@@ -243,10 +243,10 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
     [s appendString:@"Study/port from Dopamine: gPrimitives vtable + End/CPUFAMILY SKU gate + AfterKread pipeline. hop-1/kfd bodies stay in the Dopamine tree.\n"];
     switch (sku) {
         case LabSkuA14_23F77:
-            [s appendString:@"A14 23F77 first door: 43748 occupancy WRITE (P099 254-in HIT; P044 1-record OOB mapped-silent).\n"];
+            [s appendString:@"A14 23F77 first door: KERNEL T1 sequencer (P044 N=192 conversion bar; P139; P113; kread32).\n"];
             [s appendString:@"  conversion = desc_type_forged OR (body_forged AND kptr). Neighbor = live same-type ANE table or named Shape L.\n"];
             [s appendString:@"  hop-1 cluster_*_contig SKIP (EINVAL since 26.1). CS2 fail-graceful. P044 254 remaining-fire CLOSED.\n"];
-            [s appendString:@"  Hot: T1 ANE WRITE, P099, T2 Facet A, KREAD, CHAINS.\n"];
+            [s appendString:@"  Hot: T1 SKU door, conv, KREAD, CHAINS. Bandit krw_t1 picks oob192/inb191/small127.\n"];
             break;
         case LabSkuA12X_23G71:
             [s appendString:@"A12X 23G71 first door: 64788 Facet A (live until 23G82) + aio84530 HEAP leak.\n"];
@@ -260,11 +260,11 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
             [s appendString:@"  Hot: cs2core, KREAD, CHAINS.\n"];
             break;
         case LabSkuA14_21D50:
-            [s appendString:@"A14 21D50 12 mini: Dopamine rootless / CS2. Twin CLASS/FIELD only. Keep 21D50 VAs off 23F77.\n"];
+            [s appendString:@"A14 21D50 12 mini: Dopamine rootless / CS2. Twin CLASS/FIELD only. Smaller 127-in ANE (43748 not live). Keep 21D50 VAs off 23F77.\n"];
             break;
         case LabSkuT8150_24A435:
             [s appendString:@"T8150 24A435 iPhone18,2 17 Pro Max. static_base=0xfffffe0007004000. ANE table 0x10b8 record+0x90.\n"];
-            [s appendString:@"  Public Lum1na SKIPS T8101 0x820/254, CS2 hop-1, LightSword (IOGPU pins 0). SPTM.\n"];
+            [s appendString:@"  KERNEL T1 = P139 + kread32. Isolated p110/p142/p143. SKIPS T8101 0x820/254, CS2 hop-1, LightSword (IOGPU pins 0). SPTM.\n"];
             [s appendString:@"  Probe app (Lum1na-Debug) fires every TAP. iPhone18,1 and 18,3 stay unknown.\n"];
             break;
         case LabSkuT8150_other:
@@ -282,7 +282,9 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
     [s appendString:[self beta1Matrix]];
     [s appendString:@"prove matrix:\n"
                     @"  hasKread=NO until commitSlide kread32(kbase)==MH_MAGIC_64 on THIS sku\n"
-                    @"  LIVE A14: P057 65343 KASLR sel16; P044 occupancy+conversion bar; P099 254 occupancy; KREAD; 64788 Facet A P065 0x2be oracle; P063 aio84530 HEAP; P070 census\n"
+                    @"  LIVE A14: KERNEL T1 sequencer (P044 N=192 + P139 + P113 + kread32); P057 65343 KASLR sel16; P099 254 occupancy isolated; 64788 Facet A P065 0x2be oracle; P063 aio84530 HEAP\n"
+                    @"  LIVE T8150: KERNEL T1 P139 + kread32. Isolated p110/p142/p143. 43748 clamp-CLOSED. LightSword SKIP.\n"
+                    @"  LIVE 12 mini 21D50: 127-in in-bounds ANE (43748 not live); CS2/libkrw KRW; kread32\n"
                     @"  LIVE A12X: P065 Facet A; P063 aio84530 HEAP; P057 sel16; CS2 phys_oob READ scan; P034 occupancy class; KREAD; P070 census. 254 SKIP.\n"
                     @"  CLOSED: 84523 sandbox (P057/P051/P052); P045 recv; LightSword last-wire GPU OOM; type-3 PACGA; hop-1 since 26.1; 43748 254 on fill_cap\n"
                     @"  PARKED: 28968 reap fire; 163-sel; 0x800; AfterKread persist; 86950 CG; file-ACE payloads (P072 is census)\n"
@@ -313,7 +315,7 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
     }
     switch ([self detectedSku]) {
         case LabSkuA14_23F77:
-            [out appendString:@"TRACK: iPhone13 A14 23F77 ACTIVE. First door=43748 occupancy WRITE (P099). conversion then magic. hop-1 SKIP.\n"];
+            [out appendString:@"TRACK: iPhone13 A14 23F77 ACTIVE. First door=KERNEL T1 (P044 N=192 + P139 + P113 + kread32). hop-1 SKIP.\n"];
             break;
         case LabSkuA14_21D50:
             [out appendString:@"TRACK: 12 mini 21D50. Twin CLASS/FIELD only. Keep 21D50 VAs off 23F77.\n"];
