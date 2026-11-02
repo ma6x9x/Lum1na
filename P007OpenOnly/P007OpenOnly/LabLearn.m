@@ -9,6 +9,7 @@
 #import "lumina_core.h"
 
 #import <fcntl.h>
+#import <stdlib.h>
 #import <unistd.h>
 
 #define LEARN_FILE @"lab_learn.json"
@@ -92,6 +93,16 @@ static NSString *g_pendingArm;
     return 0;
 }
 
++ (BOOL)conversionConfirmed {
+    NSString *c = [self row][@"conversion"];
+    return [c isKindOfClass:[NSString class]] && [c isEqualToString:@"YES"];
+}
+
++ (BOOL)magicConfirmed {
+    NSString *m = [self row][@"magic"];
+    return [m isKindOfClass:[NSString class]] && [m isEqualToString:@"PASS"];
+}
+
 + (void)recordOccupancy:(BOOL)occ
              conversion:(BOOL)conv
                   magic:(BOOL)magic
@@ -137,6 +148,42 @@ static NSString *g_pendingArm;
         : [NSMutableDictionary dictionary];
     row[@"ident"] = ident;
     row[@"ident_ts"] = LabLocalMilitaryNow() ?: @"?";
+    skus[key] = row;
+    doc[@"skus"] = skus;
+    [self saveDoc:doc];
+}
+
++ (void)ingestBootIntel {
+    NSString *docs = [NSSearchPathForDirectoriesInDomains(
+        NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
+    if (!docs.length) return;
+    NSString *path = [docs stringByAppendingPathComponent:@"p139_boot_intel.txt"];
+    NSString *txt = [NSString stringWithContentsOfFile:path
+                                              encoding:NSUTF8StringEncoding
+                                                 error:nil];
+    if (!txt.length) return;
+    NSMutableDictionary *doc = [self loadDoc];
+    NSMutableDictionary *skus = [doc[@"skus"] isKindOfClass:[NSDictionary class]]
+        ? [doc[@"skus"] mutableCopy]
+        : [NSMutableDictionary dictionary];
+    NSString *key = [self skuKey];
+    NSMutableDictionary *row = [skus[key] isKindOfClass:[NSDictionary class]]
+        ? [skus[key] mutableCopy]
+        : [NSMutableDictionary dictionary];
+    NSUInteger cap = MIN(txt.length, (NSUInteger)4096);
+    row[@"p139"] = [txt substringToIndex:cap];
+    row[@"p139_ts"] = LabLocalMilitaryNow() ?: @"?";
+    NSRegularExpression *re =
+        [NSRegularExpression regularExpressionWithPattern:@"0x[fF]{6,}[0-9a-fA-F]+"
+                                                  options:0 error:nil];
+    NSTextCheckingResult *m = [re firstMatchInString:txt options:0
+                                               range:NSMakeRange(0, txt.length)];
+    if (m) {
+        NSString *hex = [txt substringWithRange:m.range];
+        unsigned long long v = strtoull(hex.UTF8String, NULL, 16);
+        if (lumina_kptr_zone((uint64_t)v))
+            row[@"p139_heap"] = hex;
+    }
     skus[key] = row;
     doc[@"skus"] = skus;
     [self saveDoc:doc];

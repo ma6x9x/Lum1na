@@ -12,6 +12,10 @@
 #import <sys/sysctl.h>
 #import <stdlib.h>
 #import <string.h>
+#import <notify.h>
+#if __has_include(<os/proc.h>)
+#import <os/proc.h>
+#endif
 
 static NSString *lp_sysctl(const char *name) {
     size_t n = 0;
@@ -245,8 +249,9 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
         case LabSkuA14_23F77:
             [s appendString:@"A14 23F77 first door: KERNEL T1 sequencer (P044 N=192 conversion bar; P139; P113; kread32).\n"];
             [s appendString:@"  conversion = desc_type_forged OR (body_forged AND kptr). Neighbor = live same-type ANE table or named Shape L.\n"];
+            [s appendString:@"  KERNEL locks oob192 until conversion CONFIRMED. Game Overlay ON + LPM off raises adjacency odds.\n"];
             [s appendString:@"  hop-1 cluster_*_contig SKIP (EINVAL since 26.1). CS2 fail-graceful. P044 254 remaining-fire CLOSED.\n"];
-            [s appendString:@"  Hot: T1 SKU door, conv, KREAD, CHAINS. Bandit krw_t1 picks oob192/inb191/small127.\n"];
+            [s appendString:@"  Hot: T1 SKU door, conv, KREAD, CHAINS.\n"];
             break;
         case LabSkuA12X_23G71:
             [s appendString:@"A12X 23G71 first door: 64788 Facet A (live until 23G82) + aio84530 HEAP leak.\n"];
@@ -346,6 +351,8 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
             break;
     }
     [out appendString:@"Runtime profile always wins.\n"];
+    [self beginHuntGroom];
+    [out appendString:[self gameModeLine]];
     return out;
 }
 
@@ -404,16 +411,65 @@ static CADisplayLink *g_huntDisplayLink = nil;
 + (NSString *)huntTapWarn:(NSString *)thisTap {
     NSUserDefaults *d = [NSUserDefaults standardUserDefaults];
     NSString *prev = [d objectForKey:[NSString stringWithFormat:@"labTapStamp_%@", thisTap]];
-    if (prev) return [NSString stringWithFormat:
-        @"[!] %@ ran earlier this boot - one tap per force-quit", thisTap];
+    NSMutableString *w = [NSMutableString string];
+    if (prev) [w appendFormat:@"[!] %@ ran earlier this boot - one tap per force-quit", thisTap];
+    NSProcessInfo *pi = NSProcessInfo.processInfo;
+    if (pi.isLowPowerModeEnabled)
+        [w appendString:w.length ? @" LPM=1" : @"[!] LPM=1 (conversion odds LOW)"];
+    if ((long)pi.thermalState >= 2)
+        [w appendFormat:@"%@thermal=%ld", w.length ? @" " : @"[!] ", (long)pi.thermalState];
     [self stampLastTap:thisTap];
-    return nil;
+    return w.length ? w : nil;
 }
 + (NSString *)gameModeLine {
-    BOOL gc = YES, ls = YES; /* main-app parity: plist keys present */
-    return [[NSString alloc] initWithFormat:
-        @"GAME_MODE_PLIST GCSupports=%d LSSupports=%d category=public.app-category.games",
-        gc, ls];
+    NSDictionary *info = NSBundle.mainBundle.infoDictionary;
+    id gc = info[@"GCSupportsGameMode"];
+    id ls = info[@"LSSupportsGameMode"];
+    NSString *cat = info[@"LSApplicationCategoryType"] ?: @"-";
+    int gcB = [gc respondsToSelector:@selector(boolValue)] ? [gc boolValue] : 0;
+    int lsB = [ls respondsToSelector:@selector(boolValue)] ? [ls boolValue] : 0;
+    NSMutableString *n = [NSMutableString string];
+    uint64_t anyOn = 0;
+    static const char *names[] = {
+        "com.apple.gamepolicyd.game-mode-enabled",
+        "com.apple.gamepolicyd.gamemode",
+        "com.apple.gamepolicy.gameMode",
+        "com.apple.gamepolicyd.gameModeDidChange",
+        "com.apple.runningboard.gameMode",
+        NULL
+    };
+    for (int i = 0; names[i]; i++) {
+        int token = 0;
+        uint64_t st = 0;
+        if (notify_register_check(names[i], &token) == NOTIFY_STATUS_OK) {
+            notify_get_state(token, &st);
+            notify_cancel(token);
+            [n appendFormat:@" %s=%llu", names[i], (unsigned long long)st];
+            anyOn |= st;
+        }
+    }
+    NSProcessInfo *pi = NSProcessInfo.processInfo;
+    size_t avail = 0;
+#if __has_include(<os/proc.h>)
+    avail = os_proc_available_memory();
+#endif
+    __block BOOL idle = NO;
+    void (^readIdle)(void) = ^{
+        idle = UIApplication.sharedApplication.idleTimerDisabled;
+    };
+    if ([NSThread isMainThread]) readIdle();
+    else dispatch_sync(dispatch_get_main_queue(), readIdle);
+    NSMutableString *s = [NSMutableString stringWithFormat:
+            @"GAME_MODE_PLIST GCSupports=%d LSSupports=%d category=%@\n"
+            @"GAME_MODE_NOTIFY%@\n"
+            @"GAME_MODE_GROOM activity=%d idle=%d thermal=%ld LPM=%d avail=%zu displaylink=%d\n",
+            gcB, lsB, cat,
+            n.length ? n : @" none",
+            g_huntGroomActivity != nil, idle ? 1 : 0,
+            (long)pi.thermalState, pi.isLowPowerModeEnabled ? 1 : 0, avail,
+            g_huntDisplayLink != nil];
+    if (!anyOn) [s appendString:@"GAME_MODE_HOLD\n"];
+    return s;
 }
 
 @end

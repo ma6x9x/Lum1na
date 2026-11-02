@@ -5,7 +5,7 @@ C ABI parse / self-test helpers for Lum1na.
 - Mach-O `MH_MAGIC_64` + packed magic+cputype + kernel typeinfo (commitSlide bar)
 - Dopamine `trustcache_file_v1` bounds (header + `length * 22` == blob)
 - UCB1 + LabBandit reward law
-- ANE arm → REQ_IN / model
+- ANE arm → REQ_IN / model, record-count / OOB math, oob192 lock until conversion
 - AfterKread step names (DOJailbreaker order)
 - `enumerate_pages` chunk helper
 

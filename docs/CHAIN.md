@@ -1,6 +1,6 @@
 # Chain map (public)
 
-This is not a claim of KRW. Pins are **unslid** per `LabOff()` (A14 23F77 T8101 / A12X 23G71 T8020 / T8150 iPhone18,2 24A435).
+This is not a claim of KRW. Pins are **unslid** per `LabOff()` (A14 23F77 T8101 / A12X 23G71 T8027 / T8150 iPhone18,2 24A435). iPhone XR A12 is T8020.
 
 ## KRW theory buttons (home)
 
@@ -8,7 +8,7 @@ Seven isolated TAPs. Reboot + force-quit between T1–T4 and T7 GPU map. `ui-bui
 
 | Button | Catalog | Theory |
 | --- | --- | --- |
-| **T1 ANE** | `krw` | KERNEL sequencer (`sku-door-run-1`). A14: P044 N=192 conversion bar + P139 + P113 + kread32(kbase)==MH_MAGIC_64. Arm only after conversion CONFIRMED. Occupancy CLASS is not hasKread. T8150: P139 only (isolated p110/p142/p143). 12 mini: 127-in in-bounds, 43748 not live. No 254 remaining-fire. |
+| **T1 ANE** | `krw` | KERNEL sequencer (`notes-wire-1`). A14: P044 N=192 locked until conversion + Game Mode oracle + P139 dossier + P113 + kread32(kbase)==MH_MAGIC_64. Neighbor is IOMallocType 0x820 then IOFreeType. Arm only after conversion CONFIRMED. Occupancy CLASS is not hasKread. T8150: P139 + Trigon analog map (isolated p110/p142/p143). 12 mini: 127-in in-bounds, 43748 not live. No 254 remaining-fire. |
 | **T2 FACET** | `krw2` | 64788 1×65535 + Trap2 sel=3 oracle. |
 | **T3 SOCK** | `krw3` | 43748 then icmp6filt. Expected SKIP. |
 | **T4 LS** | `krw4` | Dual-wrap last-wire. 18:45 OOM sealed. |
@@ -18,7 +18,7 @@ Seven isolated TAPs. Reboot + force-quit between T1–T4 and T7 GPU map. `ui-bui
 
 Credit: opa334 / Lars Fröder — Dopamine 3.0.10 (`primitives_external.h`, `DOJailbreaker.m`, Titan, momentarius, `physrw_pte.c`, `trustcache.c`). Copied into Lum1na: `Exploit/DopaminePrimitives.h` (vtable) + page-split `kreadbuf` fill after `commitSlide`. Parse helpers live in `Exploit/lumina_core.c` (C ABI; Rust twin `rust/lumina_core`). Hop-1 / kfd / multicast_bytecopy bodies stay in the Dopamine tree.
 
-Solo `p044` (254 controller) / `staleentry` / `lightsword` stay All-stages. PATCH is SANDBOX BadQuery → KERNEL T1 sequencer (P044AksKaslrReach N=192 + P139 + P113 + kread32) → AfterKread HOLD. Conversion is desc_type_forged OR (body_forged AND kptr). CVE-2026-86950 stays parked.
+Solo `p044` (254 controller) / `staleentry` / `lightsword` stay All-stages. PATCH is SANDBOX BadQuery → KERNEL T1 sequencer (`notes-wire-1`: P044AksKaslrReach N=192 locked until conversion + P139 dossier + P113 + kread32) → AfterKread HOLD. Conversion is desc_type_forged OR (body_forged AND kptr). CVE-2026-86950 stays parked.
 
 Home also has **CHAINS** (`p070` census), **KREAD** (`kreadtest` commitSlide bar), **FILES** (`p072` parser census). Same processing contract as P007: TAP marker in `p011_tap_log.txt` before invoke, POSIX + `F_FULLFSYNC` probe logs, recover last TAP mapped log, `hasKread` only after `kread32(kbase)==MH_MAGIC_64`.
 
@@ -78,9 +78,9 @@ View: Settings → Copy Kernel Board JSON, or All stages → Kernel board JSON.
 - wvek: `apfs_aks_create_wvek` `0xFFFFFFF009BD96D4`; F77 `len>0x210` is **BRK**, 26.7 adds `len<=512`
 - AKS UC **opens** (live P057). CVE-2026-65343 is an OOB **read** (KASLR) via ACM deserialize. Catalog `aks` tap is ACM capture (`aks-capture-v4`), not the 163-selector crash. P104 census 2026-10-26 (iPhone13,2 23F77 + iPhone18,2 24A435): type 0 AND 1 OPEN; AppleKeyStoreTest / `com.apple.driver.AppleSEPKeyStore` not found; ungated SUCCESS `{0,1,16}`. Sel 0/1 are ungated no-ops — they never reach ACMDeserialize. Feeder is megafunction sel 16 (jumptable `@0xfffffff008d9f868` → `FUN_8d8ca10` → `aks_sep_req_prepare_output_ool`). P057 v9 (`aks-p007-v9-sel16-feeder`) sends the 65343 envelope (handle[16] + declared at +24, 0x28 then 0x100, 0-scalar and 1-scalar) on sel 16. **sel5 `0xe00002c1` NotPrivileged** (privilege, not size). 163-sel 0x800 crash PARK. Sibling leak of aio84530. Does not replace 43748 fill. Not KRW. T8150 24A435 is post-23G83 (65343 patched); LIVE target is 23F77.
 
-## 23G71 A12X iPad (T8020) — dual-SKU gates
+## 23G71 A12X iPad (T8027) — dual-SKU gates
 
-SKU is `hw.machine` + `kern.osversion`: iPad8,* + 23G71. Runtime `LabOff()` is the pin table. Do not paste T8101 VAs onto T8020. Do not bump Dopamine 3.0.10 `End` 26.0.1 → 26.6.
+SKU is `hw.machine` + `kern.osversion`: iPad8,* + 23G71. A12X is T8027 (CPID 0x8027). T8020 is the XR A12. Runtime `LabOff()` is the pin table. Do not paste T8101 VAs onto T8027. Do not bump Dopamine 3.0.10 `End` 26.0.1 → 26.6.
 
 **Unpatched on 23G71 (run these):** 64788 LightSword until 23G82 — live detach is `0xe00002e2` NotPermitted (sandbox; abort after first, do not spin 24×); AKS 65343 until 23G83; aio84530 until 26.7/27; wvek create BRK if `len>0x210` (`FUN_fffffff009ab24c0`).
 
@@ -154,7 +154,7 @@ KRW self-test (must pass before inject): `kread32(kbase) == MH_MAGIC_64` and `kb
 
 A14 is **PPL**, not momentarius. Drop files into the app container, then re-tap **afterkread** after `hasKread`. Persist / tempRoot / boot-time re-arm stays later (novel Lum1na, not a Dopamine copy). See All stages → After-kread plan.
 
-Full Chain order: SANDBOX BadQuery → KERNEL T1 sequencer (`KRWChainController` BUILD `sku-door-run-1`: P100 + P139 + P044 N=192 on A14 + P113 + kread32 self-test; LightSword Arm only after conversion CONFIRMED) → DAEMON P054 bounded (1 thread, 2s, 50 files — the 4×500×30s storm stays dead) → PATCHSET AfterKread HOLD (elevate → pmap_cs → AMFI → opainject → dpkg → respring only after `kread32(kbase)==MH_MAGIC_64`). Hunt auto-chain skips P099 254, P110/P142/P143, and CS2 hop-1. Catalog `conv` is P044AksKaslrReach. Auto chain skips P051/P053. Parked All-stages: ColdForge, Rapier, p055, p058 JPEG open, p056/p061 AVE reach, Anvil open-only, P064AVE84607Racer remaining-fire, P065–P072 (invoke solo).
+Full Chain order: SANDBOX BadQuery → KERNEL T1 sequencer (`KRWChainController` BUILD `notes-wire-1`: P100 + P139 + P044 N=192 locked on A14 until conversion + P113 + kread32 self-test; LightSword Arm only after conversion CONFIRMED) → DAEMON P054 bounded (1 thread, 2s, 50 files — the 4×500×30s storm stays dead) → PATCHSET AfterKread HOLD (elevate → pmap_cs → AMFI → opainject → dpkg → respring only after `kread32(kbase)==MH_MAGIC_64`). Hunt auto-chain skips P099 254, P110/P142/P143, and CS2 hop-1. Catalog `conv` is P044AksKaslrReach. Auto chain skips P051/P053. Parked All-stages: ColdForge, Rapier, p055, p058 JPEG open, p056/p061 AVE reach, Anvil open-only, P064AVE84607Racer remaining-fire, P065–P072 (invoke solo).
 
 ## Not in this repo
 

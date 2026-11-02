@@ -8,7 +8,7 @@ use std::ffi::{c_char, c_int, CStr};
 use std::os::raw::c_void;
 use std::ptr;
 
-pub const LUMINA_CORE_VERSION: &str = "lumina-core-v1\0";
+pub const LUMINA_CORE_VERSION: &str = "lumina-core-v2\0";
 pub const LUMINA_MH_MAGIC_64: u32 = 0xfeed_facf;
 pub const LUMINA_MH_MAGIC_CPUTYPE: u64 = 0x0100_000c_feed_facf;
 pub const LUMINA_MH_TYPEINFO_ARM64: u64 = 0x0000_0002_0000_0000;
@@ -154,6 +154,36 @@ pub extern "C" fn lumina_ane_model_for_arm(arm: *const c_char) -> *const c_char 
     match cstr(arm) {
         Some("small127") => b"XVRC27_127inmin_1out\0".as_ptr() as *const c_char,
         _ => ptr::null(),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn lumina_ane_record_count(req_in: u32) -> u32 {
+    if !(2..=4096).contains(&req_in) {
+        return 0;
+    }
+    req_in + 1
+}
+
+#[no_mangle]
+pub extern "C" fn lumina_ane_oob_records(req_in: u32, cap: u32) -> u32 {
+    let rec = lumina_ane_record_count(req_in);
+    if rec == 0 || cap == 0 {
+        return 0;
+    }
+    if rec > cap {
+        rec - cap
+    } else {
+        0
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn lumina_ane_lock_oob192(conversion_confirmed: c_int) -> c_int {
+    if conversion_confirmed != 0 {
+        0
+    } else {
+        1
     }
 }
 
@@ -325,6 +355,24 @@ pub extern "C" fn lumina_core_selftest() -> c_int {
         if !lumina_ane_model_for_arm(b"oob192\0".as_ptr() as *const c_char).is_null() {
             return 30;
         }
+        if lumina_ane_record_count(192) != 193 {
+            return 40;
+        }
+        if lumina_ane_oob_records(192, 192) != 1 {
+            return 41;
+        }
+        if lumina_ane_oob_records(191, 192) != 0 {
+            return 42;
+        }
+        if lumina_ane_oob_records(192, 255) != 0 {
+            return 43;
+        }
+        if lumina_ane_lock_oob192(0) != 1 {
+            return 44;
+        }
+        if lumina_ane_lock_oob192(1) != 0 {
+            return 45;
+        }
         let hold = CStr::from_ptr(lumina_ak_step_name(0)).to_str().unwrap();
         if hold != "HOLD" {
             return 31;
@@ -352,7 +400,7 @@ pub extern "C" fn lumina_core_selftest() -> c_int {
         return 38;
     }
     unsafe {
-        if CStr::from_ptr(lumina_core_version()).to_str().unwrap() != "lumina-core-v1" {
+        if CStr::from_ptr(lumina_core_version()).to_str().unwrap() != "lumina-core-v2" {
             return 39;
         }
     }

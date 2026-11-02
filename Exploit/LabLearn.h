@@ -29,6 +29,10 @@ NS_ASSUME_NONNULL_BEGIN
 /// Learned or SKU-default REQ_IN. 0 = keep P044 compile default (192 on hunt).
 + (uint32_t)aneReqIn;
 
+/// Device-observed conversion/magic receipts. Overlay never pastes VAs.
++ (BOOL)conversionConfirmed;
++ (BOOL)magicConfirmed;
+
 /// Persist a KERNEL/P044 receipt. heap=0 and empty model are ignored.
 + (void)recordOccupancy:(BOOL)occ
              conversion:(BOOL)conv
@@ -40,6 +44,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 /// P100 LEARN PACKET ingest (chip/sku/table only; no VAs).
 + (void)ingestIdent:(NSString *)ident;
+
+/// P139 dossier ingest. Heap-shaped facts only. Never writes LabOff().
++ (void)ingestBootIntel;
 
 @end
 

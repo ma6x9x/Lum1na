@@ -20,7 +20,7 @@
 extern "C" {
 #endif
 
-#define LUMINA_CORE_VERSION        "lumina-core-v1"
+#define LUMINA_CORE_VERSION        "lumina-core-v2"
 #define LUMINA_MH_MAGIC_64         0xfeedfacfu
 #define LUMINA_MH_MAGIC_CPUTYPE    0x100000cfeedfacfull
 #define LUMINA_MH_TYPEINFO_ARM64   0x0000000200000000ull
@@ -64,6 +64,11 @@ double lumina_ucb1(double mean, double n_i, double N);
 
 uint32_t    lumina_ane_req_in_for_arm(const char *arm);
 const char *lumina_ane_model_for_arm(const char *arm);
+/* Table records = REQ_IN + 1 output. Spill is records-cap, not REQ_IN-cap. */
+uint32_t    lumina_ane_record_count(uint32_t req_in);
+uint32_t    lumina_ane_oob_records(uint32_t req_in, uint32_t cap);
+/* Hunt 23F77 conversion TAP stays N=192 until conversion is confirmed. */
+int         lumina_ane_lock_oob192(int conversion_confirmed);
 
 /* ---- AfterKread pipeline (DOJailbreaker order, HOLD until magic) ---- */
 

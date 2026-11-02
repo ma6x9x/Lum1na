@@ -39,7 +39,7 @@ blacktop’s iOS matrix is `iPhone18,1` (T8150 / AGXG18P / AppleH16ANE / AVE H18
 | Lab | Device | Build | SoC |
 | --- | --- | --- | --- |
 | Active | iPhone13,2 | 23F77 | T8101 / A14 |
-| Twin | iPad8,* | 23G71 | T8020 / A12X |
+| Twin | iPad8,* | 23G71 | T8027 / A12X |
 
 Same *build number* can still be a different kext (H16 vs H11 ANE, T8150 vs T8101 IOGPU). **Do not paste iPhone18,1 VAs onto T8101.** Use blacktop markdown to see *which strings/sizes moved*, then confirm on the Ghidra 23F77 XNU / kext for this board.
 

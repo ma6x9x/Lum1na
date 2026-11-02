@@ -111,6 +111,21 @@ const char *lumina_ane_model_for_arm(const char *arm) {
     return NULL;
 }
 
+uint32_t lumina_ane_record_count(uint32_t req_in) {
+    if (req_in < 2u || req_in > 4096u) return 0;
+    return req_in + 1u;
+}
+
+uint32_t lumina_ane_oob_records(uint32_t req_in, uint32_t cap) {
+    uint32_t rec = lumina_ane_record_count(req_in);
+    if (rec == 0 || cap == 0) return 0;
+    return rec > cap ? rec - cap : 0;
+}
+
+int lumina_ane_lock_oob192(int conversion_confirmed) {
+    return conversion_confirmed ? 0 : 1;
+}
+
 const char *lumina_ak_step_name(int step) {
     switch (step) {
         case LUMINA_AK_HOLD:       return "HOLD";
@@ -187,6 +202,12 @@ int lumina_core_selftest(void) {
     if (strcmp(lumina_ane_model_for_arm("small127"), "XVRC27_127inmin_1out") != 0)
         return 29;
     if (lumina_ane_model_for_arm("oob192") != NULL) return 30;
+    if (lumina_ane_record_count(192u) != 193u) return 40;
+    if (lumina_ane_oob_records(192u, 192u) != 1u) return 41;
+    if (lumina_ane_oob_records(191u, 192u) != 0u) return 42;
+    if (lumina_ane_oob_records(192u, 255u) != 0u) return 43;
+    if (lumina_ane_lock_oob192(0) != 1) return 44;
+    if (lumina_ane_lock_oob192(1) != 0) return 45;
 
     if (strcmp(lumina_ak_step_name(LUMINA_AK_HOLD), "HOLD") != 0) return 31;
     if (lumina_ak_next_step(0, 0, 0, 0, 0) != LUMINA_AK_HOLD) return 32;
