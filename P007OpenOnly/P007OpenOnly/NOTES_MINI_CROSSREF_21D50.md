@@ -1104,3 +1104,32 @@ door/stride laws; the p110 claim rows.
   the safe corroboration oracle; the 23F77 VAs = priors, re-derive by byte-pattern);
   (B) the T8150 M2Scaler sel-6/sel-8 contract (why 2c2 / why 2bf-64KB; the corrected
   grammar rows). Reports -> ledger + notes; the next taps build on them.
+
+## 2026-11-01 19:5x — the T8150 M2Scaler CONTRACT DECODE landed (agent, 77 static reads) — the 2c2 mystery SOLVED + the leak lane law on the 17
+- **sel-6 QueueCreate: the grammar is BYTE-IDENTICAL to 23F77 on T8150** (word0 EXACTLY
+  1000 [cmp 0x3e7/0x3e8 cited], in 0xFA8, flags bit0, the 4-stage table @0x80ff4b0) =>
+  tonight's 2c2 = **the TAGS verdict**: >=1 of the 1000 sids failed the deep validator's
+  live+owned resolution (kext lookup 0xa344130; any miss -> 0x2c2; preamble fail would
+  have been **0x2c9** — the value excludes the root leg). NOT a grammar change.
+- **sel-8 iosaDiag T8150 law (decode-CONFIRMED)**: in[0] = THE USERLAND BUFFER ADDRESS
+  the async dump engine writes into (IOMD base); structureOutput NEVER written (the 64KB
+  zeros tonight = BY DESIGN); base = count<=0x100?0x40:0x200, MD = (base+count)*0x7c+0x20;
+  **0x2bf = kIOReturnIPCError = ENGINE-ASLEEP** (no such constant in kext TEXEC — the
+  commandSleep class), NOT a shape check. Disclosure class SURVIVES on T8150: header
+  +0x18 = u64 RAW status token with NO sanitize (a live pointer there = the SLID-law
+  candidate); rec+0x18 raw CONDITIONAL on byte[+1]==0; rec+0x20..+0x4c = UNSLIDED KVAs.
+- **sel-11 = RAW no-auth engine-member snapshot**: memmove(out, engineMember+0xB8-class
+  obj, min(outLen,0x298)) + tail-zeroing; NO gate — **out+0xC = member+0xC verbatim**
+  (the p101 oracle's 0x01010101 constant = the member's own bytes, NOT a [md+0x98]
+  gate readback — no gate exists in that path). A 0x298B kernel-object read shape.
+- **OTHER ROWS**: sel-0/2/3 = 2c7 hard stubs; sel-5 scalar-out; sel-7 = IOMD::withAddress
+  Range(in); sel-10 = set_client_property (property id <4 gate); every stub has the
+  [x0+0x15c] "must called from user space!" panic guard; 12 rows stride 0x30 @0x80efcd8.
+- **p110 v2.8 SHIPPED**: the leak capture now (a) passes OUR buffer as in64 on T8150
+  (the CONFIRMED law; the 23F77 echo prior kept on that SKU), (b) classifies OUR buffer
+  (signature-2 header, countA/countB, the conditional raw, the KVA fields) instead of
+  the untouched structureOutput, (c) names 2bf = engine-asleep honestly, (d) prints the
+  QueueCreate 2c2 tags-class law. The pairing's honest next device row: the engine run
+  needs LIVE CSC work — the disclosure round needs the engine awake (a real transform
+  class queued), else the header stays unsigned and 2bf stands.
+- Report file: ~/Desktop/lumina_primitives/notes/t8150_m2scaler_contract_decode_20261101.md

