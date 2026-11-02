@@ -1077,3 +1077,30 @@ door/stride laws; the p110 claim rows.
   x60/x120/x200 rows.
 - HONESTY NOTE: this row = the tap's ONE device step toward kernel-data-in-userland (the
   sel-8 pairing). Disclosure class; never kread; the receipt law unchanged.
+
+## 2026-11-01 19:30 — the p101 wrap run + the leakgate-on first row decoded (the user's chaining push)
+- **p101 v2 (T8150, 19:30:20) — the RETAIN-WRAP PROVEN on-device**: 65,537 retains, kr=0x0
+  every round, no ceiling (the B6-class law live on 24A435); the u16 dmaref wrap theory
+  measured. The chain honestly STOPPED at the release route: the gate oracle did NOT
+  corroborate (sel-census out+0xc = 0x01010101 CONSTANT through map/unmap/remap — the
+  [md+0x98] field never moved under the driven ops = wrong observed MD or the 23F77
+  sel law drifts on 24A435), and the twin PANICS on underflow -> honest SKIP (the route
+  guard held). Chain state: wrap=X -> release-route=UNPROVEN -> NO UAF. Also a WRITE-lane
+  design at the end (page-list confusion -> P102), not a kread lane.
+- **p110 v2.6 (19:29:54) — the leakgate-on first device row (T8150) BEFORE its (b) death**:
+  the ROW PRESET fired (leakgate-on forced, consume-once verified in the log); the
+  23F77 v5 sel-6 contract = 2c2 REFUSED on T8150 (outLen 4008) and sel-8 = 0xe00002bf +
+  64KB all-zero -> **the T8150 M2Scaler grammar DIFFERS from 23F77 on BOTH selectors** —
+  the leak pairing is T8150-DECODER-BLOCKED until its own contract decodes. Pairing HELD
+  (tolerant law); rounds continued; the run died the (b) class (the design target; the
+  dirty-boot attribution printed correctly — credited to p8-b200-popwin).
+- **THE CHAINING MAP (the user's push, answered)**: the lawful chain = wrap(proven) +
+  release-route(uncorroborated = the MISSING LINK, static-decodable) + the oracle field;
+  NOT tonight's KRW answer until the release route corroborates. The ANE lanes: 43748 =
+  operator-STOPPED (verified-live groom owed), Stage-B pid-borrow = decode-owed; no
+  lawful cross-lane mashup (the no-guess law + the variant-C class law).
+- **DECODER JOBS LAUNCHED (static)**: (A) the p101 release-route/oracle decode on 24A435
+  (the gated dispatcher's userland-reachable caller + the [md+0x98] increment sites +
+  the safe corroboration oracle; the 23F77 VAs = priors, re-derive by byte-pattern);
+  (B) the T8150 M2Scaler sel-6/sel-8 contract (why 2c2 / why 2bf-64KB; the corrected
+  grammar rows). Reports -> ledger + notes; the next taps build on them.
