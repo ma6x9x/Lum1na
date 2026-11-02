@@ -1198,3 +1198,25 @@ door/stride laws; the p110 claim rows.
   probeLogFiles map + the T8150 TRACK case. The main IPA = now the full probe set on the
   17 (its honest holds stay: A14/A12X VA-lanes keep their SKU gates; the T8150 laws route
   via the T8150 table + the RocketDoor pins).
+
+## 2026-11-02 — the SPTM t8150 STATE/DATA map landed (agent 2 of 2; bridge-verified against capstone) — THE MONITOR'S CONTRACT, NAMED
+- **The kernel→SPTM callgate ABI (decode-CONFIRMED)**: call word {cmd u8@0-7, FunctionID u8@32-39,
+  caller_domain u8@48-55}; core table @0x27122350-class (stride 0x18 {auth'd handler, aux, name+perm});
+  **44 named handlers** incl: 1=RETYPE, 2=MAP_PAGE, 3/4=MAP/UNMAP_TABLE, 5-11=region ops,
+  12/13=CONFIGURE_ROOT/SWITCH_ROOT, 16/17=SIGN/AUTH_USER_POINTER, 20=SLIDE_REGION,
+  30-32=HIB, 33=IOFILTER_PROTECTED_WRITE, 41/42=SURT_ALLOC/FREE, 50=OUTPUT_AREA. Dispatch audit fn
+  0x270f2fa4; hop state machine 0x2701f808 (0x17 states x 0x0f cmds; per-cpu domain byte +0xb00).
+- **THE ONE RUNTIME KERNEL-CONTROLLABLE LEVER = FUNCTIONID_RETYPE (call 1) — hands retype-core
+  0x270f988c DIRECT to XNU** (fixup-registered trampoline 0x270fa50c; callgate row 1): writes the
+  FTE type byte row[2] = the per-PPN protection state. Validation PANIC-BACKED (bounds <=0x43,
+  claimed-current==actual FTE type, the 128-bit transition matrix per policy[actual] @0x2709e240
+  stride 0x90, domain-byte match, page-aligned PA; policy[0x00] = all-ones transition mask = the
+  universal pivot from a free FTE). FTE row = [0x2709d538] + PPN*16 (managed range 0x2709e208/210,
+  PPN=(pa-e208)>>14; hash fallback 0x270ef140). **The retype lever STEERS the T8110 DART map path's
+  force-prot csel (0xc15 x policy[+0x30]==1 → csel x23 @0x270d727c) and map_page type gates** — the
+  "krw>sptm" tail is now a named, byte-cited hinge: WITH kernel RW, retypes + map ops are the
+  monitor-side mapping-permission ladder. WITHOUT KRW: no direct userland reach to any of it.
+- Config cluster (+0xbfe..+0xc15, +0xba0/ba8) = DT/ctor-only — no runtime kernel lever (rig-CDT lever
+  confirmed as design). FTE init = bootstrap-only; the retype residue list (i-v) recorded for next pass.
+- Report: ~/Desktop/lumina_primitives/notes/sptm_t8150_state_map_20261102.md (the arch/ABI agent's
+  boot/exception map still pending).
