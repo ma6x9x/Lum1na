@@ -1220,3 +1220,26 @@ door/stride laws; the p110 claim rows.
   confirmed as design). FTE init = bootstrap-only; the retype residue list (i-v) recorded for next pass.
 - Report: ~/Desktop/lumina_primitives/notes/sptm_t8150_state_map_20261102.md (the arch/ABI agent's
   boot/exception map still pending).
+
+## 2026-11-02 — the SPTM t8150 ARCH/ABI map landed (agent 2/2; bridge cross-checked vs capstone) — the FULL monitor contract, both sides
+- **The GENTER ABI on the 17 (decode-CONFIRMED, kernel side)**: tramp va 0xfffffe000ab48018 (unique
+  mrs S3_6_c15_c8_0 doorbell in the whole cache) — **x16 = call word, x0-x7 args in-place in/out,
+  doorbell-read==0 = done**; gexit va 0xab47b74. Reachability caveat: zero static b/pointer targets
+  (runtime-populated tables — the honest negative).
+- **SPTM side (CONFIRMED)**: vectors 0x270108000; EL1t sync 0x270a7ca4 = the kernel row; gated enter/
+  exit via S3_6_c15_c10_3; SVC 7x7 table 0x2701f4f8 [kind*0x38+sel*8] (PAC ctx 0xc231); state machine
+  0x270f253c + 23-state table 0x2701f808; XNU->SPTM action 0x270a62ac blr x1 = the dispatch-resolved
+  op handler; sptm_register_dispatch_table 0x270f2000 (domain <=19, entry must lie in PAPT ranges,
+  perm bitmask per domain; "Found illegal dispatch entry point" panic class). **The PAC'd data-pointer
+  decode law: low24 = fileoff; VA = 0xfffffff027004000 + (p & 0xffffff)** (16/16 verified).
+- **Panic law (CONFIRMED)**: illegal dispatch = monitor panic / kernel doorbell spin forever — NO
+  return-code path; kernel-supplied data reaching SPTM = genter word (checked) + x0-x7 per-op args
+  (per-op validation UNRESOLVED = the named residue) + TXM-stack PA (checked).
+- **Kernel-side corrections**: __DATA_SPTM va 0xfffffe000844c000 (0x4c000) = 0 nonzero (boot-filled
+  per-cpu mirror); **the old "__sptm_args @0x7ed41c0 stride-0x18" bridge note = NOT REPRODUCIBLE on
+  this cache (past EOF) — retired**, do not paste; kernel call-number map = stripped.
+- Boot facts: __start 0x270ac388; handshake page at bootargs+0x480 (magic 0x4d545053 "SPTM", v5);
+  PAC-key ladder from lit 0x270af988; JOP key = pacga("STACKGRD"); managed range [0x2709e208,0x2709e210)
+  reconfirmed; __LATE_CONST NOT fully zero-file (2658 nonzero bytes; boot zeroes only 0x27024000..0x34000).
+- Report: ~/Desktop/lumina_primitives/notes/sptm_t8150_arch_map_20261102.md. THE FULL SPTM MAP = the
+  standing artifact set: notes/sptm_t8150_{arch,state}_map_20261102.md + scripts/sptm_t8150/.
