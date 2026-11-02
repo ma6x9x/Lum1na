@@ -208,6 +208,9 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
 }
 
 + (NSString *)expectQueueCreate {
+    const LabOffTab *o = LabOff();
+    if (!o || !o->queue_create_sel)
+        return @"QueueCreate (NO SKU LAW ROW — no QueueCreate lane values for this table; honest hold)";
     return [NSString stringWithFormat:@"QueueCreate sel=%u size=0x%x leak=+0x%x",
             [self queueCreateSel], [self queueCreateSize], [self queueLeakOff]];
 }
@@ -300,9 +303,14 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
     [out appendFormat:@"release        %s\n", u.release];
     [out appendFormat:@"sku            %@\n", [self skuName]];
     [out appendFormat:@"offset table   %s\n", off ? off->tag : "NULL"];
-    [out appendFormat:@"QueueCreate    sel=%u size=0x%x leak=+0x%x destroy=%u submit=%u MD+0x%x sel36=%u\n",
-         [self queueCreateSel], [self queueCreateSize], [self queueLeakOff],
-         [self queueDestroySel], [self queueSubmitSel], [self sysmemMdOff], [self sel36]];
+    if (off && off->queue_create_sel) {
+        [out appendFormat:@"QueueCreate    sel=%u size=0x%x leak=+0x%x destroy=%u submit=%u MD+0x%x sel36=%u\n",
+             [self queueCreateSel], [self queueCreateSize], [self queueLeakOff],
+             [self queueDestroySel], [self queueSubmitSel], [self sysmemMdOff], [self sel36]];
+    } else {
+        [out appendString:@"QueueCreate    (NO SKU LAW ROW — this table has no QueueCreate lane values;"
+                          @" zeros = honest, not decoded. The 17's queue door = the IOGPU RocketDoor lane)\n"];
+    }
     switch ([self detectedSku]) {
         case LabSkuA14_23F77:
             [out appendString:@"TRACK: iPhone13 A14 23F77 ACTIVE. First door=43748 occupancy WRITE (P099). conversion then magic. hop-1 SKIP.\n"];
