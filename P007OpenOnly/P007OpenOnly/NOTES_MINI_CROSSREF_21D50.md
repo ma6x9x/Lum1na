@@ -1167,3 +1167,34 @@ door/stride laws; the p110 claim rows.
   17 = the AVE2 DPB cluster (the blob+0x55c law) and the claim-window pairing; the READ
   candidates = the sel-8 T8150 leak law (p110 v2.8, engine-awake required). hasKread stays
   NO by law tonight.
+
+## 2026-11-01 20:2x — the relaxed-rw-protections decode LANDED (rig-boot-chain-only; the SPTM per-PPN table found) + the main-app migration
+- **relaxed-rw-protections [mapper+0x99b] = DEAD CODE for us**: writer = the IODART init
+  parse only; sole reader = leaf 0x9fac91c (relaxed=1 -> ALWAYS dir code 3); its only static
+  caller (fn 0x9fb4590) is referenced by NOTHING cache-wide (zero bl, zero pointer, zero
+  adrp) and sits at one AppleT8110DART class-vt(+0xB8) slot (virtual callers unattributable,
+  object not user-exposed). DT-provider property only; NO boot-arg/runtime setter.
+  **VERDICT: rig-boot-chain-only (DeviceTree-controlled), NOT userland-reachable on any
+  decoded path.** The caps field = [+0xa0] (base +0xa4) — the decode DIVERGES from the p148
+  brief's +0x131/+0x14 guesses (byte-verified correction; the +0x988 dart-options row).
+- **SPTM t8150.release.bin: the string IS LIVE code** — parsed @0xd7320 into [instance+0xc15]
+  (neighbor cluster: +0xc0a allow-apf-sid-remap, +0xc0c ignore-secondary, +0xc05
+  noncompliant-dead-mappings, +0xc14 avoid-tlbi-in-map, +0xc04 flush-by-dva...); sole
+  consumer @0xd3204 in the SPTM-side T8110 DART MAP path: bit==1 -> consult the SPTM
+  **per-PPN protection-state table** (16B/PPN @0x2709d000+0x538, byte+2; managed-range
+  globals @0x2709e000+0x208/0x210) and when state==1 FORCE the TTE prot bits to
+  5|(x26&1)<<3. = the monitor's own mapping-permission policy door — SPTM-internal only
+  (signed secure-instance pointers; no userland reach). **NEXT-DECODE LEAD (uncharged):
+  the SPTM per-PPN protection-state table = the same state class as the lab's SPTM/UAT
+  race lane on this 17.**
+- Shared-name diff (strings): true IODART<->SPTM surface = dart-options, relaxed-rw-
+  protections, noncompliant-dead-mappings (+real-time, dram-base); the T8110 option cluster
+  (allow-mixed-bypass-mode, flush-by-dva, allow-pte-remap...) = AppleT8110DART <-> SPTM
+  shared; monitor-only = txm-secure-channel-*, dart-sep, piogw-ps-protection, vm-reserve.
+- Report: ~/Desktop/lumina_primitives/notes/iodart_relaxed_rw_decode_20261101.md
+- **THE MAIN-APP MIGRATION (the user's ask) SHIPPED (4383371)**: 33 diverged shared files
+  synced rig->Exploit (the rig = the dev master in practice), P007Board/P007KreadLane +
+  the FULL P100-P148 family (34 probes incl. P110 v2.8) + 34 catalog rows + the
+  probeLogFiles map + the T8150 TRACK case. The main IPA = now the full probe set on the
+  17 (its honest holds stay: A14/A12X VA-lanes keep their SKU gates; the T8150 laws route
+  via the T8150 table + the RocketDoor pins).
