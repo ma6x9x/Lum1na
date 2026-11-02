@@ -1062,3 +1062,18 @@ door/stride laws; the p110 claim rows.
   is now the detector's own caveat). Parked/stopped: PATH A (lsabc D ran+missed), PATH B
   (the operator's kalloc.3072 STOP), the direct-UC blob (exclusivity). hasKread stays NO
   by law tonight unless a kread32 receipt lands.
+
+## 2026-11-01 ~19:0x — the efficiency round: the verified gates + the targeted-sampling row
+- **CI VERIFIED (the GitHub public API — gh is unauthenticated here)**: the latest push
+  (c115165) = ALL THREE jobs GREEN (Validation / Build IPA / **Build Lum1na-Debug IPA**)
+  — and the four prior pushes (be4bb6c..4a960c1) all built. The rig IPA = real, current,
+  installable. (Xcode Build = the parallel unsigned-build job = cancelled-by-design rows;
+  the AGENTS gate = Lum1na Build.)
+- **THE TARGETED-SAMPLING ROW (p110xleak)**: the efficiency fix for the bandit — instead of
+  blind re-taps until the UCB sweep reaches leakgate-on (n=0), the explicit row calls
+  P110SurfaceSwapClaim.forceLeakgateArm() then tap; the preset overrides the bandit pick
+  for exactly ONE tap (consume-once; outcomes record under the preset's arm id = the shared
+  ledger stays one-source; the override named honestly). Same consume-once law as the p147
+  x60/x120/x200 rows.
+- HONESTY NOTE: this row = the tap's ONE device step toward kernel-data-in-userland (the
+  sel-8 pairing). Disclosure class; never kread; the receipt law unchanged.

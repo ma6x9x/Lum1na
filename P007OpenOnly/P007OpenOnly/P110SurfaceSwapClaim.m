@@ -234,6 +234,8 @@ static const char *const g_p110_arms[6] = {
     "leakgate-on", "leakgate-off"
 };
 static int  g_p110_arm;                       /* one arm per tap             */
+static int  g_p110_armPreset = -1;            /* the row-preset arm
+                                                 (consume-once; -1 = none)   */
 static int  g_p110_prefillN = P110_PREFILL_DEF;
 static BOOL g_p110_dialBase0;                 /* arms 0/3: the dial stays 0  */
 static BOOL g_p110_popEarly;                  /* arm 3: +2 pop pre-window    */
@@ -805,9 +807,24 @@ static NSString *p110_flags_law(void) {
        share it). Existing code paths only — see g_p110_arms above. -------- */
     {
         char pickLine[160];
-        g_p110_arm = LabBanditPick("p110", pickLine, sizeof pickLine);
-        p110_arm_apply();
-        Lf(@"[bandit] %@", [NSString stringWithUTF8String:pickLine]);
+        int picked = LabBanditPick("p110", pickLine, sizeof pickLine);
+        /* the row-preset arm (the targeted-sampling law): an explicit
+           preset row overrides the bandit's pick for exactly ONE tap —
+           consumed HERE (consume-once); outcomes record under the
+           preset's arm id (the shared ledger stays one-source) and the
+           override is named honestly. */
+        if (g_p110_armPreset >= 0 && g_p110_armPreset < (int)(sizeof g_p110_arms / sizeof g_p110_arms[0])) {
+            g_p110_arm = g_p110_armPreset;
+            g_p110_armPreset = -1;
+            p110_arm_apply();
+            Lf(@"[bandit] ROW PRESET: arm=%s (overrides the bandit pick"
+               @" '%s' — consume-once; the targeted pairing arm)",
+               LabBanditArmName("p110", g_p110_arm), pickLine);
+        } else {
+            g_p110_arm = picked;
+            p110_arm_apply();
+            Lf(@"[bandit] %@", [NSString stringWithUTF8String:pickLine]);
+        }
         char sc[512];
         if (LabBanditScores("p110", sc, sizeof sc) >= 0)
             Lf(@"[bandit] UCB1 %s", sc);
@@ -1181,6 +1198,11 @@ static NSString *p110_flags_law(void) {
 
     if (g_fd >= 0) { (void)fcntl(g_fd, F_FULLFSYNC); (void)close(g_fd); g_fd = -1; }
     return g_log;
+}
+
+/* ---- the row-preset arm (the targeted sampling; consume-once) ---- */
++ (void)forceLeakgateArm {
+    g_p110_armPreset = 4;   /* "leakgate-on" in g_p110_arms */
 }
 
 @end

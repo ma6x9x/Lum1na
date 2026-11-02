@@ -167,6 +167,7 @@ struct ContentView: View {
                         moreRow("P147 LADDER x60 (the no-push ladder arm; the row preset 60 OVERRIDES the knob file — consume-once — the teardown chase's first climb; PANIC-POSSIBLE)", "p147x60")
                         moreRow("P147 LADDER x120 (the row preset 120; the second climb)", "p147x120")
                         moreRow("P147 LADDER x200 (the row preset 200 = the CAP; the top climb)", "p147x200")
+                        moreRow("P110 LEAK-ON PAIRING (the targeted-sampling row: the row preset FORCES the leakgate-on arm for this one tap — the sel-8 KVA-disclosure capture per round + the claim-window DIFF = the corruption observable; kernel-range KVs in OUR output buffer = disclosure class, NEVER kread)", "p110xleak")
                         moreRow("P140 MINI GROUND-TRUTH VERIFIER (21-D50 cross-ref rig): mach_port_kobject = the SKU-free port→kaddr locator, then — lane live — DIRECT kread of the p138 oracle slots ([+0x98] gate, [+0x34] dmaref, [+0x80] the 21-D50 MD twin slot): the 2c2 op-channel census answered by kernel READ, not by port-guessing. Receipt = kread32(kbase); hunt board NEVER flipped. READ-ONLY", "p140")
                         moreRow("P114. M2ScalerCSC sel-8 leak tap — SOLO leak law validation (p110 v2 pairing gate; {u64} 8B in, serializer records stride 0x7c, rec+0x18 raw KV; N=8 captures + KV table + honest KVA-disclosure class; READ-ONLY; no race)", "p114")
                         moreRow("P115. M2Scaler framework-path PEEK (the tpeek law): bounded CSC battery (IOSurface control + one VT 720p encode), diff the task's SEND ports after each op, fingerprint new ports for the M2Scaler sel-8 no-queue signature (2bf). A framework-opened UC owns a REAL queue — no QueueCreate grammar needed. READ-ONLY", "p115")
@@ -1136,6 +1137,9 @@ struct ContentView: View {
                         missing: "p100 finished but log missing")
                 }
             case "p110", "swapclaim":
+                result = P110SurfaceSwapClaim.tap()
+            case "p110xleak":
+                P110SurfaceSwapClaim.forceLeakgateArm()
                 result = P110SurfaceSwapClaim.tap()
                 if result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                     result = Self.readFreshLog(

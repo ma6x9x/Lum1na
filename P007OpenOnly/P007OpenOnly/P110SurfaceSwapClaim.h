@@ -56,6 +56,11 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface P110SurfaceSwapClaim : NSObject
 + (NSString *)tap;   // returns the log body
+/// THE ROW-PRESET ARM (the no-push targeted-sampling arm): the explicit
+/// row OVERRIDES the bandit's pick for exactly one tap (consume-once;
+/// outcomes still record under the preset's arm id so the shared ledger
+/// stays one-source; the log names the override honestly).
++ (void)forceLeakgateArm;   // the leakgate-on pairing arm (index 4)
 @end
 
 NS_ASSUME_NONNULL_END
