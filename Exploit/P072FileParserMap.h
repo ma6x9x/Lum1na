@@ -1,7 +1,9 @@
 //
 //  P072FileParserMap.h
-//  In-app file-parser chain slot — print/dlopen census + 1x1 PNG smoke.
-//  Not first KRW. No CG/ImageIO/SceneKit ACE payload. No trigger.pdf.
+//  In-app file-parser chain slot — v1 census + v2 CVE-2026-86950 glyph-OOB
+//  oracle (synthetic 30-em extreme-coord TrueType, AA-rasterizer sweep).
+//  v2 craft validated on macOS 15.6 pre-fix CG (loads, maps, renders).
+//  Not a full ACE payload; PDF-ingest vehicle = p072 v3.
 //
 
 #import <Foundation/Foundation.h>

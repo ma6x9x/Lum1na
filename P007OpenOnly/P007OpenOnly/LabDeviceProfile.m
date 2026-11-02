@@ -336,6 +336,9 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
         case LabSkuA13_other:
             [out appendFormat:@"TRACK: iPhone12 A13 osversion=%@.\n", [self osversion]];
             break;
+        case LabSkuT8150_24A435:
+            [out appendString:@"TRACK: iPhone18,2 T8150 24A435 (17 Pro Max). Doors = the claim window (p110 leak-on pairing; T8150 sel-8 law), the IOGPU RocketDoor lane (p143), the AVE2 cluster (p142/p144/p145/p147/p148 — the blob+0x55c verbatim intake). VA probes hold honestly where the T8150 rows are absent; the RocketDoor pins live in T8150_24A435. Never paste T8101/T8027 VAs.\n"];
+            break;
         default:
             [out appendString:@"TRACK: unknown — paste Ident before panic tests.\n"];
             break;
