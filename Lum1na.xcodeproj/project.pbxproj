@@ -81,17 +81,32 @@
 				"UITests/Lum1naUITests.swift",
 				"P007OpenOnly",
 				"rust",
+				"rust/lumina_core/README.md",
 				"tools",
+				"tools/frida_root/README.md",
 			);
 			target = E6DAA27F305DD93E00B0914F /* Lum1na */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+		E6A804A1305FB00100473E8B /* Exceptions for "Sources" folder in "Copy Bundle Resources" phase from "Lum1na" target */ = {
+			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
+			buildPhase = E6DAA27E305DD94500B0914F /* Resources */;
+			membershipExceptions = (
+				"rust/lumina_core/README.md",
+				"tools/frida_root/README.md",
+				"Assets.xcassets/README.md",
+			);
+		};
+/* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		E6DAA282305DD93E00B0914F /* Sources */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				E6A800E3305F1B8200473E8B /* Exceptions for "Sources" folder in "Lum1na" target */,
+				E6A804A1305FB00100473E8B /* Exceptions for "Sources" folder in "Copy Bundle Resources" phase from "Lum1na" target */,
 			);
 			explicitFileTypes = {
 				"Resources/pkgman/sileo.deb" = file;

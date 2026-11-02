@@ -134,7 +134,7 @@ xcodebuild -project Lum1na.xcodeproj -scheme Lum1na \
 
 The `objective-c-xcode.yml` workflow is historically red. **Lum1na Build** (IPA) is the gate.
 
-Paid-for CI landmines (2026-10-15): a synchronized root swallows a nested `.xcodeproj` as an implicit subproject — the Lum1na build can't exclude it via `membershipExceptions`, so `Build IPA` runs `rm -rf P007OpenOnly` before xcodebuild (the debug job builds from its own checkout). `LuminaKRW.m` and every lab file must import ClearSword headers as `ClearSword/...` (bare `common.h` only resolves inside `ClearSword/`). Entitlements for the debug job live at `P007OpenOnly/P007OpenOnly/P007OpenOnly.entitlements` — one level deeper than the project dir.
+Paid-for CI landmines (2026-10-15): a synchronized root swallows a nested `.xcodeproj` as an implicit subproject — the Lum1na build can't exclude it via `membershipExceptions`, so `Build IPA` runs `rm -rf P007OpenOnly` before xcodebuild (the debug job builds from its own checkout). `ls /Applications/Xcode_2*.app | sort -V | tail -1` matches Xcode 26 and copies `rust/**/README.md` + `tools/**/README.md` onto the same `Lum1na.app/README.md`. Pin `Xcode_16.4.app`. Validate runs on `ubuntu-latest` so a Mac-queue cancel cannot skip the IPA. `objective-c-xcode.yml` is dispatch-only. `LuminaKRW.m` and every lab file must import ClearSword headers as `ClearSword/...` (bare `common.h` only resolves inside `ClearSword/`). Entitlements for the debug job live at `P007OpenOnly/P007OpenOnly/P007OpenOnly.entitlements` — one level deeper than the project dir.
 
 ## Kernel board
 

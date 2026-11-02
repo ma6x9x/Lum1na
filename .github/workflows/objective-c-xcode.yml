@@ -1,20 +1,32 @@
 name: Xcode Build
 
+# Not the IPA gate. macos-14 cannot parse objectVersion 77; every push
+# was a 4s red check that stole a Mac runner from Lum1na Build.
+# Dispatch only. IPA is .github/workflows/build-ipa.yml (macos-15, 16.4).
 on:
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+  workflow_dispatch:
 
 jobs:
   build:
     name: Unsigned Release build (iphoneos)
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 45
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Select Xcode 16.4
+        run: |
+          set -euo pipefail
+          if [ -d /Applications/Xcode_16.4.app ]; then
+            XCODE=/Applications/Xcode_16.4.app
+          else
+            XCODE=$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -1 || true)
+          fi
+          echo "Using $XCODE"
+          sudo xcode-select -s "$XCODE/Contents/Developer"
+          xcodebuild -version
 
       - name: Show Xcode
         run: xcodebuild -version && xcodebuild -list -project Lum1na.xcodeproj

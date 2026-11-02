@@ -5,30 +5,28 @@ on:
   push:
     branches: [ main, develop ]
 
+# One IPA run per ref. A second push used to stack 3 macos-15 jobs and
+# starve Validation/Build IPA (cancelled with no log, runner_id=0).
+concurrency:
+  group: lum1na-ipa-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   PROJECT_NAME: Lum1na
   SCHEME_NAME: Lum1na
-  DEPLOYMENT_TARGET: 17.0
+  DEPLOYMENT_TARGET: "17.0"
 
 jobs:
-  # ============================================
-  # Job 1: Validate Everything First
-  # ============================================
+  # File/grep only. macos-15 is reserved for xcodebuild so this job
+  # cannot sit in the Mac queue and skip Build IPA.
   validate:
-    runs-on: macos-15
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     name: "🔍 Validation"
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Select newest Xcode
-        run: |
-          XCODE=$(ls -d /Applications/Xcode_2*.app /Applications/Xcode.app 2>/dev/null | sort -V | tail -1)
-          if [ -z "$XCODE" ]; then XCODE=/Applications/Xcode_16.4.app; fi
-          echo "Using $XCODE"
-          sudo xcode-select -s "$XCODE/Contents/Developer"
-          xcodebuild -version
 
       # ============================================
       # 1. Bridging Header Validation
@@ -330,13 +328,31 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Select newest Xcode
+      - name: Select Xcode 16.4
         run: |
-          XCODE=$(ls -d /Applications/Xcode_2*.app /Applications/Xcode.app 2>/dev/null | sort -V | tail -1)
-          if [ -z "$XCODE" ]; then XCODE=/Applications/Xcode_16.4.app; fi
+          set -euo pipefail
+          # Xcode_2*.app matches Xcode 26.x. sort -V then picks 26 over 16.4
+          # and Xcode 26 copies nested README.md into Lum1na.app/README.md.
+          if [ -d /Applications/Xcode_16.4.app ]; then
+            XCODE=/Applications/Xcode_16.4.app
+          elif [ -d /Applications/Xcode_16.3.app ]; then
+            XCODE=/Applications/Xcode_16.3.app
+          else
+            XCODE=$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -1 || true)
+          fi
+          if [ -z "${XCODE:-}" ] || [ ! -d "$XCODE" ]; then
+            echo "ERROR: Xcode 16.x not found"
+            ls /Applications | grep -i xcode || true
+            exit 1
+          fi
           echo "Using $XCODE"
           sudo xcode-select -s "$XCODE/Contents/Developer"
           xcodebuild -version
+          xcodebuild -version | head -1 | grep -q '^Xcode 16' || {
+            echo "ERROR: IPA gate is Xcode 16.x"
+            xcodebuild -version
+            exit 1
+          }
 
       - name: Remove Problematic AVE Files
         run: |
@@ -355,6 +371,10 @@ jobs:
         run: |
           rm -rf P007OpenOnly
           echo "✅ Removed P007OpenOnly from the shell-build tree"
+          # Host-only trees. Xcode 26 Copy Bundle Resources flattens nested
+          # README.md to Lum1na.app/README.md (rust/ + tools/ collide).
+          rm -rf rust tools
+          echo "✅ Removed rust/ and tools/ from the shell-build tree"
 
       # ============================================
       # Entitlements — covers every user client + service we touch:
@@ -607,13 +627,29 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Select newest Xcode
+      - name: Select Xcode 16.4
         run: |
-          XCODE=$(ls -d /Applications/Xcode_2*.app /Applications/Xcode.app 2>/dev/null | sort -V | tail -1)
-          if [ -z "$XCODE" ]; then XCODE=/Applications/Xcode_16.4.app; fi
+          set -euo pipefail
+          if [ -d /Applications/Xcode_16.4.app ]; then
+            XCODE=/Applications/Xcode_16.4.app
+          elif [ -d /Applications/Xcode_16.3.app ]; then
+            XCODE=/Applications/Xcode_16.3.app
+          else
+            XCODE=$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -1 || true)
+          fi
+          if [ -z "${XCODE:-}" ] || [ ! -d "$XCODE" ]; then
+            echo "ERROR: Xcode 16.x not found"
+            ls /Applications | grep -i xcode || true
+            exit 1
+          fi
           echo "Using $XCODE"
           sudo xcode-select -s "$XCODE/Contents/Developer"
           xcodebuild -version
+          xcodebuild -version | head -1 | grep -q '^Xcode 16' || {
+            echo "ERROR: IPA gate is Xcode 16.x"
+            xcodebuild -version
+            exit 1
+          }
 
       # T8150 (17 Pro Max / 24A435) P073 v13/v13b artifacts: the lab app's
       # bundle carries BOTH addchain models — the committed 254-in
