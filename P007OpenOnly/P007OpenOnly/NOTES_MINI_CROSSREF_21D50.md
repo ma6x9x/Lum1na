@@ -1133,3 +1133,37 @@ door/stride laws; the p110 claim rows.
   needs LIVE CSC work — the disclosure round needs the engine awake (a real transform
   class queued), else the header stays unsigned and 2bf stands.
 - Report file: ~/Desktop/lumina_primitives/notes/t8150_m2scaler_contract_decode_20261101.md
+
+## 2026-11-01 20:1x — the p101 RELEASE-ROUTE decode landed: the 43684 wrap lane CLOSES on 24A435 (byte-cited) — the guard was right
+- **THE CHAIN'S TOP-OUT = THE PANIC CLASS, BY BYTES**: the gated dispatcher's release op
+  (case w8==5, w1>>24==6, struct>=0x58) = `ldr w8,[md+0x98]; cbz -> bail kr=0 (PHANTOM
+  success, NO dec)` — meaning gate-zero = a silent NO-OP, and gate-nonzero = it calls the
+  dec FN 0xb3449a4 whose entry check panics ("_dmaReferences underflow @IOMemoryDescriptor
+  .cpp:5088") whenever the wrapped dmaref hits 0. **THERE IS NO SILENT DOUBLE-MAP/UAF
+  PRIMITIVE IN THESE BYTES** — the wrap-then-release sequence = the device reset, never a
+  dangling byte. The page-list-confusion "next design" (sub+0xe0/+0xe8) = DEAD too: its
+  precondition (a release-skip leaving the object stale) never fires.
+- **p101's device phase-3 refusal = BYTE-CORRECT** (the twin-panic guard held); the lane's
+  device product stays the WRAP receipt (65537, kr=0x0, no ceiling at site A 0xb344934 —
+  reconfirmed; site B/0x4000-guard-panic also reconfirmed) + these laws.
+- **THE SAFE ORACLE EXISTS (decode-CONFIRMED) but its userland row = MISSING**: the gated
+  twin's readback op (w1>>24==2, struct>=0x20) copies [md+0x50]->out+0, [md+0x68]->out+8,
+  **[md+0x98]->out+0xc**, vtable+0xa8->out+0x18, SAFE (never touches dmaref, never decs).
+  The ungated twin's same op does NOT write out+0xc (which explains the p101 census's
+  constant 0x01010101 = wrong class/other handler). The twins = vtable slot 18 (vptr+0x90),
+  10 gated copies (incl the M2Scaler DCONST 0x10376e8) vs 11 ungated; **zero direct bl and
+  zero vptr+0x90 loads anywhere** -> the window protocol's caller = unattributed main-
+  kernel plumbing (SUSPECT: generic IOKit map/unmap lifecycle; P086 continues).
+- **RECONCILIATION with the M2Scaler-contract decode (the two agents' surface)**: agent A
+  reported the UC table MISSING (looked for 24-byte IOExternalMethodDispatch rows; no
+  IOUserClientClass personality) — agent B DID decode a 12-row stride-0x30 method table
+  @0x80efcd8 (6-qword rows {fn fixup@+8, type@+0x18, in@+0x20, out@+0x28}) inside the
+  M2Scaler DCONST. Both consistent: the table EXISTS in the OSObject-method shape, NOT the
+  old C shape. And B's sel-11 = the fixed ENGINE-MEMBER snapshot (no gate) — which also
+  explains p101's constant. The [md+0x98] readback is NOT reachable via sel-11: the only
+  byte-verified route = the window-protocol virtual, still missing its userland row.
+- **THE HONEST LANE VERDICT**: 43684-on-24A435 closes as a panic-class receipt lane + a
+  SAFE-gate-oracle law; NOT a KRW/write lane. The write-class candidates remaining on the
+  17 = the AVE2 DPB cluster (the blob+0x55c law) and the claim-window pairing; the READ
+  candidates = the sel-8 T8150 leak law (p110 v2.8, engine-awake required). hasKread stays
+  NO by law tonight.
