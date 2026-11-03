@@ -189,4 +189,38 @@ static NSString *g_pendingArm;
     [self saveDoc:doc];
 }
 
++ (void)recordPath:(NSString *)pathId
+            result:(NSString *)result
+          evidence:(NSString *)evidence {
+    if (!pathId.length) return;
+    NSMutableDictionary *doc = [self loadDoc];
+    NSMutableDictionary *skus = [doc[@"skus"] isKindOfClass:[NSDictionary class]]
+        ? [doc[@"skus"] mutableCopy]
+        : [NSMutableDictionary dictionary];
+    NSString *key = [self skuKey];
+    NSMutableDictionary *row = [skus[key] isKindOfClass:[NSDictionary class]]
+        ? [skus[key] mutableCopy]
+        : [NSMutableDictionary dictionary];
+    NSMutableDictionary *paths = [row[@"paths"] isKindOfClass:[NSDictionary class]]
+        ? [row[@"paths"] mutableCopy]
+        : [NSMutableDictionary dictionary];
+    NSString *ev = evidence ?: @"";
+    if (ev.length > 160) ev = [ev substringToIndex:160];
+    paths[pathId] = @{
+        @"result": result.length ? result : @"HOLD",
+        @"evidence": ev,
+        @"ts": LabLocalMilitaryNow() ?: @"?",
+    };
+    row[@"paths"] = paths;
+    row[@"path_ts"] = LabLocalMilitaryNow() ?: @"?";
+    skus[key] = row;
+    doc[@"skus"] = skus;
+    [self saveDoc:doc];
+}
+
++ (NSDictionary *)pathResults {
+    id p = [self row][@"paths"];
+    return [p isKindOfClass:[NSDictionary class]] ? p : @{};
+}
+
 @end

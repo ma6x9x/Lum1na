@@ -96,6 +96,7 @@
 #import "P095UcredLadder.h"
 #import "P100AutoLearn.h"
 #import "LabLearn.h"
+#import "LabPathTest.h"
 #import "lumina_core.h"
 #import "P101DmaCommandFire.h"
 #import "P102TitanWriteTest.h"

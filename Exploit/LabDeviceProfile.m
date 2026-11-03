@@ -251,7 +251,7 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
             [s appendString:@"  conversion = desc_type_forged OR (body_forged AND kptr). Neighbor = live same-type ANE table or named Shape L.\n"];
             [s appendString:@"  KERNEL locks oob192 until conversion CONFIRMED. Game Overlay ON + LPM off raises adjacency odds.\n"];
             [s appendString:@"  hop-1 cluster_*_contig SKIP (EINVAL since 26.1). CS2 fail-graceful. P044 254 remaining-fire CLOSED.\n"];
-            [s appendString:@"  Hot: T1 SKU door, conv, KREAD, CHAINS.\n"];
+            [s appendString:@"  Hot: T1 SKU door, pathtest, conv, KREAD, CHAINS.\n"];
             break;
         case LabSkuA12X_23G71:
             [s appendString:@"A12X 23G71 first door: 64788 Facet A (live until 23G82) + aio84530 HEAP leak.\n"];
@@ -269,8 +269,9 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
             break;
         case LabSkuT8150_24A435:
             [s appendString:@"T8150 24A435 iPhone18,2 17 Pro Max. static_base=0xfffffe0007004000. ANE table 0x10b8 record+0x90.\n"];
-            [s appendString:@"  KERNEL T1 = P139 + kread32. Isolated p110/p142/p143. SKIPS T8101 0x820/254, CS2 hop-1, LightSword (IOGPU pins 0). SPTM.\n"];
-            [s appendString:@"  Probe app (Lum1na-Debug) fires every TAP. iPhone18,1 and 18,3 stay unknown.\n"];
+            [s appendString:@"  KERNEL T1 = P139 harvest + P114 sel-8 serializer + kread32. Isolated p110/p142/p143.\n"];
+            [s appendString:@"  SKIPS T8101 0x820/254, CS2 hop-1, LightSword (IOGPU pins 0). SPTM.\n"];
+            [s appendString:@"  TAP pathtest for the scorecard. Probe app fires every TAP. iPhone18,1/18,3 unknown.\n"];
             break;
         case LabSkuT8150_other:
             [s appendString:@"T8150_other iPhone18,2 24A* sibling. static_base only. Public Lum1na SKIPS T8101 geometry.\n"];
@@ -288,7 +289,7 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
     [s appendString:@"prove matrix:\n"
                     @"  hasKread=NO until commitSlide kread32(kbase)==MH_MAGIC_64 on THIS sku\n"
                     @"  LIVE A14: KERNEL T1 sequencer (P044 N=192 + P139 + P113 + kread32); P057 65343 KASLR sel16; P099 254 occupancy isolated; 64788 Facet A P065 0x2be oracle; P063 aio84530 HEAP\n"
-                    @"  LIVE T8150: KERNEL T1 P139 + kread32. Isolated p110/p142/p143. 43748 clamp-CLOSED. LightSword SKIP.\n"
+                    @"  LIVE T8150: KERNEL T1 P139 + P114 serializer + kread32. Isolated p110/p142/p143. 43748 clamp-CLOSED. LightSword SKIP.\n"
                     @"  LIVE 12 mini 21D50: 127-in in-bounds ANE (43748 not live); CS2/libkrw KRW; kread32\n"
                     @"  LIVE A12X: P065 Facet A; P063 aio84530 HEAP; P057 sel16; CS2 phys_oob READ scan; P034 occupancy class; KREAD; P070 census. 254 SKIP.\n"
                     @"  CLOSED: 84523 sandbox (P057/P051/P052); P045 recv; LightSword last-wire GPU OOM; type-3 PACGA; hop-1 since 26.1; 43748 254 on fill_cap\n"
@@ -320,7 +321,7 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
     }
     switch ([self detectedSku]) {
         case LabSkuA14_23F77:
-            [out appendString:@"TRACK: iPhone13 A14 23F77 ACTIVE. First door=KERNEL T1 (P044 N=192 + P139 + P113 + kread32). hop-1 SKIP.\n"];
+            [out appendString:@"TRACK: iPhone13 A14 23F77 ACTIVE. First door=KERNEL T1 (P044 N=192 + P139 + P113 + kread32). TAP pathtest for per-path oracles. hop-1 SKIP.\n"];
             break;
         case LabSkuA14_21D50:
             [out appendString:@"TRACK: 12 mini 21D50. Twin CLASS/FIELD only. Keep 21D50 VAs off 23F77.\n"];
@@ -344,7 +345,7 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
             [out appendFormat:@"TRACK: iPhone12 A13 osversion=%@.\n", [self osversion]];
             break;
         case LabSkuT8150_24A435:
-            [out appendString:@"TRACK: iPhone18,2 T8150 24A435 (17 Pro Max). Doors = the claim window (p110 leak-on pairing; T8150 sel-8 law), the IOGPU RocketDoor lane (p143), the AVE2 cluster (p142/p144/p145/p147/p148 — the blob+0x55c verbatim intake). VA probes hold honestly where the T8150 rows are absent; the RocketDoor pins live in T8150_24A435. Never paste T8101/T8027 VAs.\n"];
+            [out appendString:@"TRACK: iPhone18,2 T8150 24A435 (17 Pro Max). KERNEL pair = P139 harvest + P114 sel-8 serializer + kread32. Isolated: p110 leak-on, p143 RocketDoor, AVE2 p142/p144/p145/p147/p148. TAP pathtest. Never paste T8101/T8027 VAs.\n"];
             break;
         default:
             [out appendString:@"TRACK: unknown — paste Ident before panic tests.\n"];

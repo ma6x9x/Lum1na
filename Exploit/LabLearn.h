@@ -48,6 +48,12 @@ NS_ASSUME_NONNULL_BEGIN
 /// P139 dossier ingest. Heap-shaped facts only. Never writes LabOff().
 + (void)ingestBootIntel;
 
+/// Per-path oracle results (occ/conv/p010/p114/p139/kread/p143).
++ (void)recordPath:(NSString *)pathId
+            result:(NSString *)result
+          evidence:(nullable NSString *)evidence;
++ (NSDictionary *)pathResults;
+
 @end
 
 NS_ASSUME_NONNULL_END

@@ -35,7 +35,11 @@ struct ContentView: View {
                     }
                     HStack(spacing: 8) {
                         hotButton("P057 AKS v9", id: "p057")
+                        hotButton("PATHS", id: "pathtest")
+                    }
+                    HStack(spacing: 8) {
                         hotButton("KREAD", id: "kreadtest")
+                        hotButton("P139 intel", id: "p139")
                     }
                     HStack(spacing: 8) {
                         hotButton("P085 84607 racer", id: "p085")
@@ -181,6 +185,7 @@ struct ContentView: View {
                         moreRow("CS calib. phys_oob race only (not KRW)", "cscali")
                         moreRow("P122 SwordForge. combined 64788 KRW test (freer→reclaim→read)", "swordforge")
                         moreRow("P123 ShapeCensus. kalloc.3072 victims with KRW vision (mini/libkrw)", "shapecensus")
+                        moreRow("PATHS. Per-path scorecard + READ-ONLY tests. Hunt: P139+kread. 17: P139+P114+kread. Occupancy stays P044/KERNEL solo. P143 isolated.", "pathtest")
                         moreRow("KREAD. commitSlide kread32(kbase)==MH_MAGIC_64", "kreadtest")
                         moreRow("P070 five-door chain census + persist HOLD", "p070")
                         moreRow("P113. DescForge CONTROL (KRW krw hand-forged desc -> recv oracle; A13 rig)", "p113")
@@ -414,6 +419,7 @@ struct ContentView: View {
             "conv": "p073_ane_second_table_log.txt",
             "p073": "p073_ane_second_table_log.txt",
             "kreadtest": "p007_kread_test_log.txt",
+            "pathtest": "p_path_test_log.txt",
             "p057": "p057_aks_deserialize_log.txt",
             "aks": "p057_aks_deserialize_log.txt",
             "p062": "p062_neon_selftest_log.txt",
@@ -936,6 +942,8 @@ struct ContentView: View {
                 result = P076GlyphProbe.tap()
             case "p076c":
                 result = P076GlyphProbe.tapControlOnly()
+            case "pathtest":
+                result = LabPathTest.tap()
             case "kreadtest":
                 result = P007Board.tapKreadTest()
             case "p057", "aks":
