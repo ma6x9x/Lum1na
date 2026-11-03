@@ -166,9 +166,10 @@ struct ContentView: View {
                         moreRow("P143 ROCKET SUBMIT DOOR (the 17, 24A435; the state-band DERIVED: record array {ptr,+8 u32,+0x10 valid} @0x18 at PP+0x48, owner UC+0x120, the 0xcda1 fleet PAC law — static chain CLOSED): the IOGPU UC open + the sel-0x24 submit-row census with the real-resource law. PANIC-POSSIBLE; one tap", "p143")
                         moreRow("P144 AVE2 IO_Config MASK INTAKE (the agent-named knob, 24A435): row 2 = IO_Config (structIn 0x38; the u64 at +0x30 = the RAW mask, unvalidated store) after IO_Open; the mask consumer = the encode-loop map step to the boundless write-through mapper. State-machine rows; PANIC-POSSIBLE; one tap", "p144")
                         moreRow("P145 COMPOSITION (the composition row): 64 held IOSurface-backed Metal buffers painted 0x41 + a 16-surface 0x53 marker group, then the p142 stage9 AVE2 fill session (EncoderUsage=1, RCMode-20, RealTime=FALSE, HEVC 1280x720) composed INSIDE the live spray on a second thread, then the overshoot discriminator marker-vs-bytes on every held page. PANIC-POSSIBLE; one tap per force-quit", "p145")
-                        moreRow("P146 KNOB SETTER v2 (the afc-bypass law; line-per-knob): p146_set.txt line1 → p142_layers.txt (default 18), line2 → p147_cycles.txt (default 24), line3 → p148_gop.txt (default 2) — each with its readback VERIFY row + the composition flags state. A file utility between taps (no IOKit/Metal/state)", "p146")
+                        moreRow("P146 KNOB SETTER v3 (the afc-bypass law; line-per-knob): p146_set.txt line1 → p142_layers.txt (default 16463), line2 → p147_cycles.txt (default 24), line3 → p148_gop.txt (default 2), line4 → p142_pre.txt (default 8) — each with its readback VERIFY row + the composition flags state. A file utility between taps (no IOKit/Metal/state)", "p146")
                         moreRow("P147 LIFECYCLE (the STALE-SLOT UAF teardown battery): 64 held 0x41 IOSurface-backed Metal buffers + a 16-surface 0x53 marker group, then N FAST VTCompressionSession create→prepare→encode→complete→invalidate cycles (HEVC 1280x720, the stage9 property pack VERBATIM) on a worker thread with the spray LIVE — the codec-instance teardown chase at rate; then the discriminator marker-vs-bytes on every held page. Knob = the CYCLE COUNT (Documents/p147_cycles.txt, default 24, cap 200); the temporal-layers property is RETIRED on this lane. PANIC-POSSIBLE; one tap per force-quit", "p147")
                         moreRow("P148 AVE2 BLOB INTAKE (the params-blob decode, VERBATIM +0x55c = sGOP.iNumOfTemporalLayer, cfg+0x55c == structIn+0x55c NO remap): direct-UC open census -> row0 IO_Open -> row2 IO_Config zero-shape -> row3 IO_Prepare ladder {0,2,4,8} + p148_gop.txt knob IF in [0,8] — a ZEROED 0x12c08 blob whose ONLY set field = +0x55c; the kr verdicts name WHICH hard wall fires first (D5 0xe00002bc class) on the sparse shape. Values >8 = OUT-LAW (refused in-app; the 16463 panic class guarded). PANIC-POSSIBLE; one tap per force-quit", "p148")
+                        moreRow("P149 T8150 KRW CONVERSION (the 17 door): kernel pipe spray (96 held + 48 catch, 16KB unique markers) → VT Prepare N=8 (real AVE Surface Pool) → Set NumberOfTemporalLayers=16463 → encode → invalidate (dtor queue_init this+0x58 then kfree count<<5) → scan pipes for marker mismatch / kernel VA / queue-init triplet → kread32(kbase)==0xfeedfacf gate. PIPE-HIT is a write receipt, never hasKread. PANIC-POSSIBLE; one tap per force-quit; reboot after", "p149")
                         moreRow("P147 LADDER x60 (the no-push ladder arm; the row preset 60 OVERRIDES the knob file — consume-once — the teardown chase's first climb; PANIC-POSSIBLE)", "p147x60")
                         moreRow("P147 LADDER x120 (the row preset 120; the second climb)", "p147x120")
                         moreRow("P147 LADDER x200 (the row preset 200 = the CAP; the top climb)", "p147x200")
@@ -186,8 +187,8 @@ struct ContentView: View {
                         moreRow("CS calib. phys_oob race only (not KRW)", "cscali")
                         moreRow("P122 SwordForge. combined 64788 KRW test (freer→reclaim→read)", "swordforge")
                         moreRow("P123 ShapeCensus. kalloc.3072 victims with KRW vision (mini/libkrw)", "shapecensus")
-                        moreRow("KERNEL. T1 sequencer: P139 (no lock wait) + hunt P044 / 17 P114 + kread32. Occupancy is not hasKread.", "krw")
-                        moreRow("PATHS. Per-path scorecard + READ-ONLY tests. Hunt: P139+kread. 17: P139+P114+kread. Occupancy stays P044/KERNEL solo. P143 isolated.", "pathtest")
+                        moreRow("KERNEL. T1 sequencer (t8150-krw-1): P139 (no lock wait) + hunt P044 / 17 P114 then P149 conversion (Prepare N=8 then 16463, kernel pipes, PANIC-POSSIBLE) + kread32. Occupancy / PIPE-HIT is not hasKread.", "krw")
+                        moreRow("PATHS. Per-path scorecard + READ-ONLY tests. Hunt: P139+kread. 17: P139+P114+kread (P149 stays KERNEL/catalog). Occupancy stays P044/KERNEL solo. P110/P143 isolated.", "pathtest")
                         moreRow("KREAD. commitSlide kread32(kbase)==MH_MAGIC_64", "kreadtest")
                         moreRow("P070 five-door chain census + persist HOLD", "p070")
                         moreRow("P113. DescForge CONTROL (KRW krw hand-forged desc -> recv oracle; A13 rig)", "p113")
@@ -1265,6 +1266,8 @@ struct ContentView: View {
                 result = P147Lifecycle.tap()
             case "p148", "aveblob":
                 result = P148AVE2Prepare.tap()
+            case "p149", "t8150krw":
+                result = P149T8150Krw.tap()
             case "p099", "anegroom":
                 result = P099AnePrewireGroom.tap()
                 if result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

@@ -59,8 +59,14 @@ unchanged: hasKread flips ONLY on kread32(kbase)==0xfeedfacf in P007Board).
 
 ## The tap ladder for the 17 (each = one tap, honest rows)
 1. p143 v2 (the owner-selector decode first) = the door's device proof.
-2. p142 v4 variants (the count threshold; the alloc-size knobs — the
-   width/height/usage = the fill-size inputs) = the aimability rows.
-3. p093/p094-class on the 17 = the allproc/derivation rows (the DB's
-   27.x struct set prints on this build TODAY).
-4. The gate = the receipt (kread32) = the ONLY flip.
+2. p142 v6 (Prepare N=8 first so Surface Pool `this` is real, then Set
+   16463, then encode). v5 set-then-Prepare is the this=1 / FAR=0x59
+   failed-alloc panic. Ghidra: ctor/dtor FUN_fffffe0008840f78 /
+   FUN_fffffe0008840fec queue_init at this+0x58; dtor then
+   kfree(this+0x50, count<<5) with count at this+0x48.
+3. **p149** is the conversion TAP: kernel pipe spray + p142 v6 sequence
+   + scan for PIPE-HIT / QUEUE-INIT self-pointers + kread32 gate.
+   KERNEL T1 on T8150 fires P114 then P149. Catalog p149 is the solo
+   conversion fire after reboot. P110 stays catalog-solo.
+4. The gate = kread32(kbase)==0xfeedfacf = the ONLY hasKread flip.
+   PIPE-HIT / a panic PC / IPS slide never set slide.

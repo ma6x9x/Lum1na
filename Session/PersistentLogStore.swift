@@ -63,6 +63,7 @@ public final class PersistentLogStore {
         "p145": "p145_composition_log.txt",
         "p147": "p147_lifecycle_log.txt",
         "p148": "p148_aveblob_log.txt",
+        "p149": "p149_t8150krw_log.txt",
         "shapecensus": "p123_shapecensus_log.txt",
         "descforge": "p113_descforge_log.txt",
         "swordchain": "p125_swordchain_log.txt",

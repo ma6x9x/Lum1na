@@ -7,12 +7,13 @@
 //  2026-11-01); the app writes its own flags at runtime (the p131
 //  stage-3 class), so the tap set = a file utility. v2: the ladder is
 //  LINE-PER-KNOB — p146_set.txt's lines feed ALL the composition knobs
-//    line 1 -> p142_layers.txt  (the p142/p145 fill-session knob;
+//    line 1 -> p142_layers.txt  (the p142/p145/p149 overshoot knob;
 //              single-line legacy = this knob only)
 //    line 2 -> p147_cycles.txt  (the p147 teardown battery knob)
 //    line 3 -> p148_gop.txt     (the p148 blob tap's lawful [0,8] knob)
-//  Absent lines = each knob's own default (18/24/2). Every write gets
-//  the readback VERIFY row. No IOKit, no Metal, no state.
+//    line 4 -> p142_pre.txt     (Prepare-first count, lawful [1,8])
+//  Absent lines = each knob's own default (16463/24/2/8). Every write
+//  gets the readback VERIFY row. No IOKit, no Metal, no state.
 //
 
 #import "P146KnobSetter.h"
@@ -21,7 +22,7 @@
 
 #import <Foundation/Foundation.h>
 
-#define P146_BUILD @"p146-knobsetter-v2"
+#define P146_BUILD @"p146-knobsetter-v3"
 
 @implementation P146KnobSetter
 
@@ -44,12 +45,13 @@
     }
 
     /* {ladder-index (1-based), knob file, default} */
-    struct { int line; NSString *file; long def; } rows[3] = {
-        { 1, @"p142_layers.txt", 18 },
+    struct { int line; NSString *file; long def; } rows[4] = {
+        { 1, @"p142_layers.txt", 16463 },
         { 2, @"p147_cycles.txt", 24 },
         { 3, @"p148_gop.txt",    2  },
+        { 4, @"p142_pre.txt",    8  },
     };
-    long got[3] = { -1, -1, -1 };
+    long got[4] = { -1, -1, -1, -1 };
 
     [out appendFormat:@"[*] ladder: %@%@ (%@)\n",
         lines.count ? lines[0] : @"(absent)",
@@ -57,7 +59,7 @@
             [lines[1] length] ? lines[1] : @"-"] : @"",
         @"line-per-knob; single line = the legacy p142 row; absent = defaults"];
 
-    for (int i = 0; i < 3; i++) {
+    for (int i = 0; i < 4; i++) {
         long val = rows[i].def;
         BOOL fromLadder = NO;
         if (lines.count >= (NSUInteger)rows[i].line) {
@@ -94,8 +96,8 @@
         [out appendFormat:@"  flag %@ = %@\n", f, present ? @"SET" : @"-"];
     }
 
-    [out appendFormat:@"[end-state] p142=%ld p147=%ld p148=%ld\n",
-        got[0], got[1], got[2]];
+    [out appendFormat:@"[end-state] p142=%ld p147=%ld p148=%ld pre=%ld\n",
+        got[0], got[1], got[2], got[3]];
     [out appendFormat:@"=== p146 end %@ ===\n", LabLocalMilitaryNow()];
     return out;
 }

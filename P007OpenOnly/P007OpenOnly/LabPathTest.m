@@ -18,7 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define PATH_BUILD @"path-test-3"
+#define PATH_BUILD @"t8150-krw-1"
 
 @implementation LabPathTest
 
@@ -106,6 +106,19 @@ static int path_int_after(NSString *s, const char *key) {
             return @"REACH";
         return @"HOLD";
     }
+    if ([pathId isEqualToString:@"p149"]) {
+        if ([log containsString:@"hasKread=YES"] ||
+            [log containsString:@"KRW SELF-TEST READ: PASS"])
+            return @"PASS";
+        if ([log containsString:@"PIPE-HIT"] ||
+            [log containsString:@"QUEUE-INIT"] ||
+            [log containsString:@"conversion_receipt=YES"])
+            return @"REACH";
+        if ([log containsString:@"hasKread=NO"] ||
+            [log containsString:@"KRW SELF-TEST READ: FAIL"])
+            return @"FAIL";
+        return @"HOLD";
+    }
     return @"HOLD";
 }
 
@@ -127,7 +140,7 @@ static int path_int_after(NSString *s, const char *key) {
        LabLocalMilitaryNow() ?: @"?", PATH_BUILD]);
     L([NSString stringWithFormat:@"[*] sku=%@  hasKread still kread32(kbase)==0xfeedfacf",
        skuName]);
-    L(@"[*] Occupancy / P110 / P142 / P143 are catalog-solo. Hunt/17 PATHS is harvest-only. 12 mini PATHS establishes CS2/libkrw.");
+    L(@"[*] Occupancy / P110 / P143 are catalog-solo. P149 is KERNEL conversion on T8150. Hunt/17 PATHS is harvest-only. 12 mini PATHS establishes CS2/libkrw.");
     int coreSt = lumina_core_selftest();
     L([NSString stringWithFormat:@"[*] lumina_core %s selftest=%d",
        lumina_core_version(), coreSt]);
@@ -148,9 +161,10 @@ static int path_int_after(NSString *s, const char *key) {
         L(@"  kread   tap=kreadtest  bar=kread32(kbase)==0xfeedfacf");
         L(@"  p143    tap=p143       ISOLATED rocket submit. One TAP after reboot.");
         L(@"  p110    tap=p110       ISOLATED race. Family-B = window-won/slot-lost, not kread.");
-        L(@"  p142    tap=p142       ISOLATED write. Count-scaled OOB; survive-corrupt is the kread door.");
+        L(@"  p142    tap=p142       write. v6 Prepare-first then overshoot. Conversion is p149.");
+        L(@"  p149    tap=p149/krw   17 conversion. PASS = kread32(kbase)==0xfeedfacf. REACH = PIPE-HIT.");
         L(@"  occ     SKIP           43748 clamp-CLOSED (table 0x10b8, 255 in-bounds)");
-        L(@"  formula leak(P114) → race(P110) → write(P142) → krw(unnamed) → sptm(HOLD)");
+        L(@"  formula leak(P114) → write(P149=P142 prepare-then-overshoot + pipes) → kread32 → sptm(HOLD)");
     } else if (sku == LabSkuA14_21D50) {
         L(@"  kread   tap=kreadtest/libkrw/cs2  bar=kread32(kbase)==0xfeedfacf");
         L(@"  ane127  tap=conv       CLASS/FIELD in-bounds. 43748 not live.");

