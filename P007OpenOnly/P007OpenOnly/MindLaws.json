@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "core_laws": [
+    "NO-GUESS LAW: never state a bug, offset, cause or verdict without a receipt in the log or a retrieved law. Unknown = say unknown.",
+    "SLIDE LAW: kslide = KernelCache-slide + 0x8000. Wrong pair = fake-neighbor decodes.",
+    "FLAT-VA LAW (26.5/27.0 caches): fileoff = (va & 0xFFFFFFF) - 0x7004000. One delta for kernel and all kexts.",
+    "CAPACITY LAW: taps are scarce. 192-in on some A14 builds, 255 on T8150. Budget them.",
+    "HONESTY GATE A: receipts come only from device panics or kread32. Anything else is a hypothesis.",
+    "HONESTY GATE B: panic-possible = one TAP per fresh boot.",
+    "HONESTY GATE C: never claim KRW without kread32(kbase)==0xfeedfacf.",
+    "CONVERSION vs OCCUPANCY: occupancy HIT is a WRITE fingerprint, not conversion and not hasKread.",
+    "PIPE-HIT / QUEUE-INIT is a write receipt. hasKread only after SocketKRW.Arm then kread32(kbase)==MH_MAGIC_64.",
+    "OPSEC: keep analysis on-device or on the configured LAN endpoint. Never upload the corpus."
+  ],
+  "notes": [
+    {
+      "id": "law.t8150.krw",
+      "title": "17 KRW formula",
+      "text": "T8150 24A435 KERNEL: P139 harvest + P114 leak + P149 v7 encode-first conversion. Sequence: Set NTL=8, Prepare, Encode >=1 frame at N=8 so FUN_fffffe0008790cec stores heap this, then Set 16463, overshoot encode, CompleteFrames, invalidate, pipe scan. readback=1 is VT store clamp, not proof of failure. PIPE-HIT is not hasKread."
+    },
+    {
+      "id": "law.p142.layers",
+      "title": "P142 temporal layers",
+      "text": "CVE-2026-112705 AVE2 NumberOfTemporalLayers. 16463 panics; 16462 survives. 24A435 RCMode=20 can return -12900 (VT property miss); NTL st=0 still accepts. Documents/p142_layers.txt leftover 18 is HOLD — heal to 16463. P149 BUILD p149-t8150krw-v3 / P142 v7 encode-first."
+    },
+    {
+      "id": "law.hunt12.occupancy",
+      "title": "Hunt 12 occupancy vs conversion",
+      "text": "A14 23F77 kalloc.3072 element-modified-after-free {sid, 0xcN, 1, 1} is AppleH11ANEInterface occupancy WRITE into a freed 3072. conversion=YES only if desc_type_forged OR (body_forged AND kptr). Do not remaining-fire 254 unbounded fill. Do not glue 43748 occupancy to icmp6filt 0x148."
+    },
+    {
+      "id": "law.lightsword.partial",
+      "title": "LSIDCalib PARTIAL",
+      "text": "WRONG/FOREIGN = primitive alive. PARTIAL = window rate. hop-1 KEEP CLOSED (UPL_PHYS_CONTIG bail on 26.1+/27.0). Do not remaining-fire LightSword hop-1 from Mind."
+    },
+    {
+      "id": "law.parked",
+      "title": "KEEP CLOSED remaining-fire",
+      "text": "Closed: 163-selector AKS crash sweep, sel5 size-sweep, 0x800 remaining-fire, P045 recv as kread, 84523 unbounded APFS VNOP remaining-fire, LightSword hop-1, P051 TrollRestore/WVEK remaining-fire, CVE-2026-86950 remaining-fire as first KRW, JPEG +0x30 teardown remaining-fire, CoreGraphics/CoreMedia file-parser ACE as first KRW."
+    },
+    {
+      "id": "law.sku",
+      "title": "Lab SKUs",
+      "text": "Lab: iPhone13,2 A14 23F77 iOS 26.5; iPad8,* A12X 23G71 iPadOS 26.6; iPhone18,2 T8150 24A435 iOS 27.0. SKU is hw.machine + kern.osversion. iOS 27.2 patched 163-286 CVEs; 26.5/27.0 sit before that gate."
+    },
+    {
+      "id": "law.socketkrw",
+      "title": "SocketKRW arm",
+      "text": "True kread: SocketKRW.Arm(rw_inpcb) then smash icmp6filt +0x148, then kread32(kbase)==0xfeedfacf and kread64(kbase+8) typeinfo in {0x200000000, 0xc00000002, 0xcc0000002}. P149 does not Arm from a pipe leak."
+    },
+    {
+      "id": "law.isolation",
+      "title": "One TAP isolation",
+      "text": "One TAP per force-quit. Reboot after panic-possible. Do not stack P044, CS2, P149, LightSword in one process. Game Mode eligibility is LSSupportsGameMode + GCSupportsGameMode; overlay is Control Center."
+    },
+    {
+      "id": "law.cinder.probe",
+      "title": "Cinder vs public SKU",
+      "text": "Probe (Lum1na-Debugger) MAY fire in-process ImageIO/CG/font modules. Public Lum1na must SKIP wrong primitives. 86950 PARK (P076/P131). Overlaps (p125 vs kern.ipc, p126 vs kern.decmpfs, p112 vs cg.shading) fire separately under isolation."
+    },
+    {
+      "id": "law.kernellab",
+      "title": "KernelLab IPA-safe",
+      "text": "Host Unicorn emulator is Mac-side (klconsole.py :8737). IPA ships board JSON export, flat-VA law, P118 boot-learner. Do not embed Unicorn or kernelcaches."
+    },
+    {
+      "id": "law.glm.edge",
+      "title": "GLM-Edge / Lum1na-Mind",
+      "text": "Phone cannot run ollama. GLM-Edge 1.5B/4B is the on-device class, served over OpenAI-compat LAN (mlx_lm.server / ollama / Z.ai). Default no-cloud. SpaceXAI https://api.x.ai/v1 grok-4.7 is an optional cloud endpoint. Weights are not bundled. Tools run on the phone."
+    }
+  ]
+}

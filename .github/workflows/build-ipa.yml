@@ -607,14 +607,14 @@ jobs:
           echo "**Next:** sideload → run P022 probes first (highest-value untested path)" >> $GITHUB_STEP_SUMMARY
 
   # ============================================
-  # Job 3: Lum1na-Debug (P007 lab rig app) — primitives on ANY device
+  # Job 3: Lum1na-Debugger (P007 lab rig app) — primitives on ANY device
   # ============================================
-  # The P007OpenOnly lab app (home-screen name "Lum1na-Debug") is the
-  # primitive-testing rig: P005–P099 probes, ANE mlmodels, IDENT always
-  # prints, "runtime profile always wins". It runs on unknown devices:
-  # kernel-VA probes HOLD honestly when LabOff() has no row for the SKU,
-  # IOKit/spray primitives still fire. Entitlements are the free-account
-  # set (game-center + get-task-allow) — the proven lab set; keep them.
+  # The P007OpenOnly lab app (home-screen name "Lum1na-Debugger") is the
+  # Cinder-shelled primitive-testing rig: Lum1na TAP catalog, Cinder modules,
+  # filesystem, Console, GLM-Edge/Lum1na-Mind tools, IDENT always prints,
+  # "runtime profile always wins". IPA artifact name stays
+  # Lum1na-Debug-unsigned-ipa. Bundle id stays ma6x9x.P007OpenOnly.
+  # Entitlements are the free-account set (game-center + get-task-allow).
   build-debug:
     runs-on: macos-15
     timeout-minutes: 45
@@ -720,7 +720,7 @@ jobs:
             echo "❌ ERROR: P007OpenOnly.app not found"
             exit 1
           fi
-          echo "✓ Found app: $APP_PATH (home-screen name: Lum1na-Debug)"
+          echo "✓ Found app: $APP_PATH (home-screen name: Lum1na-Debugger)"
 
           mkdir -p "Payload"
           cp -R "$APP_PATH" "Payload/"

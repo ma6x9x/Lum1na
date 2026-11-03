@@ -433,7 +433,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = P007OpenOnly/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Lum1na-Debug";
+				INFOPLIST_KEY_CFBundleDisplayName = "Lum1na-Debugger";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.games";
 				INFOPLIST_KEY_LSSupportsGameMode = YES;
 				INFOPLIST_KEY_GCSupportsGameMode = YES;
@@ -446,6 +446,22 @@
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-framework",
+					ModelIO,
+					"-framework",
+					CoreHaptics,
+					"-framework",
+					AVFoundation,
+					"-framework",
+					CoreText,
+					"-framework",
+					CoreGraphics,
+					"-framework",
+					UniformTypeIdentifiers,
+					"-lsqlite3",
 				);
 				MARKETING_VERSION = 1.0;
 				NEW_SETTING = "";
@@ -481,7 +497,7 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = P007OpenOnly/Info.plist;
-				INFOPLIST_KEY_CFBundleDisplayName = "Lum1na-Debug";
+				INFOPLIST_KEY_CFBundleDisplayName = "Lum1na-Debugger";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.games";
 				INFOPLIST_KEY_LSSupportsGameMode = YES;
 				INFOPLIST_KEY_GCSupportsGameMode = YES;
@@ -494,6 +510,22 @@
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-framework",
+					ModelIO,
+					"-framework",
+					CoreHaptics,
+					"-framework",
+					AVFoundation,
+					"-framework",
+					CoreText,
+					"-framework",
+					CoreGraphics,
+					"-framework",
+					UniformTypeIdentifiers,
+					"-lsqlite3",
 				);
 				MARKETING_VERSION = 1.0;
 				NEW_SETTING = "";
