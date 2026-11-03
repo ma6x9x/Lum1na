@@ -8,7 +8,7 @@ Seven isolated TAPs. Reboot + force-quit between T1–T4 and T7 GPU map. `ui-bui
 
 | Button | Catalog | Theory |
 | --- | --- | --- |
-| **T1 ANE** | `krw` | KERNEL sequencer (`path-test-2`). A14: P044 N=192 locked until conversion + Game Mode oracle + P139 dossier (no 150s lock/unlock) + P113 + kread32(kbase)==MH_MAGIC_64. PATH_TEST lines for occ/conv/p139/kread. T8150 pair: P139 harvest + P114 sel-8 serializer + kread32 (isolated p110/p142/p143). Home KERNEL pad + PATHS button. Catalog `pathtest` is the scorecard. 12 mini: 127-in in-bounds, 43748 not live. No 254 remaining-fire. |
+| **T1 ANE** | `krw` | KERNEL sequencer (`path-test-3`). A14: P044 N=192 locked until conversion + Game Mode oracle + P139 dossier (no 150s lock/unlock) + P113 + kread32(kbase)==MH_MAGIC_64. PATH_TEST lines for occ/conv/p139/kread. T8150 leak pair: P139 harvest + P114 sel-8 serializer + kread32. 17 formula leak(P114) → race(P110) → write(P142) stays catalog-solo (panic-possible). 12 mini: CS2 then libkrw then kread32. Home KERNEL pad + PATHS button. Catalog `pathtest` is the scorecard. No 254 remaining-fire. |
 | **T2 FACET** | `krw2` | 64788 1×65535 + Trap2 sel=3 oracle. |
 | **T3 SOCK** | `krw3` | 43748 then icmp6filt. Expected SKIP. |
 | **T4 LS** | `krw4` | Dual-wrap last-wire. 18:45 OOM sealed. |

@@ -9,14 +9,16 @@
 #import "LabLearn.h"
 #import "LabLocalTime.h"
 #import "P007Board.h"
+#import "P007KreadLane.h"
 #import "P139BootIntel.h"
 #import "P114SurfaceLeak.h"
+#import "ClearSword/CS2Runner.h"
 #import "lumina_core.h"
 
 #include <stdlib.h>
 #include <string.h>
 
-#define PATH_BUILD @"path-test-2"
+#define PATH_BUILD @"path-test-3"
 
 @implementation LabPathTest
 
@@ -86,6 +88,23 @@ static int path_int_after(NSString *s, const char *key) {
             return @"REACH";
         return @"HOLD";
     }
+    if ([pathId isEqualToString:@"p110"]) {
+        if ([log containsString:@"claim won"] || [log containsString:@"claim-won"])
+            return @"PASS";
+        if ([log containsString:@"family-b"] || [log containsString:@"Family-B"] ||
+            [log containsString:@"died mid-round"])
+            return @"REACH";
+        return @"HOLD";
+    }
+    if ([pathId isEqualToString:@"p142"]) {
+        if ([log containsString:@"session still alive after corruption"] ||
+            [log containsString:@"CORRUPTION DETECTED"])
+            return @"PASS";
+        if ([log containsString:@"panic"] || [log containsString:@"0xDA78"] ||
+            [log containsString:@"OOB WRITE"])
+            return @"REACH";
+        return @"HOLD";
+    }
     return @"HOLD";
 }
 
@@ -107,7 +126,7 @@ static int path_int_after(NSString *s, const char *key) {
        LabLocalMilitaryNow() ?: @"?", PATH_BUILD]);
     L([NSString stringWithFormat:@"[*] sku=%@  hasKread still kread32(kbase)==0xfeedfacf",
        skuName]);
-    L(@"[*] Occupancy / P110 / P142 / P143 are catalog-solo. This TAP is READ-ONLY.");
+    L(@"[*] Occupancy / P110 / P142 / P143 are catalog-solo. Hunt/17 PATHS is harvest-only. 12 mini PATHS establishes CS2/libkrw.");
     int coreSt = lumina_core_selftest();
     L([NSString stringWithFormat:@"[*] lumina_core %s selftest=%d",
        lumina_core_version(), coreSt]);
@@ -127,8 +146,10 @@ static int path_int_after(NSString *s, const char *key) {
         L(@"  p114    tap=p114/krw   bar=sel-8 serializer kernel_range_q>0 or 2bf REACH");
         L(@"  kread   tap=kreadtest  bar=kread32(kbase)==0xfeedfacf");
         L(@"  p143    tap=p143       ISOLATED rocket submit. One TAP after reboot.");
-        L(@"  p110    tap=p110       ISOLATED swap-claim. Panic-possible.");
+        L(@"  p110    tap=p110       ISOLATED race. Family-B = window-won/slot-lost, not kread.");
+        L(@"  p142    tap=p142       ISOLATED write. Count-scaled OOB; survive-corrupt is the kread door.");
         L(@"  occ     SKIP           43748 clamp-CLOSED (table 0x10b8, 255 in-bounds)");
+        L(@"  formula leak(P114) → race(P110) → write(P142) → krw(unnamed) → sptm(HOLD)");
     } else if (sku == LabSkuA14_21D50) {
         L(@"  kread   tap=kreadtest/libkrw/cs2  bar=kread32(kbase)==0xfeedfacf");
         L(@"  ane127  tap=conv       CLASS/FIELD in-bounds. 43748 not live.");
@@ -193,6 +214,19 @@ static int path_int_after(NSString *s, const char *key) {
     }
 
     L(@"=== RUN kread32 GATE ===");
+    if ((sku == LabSkuA14_21D50 || sku == LabSkuA13_22G100) &&
+        ![P007Board shared].hasKread) {
+        L(@"[*] 12 mini / A13: CS2 then libkrw before kreadtest");
+        NSString *cs = nil;
+        @try { cs = [CS2Runner runUpstream]; }
+        @catch (NSException *e) { L([NSString stringWithFormat:@"[-] cs2 %@", e.name]); }
+        if (![P007Board shared].hasKread) {
+            bool armed = P007LaneArmBoard();
+            L([NSString stringWithFormat:@"[*] libkrw P007LaneArmBoard %@",
+               armed ? @"YES" : @"miss"]);
+        }
+        (void)cs;
+    }
     NSString *kt = nil;
     @try { kt = [P007Board tapKreadTest]; }
     @catch (NSException *e) { L([NSString stringWithFormat:@"[-] kreadtest %@", e.name]); }

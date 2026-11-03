@@ -35,5 +35,8 @@ bool     P007LaneKWrite64(uint64_t kaddr, uint64_t v);
 bool     P007LaneKWrite32(uint64_t kaddr, uint32_t v);
 /* Bulk read. Returns bytes read, -1 when the lane has no buffered path. */
 ssize_t  P007LaneKReadBuf(uint64_t kaddr, void *buf, size_t len);
+/* Arm P007Board from a live libkrw provider: setKread32 + commitSlide.
+   Idempotent. YES only after kread32(kbase)==0xfeedfacf. */
+bool     P007LaneArmBoard(void);
 
 NS_ASSUME_NONNULL_END

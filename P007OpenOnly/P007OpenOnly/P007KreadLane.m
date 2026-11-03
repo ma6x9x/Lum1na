@@ -181,3 +181,27 @@ ssize_t P007LaneKReadBuf(uint64_t kaddr, void *buf, size_t len) {
     }
     return -1;
 }
+
+static uint32_t p007_libkrw_kread32(uint64_t kaddr, BOOL *ok) {
+    if (!g_kread) {
+        if (ok) *ok = NO;
+        return 0;
+    }
+    uint32_t v = 0;
+    int rc = g_kread(kaddr, &v, sizeof(v));
+    if (ok) *ok = (rc == 0);
+    return v;
+}
+
+bool P007LaneArmBoard(void) {
+    P007LaneInitLibkrw();
+    P007Board *b = [P007Board shared];
+    if (b.hasKread) return true;
+    if (!g_kread || g_kbase == 0) return false;
+    uint64_t staticBase = b.staticBase;
+    if (staticBase == 0 || g_kbase < staticBase) return false;
+    uint64_t slide = g_kbase - staticBase;
+    if (slide == 0 || slide > 0x100000000ULL) return false;
+    [b setKread32:p007_libkrw_kread32];
+    return [b commitSlide:slide reason:@"libkrw"] ? true : false;
+}
