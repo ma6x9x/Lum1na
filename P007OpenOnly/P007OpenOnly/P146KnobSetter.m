@@ -22,7 +22,7 @@
 
 #import <Foundation/Foundation.h>
 
-#define P146_BUILD @"p146-knobsetter-v3"
+#define P146_BUILD @"p146-knobsetter-v4"
 
 @implementation P146KnobSetter
 
@@ -70,6 +70,13 @@
                 long v = strtol(ln.UTF8String, NULL, 10);
                 if (v > 0) { val = v; fromLadder = YES; }
             }
+        }
+        /* line 1 leftover 18 (09:06 / 09:55 HOLD) cannot hit the 16463 OOB */
+        if (i == 0 && val > 0 && val < 16462) {
+            [out appendFormat:@"[heal] line1 %ld is in-bounds leftover — writing 16463\n",
+                val];
+            val = 16463;
+            fromLadder = NO;
         }
         NSString *knob = [docs stringByAppendingPathComponent:rows[i].file];
         NSString *sval = [NSString stringWithFormat:@"%ld\n", val];

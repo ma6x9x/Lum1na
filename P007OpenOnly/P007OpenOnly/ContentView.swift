@@ -187,7 +187,7 @@ struct ContentView: View {
                         moreRow("CS calib. phys_oob race only (not KRW)", "cscali")
                         moreRow("P122 SwordForge. combined 64788 KRW test (freer→reclaim→read)", "swordforge")
                         moreRow("P123 ShapeCensus. kalloc.3072 victims with KRW vision (mini/libkrw)", "shapecensus")
-                        moreRow("KERNEL. T1 sequencer (t8150-krw-1): P139 (no lock wait) + hunt P044 / 17 P114 then P149 conversion (Prepare N=8 then 16463, kernel pipes, PANIC-POSSIBLE) + kread32. Occupancy / PIPE-HIT is not hasKread.", "krw")
+                        moreRow("KERNEL. T1 sequencer (t8150-krw-2): P139 (no lock wait) + hunt P044 / 17 P114 then P149 conversion (Prepare N=8 then 16463, kernel pipes, PANIC-POSSIBLE) + kread32. Occupancy / PIPE-HIT is not hasKread.", "krw")
                         moreRow("PATHS. Per-path scorecard + READ-ONLY tests. Hunt: P139+kread. 17: P139+P114+kread (P149 stays KERNEL/catalog). Occupancy stays P044/KERNEL solo. P110/P143 isolated.", "pathtest")
                         moreRow("KREAD. commitSlide kread32(kbase)==MH_MAGIC_64", "kreadtest")
                         moreRow("P070 five-door chain census + persist HOLD", "p070")

