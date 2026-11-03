@@ -117,7 +117,7 @@ enum Table {
         "tab.system": row("System", "系统"),
 
         // ---- overview
-        "ov.headline": row("Lab debugger · primitives + Mind", "实验室调试器 · 原语 + Mind"),
+        "ov.headline": row("Lab debugger · primitives + Mind + Learn", "实验室调试器 · 原语 + Mind + Learn"),
         "ov.sub": row("%d primitives · %d localized 27.2 fixes", "%d 个原语 · %d 条 27.2 修复定位"),
         "ov.target": row("Target device", "目标设备"),
         "ov.model": row("Model", "机型"),

@@ -158,14 +158,21 @@ enum LuminaMindLaws {
             }
         }
         lines.append("")
+        let classified = LuminaLearn.classify(id: "log", log: log)
+        lines.append("LATTICE: stage=\(classified.stage.rawValue) outcome=\(classified.outcome)")
+        lines.append("  " + classified.note)
+        if let sib = classified.sibling { lines.append("  sibling: \(sib)") }
+        lines.append("")
         if log.contains("hasKread=YES") && log.contains("0xfeedfacf") {
-            lines.append("VERDICT: kread receipt present. Still confirm kread64(kbase+8) typeinfo before commitSlide.")
+            lines.append("VERDICT: kread receipt present. Still confirm kread64(kbase+8) typeinfo before commitSlide. physRW HOLD.")
         } else if log.contains("PIPE-HIT") || log.contains("QUEUE-INIT") {
             lines.append("VERDICT: write/conversion window receipt. hasKread stays NO until kread32(kbase)==0xfeedfacf.")
         } else if log.hasPrefix("STOP") {
-            lines.append("VERDICT: parked remaining-fire. Do not retry.")
+            lines.append("VERDICT: parked remaining-fire. Do not retry. Learning will not reopen it.")
+        } else if classified.outcome == "maf" {
+            lines.append("VERDICT: panic-class. Next boot fire the survivor sibling (not hop-1). Learning stores the death; it does not mint kread.")
         } else {
-            lines.append("VERDICT: hypothesis only. Need panic IPS or kread32 receipt.")
+            lines.append("VERDICT: hypothesis only. Need panic IPS or kread32 receipt. Lattice cannot skip leak→write→kread32.")
         }
         return lines.joined(separator: "\n")
     }
@@ -234,6 +241,18 @@ enum LuminaMindTools {
         fn("list_hour_logs", "List log snapshots from the last hour.",
            [:], []),
         fn("device_sku", "hw.machine + kern.osversion + marketing version.",
+           [:], []),
+        fn("bandit_plan", "LabBanditPlan ranked cross-domain hunt scheduler plus promote.json lattice rows. device=1.0 evidence.",
+           [:], []),
+        fn("bandit_status", "Same as bandit_plan: learn.<id> ledger + survivor knobs + panic counts.",
+           [:], []),
+        fn("stage_ladder", "KernelLab 0.3.2 stage ladder sandbox→leak→race→write→krw→sptm. Labels only; not a device KRW claim.",
+           [:], []),
+        fn("promote_status", "Per-id promotion lattice: panic_count, survivor_knob, sibling, hasKread. Honest: panic can learn a survivor knob; it cannot skip kread32.",
+           [:], []),
+        fn("promote_apply", "Write learned survivor knobs into Documents (p142_layers, p147_cycles, p148_gop). Never overwrites 16463 panic-class.",
+           [:], []),
+        fn("oracle_export", "Dump lab_bandit.json + lab_promote.json for host oracle_bridge show / kernellab sim ident --feed.",
            [:], [])
     ]
 
@@ -281,6 +300,14 @@ enum LuminaMindTools {
             return listHour()
         case "device_sku":
             return deviceSKU()
+        case "bandit_plan", "bandit_status", "promote_status":
+            return LuminaLearn.status()
+        case "stage_ladder":
+            return LuminaLearn.stageLadder()
+        case "promote_apply":
+            return LuminaLearn.applySurvivorKnobs()
+        case "oracle_export":
+            return LuminaLearn.exportOracle()
         default:
             return "unknown tool \(name)"
         }
@@ -447,11 +474,13 @@ enum LuminaMindTools {
             // synchronous fallback
             let ctx = RunContext(workdir: Container.work, journal: GuardJournal())
             do {
+                LuminaLearn.begin(tid)
                 ctx.arm(tid, "mind")
                 let out = try module.run(ctx)
                 ctx.disarm(tid, out.headline)
-                return "\(out.headline)\n\(out.detail)"
+                return LuminaLearn.finish(tid, log: out.headline + "\n" + out.detail)
             } catch {
+                _ = LuminaLearn.finish(tid, log: "failed\n" + error.localizedDescription)
                 return "threw: \(error.localizedDescription)"
             }
         }
@@ -466,6 +495,7 @@ enum LuminaMindTools {
         return """
         17 KRW formula: leak(P114) → write(P142 v7 encode-first inside P149) → convert(P149 pipes) → kread32(kbase)==0xfeedfacf → sptm HOLD
         Hunt occupancy: P044 / CONV. Occupancy HIT is not hasKread.
+        Lattice: sandbox → leak → race → write → krw → sptm. APPLE-SUBMIT: closed.
         kreadSignal: \(sig)
         Last TAP markers:
         \(tail)

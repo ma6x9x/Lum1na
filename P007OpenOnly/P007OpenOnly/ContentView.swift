@@ -701,7 +701,7 @@ struct ContentView: View {
     func run(_ id: String) {
         if let stop = blockedProbeMessage(id) {
             logTap(id)
-            text = stop
+            text = LuminaLearn.observeParked(id: id, log: stop)
             return
         }
 
@@ -713,10 +713,7 @@ struct ContentView: View {
                 + "Want load_raw>=0 or load_over!=client len. NOT KRW.\n"
                 + "Log: p022_gc_escape_log.txt  (UI stays unlocked; GameKit can block)\n"
             let th = Thread {
-                P022GC_GameCenter_Sandbox_Escape.tap()
-                let body = Self.readFreshLog(
-                    named: "p022_gc_escape_log.txt",
-                    missing: "p022GC finished but Documents/p022_gc_escape_log.txt missing or empty")
+                let body = LuminaTAP.execute("p022GC")
                 DispatchQueue.main.async {
                     text = body
                 }
@@ -735,7 +732,9 @@ struct ContentView: View {
         _ = LabBanditPlan(&planBuf, 4096)
         let planText = String(cString: planBuf)
         if !planText.isEmpty {
-            text = "[PLAN]\n" + planText + "Running \(id)…\nDon't touch UI. Classify ips after reboot.\n"
+            text = "[PLAN]\n" + planText
+                + "lattice: sandbox → leak → race → write → krw → sptm HOLD\n"
+                + "Running \(id)…\nDon't touch UI. Classify ips after reboot.\n"
         } else {
             text = "Running \(id)…\nDon't touch UI. Classify ips after reboot.\n"
         }

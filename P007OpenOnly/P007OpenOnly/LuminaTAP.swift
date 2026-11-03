@@ -47,9 +47,12 @@ enum LuminaTAP {
     }
 
     /// Runs the probe on the calling queue. LabEngine already hops off main.
+    /// Every id is a learn.<id> LabBandit domain (promotion lattice).
     static func execute(_ id: String) -> String {
         logTap(id)
-        if let stop = blocked(id) { return stop }
+        if let stop = blocked(id) { return LuminaLearn.observeParked(id: id, log: stop) }
+        LuminaLearn.begin(id)
+        LuminaLearn.prepare(id)
         var result: String
         switch id {
         case "ident":       result = DeviceIdentProbe.runIdentity()
@@ -617,6 +620,6 @@ enum LuminaTAP {
         default:
             result = "unknown"
         }
-        return result
+        return LuminaLearn.finish(id, log: result)
     }
 }

@@ -26,10 +26,10 @@ enum ChainPlan {
                    unlock: "HOLE_MODE stays 0. Do not remaining-fire 254 unbounded fill."),
 
         ChainStage(id: "sL2", index: 2,
-                   title: "Lum1na KernelLab + Mind",
-                   goal: "P118 boot-learner feeds the offset ledger. Mind can run these as tools. Board JSON is the device half of KernelLab.",
+                   title: "Lum1na KernelLab + Mind + Learn",
+                   goal: "P118 boot-learner + LabBandit lattice (sandbox→leak→race→write→krw→sptm). Mind tools: bandit_plan, promote_status, oracle_export. Host KernelLab 0.3.2 oracle_bridge mirrors Documents/lab_bandit.json.",
                    moduleIDs: ["board", "p118", "p100", "intel"],
-                   unlock: "Host Unicorn stays on the Mac. IPA does not embed kernelcaches."),
+                   unlock: "Host Unicorn stays on the Mac. IPA does not embed kernelcaches. A stage label is not hasKread."),
 
         ChainStage(id: "s0", index: 3,
                    title: tl("权限面测绘"),

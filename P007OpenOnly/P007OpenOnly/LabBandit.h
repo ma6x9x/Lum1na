@@ -138,4 +138,11 @@ int    LabBanditPick2(const char *domain, char *lineOut, int lineCap);
    scheduler: run nothing before it says so, or run the top line. */
 int    LabBanditPlan(char *lineOut, int lineCap);
 
+/* One-arm convenience for the Swift promotion lattice (learn.<id>). */
+int    LabBanditRegister1(const char *domain, const char *arm,
+                          const char *seededFrom,
+                          const char *bootChangeOpen,
+                          const char *sameBootOpen,
+                          char *attrLineOut, int attrLineCap);
+
 #endif /* LabBandit_h */

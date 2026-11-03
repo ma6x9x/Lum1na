@@ -115,6 +115,11 @@ final class LabEngine: ObservableObject {
         journal = GuardJournal()
         workdir = Container.work
         try? FileManager.default.createDirectory(at: workdir, withIntermediateDirectories: true)
+        LuminaLearn.ingestDeaths(journal.recovered)
+        if !journal.recovered.isEmpty {
+            let names = journal.recovered.map(\.moduleID).joined(separator: ",")
+            log("learn: death-oracle recovered \(journal.recovered.count) armed-not-disarmed [\(names)]")
+        }
     }
 
     func log(_ line: String) {
@@ -133,6 +138,8 @@ final class LabEngine: ObservableObject {
         guard !running.contains(module.id) else { return }
         running.insert(module.id)
         log("▸ " + module.title + "  [" + module.cve + "]")
+        LuminaLearn.begin(module.id)
+        LuminaLearn.prepare(module.id)
 
         let ctx = RunContext(workdir: workdir, journal: journal)
         let started = Date()
@@ -141,16 +148,21 @@ final class LabEngine: ObservableObject {
             do {
                 var out = try module.run(ctx)
                 out.elapsedMs = Int(Date().timeIntervalSince(started) * 1000)
+                let footer = LuminaLearn.finish(module.id, log: out.headline + "\n" + out.detail)
                 DispatchQueue.main.async {
                     self.outcomes[module.id] = out
                     self.running.remove(module.id)
                     self.log("✓ \(module.title) — \(out.headline) (\(out.elapsedMs) ms)")
+                    for line in footer.components(separatedBy: .newlines) where line.hasPrefix("id=") || line.hasPrefix("sibling:") || line.hasPrefix("hasKread") {
+                        self.log("  " + line)
+                    }
                 }
             } catch {
                 let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
                 ctx.fail(module.id, message)
                 var out = ModuleOutcome(headline: tl("失败"), detail: message, failed: true)
                 out.elapsedMs = Int(Date().timeIntervalSince(started) * 1000)
+                _ = LuminaLearn.finish(module.id, log: "failed\n" + message)
                 DispatchQueue.main.async {
                     self.outcomes[module.id] = out
                     self.running.remove(module.id)
@@ -181,6 +193,8 @@ extension LabEngine {
         }
         let module = modules[index]
         running.insert(module.id)
+        LuminaLearn.begin(module.id)
+        LuminaLearn.prepare(module.id)
         let ctx = RunContext(workdir: workdir, journal: journal)
         let started = Date()
 
@@ -188,10 +202,12 @@ extension LabEngine {
             var out: ModuleOutcome
             do {
                 out = try module.run(ctx)
+                _ = LuminaLearn.finish(module.id, log: out.headline + "\n" + out.detail)
             } catch {
                 let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
                 ctx.fail(module.id, message)
                 out = ModuleOutcome(headline: tl("失败"), detail: message, failed: true)
+                _ = LuminaLearn.finish(module.id, log: "failed\n" + message)
             }
             out.elapsedMs = Int(Date().timeIntervalSince(started) * 1000)
             let finished = out

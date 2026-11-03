@@ -60,13 +60,18 @@
     },
     {
       "id": "law.kernellab",
-      "title": "KernelLab IPA-safe",
-      "text": "Host Unicorn emulator is Mac-side (klconsole.py :8737). IPA ships board JSON export, flat-VA law, P118 boot-learner. Do not embed Unicorn or kernelcaches."
+      "title": "KernelLab 0.3.2 IPA-safe",
+      "text": "Host Unicorn (klconsole.py :8737, kernellab.py, oracle_bridge.py) is Mac-side / post-jb .deb. IPA ships board JSON, flat-VA law, P118, stage ladder labels, lab_bandit.json export for sim ident --feed. Evidence weights device=1.0 emu=0.5 map=0.3. A stage label is not a device receipt. APPLE-SUBMIT: closed. Do not embed Unicorn, kernelcaches, or KernelLab.app."
     },
     {
       "id": "law.glm.edge",
       "title": "GLM-Edge / Lum1na-Mind",
-      "text": "Phone cannot run ollama. GLM-Edge 1.5B/4B is the on-device class, served over OpenAI-compat LAN (mlx_lm.server / ollama / Z.ai). Default no-cloud. SpaceXAI https://api.x.ai/v1 grok-4.7 is an optional cloud endpoint. Weights are not bundled. Tools run on the phone."
+      "text": "Phone cannot run ollama. GLM-Edge 1.5B/4B is the on-device class, served over OpenAI-compat LAN (mlx_lm.server / ollama / Z.ai). Default no-cloud. SpaceXAI https://api.x.ai/v1 grok-4.7 is an optional cloud endpoint. Weights are not bundled. Tools run on the phone. Extra tools: bandit_plan, stage_ladder, promote_status, promote_apply, oracle_export."
+    },
+    {
+      "id": "law.promote",
+      "title": "Promotion lattice",
+      "text": "Every TAP and Cinder module is learn.<id> in Documents/lab_bandit.json plus lab_promote.json. Ladder: panic-class → survive-class (knob clamp, encode-first, isolation) → leak → write (PIPE-HIT / occupancy HIT) → kread (kread32==0xfeedfacf) → physrw/sptm HOLD. Learning down-ranks panic knobs and stores survivor knobs (16462, p147 cycles, p148 gop[0,8], cg.shading.sweep last R). It cannot skip kread32 and will not remaining-fire hop-1/163-sel/TrollRestore. GuardJournal armed-not-disarmed is the death-oracle. promote_apply never overwrites 16463."
     }
   ]
 }
