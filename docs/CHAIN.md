@@ -8,7 +8,7 @@ Seven isolated TAPs. Reboot + force-quit between T1–T4 and T7 GPU map. `ui-bui
 
 | Button | Catalog | Theory |
 | --- | --- | --- |
-| **T1 ANE** | `krw` | KERNEL sequencer (`t8150-krw-2`). A14: P044 N=192 locked until conversion + Game Mode oracle + P139 dossier (no 150s lock/unlock) + P113 + kread32(kbase)==MH_MAGIC_64. PATH_TEST lines for occ/conv/p139/kread. T8150: P139 harvest + P114 sel-8 + P149 conversion (Prepare N=8 then 16463, kernel pipes) + kread32. 17 formula leak(P114) → write(P149) → kread32(kbase)==0xfeedfacf. PIPE-HIT is a write receipt, not hasKread. P110 stays catalog-solo. 12 mini: CS2 then libkrw then kread32. Home KERNEL pad + PATHS button. Catalog `p149` is the isolated conversion TAP. No 254 remaining-fire. |
+| **T1 ANE** | `krw` | KERNEL sequencer (`t8150-krw-3`). A14: P044 N=192 locked until conversion + Game Mode oracle + P139 dossier (no 150s lock/unlock) + P113 + kread32(kbase)==MH_MAGIC_64. PATH_TEST lines for occ/conv/p139/kread. T8150: P139 harvest + P114 sel-8 + P149 conversion (encode N=8 then Set 16463, kernel pipes) + kread32. 17 formula leak(P114) → write(P149) → kread32(kbase)==0xfeedfacf. PIPE-HIT is a write receipt, not hasKread. P110 stays catalog-solo. 12 mini: CS2 then libkrw then kread32. Home KERNEL pad + PATHS button. Catalog `p149` is the isolated conversion TAP. No 254 remaining-fire. |
 | **T2 FACET** | `krw2` | 64788 1×65535 + Trap2 sel=3 oracle. |
 | **T3 SOCK** | `krw3` | 43748 then icmp6filt. Expected SKIP. |
 | **T4 LS** | `krw4` | Dual-wrap last-wire. 18:45 OOM sealed. |
@@ -42,7 +42,7 @@ Port path after a primitive is proven on P007: copy `+tap` + catalog id + log na
 | `p071` | `P071AneOverflowMap` | `p071_ane_overflow_log.txt` | DeviceOpen 0x68. Not 43748 fill. |
 | `p072` | `P072FileParserMap` | `p072_file_parser_log.txt` | dlopen + 1x1 PNG. Not ACE. |
 | `kreadtest` | `Lum1naKreadTest` | `lum1na_kread_test_log.txt` | FAIL unless armed kread returns `0xfeedfacf`. |
-| `p149` | `P149T8150Krw` | `p149_t8150krw_log.txt` | T8150 conversion: Prepare N=8 then 16463, kernel pipes, kread32 gate. PIPE-HIT ≠ hasKread. |
+| `p149` | `P149T8150Krw` | `p149_t8150krw_log.txt` | T8150 conversion: encode N=8 then Set 16463, kernel pipes, kread32 gate. PIPE-HIT ≠ hasKread. |
 
 Lum1na `p057` is WVEK reach. P007 `p057` is AKS deserialize. Do not overwrite either.
 

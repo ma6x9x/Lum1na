@@ -24,9 +24,10 @@ NS_ASSUME_NONNULL_BEGIN
 /// 913.43-class = pre-27.2-fix) is the likely-live device and the
 /// 17 (24A435) is the sibling-class control.
 ///
-/// v6 sequence: Prepare with N=8 first (real Surface Pool), then Set
-/// the overshoot count, then encode. v5 set-then-Prepare is the this=1
-/// / FAR=0x59 path. Conversion TAP is catalog p149 (kernel pipes).
+/// v7 sequence: Prepare N=8, encode >=1 frame (heap this at
+/// ctx+0x147b0), then Set the overshoot, encode again, invalidate.
+/// v6 Set-then-encode left this=1 FAR=0x59 at dtor (IPS 13:45-13:55).
+/// Conversion TAP is catalog p149 (kernel pipes).
 ///
 /// HONESTY: this is a kernel-state WRITE probe (the count knob), not
 /// a read; hasKread stays kread32-gated; one value per tap.

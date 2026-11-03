@@ -21,7 +21,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define KRW_BUILD @"t8150-krw-2"
+#define KRW_BUILD @"t8150-krw-3"
 
 @implementation P007KernelChain
 
@@ -96,7 +96,7 @@
         NSString *r114 = [LabPathTest scoreLog:p114 forPath:@"p114"];
         [LabLearn recordPath:@"p114" result:r114 evidence:@"KERNEL P114"];
         L([NSString stringWithFormat:@"PATH_TEST id=p114 class=disclosure result=%@", r114]);
-        L(@"[STEP 3b] P149 17 conversion (Prepare N=8 then 16463, kernel pipes). PANIC-POSSIBLE.");
+        L(@"[STEP 3b] P149 17 conversion (encode N=8 then Set 16463, kernel pipes). PANIC-POSSIBLE.");
         NSString *p149 = nil;
         @try { p149 = [P149T8150Krw tap]; }
         @catch (NSException *e) { L([NSString stringWithFormat:@"[-] p149 %@", e.name]); }
