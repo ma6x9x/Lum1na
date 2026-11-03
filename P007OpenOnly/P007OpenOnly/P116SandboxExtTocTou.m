@@ -125,6 +125,9 @@ static long p116_read(const char *outPath, const char *s, const char *l, FILE *l
     L(@"  ANE Stage-B lane is privilege-blocked — this is the honest class answer).");
     L(@"[honesty] READ-ONLY, bounded target list, tokens never logged, no kernel");
     L(@"  claims. One tap per force-quit; fsync per line.");
+    L(@"[not-elevate] userspace sandbox file-read. Not uid0, not CS_PLATFORM,");
+    L(@"  not kread32. AfterKread elevate stays gated on hasKread.");
+    L(@"  KERNEL / Full Chain do not auto-fire this as a privilege step.");
 
     g_issue   = (p116_issue_t)dlsym(RTLD_DEFAULT, "sandbox_extension_issue_file");
     g_consume = (p116_consume_t)dlsym(RTLD_DEFAULT, "sandbox_extension_consume");

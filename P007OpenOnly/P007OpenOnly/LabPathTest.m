@@ -62,7 +62,8 @@ static int path_int_after(NSString *s, const char *key) {
     if ([pathId isEqualToString:@"p114"]) {
         int kq = path_int_after(log, "kernel_range_q");
         int nq = path_int_after(log, "nonzero_q");
-        if (kq > 0 || nq > 0) return @"PASS";
+        if (kq > 0) return @"PASS";
+        if (nq > 0) return @"REACH";
         if ([log containsString:@"0xe00002bf"] || [log containsString:@"kr=0xe00002bf"])
             return @"REACH";
         return @"FAIL";

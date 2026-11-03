@@ -100,7 +100,7 @@
 #import <IOKit/IOKitLib.h>       /* dlsym'd calls still; only the UC types  */
 #import <sys/qos.h>
 
-#define P110_BUILD      @"p110-swapclaim-v2.8-t8150leaklaw"
+#define P110_BUILD      @"p110-swapclaim-v2.9-pacfix"
 #define P110_ROUNDS     64
 #define P110_PREFILL_MAX  8     /* bandit arm room: prefill 6 (default) vs 8 */
 #define P110_PREFILL_DEF  6     /* the v1 shipped prefill(6) pop-law value   */
@@ -1031,7 +1031,7 @@ static NSString *p110_flags_law(void) {
            v2: the stamp carries the leak-record count as the round's
            pre-window state (0 = no leak stage / pairing HELD).             */
         Lf(@"[r %d/%d] IN FLIGHT — D: owner-release sid=%08x (destroy-twin class) / "
-           @"E: owner-release the round surface (detacher half) / P: pop(%d+2, %@) "
+           @"E: owner-release the round surface (detacher half) / P: pop(%d+2, %s) "
            @"dial %ldns, same CPU — leak-recs=%d (%@). If the device reboots here: "
            @"outcome (b), Family-B far 0x0020000000000048 = window WON, free slot "
            @"(attested class).",
