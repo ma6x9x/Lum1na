@@ -97,6 +97,7 @@
 #import "P100AutoLearn.h"
 #import "LabLearn.h"
 #import "LabPathTest.h"
+#import "P007KernelChain.h"
 #import "lumina_core.h"
 #import "P101DmaCommandFire.h"
 #import "P102TitanWriteTest.h"

@@ -321,7 +321,7 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
     }
     switch ([self detectedSku]) {
         case LabSkuA14_23F77:
-            [out appendString:@"TRACK: iPhone13 A14 23F77 ACTIVE. First door=KERNEL T1 (P044 N=192 + P139 + P113 + kread32). TAP pathtest for per-path oracles. hop-1 SKIP.\n"];
+            [out appendString:@"TRACK: iPhone13 A14 23F77 ACTIVE. First door=KERNEL T1 (P044 N=192 + P139 + P113 + kread32). Home KERNEL pad / PATHS button. Catalog p097 is lock/unlock solo. hop-1 SKIP.\n"];
             break;
         case LabSkuA14_21D50:
             [out appendString:@"TRACK: 12 mini 21D50. Twin CLASS/FIELD only. Keep 21D50 VAs off 23F77.\n"];
@@ -345,7 +345,7 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
             [out appendFormat:@"TRACK: iPhone12 A13 osversion=%@.\n", [self osversion]];
             break;
         case LabSkuT8150_24A435:
-            [out appendString:@"TRACK: iPhone18,2 T8150 24A435 (17 Pro Max). KERNEL pair = P139 harvest + P114 sel-8 serializer + kread32. Isolated: p110 leak-on, p143 RocketDoor, AVE2 p142/p144/p145/p147/p148. TAP pathtest. Never paste T8101/T8027 VAs.\n"];
+            [out appendString:@"TRACK: iPhone18,2 T8150 24A435 (17 Pro Max). KERNEL pair = P139 harvest + P114 sel-8 serializer + kread32. Home KERNEL pad / PATHS button. Isolated: p110 leak-on, p143 RocketDoor. Catalog p097 lock/unlock solo. Never paste T8101/T8027 VAs.\n"];
             break;
         default:
             [out appendString:@"TRACK: unknown — paste Ident before panic tests.\n"];

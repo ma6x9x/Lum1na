@@ -62,7 +62,7 @@ Stale names (do **not** resurrect): FusionChain, KernelMap/LabOffsets.swift dupl
    Only import headers that exist. NSClassFromString does not need a bridge import, but `LabOff()` / `LabDeviceProfile` do.
 
 9. **Auto chain vs catalog**  
-   PATCH must not invoke process-killing probes. P051, P053, and unbounded P054 (4×500×30s unlink) jetsam'd the app — those stay out. The DAEMON pad fires the **bounded** P054 tap (1 thread, 2s, 50 files). Do not restore the storm loop.
+   PATCH must not invoke process-killing probes. P051, P053, and unbounded P054 (4×500×30s unlink) stay catalog-solo. Auto DAEMON SKIPs p054. Composed P139/KERNEL/PATHS skip P097's 150s lock/unlock; catalog `p097` is the interactive TAP.
 
 10. **`.deb` is an `ar` archive**  
    `sileo.deb` / `zebra.deb` will be **linked** if the synchronized root treats them as static libs (`ld: archive member 'debian-binary' not a mach-o file`). Keep `Resources/pkgman`, `Resources/basebin`, `Resources/tweaks` as `explicitFolders` and the two debs as `explicitFileTypes = file`. Do not add a Makefile — the IPA gate is `xcodebuild` in `build-ipa.yml`.
@@ -92,7 +92,7 @@ Numbering collisions to keep:
 - Catalog `p063` aliases `aio84530` (`CVE_2026_84530_KASLR`). Log is `p84530_aio_kqueue_log.txt`.
 - `p066` is one 128x128 EncType MAP. `p061` is dual H264+HEVC. Keep both.
 - `P069DmaCommandMap` uses a local `mach_vm_map` prototype. Do not `#import <mach/mach_vm.h>`.
-- PATCH stays SANDBOX BadQuery + KERNEL T1 sequencer (`path-test-1`: P100 + P139 + P044 N=192 locked on A14 until conversion + P113 + kread32; T8150 P139 + P114 + kread32) + AfterKread HOLD. Catalog `pathtest` is the per-path scorecard. T1 does not remaining-fire 254 / P099 / P110 / P142 / P143. LightSword Arm only after conversion CONFIRMED. T8150 in-bounds is 255 (trailer +0x1080); 254-in is in-bounds. Do not auto-invoke P065–P072 or CS2 hop-1 on hunt. Trigon is logic (T7 CacheMode / SocketKRW.Arm), not CVE-2023-32434. Per-SKU overlay is `Documents/lab_learn.json` (LabLearn). Bandit domain `krw_t1` records oob192/inb191/small127; KERNEL forces oob192 on hunt until conversion CONFIRMED. 12 mini 21D50 uses 127-in in-bounds (43748 not live).
+- PATCH stays SANDBOX BadQuery + KERNEL T1 sequencer (`path-test-2`: P100 + P139 without the 150s lock wait + P044 N=192 locked on A14 until conversion + P113 + kread32; T8150 P139 + P114 + kread32) + AfterKread HOLD. Home KERNEL pad and PATHS button. Catalog `pathtest` is the per-path scorecard. T1 does not remaining-fire 254 / P099 / P110 / P142 / P143 / P054. LightSword Arm only after conversion CONFIRMED. T8150 in-bounds is 255 (trailer +0x1080); 254-in is in-bounds. Do not auto-invoke P065–P072 or CS2 hop-1 on hunt. Trigon is logic (T7 CacheMode / SocketKRW.Arm), not CVE-2023-32434. Per-SKU overlay is `Documents/lab_learn.json` (LabLearn). Bandit domain `krw_t1` records oob192/inb191/small127; KERNEL forces oob192 on hunt until conversion CONFIRMED. 12 mini 21D50 uses 127-in in-bounds (43748 not live).
 
 Parse-heavy helpers live in `Exploit/lumina_core.c` (C ABI; Rust twin `rust/lumina_core`, `#[no_mangle]`). IOKit / detach / ACM stay ObjC. After `commitSlide`, `gLum1naPrimitives.kreadbuf` is a Dopamine-style page-split wrapper of the live lane. Do not copy hop-1 / kfd / Fugu14 kcall / physrw as first KRW.
 
@@ -142,4 +142,4 @@ Paid-for CI landmines (2026-10-15): a synchronized root swallows a nested `.xcod
 
 ## Honesty
 
-Kernel read/write is **not** obtained on 26.5 (hunt) until `kread32(kbase)==MH_MAGIC_64`. KERNEL T1 (`path-test-1`) actually TAPs P044 N=192 / P139 / P113 and runs the kread32 self-test; T8150 runs P139 + P114 + kread32. Catalog `pathtest` prints PATH_TEST lines. Occupancy CLASS is not hasKread. No P044 v46 254 remaining-fire (that panic’d Full Chain 2026-10-19 13:54). LightSword Arm only after conversion CONFIRMED. Rig 18.6.2 still lands hasKread via cs2core. AfterKread FIRE only on a passing self-test. One failed tap does not close a CVE class (`docs/FUTURE.md`, lab notes 89). Lab panic app is `~/Desktop/P007OpenOnly`.
+Kernel read/write is **not** obtained on 26.5 (hunt) until `kread32(kbase)==MH_MAGIC_64`. KERNEL T1 (`path-test-2`) actually TAPs P044 N=192 / P139 / P113 and runs the kread32 self-test; T8150 runs P139 + P114 + kread32. Home KERNEL pad (main app) and KERNEL hot button (Lum1na-Debug). Catalog `pathtest` / home PATHS prints PATH_TEST lines. Occupancy CLASS is not hasKread. No P044 v46 254 remaining-fire (that panic’d Full Chain 2026-10-19 13:54). LightSword Arm only after conversion CONFIRMED. Rig 18.6.2 still lands hasKread via cs2core. AfterKread FIRE only on a passing self-test. One failed tap does not close a CVE class (`docs/FUTURE.md`, lab notes 89). Lab panic app is `~/Desktop/P007OpenOnly`.

@@ -10,7 +10,7 @@ NS_ASSUME_NONNULL_BEGIN
 /// The Learner layer as ONE tap: harvest every per-boot user-observable
 /// kernel state in a single session —
 ///   1. [P063] the aio kn_sdata KVA family (+0xC0 per-boot object law)
-///   2. [P097] the console/gRegistryRoot-class leak row
+///   2. [P097] SKIP in composed p139 (catalog-solo lock/unlock, 150 s)
 ///   3. [P010] the QueueCreate cursor + w1 band (slide-tracked)
 ///   4. [P090] the ipc/info rows
 ///   5. the IOMD op-2 ORACLE (the [md+0x98] gate readback, inline arm)

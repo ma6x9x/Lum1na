@@ -6,31 +6,63 @@ struct ActionButtonsView: View {
     @Environment(\.luminaMotion) private var motion
 
     var body: some View {
-        Button(action: primaryAction) {
-            HStack(spacing: 14) {
-                LuminaStarShape()
-                    .fill(.white)
-                    .frame(width: 18, height: 22)
-                    .shadow(color: .white.opacity(0.9), radius: 4)
-                Text(primaryTitle)
-                    .font(.system(size: 22, weight: .semibold))
-                    .tracking(3)
-                    .padding(.trailing, -3)
+        VStack(spacing: 10) {
+            HStack(spacing: 10) {
+                stageChip("KERNEL", tint: Color(red: 0.94, green: 0.27, blue: 0.27)) {
+                    Task { await ExploitManager.shared.executeStage("KERNEL") }
+                }
+                stageChip("PATHS", tint: Palette.cyan) {
+                    Task {
+                        if let entry = ExploitManager.catalog.first(where: { $0.id == "pathtest" }) {
+                            await ExploitManager.shared.executeExploit(entry)
+                        }
+                    }
+                }
             }
-            .foregroundStyle(.white)
-            .frame(maxWidth: .infinity)
-            .frame(height: 62)
-            .glassSurface(Capsule(), tint: Palette.violet, interactive: true)
-            .overlay { buttonWash }
-            .fresnelRim(Capsule(), intensity: 0.85, glowWidth: 8)
-            .overlay { buttonRim }
-            .shadow(color: Palette.violet.opacity(model.phase == .running ? 0.35 : 0.85), radius: 16)
-            .shadow(color: Palette.magenta.opacity(0.45), radius: 6)
+            Button(action: primaryAction) {
+                HStack(spacing: 14) {
+                    LuminaStarShape()
+                        .fill(.white)
+                        .frame(width: 18, height: 22)
+                        .shadow(color: .white.opacity(0.9), radius: 4)
+                    Text(primaryTitle)
+                        .font(.system(size: 22, weight: .semibold))
+                        .tracking(3)
+                        .padding(.trailing, -3)
+                }
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 62)
+                .glassSurface(Capsule(), tint: Palette.violet, interactive: true)
+                .overlay { buttonWash }
+                .fresnelRim(Capsule(), intensity: 0.85, glowWidth: 8)
+                .overlay { buttonRim }
+                .shadow(color: Palette.violet.opacity(model.phase == .running ? 0.35 : 0.85), radius: 16)
+                .shadow(color: Palette.magenta.opacity(0.45), radius: 6)
+            }
+            .buttonStyle(.plain)
+            .disabled(model.phase == .running)
+            .accessibilityLabel(primaryTitle)
+        }
+        .animation(Motion.adaptive(Motion.smooth, motion: motion), value: model.phase)
+    }
+
+    private func stageChip(_ title: String, tint: Color, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 14, weight: .bold, design: .rounded))
+                .tracking(1.2)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .frame(height: 40)
+                .glassSurface(Capsule(), tint: tint, interactive: true)
+                .overlay {
+                    Capsule().strokeBorder(tint.opacity(0.9), lineWidth: 1)
+                }
         }
         .buttonStyle(.plain)
         .disabled(model.phase == .running)
-        .animation(Motion.adaptive(Motion.smooth, motion: motion), value: model.phase)
-        .accessibilityLabel(primaryTitle)
+        .accessibilityLabel(title)
     }
 
     private var buttonWash: some View {

@@ -34,13 +34,23 @@ struct CircuitHeroView: View {
             LuminaGlassCluster(spacing: 8) {
                 ZStack {
                     ForEach(RunStage.allCases) { stage in
-                        StageNodeView(
-                            stage: stage,
-                            status: model.status(for: stage),
-                            size: layout.nodeSize,
-                            labelBelow: stage.corner.y > 0,
-                            pulse: model.status(for: stage) == .active ? 0.5 + 0.5 * sin(t * 5.5) * max(amp, 0.0) : 0
-                        )
+                        Button {
+                            guard !model.isRunning else { return }
+                            Task {
+                                await ExploitManager.shared.executeStage(stage.title.uppercased())
+                            }
+                        } label: {
+                            StageNodeView(
+                                stage: stage,
+                                status: model.status(for: stage),
+                                size: layout.nodeSize,
+                                labelBelow: stage.corner.y > 0,
+                                pulse: model.status(for: stage) == .active ? 0.5 + 0.5 * sin(t * 5.5) * max(amp, 0.0) : 0
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(model.isRunning)
+                        .accessibilityLabel("\(stage.title) stage")
                         .luminaGlassID(String(stage.id), in: glassNamespace)
                         .position(layout.nodeCenters[stage.rawValue])
                         .animation(Motion.adaptive(Motion.lively, motion: motion), value: model.status(for: stage))

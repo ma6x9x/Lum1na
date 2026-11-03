@@ -16,7 +16,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define PATH_BUILD @"path-test-1"
+#define PATH_BUILD @"path-test-2"
 
 @implementation LabPathTest
 

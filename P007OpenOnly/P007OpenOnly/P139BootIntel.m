@@ -15,7 +15,6 @@
 #import "LabLocalTime.h"
 #import "LabBandit.h"
 #import "P063AioKqueueLeak.h"
-#import "P097ConsoleSecLeak.h"
 #import "P010QueueLeak.h"
 #import "P090MomentariusTest.h"
 
@@ -30,7 +29,7 @@
 #import <stdlib.h>
 #import <unistd.h>
 
-#define P139_BUILD @"p139-bootintel-v1"
+#define P139_BUILD @"p139-bootintel-v2"
 
 typedef kern_return_t (*IOConnectCallMethod_t)(
     mach_port_t, uint32_t, const uint64_t *, uint32_t, const void *, size_t,
@@ -110,11 +109,12 @@ static void p139_bandit(const char *outcome) {
     total += n;
     Lf(@"  rows=%ld", n);
 
-    /* ---- 2: the console/gRegistryRoot-class leak ---- */
-    L(@"=== HARVEST 2: [p097] the console/sec-class leak ===");
-    NSString *p97 = [P097ConsoleSecLeak tap];
-    n = p139_harvest(p97 ?: @"", @"p097.consolesec", rows);
-    total += n;
+    /* ---- 2: console-sec is catalog-solo (lock/unlock, 150 s). Composed
+       KERNEL / PATHS / p139 must not block on you locking the phone. */
+    L(@"=== HARVEST 2: [p097] SKIP (catalog-solo lock/unlock) ===");
+    L(@"  IOConsoleSecurityInterest needs a lock+unlock from you.");
+    L(@"  Catalog p097 waits 150 s. Composed p139/KERNEL/PATHS skip it.");
+    n = 0;
     Lf(@"  rows=%ld", n);
 
     /* ---- 3: the p010 cursor + band ---- */

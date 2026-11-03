@@ -60,7 +60,7 @@ struct SettingsPanelView: View {
                 .frame(maxWidth: .infinity)
             }
 
-            Text("PATCH runs the live chain. It does not report success until kreadbuf is proven.")
+            Text("KERNEL and PATHS are on the home board. PATCH is Full Chain. Success only after kread32(kbase)==MH_MAGIC_64.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

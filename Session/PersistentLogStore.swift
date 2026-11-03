@@ -54,6 +54,7 @@ public final class PersistentLogStore {
         "p137": "p137_latch_log.txt",
         "p138": "p138_routed_log.txt",
         "p139": "p139_bootintel_log.txt",
+        "pathtest": "p_path_test_log.txt",
         "p140": "p140_groundtruth_log.txt",
         "p141": "p141_oracle_log.txt",
         "p142": "p142_avetemporal_log.txt",

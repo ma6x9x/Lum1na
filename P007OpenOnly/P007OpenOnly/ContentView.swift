@@ -30,26 +30,27 @@ struct ContentView: View {
 
                 VStack(spacing: 8) {
                     HStack(spacing: 8) {
-                        hotButton("P044 v73 GM192", id: "p044")
-                        hotButton("P084 PUAF", id: "p084")
-                    }
-                    HStack(spacing: 8) {
-                        hotButton("P057 AKS v9", id: "p057")
+                        hotButton("KERNEL", id: "krw")
                         hotButton("PATHS", id: "pathtest")
                     }
                     HStack(spacing: 8) {
-                        hotButton("KREAD", id: "kreadtest")
+                        hotButton("P044 v73 GM192", id: "p044")
                         hotButton("P139 intel", id: "p139")
                     }
                     HStack(spacing: 8) {
+                        hotButton("KREAD", id: "kreadtest")
+                        hotButton("P057 AKS v9", id: "p057")
+                    }
+                    HStack(spacing: 8) {
+                        hotButton("P084 PUAF", id: "p084")
                         hotButton("P085 84607 racer", id: "p085")
+                    }
+                    HStack(spacing: 8) {
                         hotButton("CHAINS", id: "p070")
-                    }
-                    HStack(spacing: 8) {
                         hotButton("P099 254", id: "p099")
-                        hotButton("CONV", id: "conv")
                     }
                     HStack(spacing: 8) {
+                        hotButton("CONV", id: "conv")
                         hotButton("CS2", id: "cs2")
                         hotButton("P073 2nd tbl", id: "p073")
                     }
@@ -185,6 +186,7 @@ struct ContentView: View {
                         moreRow("CS calib. phys_oob race only (not KRW)", "cscali")
                         moreRow("P122 SwordForge. combined 64788 KRW test (freer→reclaim→read)", "swordforge")
                         moreRow("P123 ShapeCensus. kalloc.3072 victims with KRW vision (mini/libkrw)", "shapecensus")
+                        moreRow("KERNEL. T1 sequencer: P139 (no lock wait) + hunt P044 / 17 P114 + kread32. Occupancy is not hasKread.", "krw")
                         moreRow("PATHS. Per-path scorecard + READ-ONLY tests. Hunt: P139+kread. 17: P139+P114+kread. Occupancy stays P044/KERNEL solo. P143 isolated.", "pathtest")
                         moreRow("KREAD. commitSlide kread32(kbase)==MH_MAGIC_64", "kreadtest")
                         moreRow("P070 five-door chain census + persist HOLD", "p070")
@@ -420,6 +422,8 @@ struct ContentView: View {
             "p073": "p073_ane_second_table_log.txt",
             "kreadtest": "p007_kread_test_log.txt",
             "pathtest": "p_path_test_log.txt",
+            "krw": "p007_kernel_log.txt",
+            "kernel": "p007_kernel_log.txt",
             "p057": "p057_aks_deserialize_log.txt",
             "aks": "p057_aks_deserialize_log.txt",
             "p062": "p062_neon_selftest_log.txt",
@@ -944,6 +948,8 @@ struct ContentView: View {
                 result = P076GlyphProbe.tapControlOnly()
             case "pathtest":
                 result = LabPathTest.tap()
+            case "krw", "kernel":
+                result = P007KernelChain.tap()
             case "kreadtest":
                 result = P007Board.tapKreadTest()
             case "p057", "aks":

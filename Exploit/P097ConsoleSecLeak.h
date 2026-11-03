@@ -20,7 +20,8 @@
 //
 //  READ-ONLY. Registers one IOConsoleSecurityInterest notifier on
 //  IOPlatformExpertDevice, waits for a lock/unlock trigger. No user client,
-//  no kernel writes. Standalone tap, never in the PATCH chain.
+//  no kernel writes. Catalog-solo: composed P139 / KERNEL / PATHS skip
+//  this wait so the harvest does not block 150 s.
 //
 
 #import <Foundation/Foundation.h>
@@ -29,6 +30,9 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface P097ConsoleSecLeak : NSObject
 + (NSString *)tap;
+/// Catalog tap waits 150 s for lock+unlock. Composed harvest uses a
+/// short drain (no prompt). seconds<=0 registers then returns immediately.
++ (NSString *)tapWithWaitSeconds:(NSTimeInterval)seconds;
 @end
 
 NS_ASSUME_NONNULL_END
