@@ -42,8 +42,14 @@ struct ZipWriter {
         let now = Date()
         let cal = Calendar(identifier: .gregorian)
         let comps = cal.dateComponents([.year, .month, .day, .hour, .minute, .second], from: now)
-        let dosTime = UInt16(((comps.hour ?? 0) << 11) | ((comps.minute ?? 0) << 5) | ((comps.second ?? 0) / 2))
-        let dosDate = UInt16((((comps.year ?? 2026) - 1980) << 9) | ((comps.month ?? 1) << 5) | (comps.day ?? 1))
+        let hour = comps.hour ?? 0
+        let minute = comps.minute ?? 0
+        let second = comps.second ?? 0
+        let year = comps.year ?? 2026
+        let month = comps.month ?? 1
+        let day = comps.day ?? 1
+        let dosTime = UInt16((hour << 11) | (minute << 5) | (second / 2))
+        let dosDate = UInt16(((year - 1980) << 9) | (month << 5) | day)
 
         var count: UInt16 = 0
         for entry in entries {

@@ -11,6 +11,10 @@
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Lum1na-Mind talks to a GLM-Edge / mlx / ollama server on your LAN.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_lumina-mind._tcp</string>
+	</array>
 	<key>UIFileSharingEnabled</key>
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>

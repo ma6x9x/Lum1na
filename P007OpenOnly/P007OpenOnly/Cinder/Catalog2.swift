@@ -9,8 +9,9 @@ import VideoToolbox
 
 extension Catalog {
 
-    static let imageIO2: [ExploitModule] = [
-        ExploitModule(
+    static var imageIO2: [ExploitModule] {
+        var out: [ExploitModule] = []
+        let m0 = ExploitModule(
             id: "iio.appx",
             titleZh: "APP 标记越界读 → 泄露字节写进输出 JPEG",
             cve: "CVE-2026-112627 / 112561",
@@ -69,9 +70,9 @@ extension Catalog {
                             tl("\n若 27.0 未钳制，这些 0x41 来自越界读到的堆内容；27.2 会直接丢弃越界标记。"),
                     evidence: [tl("源 JPEG ") + "\(jpeg.count)" + tl(" B"), tl("产出 ") + "\(produced.count)" + tl(" B"), tl("重编码成功=") + "\(ok)"],
                     artifacts: [src, outURL])
-            }),
-
-        ExploitModule(
+            })
+        out.append(m0)
+        let m1 = ExploitModule(
             id: "iio.tiff.direntry",
             titleZh: "TIFF 目录项分配 32 位截断",
             cve: "CVE-2026-112488",
@@ -97,9 +98,9 @@ extension Catalog {
                 detail.append(tl("27.0 期望：分配截断 → 转换循环越界写。27.2 期望：_TIFFCheckMalloc_type 拒绝。"))
                 return ModuleOutcome(headline: tl("分配路径已触发"), detail: detail.joined(separator: "\n"),
                                      artifacts: [url])
-            }),
-
-        ExploitModule(
+            })
+        out.append(m1)
+        let m2 = ExploitModule(
             id: "iio.pdf.raster",
             titleZh: "PDF 栅格化解码缓冲越界",
             cve: "CVE-2026-112633",
@@ -124,9 +125,9 @@ extension Catalog {
                 lines.append(tl("页面 4000×4000 · 需要 64 MB 缓冲"))
                 return ModuleOutcome(headline: tl("PDF 解码路径已触发"),
                                      detail: lines.joined(separator: "\n"), artifacts: [url])
-            }),
-
-        ExploitModule(
+            })
+        out.append(m2)
+        let m3 = ExploitModule(
             id: "iio.pvr",
             titleZh: "PVR 位深低于通道位和",
             cve: "CVE-2026-112625",
@@ -145,11 +146,14 @@ extension Catalog {
                 return ModuleOutcome(headline: tl("解码存活（已解码=") + "\(r.decoded)" + tl("）"),
                                      detail: tl("尺寸 ") + "\(r.width)" + tl("×") + "\(r.height)" + tl(" · 帧数 ") + "\(r.frameCount)",
                                      artifacts: [url])
-            }),
-    ]
+            })
+        out.append(m3)
+        return out
+    }
 
-    static let archive2: [ExploitModule] = [
-        ExploitModule(
+    static var archive2: [ExploitModule] {
+        var out: [ExploitModule] = []
+        let m0 = ExploitModule(
             id: "arc.cab",
             titleZh: "CAB LZX 历史未初始化即取匹配",
             cve: "CVE-2026-112522",
@@ -169,9 +173,9 @@ extension Catalog {
                                      detail: entries.isEmpty ? tl("无条目（解码器在块层就停了）") : entries.joined(separator: "\n"),
                                      evidence: ["CAB \(cab.count) B", tl("压缩类型 3 = LZX")],
                                      artifacts: [url])
-            }),
-
-        ExploitModule(
+            })
+        out.append(m0)
+        let m1 = ExploitModule(
             id: "arc.rr",
             titleZh: "RockRidge 重定位环（未修复孪生）",
             cve: "—",
@@ -202,11 +206,14 @@ extension Catalog {
                 lines.append(tl("RockRidge CL/PL 环：27.0 与 27.2 都未修（上游已修，Apple 未取）"))
                 return ModuleOutcome(headline: tl("RockRidge 路径已遍历"),
                                      detail: lines.joined(separator: "\n"))
-            }),
-    ]
+            })
+        out.append(m1)
+        return out
+    }
 
-    static let audio2: [ExploitModule] = [
-        ExploitModule(
+    static var audio2: [ExploitModule] {
+        var out: [ExploitModule] = []
+        let m0 = ExploitModule(
             id: "aud.immersive",
             titleZh: "沉浸式渲染数据反序列化容量缺失",
             cve: "CVE-2026-113907",
@@ -252,9 +259,9 @@ extension Catalog {
                 ctx.disarm("aud.immersive", "probe complete")
                 return ModuleOutcome(headline: tl("沉浸式音频入口探测完成"),
                                      detail: lines.joined(separator: "\n"))
-            }),
-
-        ExploitModule(
+            })
+        out.append(m0)
+        let m1 = ExploitModule(
             id: "aud.drc",
             titleZh: "MPEG-D DRC 下混矩阵系数校验",
             cve: "CVE-2026-113912 / 86972",
@@ -280,11 +287,14 @@ extension Catalog {
                 lines.append(Runners.audioConverter(format: 0x64726331, sampleRate: 48000, channels: 6))
                 ctx.disarm("aud.drc", "probe complete")
                 return ModuleOutcome(headline: tl("DRC 路径探测完成"), detail: lines.joined(separator: "\n"))
-            }),
-    ]
+            })
+        out.append(m1)
+        return out
+    }
 
-    static let video: [ExploitModule] = [
-        ExploitModule(
+    static var video: [ExploitModule] {
+        var out: [ExploitModule] = []
+        let m0 = ExploitModule(
             id: "vid.avc",
             titleZh: "AVC 切片数量上限缺失",
             cve: "CVE-2026-112416",
@@ -321,9 +331,9 @@ extension Catalog {
                 ctx.disarm("vid.avc", "status=\(status)")
                 return ModuleOutcome(headline: tl("AVC 参数集路径已触发"),
                                      detail: lines.joined(separator: "\n"), artifacts: [url])
-            }),
-
-        ExploitModule(
+            })
+        out.append(m0)
+        let m1 = ExploitModule(
             id: "vid.hevc",
             titleZh: "MVHEVC 层 ID 越界",
             cve: "CVE-2026-112415",
@@ -359,11 +369,14 @@ extension Catalog {
                 ctx.disarm("vid.hevc", "status=\(status)")
                 return ModuleOutcome(headline: tl("HEVC 层路径已触发"),
                                      detail: lines.joined(separator: "\n"), artifacts: [url])
-            }),
-    ]
+            })
+        out.append(m1)
+        return out
+    }
 
-    static let font2: [ExploitModule] = [
-        ExploitModule(
+    static var font2: [ExploitModule] {
+        var out: [ExploitModule] = []
+        let m0 = ExploitModule(
             id: "font.gdef",
             titleZh: "GDEFLigatureCaret 追链越界读",
             cve: "CVE-2026-112656",
@@ -398,11 +411,14 @@ extension Catalog {
                 ctx.disarm("font.gdef", "done")
                 return ModuleOutcome(headline: tl("LigCaret 查询完成"),
                                      detail: lines.joined(separator: "\n"), artifacts: [url])
-            }),
-    ]
+            })
+        out.append(m0)
+        return out
+    }
 
-    static let kext: [ExploitModule] = [
-        ExploitModule(
+    static var kext: [ExploitModule] {
+        var out: [ExploitModule] = []
+        let m0 = ExploitModule(
             id: "kext.gpt",
             titleZh: "GPT 分区名扫描 72 字节内核堆越界读",
             cve: "CVE-2026-112554",
@@ -422,9 +438,9 @@ extension Catalog {
                                      detail: (lines + [tl("镜像 ") + "\(image.count)" + tl(" B · 4 个条目 · 名字域 36 单元 / 72 字节")]).joined(separator: "\n"),
                                      evidence: [tl("27.0 扫描边界 0x48 = 72 B"), tl("27.2 收紧到 0x24 = 36 B")],
                                      artifacts: [url])
-            }),
-
-        ExploitModule(
+            })
+        out.append(m0)
+        let m1 = ExploitModule(
             id: "kext.iohid",
             titleZh: "IOKit 事件短堆固定偏移写",
             cve: "CVE-2026-65385",
@@ -443,11 +459,14 @@ extension Catalog {
                               "IOHIDEventCreateVendorDefined"])
                 ctx.disarm("kext.iohid", "probe complete")
                 return ModuleOutcome(headline: tl("IOKit 事件入口探测"), detail: r)
-            }),
-    ]
+            })
+        out.append(m1)
+        return out
+    }
 
-    static let userspace: [ExploitModule] = [
-        ExploitModule(
+    static var userspace: [ExploitModule] {
+        var out: [ExploitModule] = []
+        let m0 = ExploitModule(
             id: "sb.stash",
             titleZh: "SpringBoard 布局名 stash 校验",
             cve: "CVE-2026-112646",
@@ -473,9 +492,9 @@ extension Catalog {
                 lines.append(tl("本容器内 IconState: ") + "\(fm.fileExists(atPath: iconState) ? tl("存在") : tl("不存在"))")
                 ctx.disarm("sb.stash", "probe complete")
                 return ModuleOutcome(headline: tl("SpringBoard 路径探测"), detail: lines.joined(separator: "\n"))
-            }),
-
-        ExploitModule(
+            })
+        out.append(m0)
+        let m1 = ExploitModule(
             id: "cal.unzip",
             titleZh: "日历附件解压容器逃逸",
             cve: "CVE-2026-112619",
@@ -505,8 +524,10 @@ extension Catalog {
                 ctx.disarm("cal.unzip", "probe complete")
                 return ModuleOutcome(headline: tl("日历附件遏制路径探测"),
                                      detail: lines.joined(separator: "\n"))
-            }),
-    ]
+            })
+        out.append(m1)
+        return out
+    }
 
     static var allExtra: [ExploitModule] {
         imageIO2 + archive2 + audio2 + video + font2 + kext + userspace

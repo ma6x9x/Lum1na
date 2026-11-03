@@ -9,9 +9,9 @@ import UIKit
 
 extension Catalog {
 
-    static let tooling: [ExploitModule] = [
-
-        ExploitModule(
+    static var tooling: [ExploitModule] {
+        var out: [ExploitModule] = []
+        let m0 = ExploitModule(
             id: "tool.ipa",
             titleZh: "IPA 手术自检（改包名 / 注入 / 重签名准备）",
             cve: "—",
@@ -107,9 +107,9 @@ extension Catalog {
                 return ModuleOutcome(headline: output == nil ? tl("手术未完成") : tl("IPA 手术链路可用"),
                                      detail: lines.joined(separator: "\n"),
                                      artifacts: artifacts)
-            }),
-
-        ExploitModule(
+            })
+        out.append(m0)
+        let m1 = ExploitModule(
             id: "tool.zip",
             titleZh: "ZIP 写入器往返自检",
             cve: "—",
@@ -160,9 +160,9 @@ extension Catalog {
                     detail: tl("归档 ") + "\(archive.count)" + tl(" B · 解包 ") + "\(result.count)" + tl(" 项 · ") + "\(result.status)",
                     evidence: [tl("64 × 4 KB 随机内容"), tl("自己写 ZIP → libarchive 读回")],
                     artifacts: [url])
-            }),
-
-        ExploitModule(
+            })
+        out.append(m1)
+        let m2 = ExploitModule(
             id: "tool.macho",
             titleZh: "Mach-O 解析器自检",
             cve: "—",
@@ -204,9 +204,9 @@ extension Catalog {
                 ctx.disarm("tool.macho", "parsed=\(parsed)")
                 return ModuleOutcome(headline: tl("解析 ") + "\(parsed)" + tl(" 个二进制"),
                                      detail: lines.joined(separator: "\n"))
-            }),
-
-        ExploitModule(
+            })
+        out.append(m2)
+        let m3 = ExploitModule(
             id: "tool.hex",
             titleZh: "十六进制查找替换自检",
             cve: "—",
@@ -247,9 +247,9 @@ extension Catalog {
                 if !ok { lines.append(tl("有断言不成立")) }
                 return ModuleOutcome(headline: ok ? tl("查找替换全部断言通过") : tl("有断言失败"),
                                      detail: lines.joined(separator: "\n"))
-            }),
-
-        ExploitModule(
+            })
+        out.append(m3)
+        let m4 = ExploitModule(
             id: "tool.container",
             titleZh: "容器读写正常化（数据容器自检 + 修复）",
             cve: "—",
@@ -322,9 +322,9 @@ extension Catalog {
                                      detail: report,
                                      evidence: [tl("探针 = 建文件 → 写 → fsync → 读回 → 比对 → 删除")],
                                      artifacts: [url])
-            }),
-
-        ExploitModule(
+            })
+        out.append(m4)
+        let m5 = ExploitModule(
             id: "tool.backup",
             titleZh: "备份 / 回滚往返自检",
             cve: "—",
@@ -395,9 +395,9 @@ extension Catalog {
                         tl("路径穿越遏制: ") + "\(escaped ? tl("失败 —— ../ 逃出了目标目录") : tl("有效（../ 未逃出）"))",
                     ].joined(separator: "\n"),
                     artifacts: [archiveURL])
-            }),
-
-        ExploitModule(
+            })
+        out.append(m5)
+        let m6 = ExploitModule(
             id: "tool.paths",
             titleZh: "文件系统权限矩阵全扫",
             cve: "—",
@@ -423,6 +423,8 @@ extension Catalog {
                 ctx.disarm("tool.paths", "r=\(readable) w=\(writable)")
                 return ModuleOutcome(headline: "\(readable)" + tl(" 个可读 · ") + "\(writable)" + tl(" 个可写"),
                                      detail: report, artifacts: [url])
-            }),
-    ]
+            })
+        out.append(m6)
+        return out
+    }
 }

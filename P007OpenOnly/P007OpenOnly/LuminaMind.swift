@@ -20,10 +20,10 @@ enum LuminaMindProvider: String, CaseIterable, Identifiable {
 
     var defaultBase: String {
         switch self {
-        case .lan: return "http://192.168.1.1:8080/v1"
-        case .ollama: return "http://192.168.1.1:11434/v1"
+        case .lan: return "http://MAC_LAN_IP:8080/v1"
+        case .ollama: return "http://MAC_LAN_IP:11434/v1"
         case .spacexai: return "https://api.x.ai/v1"
-        case .custom: return "http://127.0.0.1:8080/v1"
+        case .custom: return "http://MAC_LAN_IP:8080/v1"
         }
     }
 
@@ -70,6 +70,19 @@ final class LuminaMindSettings: ObservableObject {
         provider = p
         baseURL = p.defaultBase
         model = p.defaultModel
+    }
+
+    var isPlaceholder: Bool {
+        LuminaMindSettings.isPlaceholder(baseURL)
+    }
+
+    static func isPlaceholder(_ url: String) -> Bool {
+        let u = url.lowercased()
+        if url.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return true }
+        if u.contains("mac_lan_ip") { return true }
+        if u.contains("change_me") { return true }
+        if u.contains("192.168.1.1") { return true }
+        return false
     }
 }
 
@@ -196,7 +209,7 @@ enum LuminaMindLaws {
 // MARK: - Phone-side tools
 
 enum LuminaMindTools {
-    static let schema: [[String: Any]] = [
+    static var schema: [[String: Any]] { [
         fn("run_tap", "Run a Lum1na probe/primitive by catalog id (p149, p114, ident, krw, …). Honor parked remaining-fire. One TAP per force-quit. Panic-possible probes may kill the process.",
            ["id": str("TAP id such as p149, p114, ident, krw, board")],
            ["id"]),
@@ -253,8 +266,12 @@ enum LuminaMindTools {
         fn("promote_apply", "Write learned survivor knobs into Documents (p142_layers, p147_cycles, p148_gop). Never overwrites 16463 panic-class.",
            [:], []),
         fn("oracle_export", "Dump lab_bandit.json + lab_promote.json for host oracle_bridge show / kernellab sim ident --feed.",
-           [:], [])
-    ]
+           [:], []),
+        fn("mind_ping", "Probe the phone's Mind endpoint: GET /models then a tiny chat. Use after Mac lumina_mind_serve.sh.",
+           ["base": str("optional override base URL"),
+            "model": str("optional override model")],
+           [])
+    ] }
 
     static func openaiTools() -> [[String: Any]] {
         schema.map { ["type": "function", "function": $0] }
@@ -308,6 +325,14 @@ enum LuminaMindTools {
             return LuminaLearn.applySurvivorKnobs()
         case "oracle_export":
             return LuminaLearn.exportOracle()
+        case "mind_ping":
+            let d = UserDefaults.standard
+            let base = (args["base"]?.isEmpty == false ? args["base"] : nil)
+                ?? d.string(forKey: "lumind.base") ?? ""
+            let model = (args["model"]?.isEmpty == false ? args["model"] : nil)
+                ?? d.string(forKey: "lumind.model") ?? ""
+            let key = d.string(forKey: "lumind.key") ?? ""
+            return ping(base: base, model: model, apiKey: key).summary
         default:
             return "unknown tool \(name)"
         }
@@ -515,6 +540,101 @@ enum LuminaMindTools {
         DeviceIdentProbe.runIdentity()
     }
 
+    struct PingResult {
+        let ok: Bool
+        let summary: String
+        let models: [String]
+    }
+
+    static func ping(base: String, model: String, apiKey: String) -> PingResult {
+        let trimmed = base.trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        if LuminaMindSettings.isPlaceholder(trimmed) {
+            return PingResult(
+                ok: false,
+                summary: "FAIL: no Mac URL. 192.168.1.1 is usually the Wi-Fi gateway. On the Mac run tools/lumina_mind_serve.sh, then Discover or paste http://<mac-lan-ip>:11434/v1 (ollama) or :8080/v1 (mlx).",
+                models: [])
+        }
+        guard let modelsURL = URL(string: trimmed + "/models") else {
+            return PingResult(ok: false, summary: "FAIL: bad URL \(trimmed)", models: [])
+        }
+        var req = URLRequest(url: modelsURL, timeoutInterval: 8)
+        req.setValue("Lum1na-Debugger", forHTTPHeaderField: "User-Agent")
+        if !apiKey.isEmpty {
+            req.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        }
+        let sem = DispatchSemaphore(value: 0)
+        var data: Data?
+        var status = 0
+        var errStr = ""
+        URLSession.shared.dataTask(with: req) { d, resp, err in
+            data = d
+            status = (resp as? HTTPURLResponse)?.statusCode ?? 0
+            errStr = err?.localizedDescription ?? ""
+            sem.signal()
+        }.resume()
+        _ = sem.wait(timeout: .now() + 10)
+
+        var ids: [String] = []
+        if let data,
+           let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            if let arr = obj["data"] as? [[String: Any]] {
+                ids = arr.compactMap { $0["id"] as? String }
+            }
+        }
+
+        if status == 200 {
+            let modelHint: String
+            if ids.isEmpty {
+                modelHint = "GET /models returned empty data. Phone model=\(model)"
+            } else if ids.contains(model) {
+                modelHint = "model \(model) is on the server."
+            } else {
+                modelHint = "server models: \(ids.joined(separator: ", ")). Phone model is '\(model)' — tap one of the server names."
+            }
+            return PingResult(ok: true, summary: "OK GET /models HTTP \(status)\n\(modelHint)", models: ids)
+        }
+
+        if let chatURL = URL(string: trimmed + "/chat/completions") {
+            var creq = URLRequest(url: chatURL, timeoutInterval: 16)
+            creq.httpMethod = "POST"
+            creq.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            creq.setValue("Lum1na-Debugger", forHTTPHeaderField: "User-Agent")
+            if !apiKey.isEmpty {
+                creq.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+            }
+            let body: [String: Any] = [
+                "model": model,
+                "messages": [["role": "user", "content": "ping"]],
+                "max_tokens": 8,
+                "stream": false
+            ]
+            creq.httpBody = try? JSONSerialization.data(withJSONObject: body)
+            var cdata: Data?
+            var cstatus = 0
+            var cerr = ""
+            let sem2 = DispatchSemaphore(value: 0)
+            URLSession.shared.dataTask(with: creq) { d, resp, err in
+                cdata = d
+                cstatus = (resp as? HTTPURLResponse)?.statusCode ?? 0
+                cerr = err?.localizedDescription ?? ""
+                sem2.signal()
+            }.resume()
+            _ = sem2.wait(timeout: .now() + 18)
+            if cstatus == 200 {
+                return PingResult(ok: true,
+                                  summary: "OK POST /chat/completions HTTP 200 (GET /models was HTTP \(status)). model=\(model)",
+                                  models: ids)
+            }
+            let raw = cdata.flatMap { String(data: $0, encoding: .utf8) } ?? cerr
+            let modelsBit = errStr.isEmpty ? "GET /models HTTP \(status)" : "GET /models error: \(errStr)"
+            return PingResult(ok: false,
+                              summary: "FAIL \(modelsBit); chat HTTP \(cstatus) \(raw.prefix(240))\nMac: tools/lumina_mind_serve.sh  (ollama must bind 0.0.0.0, not 127.0.0.1).",
+                              models: ids)
+        }
+        return PingResult(ok: false, summary: "FAIL GET /models HTTP \(status) \(errStr)", models: ids)
+    }
+
     private static func fn(_ name: String, _ desc: String, _ props: [String: Any], _ req: [String]) -> [String: Any] {
         [
             "name": name,
@@ -570,9 +690,7 @@ struct MindMessage: Identifiable {
 }
 
 final class LuminaMindAgent: ObservableObject {
-    @Published var messages: [MindMessage] = [
-        MindMessage(role: "system", text: Self.systemPrompt)
-    ]
+    @Published var messages: [MindMessage] = []
     @Published var busy = false
     @Published var status = "idle"
     @Published var lastError = ""
@@ -582,6 +700,7 @@ final class LuminaMindAgent: ObservableObject {
 
     init(settings: LuminaMindSettings) {
         self.settings = settings
+        self.messages = [MindMessage(role: "system", text: LuminaMindAgent.systemPrompt)]
     }
 
     static let systemPrompt = """
@@ -618,7 +737,7 @@ final class LuminaMindAgent: ObservableObject {
     }
 
     func clear() {
-        messages = [MindMessage(role: "system", text: Self.systemPrompt)]
+        messages = [MindMessage(role: "system", text: LuminaMindAgent.systemPrompt)]
         lastError = ""
         status = "idle"
     }
@@ -657,6 +776,9 @@ final class LuminaMindAgent: ObservableObject {
 
     private static func chat(history: [MindMessage], settings: LuminaMindSettings) throws -> (String?, [ToolCall]) {
         let base = settings.baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        if LuminaMindSettings.isPlaceholder(base) {
+            throw NSError(domain: "Lumind", code: 1, userInfo: [NSLocalizedDescriptionKey: "Mind is not pointed at a Mac. Open Mind settings → Discover, or paste the Phone URL printed by tools/lumina_mind_serve.sh. 192.168.1.1 is usually the router."])
+        }
         guard let url = URL(string: base + "/chat/completions") else {
             throw NSError(domain: "Lumind", code: 1, userInfo: [NSLocalizedDescriptionKey: "bad base URL"])
         }
@@ -727,6 +849,9 @@ final class LuminaMindAgent: ObservableObject {
 
     private static func chatNoTools(history: [MindMessage], settings: LuminaMindSettings) throws -> (String?, [ToolCall]) {
         let base = settings.baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        if LuminaMindSettings.isPlaceholder(base) {
+            throw NSError(domain: "Lumind", code: 1, userInfo: [NSLocalizedDescriptionKey: "Mind is not pointed at a Mac. Open Mind settings → Discover, or paste the Phone URL printed by tools/lumina_mind_serve.sh."])
+        }
         guard let url = URL(string: base + "/chat/completions") else {
             throw NSError(domain: "Lumind", code: 1, userInfo: [NSLocalizedDescriptionKey: "bad base URL"])
         }
@@ -885,10 +1010,17 @@ struct MindPane: View {
             Text("GLM-Edge / Lum1na-Mind")
                 .font(T.head)
                 .foregroundColor(.white)
-            Text("\(settings.provider.rawValue) · \(settings.model)\nPhone tools: run_tap, logs, laws, web_search, VA law, Cinder. Weights stay off-device.")
-                .font(T.tiny)
-                .foregroundColor(.white.opacity(0.45))
-                .fixedSize(horizontal: false, vertical: true)
+            if settings.isPlaceholder {
+                Text("Not connected. Open the gear: Discover, or paste the Phone URL from Mac tools/lumina_mind_serve.sh. 192.168.1.1 is usually the router, not the Mac.")
+                    .font(T.tiny)
+                    .foregroundColor(T.warn)
+                    .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text("\(settings.provider.rawValue) · \(settings.model)\n\(settings.baseURL)\nPhone tools: run_tap, logs, laws, web_search, VA law, Cinder, mind_ping. Weights stay off-device.")
+                    .font(T.tiny)
+                    .foregroundColor(.white.opacity(0.45))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
@@ -917,6 +1049,7 @@ struct MindPane: View {
         VStack(spacing: 8) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
+                    chip("Ping Mac") { agent.send("mind_ping the configured endpoint. Report OK/FAIL and the model list. Do not run a TAP.") }
                     chip("Ident + board") { agent.send("Run ident and read_board. Summarize SKU and kreadSignal. Do not fire panic-possible probes.") }
                     chip("Analyze last TAP") { agent.send("Read p011_tap_log.txt, then analyze the newest matching Documents log. Cite CORE LAWS. Next TAP = one id.") }
                     chip("17 KRW path") { agent.send("chain_status then search_laws for T8150 KRW. What is the next single TAP on this SKU? Do not fire it yet.") }
@@ -962,13 +1095,108 @@ struct MindPane: View {
     }
 }
 
+final class MindBonjour: NSObject, ObservableObject, NetServiceBrowserDelegate, NetServiceDelegate {
+    struct Host: Identifiable, Hashable {
+        let id: String
+        let name: String
+        let url: String
+        let detail: String
+    }
+
+    @Published var hosts: [Host] = []
+    @Published var status = "idle"
+    private let browser = NetServiceBrowser()
+    private var resolving: [NetService] = []
+    private var started = false
+
+    func start() {
+        guard !started else { return }
+        started = true
+        browser.delegate = self
+        status = "browsing _lumina-mind._tcp"
+        browser.searchForServices(ofType: "_lumina-mind._tcp.", inDomain: "local.")
+    }
+
+    func stop() {
+        browser.stop()
+        started = false
+        status = "idle"
+    }
+
+    func netServiceBrowser(_ browser: NetServiceBrowser, didFind service: NetService, moreComing: Bool) {
+        service.delegate = self
+        service.resolve(withTimeout: 5)
+        resolving.append(service)
+        DispatchQueue.main.async { self.status = "resolving \(service.name)" }
+    }
+
+    func netServiceBrowser(_ browser: NetServiceBrowser, didRemove service: NetService, moreComing: Bool) {
+        let name = service.name
+        DispatchQueue.main.async { self.hosts.removeAll { $0.name == name } }
+    }
+
+    func netServiceBrowser(_ browser: NetServiceBrowser, didNotSearch errorDict: [String: NSNumber]) {
+        DispatchQueue.main.async { self.status = "browse failed \(errorDict)" }
+    }
+
+    func netServiceDidResolveAddress(_ sender: NetService) {
+        let ip = ipv4(sender) ?? sender.hostName ?? ""
+        guard !ip.isEmpty else { return }
+        let port = sender.port
+        let url = "http://\(ip):\(port)/v1"
+        let host = Host(id: url, name: sender.name, url: url, detail: "\(ip):\(port)")
+        DispatchQueue.main.async {
+            if !self.hosts.contains(where: { $0.url == url }) {
+                self.hosts.append(host)
+            }
+            self.status = "found \(self.hosts.count)"
+        }
+    }
+
+    func netService(_ sender: NetService, didNotResolve errorDict: [String: NSNumber]) {
+        DispatchQueue.main.async { self.status = "resolve failed \(sender.name)" }
+    }
+
+    private func ipv4(_ service: NetService) -> String? {
+        guard let addrs = service.addresses else { return nil }
+        for data in addrs {
+            var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+            let ok: Bool = data.withUnsafeBytes { raw in
+                guard let sa = raw.baseAddress?.assumingMemoryBound(to: sockaddr.self) else { return false }
+                return getnameinfo(sa, socklen_t(data.count), &hostname, socklen_t(NI_MAXHOST), nil, 0, NI_NUMERICHOST) == 0
+            }
+            guard ok else { continue }
+            let s = String(cString: hostname)
+            if s.contains(":") { continue }
+            if s.hasPrefix("127.") { continue }
+            return s
+        }
+        return nil
+    }
+}
+
 struct MindSettingsSheet: View {
     @ObservedObject var settings: LuminaMindSettings
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var bonjour = MindBonjour()
+    @State private var pingBusy = false
+    @State private var pingText = ""
+    @State private var pingOK = false
+    @State private var serverModels: [String] = []
 
     var body: some View {
         NavigationStack {
             Form {
+                Section("Mac / phone setup") {
+                    Text("1. Same Wi-Fi as this phone.\n2. Mac: tools/lumina_mind_serve.sh (binds 0.0.0.0, prints Phone URL, advertises Bonjour).\n3. Allow Local Network when iOS asks.\n4. Discover below, or paste http://<mac-lan-ip>:11434/v1 (ollama) or :8080/v1 (mlx).\n5. Test Connection, then pick a model name the server actually has.")
+                        .font(T.tiny)
+                        .foregroundColor(.secondary)
+                    if settings.isPlaceholder {
+                        Text("Current URL is a placeholder / gateway. 192.168.1.1 is usually the router.")
+                            .font(T.tiny)
+                            .foregroundColor(T.warn)
+                    }
+                }
                 Section("Endpoint") {
                     Picker("Provider", selection: $settings.provider) {
                         ForEach(LuminaMindProvider.allCases) { p in
@@ -988,12 +1216,72 @@ struct MindSettingsSheet: View {
                         .font(T.monoSm)
                     SecureField("API key (SpaceXAI / custom)", text: $settings.apiKey)
                         .font(T.monoSm)
+                    Button {
+                        runPing()
+                    } label: {
+                        HStack {
+                            Text(pingBusy ? "Probing…" : "Test Connection")
+                            if pingBusy { Spacer(); ProgressView() }
+                        }
+                    }
+                    .disabled(pingBusy)
+                    if !pingText.isEmpty {
+                        Text(pingText)
+                            .font(T.monoSm)
+                            .foregroundColor(pingOK ? .green : T.warn)
+                            .textSelection(.enabled)
+                    }
+                    if !serverModels.isEmpty {
+                        ForEach(serverModels, id: \.self) { name in
+                            Button {
+                                settings.model = name
+                            } label: {
+                                HStack {
+                                    Text(name).font(T.monoSm)
+                                    Spacer()
+                                    if settings.model == name {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                Section("Discover (_lumina-mind._tcp)") {
+                    Text(bonjour.status)
+                        .font(T.tiny)
+                        .foregroundColor(.secondary)
+                    if bonjour.hosts.isEmpty {
+                        Text("No Bonjour hosts yet. The Mac script must be running (dns-sd -R Lum1na-Mind).")
+                            .font(T.tiny)
+                            .foregroundColor(.secondary)
+                    }
+                    ForEach(bonjour.hosts) { host in
+                        Button {
+                            settings.baseURL = host.url
+                            if host.url.contains(":11434") {
+                                settings.provider = .ollama
+                            } else if host.url.contains(":8080") || host.url.contains(":8081") {
+                                settings.provider = .lan
+                            }
+                            runPing()
+                        } label: {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(host.name).font(T.body)
+                                Text(host.url).font(T.monoSm).foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                    Button("Browse again") {
+                        bonjour.stop()
+                        bonjour.start()
+                    }
                 }
                 Section("Behavior") {
                     Toggle("Auto-analyze after TAP", isOn: $settings.autoAnalyze)
                 }
                 Section("Notes") {
-                    Text("LAN: serve GLM-Edge / glm-4-9b-chat with mlx_lm.server or ollama on your Mac, then set the phone's LUMIND base to http://<mac-lan-ip>:8080/v1.\nSpaceXAI: https://api.x.ai/v1 model grok-4.7, key from docs.x.ai.\nWeights are not in the IPA.")
+                    Text("LAN ollama: OLLAMA_HOST=0.0.0.0:11434. mlx_lm.server --host 0.0.0.0. SpaceXAI: https://api.x.ai/v1 model grok-4.7, key from docs.x.ai. Weights are not in the IPA.")
                         .font(T.tiny)
                         .foregroundColor(.secondary)
                 }
@@ -1007,7 +1295,26 @@ struct MindSettingsSheet: View {
                     Button("Done") { dismiss() }
                 }
             }
+            .onAppear { bonjour.start() }
+            .onDisappear { bonjour.stop() }
         }
         .preferredColorScheme(.dark)
+    }
+
+    private func runPing() {
+        pingBusy = true
+        pingText = "probing \(settings.baseURL)…"
+        let base = settings.baseURL
+        let model = settings.model
+        let key = settings.apiKey
+        DispatchQueue.global(qos: .userInitiated).async {
+            let r = LuminaMindTools.ping(base: base, model: model, apiKey: key)
+            DispatchQueue.main.async {
+                pingBusy = false
+                pingOK = r.ok
+                pingText = r.summary
+                serverModels = r.models
+            }
+        }
     }
 }
