@@ -35,6 +35,14 @@ struct ModuleOutcome {
     /// Set only when the module threw. The headline is display text and may be localized,
     /// so it must never be compared against a literal to detect failure.
     var failed: Bool = false
+
+    func copyBlock(moduleId: String) -> String {
+        var lines = ["id=\(moduleId)", headline]
+        if !detail.isEmpty { lines.append(detail) }
+        lines.append(contentsOf: evidence)
+        if elapsedMs > 0 { lines.append("elapsedMs=\(elapsedMs)") }
+        return lines.joined(separator: "\n")
+    }
 }
 
 final class RunContext {

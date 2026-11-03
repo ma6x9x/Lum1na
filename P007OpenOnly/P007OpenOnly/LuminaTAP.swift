@@ -46,6 +46,16 @@ enum LuminaTAP {
         }
     }
 
+    /// P099/P073 remaining-fire 254-in. Probe still fires. Not the hunt-12 KRW chain.
+    static func hunt12MafBanner(_ id: String) -> String {
+        return """
+        *** \(id) is STANDALONE 254-in occupancy. MAF = first OOB record into a FREE kalloc.3072.
+        Hunt 12 23F77 KRW chain is KERNEL: P139 disclose (P010 QueueCreate copyout + P063 aio kptr) then P044 N=192 LIVE 1-record OOB, then SocketKRW.Arm(rw_inpcb), then kread32(kbase)==MH_MAGIC_64.
+        P099/P073 254 is not that chain. Probe still fires. One TAP per force-quit.
+
+        """
+    }
+
     /// Runs the probe on the calling queue. LabEngine already hops off main.
     /// Every id is a learn.<id> LabBandit domain (promotion lattice).
     static func execute(_ id: String) -> String {
@@ -222,7 +232,7 @@ enum LuminaTAP {
         case "p044":
             result = P044AksKaslrReach.tap()
         case "conv", "p073":
-            result = P073AneSecondTable.tap()
+            result = hunt12MafBanner(id) + P073AneSecondTable.tap()
         case "p074":
             result = P074AneConsume.tap()
         case "p075":
@@ -567,7 +577,7 @@ enum LuminaTAP {
         case "p149", "t8150krw":
             result = P149T8150Krw.tap()
         case "p099", "anegroom":
-            result = P099AnePrewireGroom.tap()
+            result = hunt12MafBanner(id) + P099AnePrewireGroom.tap()
             if result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 result = ContentView.readFreshLog(
                     named: "p099_aneprewire_log.txt",

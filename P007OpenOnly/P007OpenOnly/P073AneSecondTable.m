@@ -659,9 +659,11 @@ static NSURL *p073_model_url(NSString *name) {
 
     p073_log(@"=== p073 session %@ BUILD %@ ===", LabLocalMilitaryNow(), P073_BUILD);
     p073_log(@"43748 conversion: second ANE MemoryMap table as the 3072 neighbor (v46 parity).");
+    p073_log(@"STANDALONE 254-in. MAF if the crossing 3072 is FREE. Not the hunt-12 KRW chain.");
+    p073_log(@"KERNEL chain is P010 disclose then P044 N=192 LIVE neighbor. conversion != hasKread.");
     p073_log(@"Bar: conversion=YES is desc_type_forged OR (body_forged AND kptr). Occupancy != conversion.");
     p073_log(@"No fat type-3 (v45 PACGA). No fat punch (v42 16384 MAF). One TAP per force-quit.");
-    p073_log(@"%@", [P007Board shared].kreadSignal);
+    p073_log(@"board live this process: %@", [P007Board shared].kreadSignal);
 
     NSString *stop = [LabDeviceProfile stopUnlessA14_23F77:@"p073"];
     if (stop) {

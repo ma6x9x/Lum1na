@@ -9,6 +9,7 @@ struct ContentView: View {
     @State private var showMore = false
     @State private var showHour = false
     @State private var showSettings = false
+    @State private var showLogs = false
     @State private var kreadSignal = P007Board.shared().kreadSignal
 
     var body: some View {
@@ -47,12 +48,11 @@ struct ContentView: View {
                     }
                     HStack(spacing: 8) {
                         hotButton("CHAINS", id: "p070")
-                        hotButton("P099 254", id: "p099")
+                        hotButton("P010 disclose", id: "p010qleak")
                     }
                     HStack(spacing: 8) {
-                        hotButton("CONV", id: "conv")
+                        hotButton("P063 leak", id: "p063")
                         hotButton("CS2", id: "cs2")
-                        hotButton("P073 2nd tbl", id: "p073")
                     }
                     HStack(spacing: 8) {
                         Button("Ident") { run("ident") }
@@ -65,6 +65,14 @@ struct ContentView: View {
                         }
                         .buttonStyle(.bordered)
                         .disabled(running)
+                        Button {
+                            showLogs = true
+                        } label: {
+                            Image(systemName: "folder")
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(running)
+                        .accessibilityLabel("Logs")
                         Button("Hour") { showHour = true }
                             .buttonStyle(.bordered)
                             .disabled(running)
@@ -124,6 +132,13 @@ struct ContentView: View {
                 showHour = false
             }
         }
+        .sheet(isPresented: $showLogs) {
+            LogListSheet { body in
+                text = body.count > 48_000 ? String(body.suffix(48_000)) : body
+                kreadSignal = P007Board.shared().kreadSignal
+                showLogs = false
+            }
+        }
         .sheet(isPresented: $showMore) {
             NavigationStack {
                 List {
@@ -179,15 +194,15 @@ struct ContentView: View {
                         moreRow("P115. M2Scaler framework-path PEEK (the tpeek law): bounded CSC battery (IOSurface control + one VT 720p encode), diff the task's SEND ports after each op, fingerprint new ports for the M2Scaler sel-8 no-queue signature (2bf). A framework-opened UC owns a REAL queue — no QueueCreate grammar needed. READ-ONLY", "p115")
                         moreRow("P116. sandbox_extension NOFOLLOW TOCTOU (CVE-class file-read escape; deterministic, live on 23F77..24B119; port of speedyfriend433/sandbox_extension-TOCTOU-bug): control in-container read + 7 bounded out-of-container targets (/etc + prefs); tokens never logged; READ-ONLY", "p116")
                         moreRow("P110. IOSurface swap-claim probe (270 design; sibling-client reclaim after owner death, prefill(6)+2 same-CPU pop, 64 rounds; three-outcome honest verdicts; T8101 23F77 + T8150 24A435; STANDALONE — Family-B is a target outcome)", "p110")
-                        moreRow("P088. 43748 forged OUTPUT-record write hop v8 (prewire OOB confirmed at the pc: entry 192 = +0xC00; err=-1 = downstream reject, content check is the signal; ourBand census per D2 hit; bandit 4-arm volley)", "p088")
-                        moreRow("P099. 43748 ANE prewire GROOMED (espresso/CoreML primary, 254-in addchain; STANDALONE ONLY — real OOB, never in chain)", "p099")
+                        moreRow("P088. 43748 forged OUTPUT-record write hop. Never flips hasKread. STANDALONE 254-in A is MAF-class; KERNEL smash is P044 N=192.", "p088")
+                        moreRow("P099. 43748 ANE prewire GROOMED 254-in. STANDALONE MAF occupancy into FREE kalloc.3072. Not the hunt-12 KRW chain. Use KERNEL / P044 N=192.", "p099")
                         moreRow("CS2. VERBATIM Dopamine core (A13 22G100 KRW — one tap)", "cs2")
                         moreRow("LSWORD ARM. calib-licensed cs2 on patched trains (toggle arm file)", "lswarm")
                         moreRow("CS KRW. mapped theory (runKRW, 23F77 offsets)", "cskrw")
                         moreRow("CS calib. phys_oob race only (not KRW)", "cscali")
                         moreRow("P122 SwordForge. combined 64788 KRW test (freer→reclaim→read)", "swordforge")
                         moreRow("P123 ShapeCensus. kalloc.3072 victims with KRW vision (mini/libkrw)", "shapecensus")
-                        moreRow("KERNEL. T1 sequencer (t8150-krw-3): P139 (no lock wait) + hunt P044 / 17 P114 then P149 conversion (encode N=8 then Set 16463, kernel pipes, PANIC-POSSIBLE) + kread32. Occupancy / PIPE-HIT is not hasKread.", "krw")
+                        moreRow("KERNEL. hunt-krw-4: P139 disclose (P010 QueueCreate copyout + P063 aio kptr) then hunt P044 N=192 LIVE / 17 P114+P149 + kread32. SKIP P099/P073 254. Occupancy / PIPE-HIT is not hasKread.", "krw")
                         moreRow("PATHS. Per-path scorecard + READ-ONLY tests. Hunt: P139+kread. 17: P139+P114+kread (P149 stays KERNEL/catalog). Occupancy stays P044/KERNEL solo. P110/P143 isolated.", "pathtest")
                         moreRow("KREAD. commitSlide kread32(kbase)==MH_MAGIC_64", "kreadtest")
                         moreRow("P070 five-door chain census + persist HOLD", "p070")
@@ -222,8 +237,8 @@ struct ContentView: View {
                         moreRow("P077. 43748 y-craft (crafted y = output record sid; write door)", "p077")
                         moreRow("P075. 43748 KRW v2 SAFE (pre-load sid_C groom; read+write doors)", "p075")
                         moreRow("P074. 43748 consume (count-gate pass, no overflow, not hasKread)", "p074")
-                        moreRow("CONV. P073 43748 second-table conversion bar (not hasKread)", "conv")
-                        moreRow("P073. 43748 second-table conversion (v46 parity + detectors)", "p073")
+                        moreRow("CONV. P073 43748 second-table. STANDALONE 254-in MAF occupancy. conversion != hasKread. Hunt smash is P044 N=192.", "conv")
+                        moreRow("P073. 43748 second-table 254-in. STANDALONE MAF if neighbor FREE. Not KERNEL.", "p073")
                         moreRow("P086. 43684 dmaCommand fingerprint sweep (3 UCs, no fires)", "p086")
                         moreRow("P101. 43684 dmaCommand FIRE (bounded reuse IOMD+0x68; one setup + one reuse; isolate from T7)", "p101")
                         moreRow("P102. Titan write TEST (MapMemory IORVBAR look-for + CacheMode canary; SKIPs MMIO without window; no titan.m ROP)", "p102")
@@ -549,7 +564,7 @@ struct ContentView: View {
 
         func loadLog(named name: String) -> String? {
             let url = docs.appendingPathComponent(name)
-            guard let raw = try? String(contentsOf: url, encoding: .utf8), !raw.isEmpty else { return nil }
+            guard let raw = FileLoader.tail(at: url.path, maxBytes: 256_000), !raw.isEmpty else { return nil }
             return Self.lastLogSession(raw)
         }
 
@@ -600,7 +615,7 @@ struct ContentView: View {
             }
         }
         guard let win = newest,
-              let raw = try? String(contentsOf: win.url, encoding: .utf8),
+              let raw = FileLoader.tail(at: win.url.path, maxBytes: 256_000),
               !raw.isEmpty else {
             if let tid = lastTapId {
                 text = "=== RECOVERED ===\n"
@@ -645,7 +660,7 @@ struct ContentView: View {
     static func readFreshLog(named name: String, missing: String) -> String {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first!
         let path = docs.appendingPathComponent(name)
-        guard let raw = try? String(contentsOf: path, encoding: .utf8), !raw.isEmpty else {
+        guard let raw = FileLoader.tail(at: path.path, maxBytes: 256_000), !raw.isEmpty else {
             return missing
         }
         // Probes truncate per run ("w"); still strip older appended sessions if any.
@@ -810,18 +825,27 @@ struct HourLogGallery: View {
                         .padding()
                 } else {
                     List(items) { item in
-                        Button {
-                            let body = (try? String(contentsOf: item.url, encoding: .utf8)) ?? "(unreadable)"
-                            onPick(body)
-                        } label: {
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(item.name)
-                                    .font(.system(.subheadline, design: .monospaced))
-                                    .foregroundStyle(.primary)
-                                Text(item.modified.formatted(date: .omitted, time: .standard))
-                                    .font(.system(.caption, design: .rounded))
-                                    .foregroundStyle(.secondary)
+                        HStack {
+                            Button {
+                                let body = FileLoader.tail(at: item.url.path, maxBytes: 256_000) ?? "(unreadable)"
+                                onPick(body)
+                            } label: {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(item.name)
+                                        .font(.system(.subheadline, design: .monospaced))
+                                        .foregroundStyle(.primary)
+                                    Text(item.modified.formatted(date: .omitted, time: .standard))
+                                        .font(.system(.caption, design: .rounded))
+                                        .foregroundStyle(.secondary)
+                                }
                             }
+                            Spacer()
+                            Button {
+                                UIPasteboard.general.string = FileLoader.tail(at: item.url.path, maxBytes: 256_000) ?? ""
+                            } label: {
+                                Image(systemName: "doc.on.doc")
+                            }
+                            .buttonStyle(.borderless)
                         }
                     }
                 }
@@ -877,5 +901,80 @@ struct HourLogGallery: View {
             for url in snaps { consider(url) }
         }
         return items.sorted { $0.modified > $1.modified }
+    }
+}
+
+/// Documents TAP logs. Tail-only so a huge P044/P073 file cannot jetsam the UI.
+struct LogListSheet: View {
+    var onPick: (String) -> Void
+    @Environment(\.dismiss) private var dismiss
+    @State private var items: [(name: String, path: String, size: Int64, date: Date)] = []
+    @State private var copied: String?
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if items.isEmpty {
+                    Text("No *_log.txt in Documents yet. Run KERNEL or a probe first.")
+                        .font(.system(.body, design: .rounded))
+                        .foregroundStyle(.secondary)
+                }
+                ForEach(items, id: \.path) { item in
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(item.name)
+                            .font(.system(.subheadline, design: .monospaced))
+                        Text(byteCount(item.size) + " · " + item.date.formatted(date: .omitted, time: .standard))
+                            .font(.system(.caption, design: .rounded))
+                            .foregroundStyle(.secondary)
+                        HStack {
+                            Button("Open tail") {
+                                let body = FileLoader.tail(at: item.path, maxBytes: 256_000) ?? "(unreadable)"
+                                onPick("=== LOG \(item.name) ===\n" + body)
+                            }
+                            .buttonStyle(.bordered)
+                            Button(copied == item.path ? "Copied" : "Copy tail") {
+                                UIPasteboard.general.string = FileLoader.tail(at: item.path, maxBytes: 256_000) ?? ""
+                                copied = item.path
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+            .navigationTitle("TAP logs")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+            .onAppear { items = Self.load() }
+        }
+    }
+
+    private func byteCount(_ n: Int64) -> String {
+        let f = ByteCountFormatter()
+        f.countStyle = .file
+        return f.string(fromByteCount: n)
+    }
+
+    private static func load() -> [(name: String, path: String, size: Int64, date: Date)] {
+        let fm = FileManager.default
+        guard let docs = fm.urls(for: .documentDirectory, in: .userDomainMask).first else { return [] }
+        guard let urls = try? fm.contentsOfDirectory(
+            at: docs,
+            includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey],
+            options: [.skipsHiddenFiles]
+        ) else { return [] }
+        var out: [(name: String, path: String, size: Int64, date: Date)] = []
+        for url in urls {
+            let name = url.lastPathComponent
+            let keep = name.hasSuffix("_log.txt") || name == "p007_board.json" || name == "p011_tap_log.txt"
+            guard keep else { continue }
+            let rv = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
+            out.append((name, url.path, Int64(rv?.fileSize ?? 0), rv?.contentModificationDate ?? .distantPast))
+        }
+        return out.sorted { $0.date > $1.date }
     }
 }

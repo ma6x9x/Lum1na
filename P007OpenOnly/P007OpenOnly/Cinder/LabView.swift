@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 extension Reach {
     var tint: Color {
@@ -168,20 +169,30 @@ struct ModuleDetailView: View {
                                     SectionLabel(text: t("module.result"))
                                     Spacer()
                                     Text("\(outcome.elapsedMs) ms").font(T.monoSm).foregroundColor(.white.opacity(0.3))
+                                    Button {
+                                        UIPasteboard.general.string = outcome.copyBlock(moduleId: module.id)
+                                    } label: {
+                                        Label("Copy", systemImage: "doc.on.doc")
+                                            .font(.system(size: 11, weight: .semibold))
+                                    }
+                                    .tint(T.ember)
                                 }
                                 Text(outcome.headline)
                                     .font(.system(size: 15, weight: .semibold, design: .rounded))
                                     .foregroundColor(outcome.failed ? T.bad : T.good)
+                                    .textSelection(.enabled)
                                 if !outcome.detail.isEmpty {
                                     Text(outcome.detail)
                                         .font(T.monoSm)
                                         .foregroundColor(.white.opacity(0.6))
                                         .fixedSize(horizontal: false, vertical: true)
+                                        .textSelection(.enabled)
                                 }
                                 ForEach(Array(outcome.evidence.enumerated()), id: \.offset) { _, line in
                                     Text("· \(line)")
                                         .font(T.monoSm)
                                         .foregroundColor(.white.opacity(0.42))
+                                        .textSelection(.enabled)
                                 }
                             }
                         }

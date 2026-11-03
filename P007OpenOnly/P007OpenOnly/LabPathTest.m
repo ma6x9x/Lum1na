@@ -18,7 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define PATH_BUILD @"t8150-krw-3"
+#define PATH_BUILD @"hunt-krw-4"
 
 @implementation LabPathTest
 
@@ -208,7 +208,8 @@ static int path_int_after(NSString *s, const char *key) {
         L([NSString stringWithFormat:@"PATH_TEST id=p114 class=disclosure sku=%@ result=%@ kernel_range_q=%d",
            skuName, r114, kq]);
     } else if (sku == LabSkuA14_23F77) {
-        L(@"=== RUN HUNT READ-ONLY: P139 (includes P010) ===");
+        L(@"=== RUN HUNT READ-ONLY: P139 (includes P010 disclose + P063 aio kptr) ===");
+        L(@"[*] P010 QueueCreate copyout is the disclose. Smash is KERNEL P044 N=192, not P099/P073 254.");
         L(@"[*] Occupancy test is KERNEL / catalog p044. One TAP after reboot, Game Mode ON.");
         NSString *p139 = nil;
         @try { p139 = [P139BootIntel tap]; }

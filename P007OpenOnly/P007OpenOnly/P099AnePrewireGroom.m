@@ -801,6 +801,8 @@ static void p099_bandit_close(NSString *outcome) {
         g_p099_fd = open(path.fileSystemRepresentation, O_CREAT | O_WRONLY | O_APPEND, 0644);
 
         L(@"=== p099 session %@ BUILD %@ ===", LabLocalMilitaryNow() ?: @"?", P099_BUILD);
+        L(@"STANDALONE 254-in occupancy. MAF if the crossing 3072 is FREE. Not KERNEL.");
+        L(@"Hunt 12 KRW chain is P010 disclose then P044 N=192 LIVE 1-record OOB.");
         L(@"CVE-2026-43748 ANE direct-path prewire OOB (0x80 table vs 0xff limit),");
         L(@"GROOMED: OOB lands in freed INLINE mach-msg victims, not gzalloc");
         L(@"metadata. The ungroomed shape is panic #1-#3 (wild write, x25 =");

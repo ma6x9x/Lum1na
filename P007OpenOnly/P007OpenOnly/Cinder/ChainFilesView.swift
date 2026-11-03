@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 // MARK: - Chain
 
@@ -158,6 +159,8 @@ struct FilePreviewView: View {
     @State private var editing = false
     @State private var draft = ""
     @State private var status = ""
+    @State private var copied = false
+    @State private var packageEntries: [PackageEntry] = []
 
     var body: some View {
         NavigationStack {
@@ -219,12 +222,11 @@ struct FilePreviewView: View {
                             }
                         default:
                             Card {
-                                let entries = PackageTool.list(item.path)
                                 VStack(alignment: .leading, spacing: 3) {
-                                    if entries.isEmpty {
+                                    if packageEntries.isEmpty {
                                         Text("—").font(T.monoSm).foregroundColor(.white.opacity(0.4))
                                     } else {
-                                        ForEach(entries.prefix(300)) { e in
+                                        ForEach(packageEntries.prefix(300)) { e in
                                             Text("\(e.name)  \(e.size) B")
                                                 .font(T.monoSm)
                                                 .foregroundColor(.white.opacity(0.6))
@@ -251,7 +253,15 @@ struct FilePreviewView: View {
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(t("module.close")) { dismiss() }.tint(T.ember)
+                    HStack {
+                        Button {
+                            UIPasteboard.general.string = text ?? FileLoader.tail(at: item.path) ?? ""
+                            copied = true
+                        } label: {
+                            Image(systemName: copied ? "checkmark" : "doc.on.doc")
+                        }.tint(T.ember)
+                        Button(t("module.close")) { dismiss() }.tint(T.ember)
+                    }
                 }
             }
             .onAppear(perform: load)
@@ -260,11 +270,26 @@ struct FilePreviewView: View {
 
     private func load() {
         info = browser.fileInfo(item)
-        switch FileLoader.kind(of: item.path) {
-        case .plist: text = FileLoader.plist(at: item.path) ?? FileLoader.text(at: item.path)
-        default: text = FileLoader.text(at: item.path)
+        let path = item.path
+        let size = item.size
+        DispatchQueue.global(qos: .userInitiated).async {
+            let kind = FileLoader.kind(of: path)
+            let preview: String?
+            switch kind {
+            case .plist: preview = FileLoader.plist(at: path) ?? FileLoader.previewText(at: path)
+            default: preview = FileLoader.previewText(at: path)
+            }
+            let dump = FileLoader.hexDump(at: path, limit: 4096)
+            var pkg: [PackageEntry] = []
+            if PackageTool.isZip(path), size < 8_000_000 {
+                pkg = PackageTool.list(path)
+            }
+            DispatchQueue.main.async {
+                text = preview
+                hex = dump
+                packageEntries = pkg
+            }
         }
-        hex = FileLoader.hexDump(at: item.path)
     }
 
     private func save() {

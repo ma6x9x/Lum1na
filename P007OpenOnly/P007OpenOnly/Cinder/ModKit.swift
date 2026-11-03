@@ -186,7 +186,7 @@ enum FileLoader {
         return .binary
     }
 
-    static func text(at path: String, limit: Int = 400_000) -> String? {
+    static func text(at path: String, limit: Int = 65_536) -> String? {
         guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
         defer { try? handle.close() }
         let data = handle.readData(ofLength: limit)
@@ -195,8 +195,36 @@ enum FileLoader {
         return nil
     }
 
+    /// Last `maxBytes` of a TAP log. Huge P044/P073 files jetsam if loaded whole into SwiftUI Text.
+    static func tail(at path: String, maxBytes: Int = 65_536) -> String? {
+        guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
+        defer { try? handle.close() }
+        let size: UInt64
+        do { size = try handle.seekToEnd() } catch { return nil }
+        guard size > 0 else { return "" }
+        let start = size > UInt64(maxBytes) ? size - UInt64(maxBytes) : 0
+        do { try handle.seek(toOffset: start) } catch { return nil }
+        let data = handle.readDataToEndOfFile()
+        var s = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) ?? ""
+        if start > 0 {
+            if let nl = s.firstIndex(of: "\n") { s = String(s[s.index(after: nl)...]) }
+            s = "[tail \(maxBytes) B of \(size) B — Copy tail / Open tail, not the whole file]\n" + s
+        }
+        return s
+    }
+
+    static func previewText(at path: String, maxBytes: Int = 65_536) -> String? {
+        let ext = (path as NSString).pathExtension.lowercased()
+        if ["txt", "log", "json"].contains(ext) || path.hasSuffix("_log.txt") {
+            return tail(at: path, maxBytes: maxBytes)
+        }
+        return text(at: path, limit: maxBytes)
+    }
+
     static func plist(at path: String) -> String? {
-        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else { return nil }
+        guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
+        defer { try? handle.close() }
+        let data = handle.readData(ofLength: 1_000_000)
         if let obj = try? PropertyListSerialization.propertyList(from: data, format: nil) {
             if let xml = try? PropertyListSerialization.data(fromPropertyList: obj, format: .xml, options: 0),
                let s = String(data: xml, encoding: .utf8) {
@@ -207,9 +235,18 @@ enum FileLoader {
         return nil
     }
 
-    static func hexDump(at path: String, limit: Int = 8192) -> String? {
-        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else { return nil }
-        return hexdump(data, limit: limit)
+    static func hexDump(at path: String, limit: Int = 4096) -> String? {
+        guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
+        defer { try? handle.close() }
+        let data = handle.readData(ofLength: limit)
+        var total: UInt64 = UInt64(data.count)
+        if let attrs = try? FileManager.default.attributesOfItem(atPath: path),
+           let n = attrs[.size] as? NSNumber {
+            total = n.uint64Value
+        }
+        var s = hexdump(data, limit: limit)
+        if total > UInt64(limit) { s += "... (\(total) bytes total)\n" }
+        return s
     }
 
     @discardableResult

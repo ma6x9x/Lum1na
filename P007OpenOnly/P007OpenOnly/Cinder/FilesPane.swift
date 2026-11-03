@@ -1,5 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import UIKit
 
 // MARK: - File manager
 //
@@ -361,6 +362,12 @@ struct FilesPane: View {
                 clipboard.stage([item.path], mode: .copy)
                 status = "✓ \(t("files.copied")) \(item.name)"
             } label: { Label(t("files.copy"), systemImage: "doc.on.doc") }
+            if !item.isDirectory {
+                Button {
+                    UIPasteboard.general.string = FileLoader.tail(at: item.path, maxBytes: 256_000) ?? ""
+                    status = "✓ copied tail \(item.name)"
+                } label: { Label("Copy contents", systemImage: "doc.on.clipboard") }
+            }
             Button {
                 clipboard.stage([item.path], mode: .move)
                 status = "→ \(t("files.move")) \(item.name)"

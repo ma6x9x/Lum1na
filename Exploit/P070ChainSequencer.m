@@ -107,8 +107,9 @@ static void p070_svc(void (^L)(NSString *), const char *name) {
         L(@"A12X: 1 Ident  2 P070 census  3 P065 or P063  4 force-quit  5 KREAD after kread32");
         L(@"254 EXPECT-BAD on probe (public SKIP). hop-1 SKIP. CS2 is a READ scan until magic.");
     } else if ([LabDeviceProfile sku] == LabSkuA14_23F77) {
-        L(@"A14: 1 Ident  2 P070 census  3 P099 occupancy or P044 1-rec OOB  4 force-quit");
-        L(@"5 conversion (live ANE neighbor / Shape L)  6 SocketKRW.Arm  7 KREAD magic");
+        L(@"A14: 1 Ident  2 P070 census  3 KERNEL (P139 disclose P010/P063 then P044 N=192)");
+        L(@"4 force-quit  5 conversion on LIVE neighbor  6 SocketKRW.Arm(rw_inpcb)  7 KREAD magic");
+        L(@"P099/P073 254 are STANDALONE MAF occupancy. Do not fire them as the KRW chain.");
     } else if ([LabDeviceProfile sku] == LabSkuT8150_24A435 ||
                [LabDeviceProfile sku] == LabSkuT8150_other) {
         L(@"T8150: 1 Ident  2 P070 census  3 P100 / ANE 0x10b8 map. static_base=0xfffffe0007004000");

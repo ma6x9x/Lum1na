@@ -232,7 +232,8 @@ static void p132_bandit(const char *outcome) {
     /* ---------- STAGE LAND: the landing engine, FLAG-GATED -------------- */
     NSString *landPath = [docs stringByAppendingPathComponent:@"p132_land.txt"];
     if ([[NSFileManager defaultManager] fileExistsAtPath:landPath]) {
-        L(@"=== STAGE LAND: [p073] flagged - the record landing engine fires ===");
+        L(@"=== STAGE LAND: [p073] flagged - STANDALONE 254-in MAF occupancy, not KERNEL ===");
+        L(@"  Hunt 12 KRW chain is P010 disclose then P044 N=192. p073 remaining-fires 254.");
         NSString *p073log = [P073AneSecondTable tap];
         if (p073log.length) {
             L(p073log.length > 6000 ? [@"[p073 head/truncated]\n" stringByAppendingString:

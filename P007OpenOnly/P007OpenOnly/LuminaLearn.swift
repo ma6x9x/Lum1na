@@ -214,17 +214,14 @@ enum LuminaLearn {
                                       sibling: nil, hasKread: false,
                                       conversion: false, occupancy: false)
         }
-        if lower.contains("haskread=yes") && (log.contains("0xfeedfacf") || lower.contains("mh_magic")) {
+        // Live board only. Instructional "hasKread=YES" / "kread32(kbase)==0xfeedfacf"
+        // lines in P088/P044 verdicts are next-step text, not a receipt.
+        if P007Board.shared().hasKread {
             hasKread = true
             conversion = true
             stage = .krw
             outcome = "ok"
-            note = "kread32(kbase)==0xfeedfacf. physRW/sptm still HOLD until commitSlide."
-        } else if log.contains("0xfeedfacf") && (lower.contains("kread32") || lower.contains("magic")) {
-            hasKread = true
-            stage = .krw
-            outcome = "magic"
-            note = "MH_MAGIC_64 in log. Confirm kread64(kbase+8) typeinfo before commitSlide."
+            note = "live board hasKread. kread32(kbase)==MH_MAGIC_64 this process."
         } else if log.contains("PIPE-HIT") || log.contains("QUEUE-INIT") || lower.contains("conversion=yes") {
             conversion = true
             stage = .write
@@ -280,12 +277,12 @@ enum LuminaLearn {
             return .leak
         }
         if ["p110", "p125", "p128", "p121", "p119", "kern.ipc", "cscali",
-            "p088", "p073", "p099", "p011", "p027", "p053"].contains(x)
+            "p011", "p027", "p053"].contains(x)
             || x.contains("race") || x.contains("calib") {
             return .race
         }
         if ["p142", "p149", "t8150krw", "p145", "p147", "p148", "p034", "p044",
-            "conv", "cg.shading", "p075", "p113"].contains(x)
+            "conv", "p073", "p099", "p088", "cg.shading", "p075", "p113"].contains(x)
             || x.contains("write") || x.contains("shading") || x.contains("occup") {
             return .write
         }
@@ -310,7 +307,11 @@ enum LuminaLearn {
         case "p148", "aveblob":
             return "p148_gop.txt in [0,8]; values >8 are OUT-LAW"
         case "p044", "conv":
-            return "P114 leak + occupancy census. HOLE_MODE=0. Do not remaining-fire 254."
+            return "P010 disclose then P044 N=192 LIVE neighbor. HOLE_MODE=0. Do not remaining-fire 254."
+        case "p073", "p099", "anegroom":
+            return "KERNEL → P044 N=192. p099/p073 254 is STANDALONE MAF occupancy into FREE 3072."
+        case "p088", "writehop":
+            return "P088 never flips hasKread. Next is reclaim+inpcb, not 254 remaining-fire."
         case "cg.shading":
             return "cg.shading.sweep (find absorb threshold) before R=136"
         case "kern.ipc":

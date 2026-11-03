@@ -161,7 +161,8 @@
 //       vtable+0x650 implementer -> Chain 4 over-release lane
 //    4. reclaim + inpcb spray -> read inpcb kaddr -> SocketKRW.Arm
 //       (A14_23F77_INPCB_ICMP6FILT 0x148, SO_PCB 0x18)
-//    5. kread32(kbase)==0xfeedfacf -> hasKread=YES -> Bootstrap HOLD lifts
+//    5. SocketKRW.Arm then kread32(kbase)==MH_MAGIC_64 is the commitSlide bar.
+//       P088 never flips hasKread. Do not print hasKread=YES in this log.
 //
 //  Isolation: ONE TAP per force-quit. PANIC POSSIBLE at the 254 fill
 //  (CheckandPrewire+0x18c GZAlloc page-end IPS) and at forged fetches
@@ -182,7 +183,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P088_BUILD @"p088-write-hop-v22-bandit"
+#define P088_BUILD @"p088-write-hop-v23-honest"
 
 /* kernel-target tap: 0 = in-process T (safe-ish), 1 = kernel sid (PANIC) */
 #define P088_KERNEL_TARGET 0
@@ -735,7 +736,8 @@ static NSString *p088_yfmt(double y) {
     p088_log(@"*** KERNEL-TARGET BUILD: OOB slots carry kernel sid %u. PANIC POSSIBLE.", P088_KERNEL_SID);
     p088_log(@"*** Completion-only evidence: no byte proof without kread.");
 #endif
-    p088_log(@"%@", [P007Board shared].kreadSignal);
+    p088_log(@"board live this process: %@", [P007Board shared].kreadSignal);
+    p088_log(@"P088 never calls commitSlide. A YES on the board line is leftover from another TAP this process.");
 
     NSString *stop = [LabDeviceProfile stopUnlessA14_23F77:@"p088"];
     if (stop) {
@@ -1431,10 +1433,9 @@ static NSString *p088_yfmt(double y) {
     p088_log(@"     decompile DART-map vtable+0x650 implementer (Chain 4 over-release).");
     p088_log(@"  3. Lab: reclaim + inpcb spray -> read inpcb kaddr -> SocketKRW.Arm");
     p088_log(@"     (A14_23F77_INPCB_ICMP6FILT 0x148, SO_PCB 0x18).");
-    p088_log(@"  4. kread32(kbase)==0xfeedfacf -> hasKread=YES -> Bootstrap HOLD lifts.");
-    p088_log(@"Honesty: hasKread=NO. It flips ONLY on kread32(kbase)==0xfeedfacf via");
-    p088_log(@"Lum1naSocketKRW verify (Chain 4 kvad supply). A surface diff NEVER");
-    p088_log(@"sets it. Conversion bar untouched. One TAP per force-quit; fresh boot next.");
+    p088_log(@"  4. SocketKRW.Arm then kread32(kbase)==MH_MAGIC_64 is the commitSlide bar.");
+    p088_log(@"Honesty: this TAP leaves hasKread untouched (live starts NO each process).");
+    p088_log(@"A surface diff NEVER sets it. Conversion bar untouched. One TAP per force-quit.");
 
     /* v22: the bandit summary record for this arm (per the classes above) +
        the scores line; RoundClose stamps the summary into the ledger. */

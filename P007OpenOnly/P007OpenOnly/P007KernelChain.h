@@ -3,8 +3,10 @@
 //  Lum1na-Debug (P007 rig)
 //
 //  KERNEL hot button. Same SKU doors as public KRWChainController:
-//  P139 harvest (no 150s lock) + hunt P044 / 17 P114+P149 + kread32.
-//  Occupancy CLASS is not hasKread. No P110/P143/P054 auto. T8150 fires P149.
+//  hunt 12 23F77: P139 harvest (P063 + P010 disclose) → P044 N=192
+//  LIVE 1-record OOB → Arm HOLD until rw_inpcb → kread32.
+//  P099/P073 254 remaining-fire SKIP (MAF into FREE kalloc.3072).
+//  Occupancy CLASS is not hasKread. T8150 fires P149.
 //
 
 #import <Foundation/Foundation.h>
