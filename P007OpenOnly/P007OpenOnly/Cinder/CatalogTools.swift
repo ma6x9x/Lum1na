@@ -11,7 +11,7 @@ extension Catalog {
 
     static var tooling: [ExploitModule] {
         var out: [ExploitModule] = []
-        let m0 = ExploitModule(
+        let m0: ExploitModule = ExploitModule(
             id: "tool.ipa",
             titleZh: "IPA 手术自检（改包名 / 注入 / 重签名准备）",
             cve: "—",
@@ -21,8 +21,89 @@ extension Catalog {
             tier: 1,
             summaryZh: "现场造一个最小 IPA（Info.plist + 一个真的 Mach-O），跑完整的改机流程：解包 → 改 CFBundleIdentifier → 注入 LC_LOAD_DYLIB → 去掉 LC_CODE_SIGNATURE → 用自己写的 ZIP 写入器重新打包。产出留在 Documents/Cinder27/IPA，可以直接拿去签名。",
             notesZh: "这条不是漏洞，是工具链的证明。它跑通说明 IPA 面板在你的设备上能用，而不是只在构建机上能用。",
-            run: { ctx in
-                ctx.arm("tool.ipa", "fixture + patch")
+            run: CatalogToolRuns.tool_ipa)
+        out.append(m0)
+        let m1: ExploitModule = ExploitModule(
+            id: "tool.zip",
+            titleZh: "ZIP 写入器往返自检",
+            cve: "—",
+            component: "ZipWriter + libarchive",
+            primitive: .probe,
+            reach: .inProcess,
+            tier: 1,
+            summaryZh: "用自己写的 ZIP 写入器造一个含随机内容的归档，再用 libarchive 解回来，逐字节比对。这条证明重打包不会悄悄损坏文件 —— 改机工具最怕的就是这个。",
+            notesZh: "64 个文件，每个 4 KB 随机内容，比对 CRC 与长度。",
+            run: CatalogToolRuns.tool_zip)
+        out.append(m1)
+        let m2: ExploitModule = ExploitModule(
+            id: "tool.macho",
+            titleZh: "Mach-O 解析器自检",
+            cve: "—",
+            component: "MachO · MachOInspector",
+            primitive: .probe,
+            reach: .inProcess,
+            tier: 1,
+            summaryZh: "对系统卷上的几个真实二进制跑一遍头解析：架构、类型、平台、最低系统、SDK、加密状态、链接库、rpath。加密状态是这一整套里最有信息量的字段 —— 系统框架 cryptid 为 0，第三方 App 的二进制不是。",
+            notesZh: "同时跑我自己写的解析器和 MachOInspector，两个结果应该一致。",
+            run: CatalogToolRuns.tool_macho)
+        out.append(m2)
+        let m3: ExploitModule = ExploitModule(
+            id: "tool.hex",
+            titleZh: "十六进制查找替换自检",
+            cve: "—",
+            component: "HexTool",
+            primitive: .probe,
+            reach: .inProcess,
+            tier: 1,
+            summaryZh: "在随机缓冲里植入已知模式，用十六进制与文本两种写法查找、替换、再查找，确认命中数与偏移都对。",
+            notesZh: "这条守的是「改机工具最不该出错的地方」。",
+            run: CatalogToolRuns.tool_hex)
+        out.append(m3)
+        let m4: ExploitModule = ExploitModule(
+            id: "tool.container",
+            titleZh: "容器读写正常化（数据容器自检 + 修复）",
+            cve: "—",
+            component: "Container · ensureAll / probe / repair / normalize",
+            primitive: .probe,
+            reach: .inProcess,
+            tier: 1,
+            summaryZh: "把数据容器里每一个工具会用到的目录逐个解析、创建、然后真的建文件写一遍、fsync、读回、比对、删除。之前「容器内读写失败」的四个真实原因都在这里被点名：目录只是 URL 不是目录、isWritableFile 是坏探针、容器 UUID 会变、Library/Preferences 归 cfprefsd。",
+            notesZh: "跑完会留下 container_health.txt。修复动作是幂等的，每次启动都会再跑一遍。",
+            run: CatalogToolRuns.tool_container)
+        out.append(m4)
+        let m5: ExploitModule = ExploitModule(
+            id: "tool.backup",
+            titleZh: "备份 / 回滚往返自检",
+            cve: "—",
+            component: "BackupPane · ZipWriter · libarchive",
+            primitive: .probe,
+            reach: .inProcess,
+            tier: 1,
+            summaryZh: "在容器里放一组已知内容的文件，打包成 ZIP，解到另一个目录，逐字节比对，再删掉。这条守的是「备份能不能真的回滚」——上一版写的是自造格式却叫 .tar，解不回来。",
+            notesZh: "同时验证解包时 ../ 与符号链接出不了目标目录。",
+            run: CatalogToolRuns.tool_backup)
+        out.append(m5)
+        let m6: ExploitModule = ExploitModule(
+            id: "tool.paths",
+            titleZh: "文件系统权限矩阵全扫",
+            cve: "—",
+            component: "Probe · FileManager",
+            primitive: .probe,
+            reach: .inProcess,
+            tier: 1,
+            summaryZh: "把 30 多个关键路径逐个试读试写，记录可读/可写/条目数/errno。这是改机工具的活动范围地图 —— 它决定了所有面板能做到哪里为止。",
+            notesZh: "结果同时会写进 Documents 里一份文本，方便对照。",
+            run: CatalogToolRuns.tool_paths)
+        out.append(m6)
+        return out
+    }
+}
+
+
+private enum CatalogToolRuns {
+    // tool.ipa
+    static func tool_ipa(_ ctx: RunContext) throws -> ModuleOutcome {
+ctx.arm("tool.ipa", "fixture + patch")
                 var lines: [String] = []
 
                 // ---- fixture: a real arm64 Mach-O from this process
@@ -107,20 +188,12 @@ extension Catalog {
                 return ModuleOutcome(headline: output == nil ? tl("手术未完成") : tl("IPA 手术链路可用"),
                                      detail: lines.joined(separator: "\n"),
                                      artifacts: artifacts)
-            })
-        out.append(m0)
-        let m1 = ExploitModule(
-            id: "tool.zip",
-            titleZh: "ZIP 写入器往返自检",
-            cve: "—",
-            component: "ZipWriter + libarchive",
-            primitive: .probe,
-            reach: .inProcess,
-            tier: 1,
-            summaryZh: "用自己写的 ZIP 写入器造一个含随机内容的归档，再用 libarchive 解回来，逐字节比对。这条证明重打包不会悄悄损坏文件 —— 改机工具最怕的就是这个。",
-            notesZh: "64 个文件，每个 4 KB 随机内容，比对 CRC 与长度。",
-            run: { ctx in
-                ctx.arm("tool.zip", "roundtrip")
+            
+    }
+
+    // tool.zip
+    static func tool_zip(_ ctx: RunContext) throws -> ModuleOutcome {
+ctx.arm("tool.zip", "roundtrip")
                 var zip = ZipWriter()
                 var expected: [String: Data] = [:]
                 var seed: UInt64 = 0x9E3779B97F4A7C15
@@ -160,20 +233,12 @@ extension Catalog {
                     detail: tl("归档 ") + "\(archive.count)" + tl(" B · 解包 ") + "\(result.count)" + tl(" 项 · ") + "\(result.status)",
                     evidence: [tl("64 × 4 KB 随机内容"), tl("自己写 ZIP → libarchive 读回")],
                     artifacts: [url])
-            })
-        out.append(m1)
-        let m2 = ExploitModule(
-            id: "tool.macho",
-            titleZh: "Mach-O 解析器自检",
-            cve: "—",
-            component: "MachO · MachOInspector",
-            primitive: .probe,
-            reach: .inProcess,
-            tier: 1,
-            summaryZh: "对系统卷上的几个真实二进制跑一遍头解析：架构、类型、平台、最低系统、SDK、加密状态、链接库、rpath。加密状态是这一整套里最有信息量的字段 —— 系统框架 cryptid 为 0，第三方 App 的二进制不是。",
-            notesZh: "同时跑我自己写的解析器和 MachOInspector，两个结果应该一致。",
-            run: { ctx in
-                ctx.arm("tool.macho", "parse")
+            
+    }
+
+    // tool.macho
+    static func tool_macho(_ ctx: RunContext) throws -> ModuleOutcome {
+ctx.arm("tool.macho", "parse")
                 let targets: [(String, String)] = [
                     ("CoreGraphics", "/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics"),
                     ("CoreMedia", "/System/Library/Frameworks/CoreMedia.framework/CoreMedia"),
@@ -204,20 +269,12 @@ extension Catalog {
                 ctx.disarm("tool.macho", "parsed=\(parsed)")
                 return ModuleOutcome(headline: tl("解析 ") + "\(parsed)" + tl(" 个二进制"),
                                      detail: lines.joined(separator: "\n"))
-            })
-        out.append(m2)
-        let m3 = ExploitModule(
-            id: "tool.hex",
-            titleZh: "十六进制查找替换自检",
-            cve: "—",
-            component: "HexTool",
-            primitive: .probe,
-            reach: .inProcess,
-            tier: 1,
-            summaryZh: "在随机缓冲里植入已知模式，用十六进制与文本两种写法查找、替换、再查找，确认命中数与偏移都对。",
-            notesZh: "这条守的是「改机工具最不该出错的地方」。",
-            run: { ctx in
-                ctx.arm("tool.hex", "roundtrip")
+            
+    }
+
+    // tool.hex
+    static func tool_hex(_ ctx: RunContext) throws -> ModuleOutcome {
+ctx.arm("tool.hex", "roundtrip")
                 var bytes = [UInt8](repeating: 0x00, count: 65536)
                 let needle: [UInt8] = [0xDE, 0xAD, 0xBE, 0xEF]
                 var planted: [Int] = []
@@ -247,20 +304,12 @@ extension Catalog {
                 if !ok { lines.append(tl("有断言不成立")) }
                 return ModuleOutcome(headline: ok ? tl("查找替换全部断言通过") : tl("有断言失败"),
                                      detail: lines.joined(separator: "\n"))
-            })
-        out.append(m3)
-        let m4 = ExploitModule(
-            id: "tool.container",
-            titleZh: "容器读写正常化（数据容器自检 + 修复）",
-            cve: "—",
-            component: "Container · ensureAll / probe / repair / normalize",
-            primitive: .probe,
-            reach: .inProcess,
-            tier: 1,
-            summaryZh: "把数据容器里每一个工具会用到的目录逐个解析、创建、然后真的建文件写一遍、fsync、读回、比对、删除。之前「容器内读写失败」的四个真实原因都在这里被点名：目录只是 URL 不是目录、isWritableFile 是坏探针、容器 UUID 会变、Library/Preferences 归 cfprefsd。",
-            notesZh: "跑完会留下 container_health.txt。修复动作是幂等的，每次启动都会再跑一遍。",
-            run: { ctx in
-                ctx.arm("tool.container", "ensure + probe")
+            
+    }
+
+    // tool.container
+    static func tool_container(_ ctx: RunContext) throws -> ModuleOutcome {
+ctx.arm("tool.container", "ensure + probe")
                 var lines: [String] = []
                 lines.append(tl("容器根: ") + "\(Container.rootPath)")
 
@@ -322,20 +371,12 @@ extension Catalog {
                                      detail: report,
                                      evidence: [tl("探针 = 建文件 → 写 → fsync → 读回 → 比对 → 删除")],
                                      artifacts: [url])
-            })
-        out.append(m4)
-        let m5 = ExploitModule(
-            id: "tool.backup",
-            titleZh: "备份 / 回滚往返自检",
-            cve: "—",
-            component: "BackupPane · ZipWriter · libarchive",
-            primitive: .probe,
-            reach: .inProcess,
-            tier: 1,
-            summaryZh: "在容器里放一组已知内容的文件，打包成 ZIP，解到另一个目录，逐字节比对，再删掉。这条守的是「备份能不能真的回滚」——上一版写的是自造格式却叫 .tar，解不回来。",
-            notesZh: "同时验证解包时 ../ 与符号链接出不了目标目录。",
-            run: { ctx in
-                ctx.arm("tool.backup", "roundtrip")
+            
+    }
+
+    // tool.backup
+    static func tool_backup(_ ctx: RunContext) throws -> ModuleOutcome {
+ctx.arm("tool.backup", "roundtrip")
                 let fm = FileManager.default
                 let src = ctx.workdir.appendingPathComponent("backup_src", isDirectory: true)
                 let dst = ctx.workdir.appendingPathComponent("backup_dst", isDirectory: true)
@@ -395,20 +436,12 @@ extension Catalog {
                         tl("路径穿越遏制: ") + "\(escaped ? tl("失败 —— ../ 逃出了目标目录") : tl("有效（../ 未逃出）"))",
                     ].joined(separator: "\n"),
                     artifacts: [archiveURL])
-            })
-        out.append(m5)
-        let m6 = ExploitModule(
-            id: "tool.paths",
-            titleZh: "文件系统权限矩阵全扫",
-            cve: "—",
-            component: "Probe · FileManager",
-            primitive: .probe,
-            reach: .inProcess,
-            tier: 1,
-            summaryZh: "把 30 多个关键路径逐个试读试写，记录可读/可写/条目数/errno。这是改机工具的活动范围地图 —— 它决定了所有面板能做到哪里为止。",
-            notesZh: "结果同时会写进 Documents 里一份文本，方便对照。",
-            run: { ctx in
-                ctx.arm("tool.paths", "scan")
+            
+    }
+
+    // tool.paths
+    static func tool_paths(_ ctx: RunContext) throws -> ModuleOutcome {
+ctx.arm("tool.paths", "scan")
                 var lines: [String] = []
                 var readable = 0, writable = 0
                 for path in Probe.interestingRoots {
@@ -423,8 +456,7 @@ extension Catalog {
                 ctx.disarm("tool.paths", "r=\(readable) w=\(writable)")
                 return ModuleOutcome(headline: "\(readable)" + tl(" 个可读 · ") + "\(writable)" + tl(" 个可写"),
                                      detail: report, artifacts: [url])
-            })
-        out.append(m6)
-        return out
+            
     }
+
 }
