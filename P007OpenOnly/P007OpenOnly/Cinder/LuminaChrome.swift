@@ -8,7 +8,7 @@ import Combine
 // phone still has hunt-krw-6. Glass is chrome only — TAP bodies unchanged.
 
 enum LuminaStamp {
-    static let ui = "hunt-krw-9"
+    static let ui = "hunt-krw-10"
 }
 
 final class LuminaTabs: ObservableObject {

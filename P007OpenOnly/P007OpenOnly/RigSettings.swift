@@ -51,6 +51,8 @@ struct RigSettingsView: View {
 
     @Environment(\.dismiss) private var dismiss
     @State private var showConsole = false
+    @State private var showHourSheet = false
+    @State private var showLogsSheet = false
     @State private var pairingName: String = ""
     @State private var pairingStatus: String = ""
     @State private var consoleSource: String = UserDefaults.standard.string(forKey: "rig.consoleSource") ?? "klog-only"
@@ -63,13 +65,36 @@ struct RigSettingsView: View {
         NavigationStack {
             Form {
                 Section("Isolation") {
-                    Text("One TAP per force-quit. KERNEL is the hunt door. P099/P073/P130 254-in stay catalog-solo. Unlock UI frees Console buttons while a probe is still in flight.")
+                    Text("One TAP per force-quit. KERNEL is the hunt door. P099/P073/P130 254-in stay catalog-solo. Unlock UI is a full-width banner while a TAP is running and is never disabled.")
                         .font(.footnote)
                     LabeledContent("Build") { Text(LuminaStamp.ui).font(.footnote.monospaced()) }
                     LabeledContent("Board") {
                         Text(snap.kreadSignal)
                             .font(.footnote.monospaced())
                             .textSelection(.enabled)
+                    }
+                }
+
+                Section("Beta 1 bar") {
+                    LabeledContent("kread") {
+                        Text(snap.hasKread ? "YES" : "NO")
+                            .font(.footnote.monospaced())
+                            .foregroundColor(snap.hasKread ? .green : .red)
+                    }
+                    LabeledContent("conversion") {
+                        Text(snap.conversion ? "YES" : "NO").font(.footnote.monospaced())
+                    }
+                    LabeledContent("occupancy") {
+                        Text(snap.occupancy ? "YES" : "NO").font(.footnote.monospaced())
+                    }
+                    LabeledContent("leaks") {
+                        Text("\(snap.leakCount)").font(.footnote.monospaced())
+                    }
+                    Text("Beta 1 on this device is kread32(kbase)==0xfeedfacf. Occupancy, PIPE-HIT, and truncated P010 word1 stay NO. AfterKread HOLD until that magic.")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
+                    Button("Copy board + NEXT TAP") {
+                        LuminaCopyBus.shared.copy(snap.copyBlock, label: "Board · \(snap.nextID)")
                     }
                 }
 
@@ -89,13 +114,26 @@ struct RigSettingsView: View {
                         LuminaTabs.shared.index = 2
                         dismiss()
                     }
+                    Button("Jump to Console") {
+                        LuminaTabs.shared.index = 4
+                        dismiss()
+                    }
                 }
 
                 Section("Logs") {
-                    Button("Open log files") { onLogs?() }
-                    Button("Hour gallery") { onHour?() }
-                    Button("All TAP ids") { onAllTaps?() }
-                    Text("Copy full lives on each TAP card in Lab, on Console Copy, and on the HUD NEXT chip.")
+                    Button("Open log files") {
+                        if let onLogs { onLogs() } else { showLogsSheet = true }
+                    }
+                    Button("Hour gallery") {
+                        if let onHour { onHour() } else { showHourSheet = true }
+                    }
+                    Button("Lab catalog (all TAP cards)") {
+                        if let onAllTaps { onAllTaps() } else {
+                            LuminaTabs.shared.index = 1
+                            dismiss()
+                        }
+                    }
+                    Text("Copy full lives on each TAP card in Lab, on Console Copy, and on the HUD NEXT chip. Files tab previews a 12 KB tail so huge P044/P073 logs cannot jetsam.")
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }
@@ -151,6 +189,22 @@ struct RigSettingsView: View {
                 importPairing(result)
             }
             .sheet(isPresented: $showConsole) { DeviceConsoleSheet() }
+            .sheet(isPresented: $showLogsSheet) {
+                LogListSheet { body in
+                    LuminaCopyBus.shared.copy(body, label: "Log copied")
+                    showLogsSheet = false
+                    LuminaTabs.shared.index = 4
+                    dismiss()
+                }
+            }
+            .sheet(isPresented: $showHourSheet) {
+                HourLogGallery { body in
+                    LuminaCopyBus.shared.copy(body, label: "Hour log copied")
+                    showHourSheet = false
+                    LuminaTabs.shared.index = 4
+                    dismiss()
+                }
+            }
             .onAppear {
                 refreshPairingStatus()
                 snap = BoardSnapshot.current()

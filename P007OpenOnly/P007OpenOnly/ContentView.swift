@@ -182,7 +182,7 @@ struct ContentView: View {
                         moreRow("CS calib. phys_oob race only (not KRW)", "cscali")
                         moreRow("P122 SwordForge. combined 64788 KRW test (freer→reclaim→read)", "swordforge")
                         moreRow("P123 ShapeCensus. kalloc.3072 victims with KRW vision (mini/libkrw)", "shapecensus")
-                        moreRow("KERNEL. hunt-krw-9: P139 disclose (P010 QueueCreate copyout + P063 aio kptr) then hunt P044 N=192 LIVE / 17 P114+P149 / A12X 23H30 FIELD# harvest + kread32. SKIP P099/P073 254. Occupancy / PIPE-HIT is not hasKread.", "krw")
+                        moreRow("KERNEL. hunt-krw-10: P139 disclose (P010 QueueCreate copyout + P063 aio kptr) then hunt P044 N=192 LIVE / 17 P114+P149 / A12X 23H30 FIELD# harvest + kread32. SKIP P099/P073 254. Occupancy / PIPE-HIT is not hasKread.", "krw")
                         moreRow("PATHS. Per-path scorecard + READ-ONLY tests. Hunt: P139+kread. 17: P139+P114+kread (P149 stays KERNEL/catalog). Occupancy stays P044/KERNEL solo. P110/P143 isolated.", "pathtest")
                         moreRow("KREAD. commitSlide kread32(kbase)==MH_MAGIC_64", "kreadtest")
                         moreRow("P070 five-door chain census + persist HOLD", "p070")
@@ -695,35 +695,9 @@ struct ContentView: View {
         }
     }
 
-    /// Leftover XR / survived / wire-UAF probes. Visible rows still exist so
-    /// a mis-tap cannot launch close-vs-method or last-ref UAF.
+    /// Leftover XR / hop-1 / 163-sel / TrollRestore. One list: LuminaTAP.blocked.
     func blockedProbeMessage(_ id: String) -> String? {
-        switch id {
-        case "iogpu_close":
-            return "STOP iogpu_close — XR leftover (sel=7-as-create / sel=26-as-submit).\n"
-                + "Named 43805 dest is P040: live sel=6 0x410 then sel=7.\n"
-                + "Do not run close-vs-method. Not [1].\n"
-        case "t014a", "t014b", "t014c", "t014d", "t014e", "t014f":
-            return "STOP T014 — XR leftover close-vs-method / wrong selectors.\n"
-                + "23F77 create is sel=6 stIn=0x410. Destroy is sel=7 qid.\n"
-                + "Use P040 for dest ABI only.\n"
-        case "p014close":
-            return "STOP p014close — XR leftover (sel=7 structIn as CREATE).\n"
-                + "Not A14 destroy. Do not run close-vs-method.\n"
-        case "p010obj":
-            return "STOP p010obj — SURVIVED 2026-08-31. Not last-ref UAF. Not KRW.\n"
-                + "P010 qleak word1=+0x558 is a small int, not a kptr.\n"
-                + "Reconfirmed 2026-09-02. Do not re-tap last-ref.\n"
-        case "t019":
-            return "STOP t019 — Lookup-nil under lock is XR leak class. exit(0) expected.\n"
-                + "Not a 26.5 door. Do not re-tap.\n"
-        case "p011v3", "p011v4", "p011v5", "p011v6", "p011v7", "p011v8", "p011v9", "p011v10", "p012ctx",
-             "p010pduaf", "p010twoconn", "p010pdsweep", "p010krwv2", "p014ane", "p014b", "p015", "p017":
-            return "STOP \(id) — leftover wire/UAF race, not in the 23F77 prove set.\n"
-                + "Use P009 PathB (F) and p017v2 (H+R+C). Not [1].\n"
-        default:
-            return nil
-        }
+        LuminaTAP.blocked(id)
     }
 
     func run(_ id: String) {
