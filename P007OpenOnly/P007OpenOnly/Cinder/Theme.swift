@@ -1,12 +1,16 @@
 import SwiftUI
+import UIKit
 
 enum T {
-    static let bg = Color(red: 0.047, green: 0.047, blue: 0.058)
-    static let panel = Color(red: 0.094, green: 0.094, blue: 0.110)
-    static let panelHi = Color(red: 0.140, green: 0.140, blue: 0.162)
-    static let stroke = Color.white.opacity(0.075)
+    /// Solid sheet/splash fill. Tab screens use luminaCanvas() over LuminaBackdrop.
+    static let void = Color(red: 0.035, green: 0.032, blue: 0.055)
+    static let bg = void
+    static let panel = Color(red: 0.10, green: 0.10, blue: 0.14).opacity(0.82)
+    static let panelHi = Color(red: 0.16, green: 0.14, blue: 0.20)
+    static let stroke = Color.white.opacity(0.12)
     static let ember = Color(red: 1.00, green: 0.42, blue: 0.16)
     static let emberSoft = Color(red: 1.00, green: 0.60, blue: 0.32)
+    static let cyan = Color(red: 0.28, green: 0.92, blue: 0.95)
     static let good = Color(red: 0.32, green: 0.85, blue: 0.55)
     static let warn = Color(red: 1.00, green: 0.76, blue: 0.28)
     static let bad = Color(red: 1.00, green: 0.34, blue: 0.34)
@@ -27,11 +31,26 @@ struct Card<Content: View>: View {
     @ViewBuilder var content: () -> Content
 
     var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 16, style: .continuous)
         content()
             .padding(padding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(T.panel))
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(T.stroke, lineWidth: 1))
+            .background {
+                ZStack {
+                    shape.fill(T.panel)
+                    shape.fill(
+                        LinearGradient(colors: [T.ember.opacity(0.10), T.cyan.opacity(0.05), .clear],
+                                       startPoint: .topLeading, endPoint: .bottomTrailing)
+                    )
+                }
+            }
+            .overlay(
+                shape.strokeBorder(
+                    LinearGradient(colors: [T.ember.opacity(0.40), Color.white.opacity(0.14), T.cyan.opacity(0.28)],
+                                   startPoint: .topLeading, endPoint: .bottomTrailing),
+                    lineWidth: 1)
+            )
+            .shadow(color: T.ember.opacity(0.08), radius: 12, y: 6)
     }
 }
 
@@ -91,19 +110,23 @@ struct RunButton: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button(action: {
+            if !disabled {
+                UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            }
+            action()
+        }) {
             HStack(spacing: 7) {
                 Image(systemName: systemImage).font(.system(size: 12, weight: .bold))
                 Text(title).font(.system(size: 13, weight: .semibold, design: .rounded))
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, 10)
-            .background(RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(disabled ? T.panelHi : tint.opacity(0.18)))
-            .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .strokeBorder(disabled ? T.stroke : tint.opacity(0.5), lineWidth: 1))
-            .foregroundColor(disabled ? .white.opacity(0.25) : tint)
+            .padding(.vertical, 11)
+            .foregroundColor(disabled ? .white.opacity(0.28) : .white)
         }
+        .luminaGlass(RoundedRectangle(cornerRadius: 12, style: .continuous),
+                     interactive: !disabled, tint: disabled ? nil : tint)
         .disabled(disabled)
+        .opacity(disabled ? 0.55 : 1)
     }
 }

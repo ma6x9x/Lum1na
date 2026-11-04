@@ -65,7 +65,7 @@ struct GateView: View {
 
     var body: some View {
         ZStack {
-            T.bg.ignoresSafeArea()
+            LuminaBackdrop()
 
             if entered {
                 RootView()
@@ -94,9 +94,16 @@ struct GateView: View {
             Spacer()
 
             VStack(spacing: 10) {
-                Text("Lum1na-Debugger")
-                    .font(.system(size: 34, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
+                LuminaMark(size: 78)
+                Text("Lum1na")
+                    .font(.system(size: 36, weight: .bold, design: .rounded))
+                    .foregroundStyle(
+                        LinearGradient(colors: [T.emberSoft, .white, T.cyan],
+                                       startPoint: .leading, endPoint: .trailing)
+                    )
+                Text("Debugger · \(LuminaStamp.ui)")
+                    .font(.system(size: 13, weight: .medium, design: .rounded))
+                    .foregroundColor(.white.opacity(0.45))
                 Text(t("ov.headline"))
                     .font(.system(size: 13, weight: .medium, design: .rounded))
                     .foregroundColor(.white.opacity(0.4))

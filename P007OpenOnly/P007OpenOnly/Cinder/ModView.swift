@@ -42,10 +42,10 @@ struct ModView: View {
                                     Text(entry.0)
                                 }
                                 .font(T.tiny)
-                                .foregroundColor(pane == i ? T.ember : .white.opacity(0.45))
+                                .foregroundColor(pane == i ? .white : .white.opacity(0.45))
                                 .padding(.horizontal, 8).padding(.vertical, 4)
-                                .background(Capsule().fill(pane == i ? T.ember.opacity(0.14) : Color.clear))
-                                .overlay(Capsule().strokeBorder(pane == i ? T.ember.opacity(0.35) : T.stroke, lineWidth: 0.6))
+                                .background(Capsule().fill(pane == i ? T.ember.opacity(0.22) : Color.white.opacity(0.04)))
+                                .overlay(Capsule().strokeBorder(pane == i ? T.ember.opacity(0.55) : T.stroke, lineWidth: 0.6))
                             }
                         }
                     }
@@ -75,7 +75,7 @@ struct ModView: View {
                 default: ProfilePane()
                 }
             }
-            .background(T.bg.ignoresSafeArea())
+            .luminaCanvas()
             .navigationTitle(t("mod.title"))
             .navigationBarTitleDisplayMode(.inline)
         }

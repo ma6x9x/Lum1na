@@ -3,7 +3,7 @@ import UIKit
 import Darwin
 
 struct ContentView: View {
-    @State private var text = "Hot: probe-open on every SKU including 12 mini iOS 17.3 and 17 Pro Max. Ident first. One TAP. EXPECT-BAD still fires."
+    @State private var text = "Lum1na \(LuminaStamp.ui). Ident first. One TAP per force-quit. EXPECT-BAD still fires. HUD NEXT is a suggestion — it never auto-fires."
     @State private var copiedFlash = false
     @State private var running = false
     @State private var showMore = false
@@ -18,16 +18,24 @@ struct ContentView: View {
                 ScrollView {
                     Text(text)
                         .font(.system(.caption, design: .monospaced))
+                        .foregroundColor(Color.white.opacity(0.86))
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(10)
                         // Cap layout cost — huge recovered logs froze first paint.
                         .lineLimit(running ? 8 : 400)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(.secondarySystemBackground))
+                .background(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.black.opacity(0.42))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(T.cyan.opacity(0.18), lineWidth: 1)
+                )
+                .padding(.horizontal, 8)
+                .padding(.top, 6)
                 .allowsHitTesting(!running)
-
-                Divider()
 
                 VStack(spacing: 8) {
                     HStack(spacing: 8) {
@@ -54,75 +62,45 @@ struct ContentView: View {
                         hotButton("P063 leak", id: "p063")
                         hotButton("CS2", id: "cs2")
                     }
-                    HStack(spacing: 8) {
-                        Button("Ident") { run("ident") }
-                            .buttonStyle(.bordered)
-                            .disabled(running)
-                        Button {
-                            showRecoveredLog()
-                        } label: {
-                            Image(systemName: "doc.text.magnifyingglass")
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(running)
-                        Button {
-                            showLogs = true
-                        } label: {
-                            Image(systemName: "folder")
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(running)
-                        .accessibilityLabel("Logs")
-                        Button("Hour") { showHour = true }
-                            .buttonStyle(.bordered)
-                            .disabled(running)
-                        Button {
-                            showSettings = true
-                        } label: {
-                            Image(systemName: "gearshape")
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(running)
-                        Button {
-                            UIPasteboard.general.string = text
-                            copiedFlash = true
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { copiedFlash = false }
-                        } label: {
-                            Image(systemName: copiedFlash ? "checkmark" : "doc.on.doc")
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(running)
-                        Button("More…") { showMore = true }
-                            .buttonStyle(.bordered)
-                            .disabled(running)
-                        if running {
-                            ProgressView().controlSize(.small)
-                            Button("Unlock") {
-                                running = false
-                                text = "Manually unlocked UI (probe may still run in background).\n" + text
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            utilButton("Ident") { run("ident") }
+                            utilIcon("doc.text.magnifyingglass", "Recover") { showRecoveredLog() }
+                            utilIcon("folder", "Logs") { showLogs = true }
+                            utilButton("Hour") { showHour = true }
+                            utilIcon("gearshape", "Settings") { showSettings = true }
+                            utilIcon(copiedFlash ? "checkmark" : "doc.on.doc", "Copy") {
+                                LuminaCopyBus.shared.copy(text, label: "Console copied")
+                                copiedFlash = true
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { copiedFlash = false }
                             }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
+                            utilButton("More…") { showMore = true }
+                            if running {
+                                ProgressView().controlSize(.small).tint(T.ember)
+                                utilButton("Unlock") {
+                                    running = false
+                                    text = "Manually unlocked UI (probe may still run in background).\n" + text
+                                }
+                            }
                         }
-                        Spacer(minLength: 0)
                     }
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
             }
+            .luminaCanvas()
             .navigationTitle("Console")
             .navigationBarTitleDisplayMode(.inline)
             .safeAreaInset(edge: .top, spacing: 0) {
-                Text(kreadSignal)
+                Text("\(LuminaStamp.ui)  \(kreadSignal)")
                     .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(Color.secondary)
+                    .foregroundStyle(T.cyan.opacity(0.85))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 4)
             }
         }
         // Do NOT scan Documents on first frame — that caused ~1s freeze.
-        .preferredColorScheme(.light)
         .sheet(isPresented: $showSettings) {
             RigSettingsView()
         }
@@ -202,7 +180,7 @@ struct ContentView: View {
                         moreRow("CS calib. phys_oob race only (not KRW)", "cscali")
                         moreRow("P122 SwordForge. combined 64788 KRW test (freer→reclaim→read)", "swordforge")
                         moreRow("P123 ShapeCensus. kalloc.3072 victims with KRW vision (mini/libkrw)", "shapecensus")
-                        moreRow("KERNEL. hunt-krw-6: P139 disclose (P010 QueueCreate copyout + P063 aio kptr) then hunt P044 N=192 LIVE / 17 P114+P149 / A12X 23H30 FIELD# harvest + kread32. SKIP P099/P073 254. Occupancy / PIPE-HIT is not hasKread.", "krw")
+                        moreRow("KERNEL. hunt-krw-7: P139 disclose (P010 QueueCreate copyout + P063 aio kptr) then hunt P044 N=192 LIVE / 17 P114+P149 / A12X 23H30 FIELD# harvest + kread32. SKIP P099/P073 254. Occupancy / PIPE-HIT is not hasKread.", "krw")
                         moreRow("PATHS. Per-path scorecard + READ-ONLY tests. Hunt: P139+kread. 17: P139+P114+kread (P149 stays KERNEL/catalog). Occupancy stays P044/KERNEL solo. P110/P143 isolated.", "pathtest")
                         moreRow("KREAD. commitSlide kread32(kbase)==MH_MAGIC_64", "kreadtest")
                         moreRow("P070 five-door chain census + persist HOLD", "p070")
@@ -369,14 +347,49 @@ struct ContentView: View {
 
     @ViewBuilder
     private func hotButton(_ title: String, id: String) -> some View {
-        Button(title) { run(id) }
-            .buttonStyle(.borderedProminent)
-            .tint(.purple)
-            .controlSize(.regular)
-            .frame(maxWidth: .infinity)
-            .lineLimit(1)
-            .minimumScaleFactor(0.75)
-            .disabled(running)
+        Button {
+            UIImpactFeedbackGenerator(style: .light).impactOccurred()
+            run(id)
+        } label: {
+            Text(title)
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 11)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .foregroundColor(.white)
+        }
+        .luminaGlass(RoundedRectangle(cornerRadius: 12, style: .continuous),
+                     interactive: !running, tint: T.ember)
+        .disabled(running)
+        .opacity(running ? 0.55 : 1)
+    }
+
+    @ViewBuilder
+    private func utilButton(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .foregroundColor(.white)
+        }
+        .luminaGlass(Capsule(), interactive: !running, tint: T.cyan)
+        .disabled(running)
+    }
+
+    @ViewBuilder
+    private func utilIcon(_ system: String, _ label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: system)
+                .font(.system(size: 12, weight: .semibold))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 7)
+                .foregroundColor(.white)
+        }
+        .luminaGlass(Capsule(), interactive: !running, tint: T.cyan)
+        .disabled(running)
+        .accessibilityLabel(label)
     }
 
     private func moreRow(_ title: String, _ id: String) -> some View {

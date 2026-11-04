@@ -94,7 +94,7 @@ struct ChainView: View {
                 }
                 .padding(16)
             }
-            .background(T.bg.ignoresSafeArea())
+            .luminaCanvas()
             .navigationTitle(t("chain.title"))
             .navigationBarTitleDisplayMode(.inline)
         }

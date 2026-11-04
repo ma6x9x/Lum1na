@@ -66,13 +66,13 @@ struct LabView: View {
                 }
                 .padding(16)
             }
-            .background(T.bg.ignoresSafeArea())
+            .luminaCanvas()
             .navigationTitle(t("lab.title"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Copy all") {
-                        UIPasteboard.general.string = engine.copyAllResults()
+                        LuminaCopyBus.shared.copy(engine.copyAllResults(), label: "All logs copied")
                     }
                     .font(T.tiny)
                     .tint(T.ember)
@@ -118,8 +118,20 @@ struct LabView: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(T.panel))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(T.stroke, lineWidth: 1))
+        .background {
+            RoundedRectangle(cornerRadius: 14, style: .continuous).fill(T.panel)
+        }
+        .overlay(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(isRunning ? T.info : verdict.tint)
+                .frame(width: 3)
+                .padding(.vertical, 10)
+                .padding(.leading, 4)
+        }
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(verdict.tint.opacity(isRunning ? 0.55 : 0.22), lineWidth: 1)
+        )
     }
 }
 
@@ -179,9 +191,10 @@ struct ModuleDetailView: View {
                                     Spacer()
                                     Text("\(outcome.elapsedMs) ms").font(T.monoSm).foregroundColor(.white.opacity(0.3))
                                     Button {
-                                        UIPasteboard.general.string =
+                                        LuminaCopyBus.shared.copy(
                                             CinderLogStore.readFull(id: module.id)
-                                            ?? outcome.copyBlock(moduleId: module.id)
+                                            ?? outcome.copyBlock(moduleId: module.id),
+                                            label: "Full log copied")
                                     } label: {
                                         Label("Copy full", systemImage: "doc.on.doc")
                                             .font(.system(size: 11, weight: .semibold))
@@ -225,7 +238,7 @@ struct ModuleDetailView: View {
                                     Spacer()
                                     Button("Copy") {
                                         let block = history.map { "\($0.phase)\t\($0.detail)" }.joined(separator: "\n")
-                                        UIPasteboard.general.string = block
+                                        LuminaCopyBus.shared.copy(block, label: "History copied")
                                     }
                                     .font(.system(size: 11, weight: .semibold))
                                     .tint(T.ember)

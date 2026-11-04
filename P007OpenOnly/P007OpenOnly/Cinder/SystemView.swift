@@ -123,7 +123,7 @@ struct SystemView: View {
                 }
                 .padding(16)
             }
-            .background(T.bg.ignoresSafeArea())
+            .luminaCanvas()
             .navigationTitle(t("sys.title"))
             .navigationBarTitleDisplayMode(.inline)
             .onAppear {

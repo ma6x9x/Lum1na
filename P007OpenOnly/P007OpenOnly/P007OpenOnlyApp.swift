@@ -29,15 +29,17 @@ struct P007OpenOnlyApp: App {
 
     var body: some Scene {
         WindowGroup {
-            GateView()
-                .environmentObject(engine)
-                .environmentObject(browser)
-                .environmentObject(clipboard)
-                .environmentObject(bookmarks)
-                .environmentObject(l10n)
-                .environment(\.layoutDirection, Lang.resolved.isRTL ? .rightToLeft : .leftToRight)
-                .preferredColorScheme(.dark)
-                .id(Lang.resolved)
+            GlassTierRoot {
+                GateView()
+                    .environmentObject(engine)
+                    .environmentObject(browser)
+                    .environmentObject(clipboard)
+                    .environmentObject(bookmarks)
+                    .environmentObject(l10n)
+                    .environment(\.layoutDirection, Lang.resolved.isRTL ? .rightToLeft : .leftToRight)
+                    .preferredColorScheme(.dark)
+                    .id(Lang.resolved)
+            }
         }
     }
 }

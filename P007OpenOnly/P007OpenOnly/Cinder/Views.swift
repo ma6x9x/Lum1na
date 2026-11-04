@@ -37,19 +37,17 @@ struct RootView: View {
             }.tag(6)
         }
         .tint(T.ember)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            BoardHUD(tab: $tab)
+        }
+        .overlay(alignment: .bottom) {
+            CopyToastOverlay()
+                .padding(.bottom, 52)
+        }
         .onAppear {
             Container.ensureAll()
             runAutorunIfRequested()
-            styleTabBar()
         }
-    }
-
-    private func styleTabBar() {
-        let appearance = UITabBarAppearance()
-        appearance.configureWithOpaqueBackground()
-        appearance.backgroundColor = UIColor(red: 0.055, green: 0.055, blue: 0.068, alpha: 1)
-        UITabBar.appearance().standardAppearance = appearance
-        UITabBar.appearance().scrollEdgeAppearance = appearance
     }
 
     /// Nothing in this app runs on its own. Every primitive stays at "not run" until the
@@ -95,6 +93,7 @@ struct DashboardView: View {
             ScrollView {
                 VStack(spacing: 14) {
                     header
+                    SKUDoorCard()
                     deviceCard
                     capabilityCard
 
@@ -112,7 +111,7 @@ struct DashboardView: View {
                             }
                             RunButton(title: "Copy all logs", systemImage: "doc.on.doc",
                                       tint: T.ember) {
-                                UIPasteboard.general.string = engine.copyAllResults()
+                                LuminaCopyBus.shared.copy(engine.copyAllResults(), label: "All logs copied")
                             }
                         }
                     }
@@ -122,22 +121,31 @@ struct DashboardView: View {
                 }
                 .padding(16)
             }
-            .background(T.bg.ignoresSafeArea())
-            .navigationTitle("Lum1na-Debugger")
+            .luminaCanvas()
+            .navigationTitle("Lum1na")
             .navigationBarTitleDisplayMode(.inline)
         }
     }
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(t("ov.headline"))
-                .font(T.title)
-                .foregroundColor(.white)
-                .fixedSize(horizontal: false, vertical: true)
-            Text(String(format: t("ov.sub"), Catalog.all.count, Catalog.locatedFixes))
-                .font(T.tiny)
-                .foregroundColor(.white.opacity(0.4))
-                .fixedSize(horizontal: false, vertical: true)
+        HStack(alignment: .center, spacing: 14) {
+            LuminaMark(size: 54)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Lum1na")
+                    .font(T.title)
+                    .foregroundStyle(
+                        LinearGradient(colors: [T.emberSoft, .white],
+                                       startPoint: .leading, endPoint: .trailing)
+                    )
+                Text(t("ov.headline"))
+                    .font(T.body)
+                    .foregroundColor(.white.opacity(0.72))
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(String(format: t("ov.sub"), Catalog.all.count, Catalog.locatedFixes))
+                    .font(T.tiny)
+                    .foregroundColor(.white.opacity(0.4))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -216,7 +224,7 @@ struct DashboardView: View {
                     SectionLabel(text: t("ov.log"))
                     Spacer()
                     Button("Copy") {
-                        UIPasteboard.general.string = engine.copyAllResults()
+                        LuminaCopyBus.shared.copy(engine.copyAllResults(), label: "Logs copied")
                     }
                     .font(.system(size: 11, weight: .semibold))
                     .tint(T.ember)
@@ -243,7 +251,13 @@ struct DashboardView: View {
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 14)
-        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(T.panel))
-        .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(T.stroke, lineWidth: 1))
+        .background {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(T.panel)
+        }
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(color.opacity(0.35), lineWidth: 1)
+        )
     }
 }

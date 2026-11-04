@@ -1126,7 +1126,7 @@ struct MindPane: View {
                 }
                 composer
             }
-            .background(T.bg.ignoresSafeArea())
+            .luminaCanvas()
             .navigationTitle(t("tab.mind"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -1177,7 +1177,7 @@ struct MindPane: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(T.panel)
+        .luminaGlass(RoundedRectangle(cornerRadius: 0, style: .continuous), interactive: false, tint: T.ember)
     }
 
     private func bubble(_ msg: MindMessage) -> some View {
@@ -1216,7 +1216,7 @@ struct MindPane: View {
                     .foregroundColor(.white)
                     .lineLimit(1...5)
                     .padding(10)
-                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(T.panel))
+                    .luminaGlass(RoundedRectangle(cornerRadius: 12, style: .continuous), interactive: true)
                 Button {
                     let t = draft
                     draft = ""
@@ -1231,18 +1231,17 @@ struct MindPane: View {
             .padding(.horizontal, 12)
             .padding(.bottom, 10)
         }
-        .background(T.bg)
     }
 
     private func chip(_ title: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(title)
                 .font(T.tiny)
-                .foregroundColor(T.emberSoft)
+                .foregroundColor(.white)
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
-                .background(Capsule().strokeBorder(T.ember.opacity(0.4), lineWidth: 1))
         }
+        .luminaGlass(Capsule(), interactive: true, tint: T.ember)
         .disabled(agent.busy)
     }
 }
