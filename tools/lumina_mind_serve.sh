@@ -66,17 +66,35 @@ pick_mlx_port() {
 
 echo "Mac LAN IPv4: ${LAN_IP}"
 
+ensure_ollama_model() {
+  local tag="$1"
+  command -v ollama >/dev/null 2>&1 || return 0
+  if ollama list 2>/dev/null | awk 'NR>1 {print $1}' | grep -Fxq "${tag}"; then
+    echo "have ${tag}"
+    return 0
+  fi
+  echo "pulling ${tag} (free local)…"
+  ollama pull "${tag}" || echo "pull ${tag} failed — phone can still use Grok (xAI) or whatever is listed"
+}
+
 # --- already-running ollama on all interfaces (this lab Mac) ---
 if [[ "${ENGINE}" == "auto" || "${ENGINE}" == "ollama" ]]; then
   if ollama_all_ifaces; then
     echo "ollama already listening on *:11434 (phone-reachable)."
+    ensure_ollama_model "llama3.1:8b"
+    ensure_ollama_model "deepseek-r1:1.5b"
     if command -v ollama >/dev/null 2>&1; then
       echo "Models on this Mac:"
       ollama list || true
     fi
-    echo "From this Mac: curl -s http://127.0.0.1:11434/v1/models"
-    echo "Phone model field must match one of those names (llama3.1:8b, glm-5.3-flash:cloud, …)."
-    echo "glm-edge-1.5b is the in-app default; pull it or change the phone model."
+    echo "Phone model: llama3.1:8b (XNU/coding expert) or deepseek-r1:1.5b (free local DeepSeek)."
+    echo "glm-edge-1.5b does not exist. glm-5.3-flash:cloud is Ollama-cloud quota (this Mac hit the monthly cap)."
+    echo "Kimi is ollama :cloud — same quota. Grok is https://api.x.ai/v1 + console.x.ai key."
+    echo "Warming llama3.1:8b so the phone does not sit on model step 1…"
+    curl -sS -m 90 http://127.0.0.1:11434/v1/chat/completions \
+      -H 'Content-Type: application/json' \
+      -d '{"model":"llama3.1:8b","messages":[{"role":"user","content":"pong"}],"max_tokens":4}' \
+      >/tmp/lumina-mind-warm.json 2>/tmp/lumina-mind-warm.err || true
     print_phone 11434
     advertise 11434
   fi

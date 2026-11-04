@@ -177,25 +177,43 @@ enum FileKind {
 }
 
 enum FileLoader {
+    /// On-screen cap. A single SwiftUI Text of a 65 KB TAP log jetsams the Debugger.
+    static let screenCap = 12_288
+    static let copyCap = 256_000
+
     static func kind(of path: String) -> FileKind {
         let ext = (path as NSString).pathExtension.lowercased()
-        if ["plist", "strings", "xml", "json", "txt", "log", "conf", "cfg", "sh", "py", "swift", "c", "h", "mm", "js"].contains(ext) {
-            return ext == "plist" ? .plist : .text
-        }
         if ["png", "jpg", "jpeg", "gif", "heic", "webp"].contains(ext) { return .image }
+        if ["plist", "strings"].contains(ext) { return .plist }
+        if ["xml", "json", "txt", "log", "conf", "cfg", "sh", "py", "swift",
+            "c", "h", "mm", "js", "md", "jsonl", "csv", "yml", "yaml", "toml"].contains(ext) {
+            return .text
+        }
+        if path.hasSuffix("_log.txt") { return .text }
         return .binary
     }
 
-    static func text(at path: String, limit: Int = 65_536) -> String? {
+    /// UTF-8 / ASCII only. latin1 always succeeds on binary and used to jetsam the preview.
+    static func looksText(_ data: Data) -> Bool {
+        if data.isEmpty { return true }
+        if data.contains(0) { return false }
+        let n = min(data.count, 1024)
+        var printable = 0
+        data.prefix(n).forEach { b in
+            if (b >= 0x20 && b < 0x7f) || b == 0x09 || b == 0x0a || b == 0x0d { printable += 1 }
+        }
+        return n == 0 || printable * 100 / n >= 85
+    }
+
+    static func text(at path: String, limit: Int = 12_288) -> String? {
         guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
         defer { try? handle.close() }
         let data = handle.readData(ofLength: limit)
-        if let s = String(data: data, encoding: .utf8) { return s }
-        if let s = String(data: data, encoding: .isoLatin1) { return s }
-        return nil
+        guard looksText(data) else { return nil }
+        return String(data: data, encoding: .utf8) ?? String(data: data, encoding: .ascii)
     }
 
-    /// Last `maxBytes` of a TAP log. Huge P044/P073 files jetsam if loaded whole into SwiftUI Text.
+    /// Last `maxBytes` of a TAP / Cinder log. Never load the whole file into the view.
     static func tail(at path: String, maxBytes: Int = 65_536) -> String? {
         guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
         defer { try? handle.close() }
@@ -205,48 +223,65 @@ enum FileLoader {
         let start = size > UInt64(maxBytes) ? size - UInt64(maxBytes) : 0
         do { try handle.seek(toOffset: start) } catch { return nil }
         let data = handle.readDataToEndOfFile()
-        var s = String(data: data, encoding: .utf8) ?? String(data: data, encoding: .isoLatin1) ?? ""
+        var s = String(data: data, encoding: .utf8)
+            ?? (looksText(data) ? String(data: data, encoding: .ascii) : nil)
+            ?? ""
+        if s.isEmpty, !looksText(data) {
+            return "[binary \(size) B — use Hex / Copy hex, not Text]\n"
+        }
         if start > 0 {
             if let nl = s.firstIndex(of: "\n") { s = String(s[s.index(after: nl)...]) }
-            s = "[tail \(maxBytes) B of \(size) B — Copy tail / Open tail, not the whole file]\n" + s
+            s = "[tail \(maxBytes) B of \(size) B — Copy tail, not the whole file]\n" + s
         }
         return s
     }
 
-    static func previewText(at path: String, maxBytes: Int = 65_536) -> String? {
-        let ext = (path as NSString).pathExtension.lowercased()
-        if ["txt", "log", "json"].contains(ext) || path.hasSuffix("_log.txt") {
+    static func previewText(at path: String, maxBytes: Int = 12_288) -> String? {
+        switch kind(of: path) {
+        case .image:
+            return "[image — Info tab shows a thumbnail. Hex for bytes.]"
+        case .binary:
+            return nil
+        case .plist:
+            return plist(at: path, limit: maxBytes) ?? tail(at: path, maxBytes: maxBytes)
+        case .text:
             return tail(at: path, maxBytes: maxBytes)
         }
-        return text(at: path, limit: maxBytes)
     }
 
-    static func plist(at path: String) -> String? {
+    static func plist(at path: String, limit: Int = 256_000) -> String? {
         guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
         defer { try? handle.close() }
-        let data = handle.readData(ofLength: 1_000_000)
+        let data = handle.readData(ofLength: limit)
         if let obj = try? PropertyListSerialization.propertyList(from: data, format: nil) {
             if let xml = try? PropertyListSerialization.data(fromPropertyList: obj, format: .xml, options: 0),
                let s = String(data: xml, encoding: .utf8) {
+                if s.count > screenCap { return String(s.prefix(screenCap)) + "\n…[plist truncated for screen]" }
                 return s
             }
-            return "\(obj)"
+            let dump = "\(obj)"
+            if dump.count > screenCap { return String(dump.prefix(screenCap)) + "\n…[truncated]" }
+            return dump
         }
         return nil
     }
 
-    static func hexDump(at path: String, limit: Int = 4096) -> String? {
+    static func hexDump(at path: String, limit: Int = 2048) -> String? {
         guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
         defer { try? handle.close() }
-        let data = handle.readData(ofLength: limit)
+        let data = handle.readData(ofLength: min(limit, 4096))
         var total: UInt64 = UInt64(data.count)
         if let attrs = try? FileManager.default.attributesOfItem(atPath: path),
            let n = attrs[.size] as? NSNumber {
             total = n.uint64Value
         }
-        var s = hexdump(data, limit: limit)
-        if total > UInt64(limit) { s += "... (\(total) bytes total)\n" }
+        var s = hexdump(data, limit: data.count)
+        if total > UInt64(data.count) { s += "... (\(total) bytes total)\n" }
         return s
+    }
+
+    static func fileSize(at path: String) -> UInt64 {
+        ((try? FileManager.default.attributesOfItem(atPath: path))?[.size] as? NSNumber)?.uint64Value ?? 0
     }
 
     @discardableResult
@@ -279,10 +314,17 @@ enum PackageTool {
     }
 
     /// Uses libarchive so IPA, DEB, tar and gzip all go through one path.
+    /// Whole-file Data(contentsOf:) of a multi-MB IPA jetsams the Files tab — cap at 1.5 MB.
     static func list(_ path: String) -> [PackageEntry] {
-        guard let data = try? Data(contentsOf: URL(fileURLWithPath: path)) else { return [] }
+        let total = FileLoader.fileSize(at: path)
+        if total > 1_500_000 {
+            return [PackageEntry(name: "(package \(total) B — too large to list in-app)", size: Int64(total))]
+        }
+        guard let handle = FileHandle(forReadingAtPath: path) else { return [] }
+        defer { try? handle.close() }
+        let data = handle.readData(ofLength: Int(total))
         guard let (entries, _) = try? Runners.Archive.list(data) else { return [] }
-        return entries.map { line in
+        return entries.prefix(300).map { line in
             let parts = line.components(separatedBy: "  (")
             let name = parts.first ?? line
             let sizeText = parts.count > 1 ? parts[1].replacingOccurrences(of: " B)", with: "") : "0"

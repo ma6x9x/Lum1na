@@ -7,13 +7,16 @@
 import Foundation
 import SwiftUI
 import Darwin
+import AVFoundation
+import UIKit
 
 // MARK: - Settings
 
 enum LuminaMindProvider: String, CaseIterable, Identifiable {
-    case lan = "LAN GLM-Edge"
-    case ollama = "Ollama"
-    case spacexai = "SpaceXAI"
+    case ollama = "Ollama (local/free)"
+    case spacexai = "Grok (xAI)"
+    case openrouter = "OpenRouter free"
+    case lan = "LAN mlx"
     case custom = "Custom"
 
     var id: String { rawValue }
@@ -23,20 +26,24 @@ enum LuminaMindProvider: String, CaseIterable, Identifiable {
         case .lan: return "http://MAC_LAN_IP:8080/v1"
         case .ollama: return "http://MAC_LAN_IP:11434/v1"
         case .spacexai: return "https://api.x.ai/v1"
+        case .openrouter: return "https://openrouter.ai/api/v1"
         case .custom: return "http://MAC_LAN_IP:8080/v1"
         }
     }
 
     var defaultModel: String {
         switch self {
-        case .lan: return "glm-4-9b-chat"
-        case .ollama: return "glm-edge-1.5b"
+        case .lan: return "llama3.1:8b"
+        case .ollama: return "llama3.1:8b"
         case .spacexai: return "grok-4.7"
-        case .custom: return "glm-4-9b-chat"
+        case .openrouter: return "openrouter/free"
+        case .custom: return "llama3.1:8b"
         }
     }
 
-    var needsKey: Bool { self == .spacexai || self == .custom }
+    var needsKey: Bool {
+        self == .spacexai || self == .openrouter || self == .custom
+    }
 }
 
 final class LuminaMindSettings: ObservableObject {
@@ -55,15 +62,48 @@ final class LuminaMindSettings: ObservableObject {
     @Published var autoAnalyze: Bool {
         didSet { UserDefaults.standard.set(autoAnalyze, forKey: "lumind.autoanalyze") }
     }
+    @Published var speakReplies: Bool {
+        didSet { UserDefaults.standard.set(speakReplies, forKey: "lumind.speak") }
+    }
 
     init() {
         let d = UserDefaults.standard
-        let p = LuminaMindProvider(rawValue: d.string(forKey: "lumind.provider") ?? "") ?? .lan
+        let stored = d.string(forKey: "lumind.provider") ?? ""
+        let p: LuminaMindProvider
+        if stored == "SpaceXAI" || stored == "Grok (xAI)" {
+            p = .spacexai
+        } else if stored == "Ollama" || stored == "Ollama (local/free)" {
+            p = .ollama
+        } else if stored == "LAN GLM-Edge" {
+            p = .lan
+        } else {
+            p = LuminaMindProvider(rawValue: stored) ?? .ollama
+        }
         provider = p
         baseURL = d.string(forKey: "lumind.base") ?? p.defaultBase
-        model = d.string(forKey: "lumind.model") ?? p.defaultModel
-        apiKey = d.string(forKey: "lumind.key") ?? ""
+        var m = d.string(forKey: "lumind.model") ?? p.defaultModel
+        // glm-edge-1.5b is not an ollama tag. glm-5.3-flash:cloud is quota-gated.
+        if m == "glm-edge-1.5b" || m == "glm-4-9b-chat" {
+            m = p == .spacexai ? "grok-4.7" : "llama3.1:8b"
+        }
+        model = m
+        var key = d.string(forKey: "lumind.key") ?? ""
+        if key.isEmpty { key = Self.loadDroppedKey() }
+        apiKey = key
         autoAnalyze = d.object(forKey: "lumind.autoanalyze") as? Bool ?? true
+        speakReplies = d.object(forKey: "lumind.speak") as? Bool ?? true
+    }
+
+    /// Drop a one-line key in Documents/xai_key.txt or Documents/openrouter_key.txt.
+    static func loadDroppedKey() -> String {
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+        for name in ["xai_key.txt", "openrouter_key.txt", "lumind.key"] {
+            guard let url = docs?.appendingPathComponent(name),
+                  let raw = try? String(contentsOf: url, encoding: .utf8) else { continue }
+            let s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !s.isEmpty { return s }
+        }
+        return ""
     }
 
     func applyPreset(_ p: LuminaMindProvider) {
@@ -84,6 +124,27 @@ final class LuminaMindSettings: ObservableObject {
         if u.contains("192.168.1.1") { return true }
         return false
     }
+}
+
+final class MindVoice: NSObject, AVSpeechSynthesizerDelegate {
+    static let shared = MindVoice()
+    private let synth = AVSpeechSynthesizer()
+
+    func speak(_ text: String) {
+        let cleaned = text
+            .replacingOccurrences(of: #"<think>[\s\S]*?</think>"#, with: "", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty else { return }
+        if synth.isSpeaking { synth.stopSpeaking(at: .immediate) }
+        let u = AVSpeechUtterance(string: String(cleaned.prefix(1800)))
+        u.voice = AVSpeechSynthesisVoice(language: "en-US")
+            ?? AVSpeechSynthesisVoice(language: "en-GB")
+        u.rate = AVSpeechUtteranceDefaultSpeechRate * 0.95
+        u.pitchMultiplier = 1.02
+        synth.speak(u)
+    }
+
+    func stop() { synth.stopSpeaking(at: .immediate) }
 }
 
 // MARK: - Bundled laws + BM25-lite
@@ -563,6 +624,10 @@ enum LuminaMindTools {
         if !apiKey.isEmpty {
             req.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         }
+        if trimmed.contains("openrouter.ai") {
+            req.setValue("https://github.com/ma6x9x/Lum1na", forHTTPHeaderField: "HTTP-Referer")
+            req.setValue("Lum1na-Mind", forHTTPHeaderField: "X-Title")
+        }
         let sem = DispatchSemaphore(value: 0)
         var data: Data?
         var status = 0
@@ -704,13 +769,14 @@ final class LuminaMindAgent: ObservableObject {
     }
 
     static let systemPrompt = """
-    You are Lum1na-Mind, the on-phone triage agent inside Lum1na-Debugger.
-    You run on the user's lab iPhone. The phone gives you tools: run probes, read logs, search laws, search the web.
+    You are Lum1na-Mind, the user's personal iOS/XNU and coding expert inside Lum1na-Debugger.
+    You know this lab's chain: disclose (P010/P063 via P139, kern.decmpfs/P126) → write (P044 N=192 on A14 23F77; P149 on T8150; SKIP 254/P099/P073) → convert unnamed 0x820 neighbor → SocketKRW.Arm(rw_inpcb) → kread32(kbase)==0xfeedfacf → AfterKread HOLD.
+    A12X 23H30 is FIELD#-only (queue 0x408 / leak +0x550, fill_cap=1). 43748 patched in 26.6. Facet A patched 23G82. hop-1 EINVAL since 26.1. PPL AfterKread is easier on A12X than T8150 SPTM — it is not a first-KRW shortcut.
     Follow CORE LAWS. Never claim KRW without kread32(kbase)==0xfeedfacf.
     Occupancy HIT, PIPE-HIT, panic PCs, and ANE sid dumps are not hasKread.
-    One TAP per force-quit. Panic-possible probes may kill the process — warn before run_tap on p149/p044/p142/cs2/krw.
+    One TAP per force-quit. Warn before run_tap on p149/p044/p142/cs2/krw.
     Prefer tools over guessing. After run_tap, read the auto-analyze. Cite law ids.
-    Default next TAP is a single concrete id, not a stack.
+    Suggest the next SINGLE TAP and why. Write and review code when asked.
     hop-1, 163-sel remaining-fire, TrollRestore/WVEK remaining-fire, 84523 unbounded, 86950-as-first-KRW stay STOP.
     """
 
@@ -732,6 +798,7 @@ final class LuminaMindAgent: ObservableObject {
                 self.messages.append(MindMessage(role: "assistant", text: reply))
                 self.busy = false
                 self.status = "idle"
+                if settings.speakReplies { MindVoice.shared.speak(reply) }
             }
         }
     }
@@ -744,11 +811,30 @@ final class LuminaMindAgent: ObservableObject {
 
     private static func loop(messages: [MindMessage], settings: LuminaMindSettings, engine: LabEngine?,
                              onStatus: @escaping (String) -> Void) -> String {
+        let lastUser = messages.last(where: { $0.role == "user" })?.text ?? ""
+        if settings.isPlaceholder && settings.provider != .spacexai && settings.provider != .openrouter {
+            return offlineExpert(user: lastUser, error: "no Mac URL — Discover or pick Grok (xAI)", engine: engine)
+        }
+        if settings.provider.needsKey && settings.apiKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return offlineExpert(user: lastUser,
+                                 error: "\(settings.provider.rawValue) needs an API key. Paste it in Mind gear, or drop Documents/xai_key.txt (Grok) / Documents/openrouter_key.txt.",
+                                 engine: engine)
+        }
+        onStatus("GET /models")
+        let ping = LuminaMindTools.ping(base: settings.baseURL, model: settings.model, apiKey: settings.apiKey)
+        let resolved = pickModel(requested: settings.model, available: ping.models)
+        if resolved != settings.model {
+            DispatchQueue.main.async { settings.model = resolved }
+            onStatus("using \(resolved)")
+        }
         var history = messages
         for step in 0..<8 {
-            onStatus("model step \(step + 1)")
+            onStatus("chat \(resolved) step \(step + 1)")
             do {
-                let (content, toolCalls) = try chat(history: history, settings: settings)
+                let skip = shouldSkipTools(resolved)
+                let (content, toolCalls) = skip
+                    ? try chatNoTools(history: history, settings: settings, model: resolved)
+                    : try chat(history: history, settings: settings, model: resolved)
                 if toolCalls.isEmpty {
                     if let content, !content.isEmpty { return content }
                     return "(empty model reply)"
@@ -763,10 +849,60 @@ final class LuminaMindAgent: ObservableObject {
                     history.append(MindMessage(role: "tool", text: "[\(call.name)]\n\(clipped)"))
                 }
             } catch {
-                return "model error: \(error.localizedDescription)\nCheck Mind settings (LAN GLM-Edge / mlx_lm.server / ollama / SpaceXAI)."
+                let msg = error.localizedDescription
+                if msg.lowercased().contains("usage limit") || msg.lowercased().contains("upgrade") {
+                    return offlineExpert(user: lastUser,
+                                         error: "Ollama cloud GLM/Kimi quota is exhausted. Switch to llama3.1:8b or deepseek-r1:1.5b (local/free) or Grok (xAI key).",
+                                         engine: engine)
+                }
+                return offlineExpert(user: lastUser, error: msg, engine: engine)
             }
         }
         return "tool-loop cap (8). Ask a narrower question."
+    }
+
+    static func pickModel(requested: String, available: [String]) -> String {
+        if available.isEmpty { return requested }
+        if available.contains(requested) { return requested }
+        let prefer = ["llama3.1:8b", "deepseek-r1:1.5b", "deepseek-coder:1.3b",
+                      "grok-4.7", "grok-4", "grok-4-fast", "openrouter/free"]
+        for p in prefer where available.contains(p) { return p }
+        return available.first { id in
+            let x = id.lowercased()
+            return !x.contains("embed") && !x.contains("cloud")
+        } ?? requested
+    }
+
+    static func shouldSkipTools(_ model: String) -> Bool {
+        let m = model.lowercased()
+        if m.contains("cloud") { return true }
+        if m.contains("glm-edge") { return true }
+        if m.contains("embed") { return true }
+        if m.contains("-base") { return true }
+        if m.contains("deepseek-r1") { return true }
+        if m.contains("deepseek-coder") { return true }
+        return false
+    }
+
+    static func offlineExpert(user: String, error: String?, engine: LabEngine?) -> String {
+        var lines: [String] = [
+            "ON-DEVICE EXPERT (no live model, or the upstream hung / quota-blocked)",
+        ]
+        if let error, !error.isEmpty { lines.append("upstream: \(error)") }
+        lines.append("")
+        lines.append(LuminaMindLaws.analyze(user))
+        lines.append("")
+        lines.append("kreadSignal: \(P007Board.shared().kreadSignal)")
+        if let engine {
+            let ids = engine.outcomes.keys.sorted()
+            if !ids.isEmpty {
+                lines.append("Cinder last: " + ids.suffix(8).joined(separator: ", "))
+            }
+        }
+        lines.append("")
+        lines.append("SUGGESTION: Ident → KERNEL (P139 harvest, then P044 N=192 on 23F77; harvest-only on 23H30). Skip P099/P073. Copy Lab/Cinder logs from the card or Console folder.")
+        lines.append("Mind gear: Ollama llama3.1:8b (local/free), deepseek-r1:1.5b (local/free), or Grok (xAI) with your key.")
+        return lines.joined(separator: "\n")
     }
 
     private struct ToolCall {
@@ -774,10 +910,23 @@ final class LuminaMindAgent: ObservableObject {
         let arguments: String
     }
 
-    private static func chat(history: [MindMessage], settings: LuminaMindSettings) throws -> (String?, [ToolCall]) {
+    private static func applyHeaders(_ req: inout URLRequest, settings: LuminaMindSettings) {
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.setValue("Lum1na-Debugger", forHTTPHeaderField: "User-Agent")
+        if !settings.apiKey.isEmpty {
+            req.setValue("Bearer \(settings.apiKey)", forHTTPHeaderField: "Authorization")
+        }
+        if settings.provider == .openrouter {
+            req.setValue("https://github.com/ma6x9x/Lum1na", forHTTPHeaderField: "HTTP-Referer")
+            req.setValue("Lum1na-Mind", forHTTPHeaderField: "X-Title")
+        }
+    }
+
+    private static func chat(history: [MindMessage], settings: LuminaMindSettings, model: String? = nil) throws -> (String?, [ToolCall]) {
+        let modelName = model ?? settings.model
         let base = settings.baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         if LuminaMindSettings.isPlaceholder(base) {
-            throw NSError(domain: "Lumind", code: 1, userInfo: [NSLocalizedDescriptionKey: "Mind is not pointed at a Mac. Open Mind settings → Discover, or paste the Phone URL printed by tools/lumina_mind_serve.sh. 192.168.1.1 is usually the router."])
+            throw NSError(domain: "Lumind", code: 1, userInfo: [NSLocalizedDescriptionKey: "Mind is not pointed at a Mac. Open Mind settings → Discover, pick Grok (xAI), or paste the Phone URL from tools/lumina_mind_serve.sh."])
         }
         guard let url = URL(string: base + "/chat/completions") else {
             throw NSError(domain: "Lumind", code: 1, userInfo: [NSLocalizedDescriptionKey: "bad base URL"])
@@ -791,18 +940,15 @@ final class LuminaMindAgent: ObservableObject {
             }
         }
         var body: [String: Any] = [
-            "model": settings.model,
+            "model": modelName,
             "messages": msgs,
             "temperature": 0.2,
             "tools": LuminaMindTools.openaiTools(),
             "tool_choice": "auto"
         ]
-        var req = URLRequest(url: url, timeoutInterval: 120)
+        var req = URLRequest(url: url, timeoutInterval: 55)
         req.httpMethod = "POST"
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if !settings.apiKey.isEmpty {
-            req.setValue("Bearer \(settings.apiKey)", forHTTPHeaderField: "Authorization")
-        }
+        applyHeaders(&req, settings: settings)
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let sem = DispatchSemaphore(value: 0)
@@ -815,14 +961,14 @@ final class LuminaMindAgent: ObservableObject {
             code = (resp as? HTTPURLResponse)?.statusCode ?? 0
             sem.signal()
         }.resume()
-        _ = sem.wait(timeout: .now() + 125)
+        _ = sem.wait(timeout: .now() + 58)
         if let err { throw err }
-        guard let data else { throw NSError(domain: "Lumind", code: 2, userInfo: [NSLocalizedDescriptionKey: "no response from \(base)"]) }
+        guard let data else { throw NSError(domain: "Lumind", code: 2, userInfo: [NSLocalizedDescriptionKey: "no response from \(base) — first llama3.1:8b load can take a minute. Warm it on the Mac: curl the chat endpoint once."]) }
         if code >= 400 {
             let raw = String(data: data, encoding: .utf8) ?? ""
             // retry without tools if the server rejects the tools field
             if raw.lowercased().contains("tool") || code == 400 {
-                return try chatNoTools(history: history, settings: settings)
+                return try chatNoTools(history: history, settings: settings, model: modelName)
             }
             throw NSError(domain: "Lumind", code: code, userInfo: [NSLocalizedDescriptionKey: "HTTP \(code): \(raw.prefix(400))"])
         }
@@ -847,10 +993,11 @@ final class LuminaMindAgent: ObservableObject {
         return (content, calls)
     }
 
-    private static func chatNoTools(history: [MindMessage], settings: LuminaMindSettings) throws -> (String?, [ToolCall]) {
+    private static func chatNoTools(history: [MindMessage], settings: LuminaMindSettings, model: String? = nil) throws -> (String?, [ToolCall]) {
+        let modelName = model ?? settings.model
         let base = settings.baseURL.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         if LuminaMindSettings.isPlaceholder(base) {
-            throw NSError(domain: "Lumind", code: 1, userInfo: [NSLocalizedDescriptionKey: "Mind is not pointed at a Mac. Open Mind settings → Discover, or paste the Phone URL printed by tools/lumina_mind_serve.sh."])
+            throw NSError(domain: "Lumind", code: 1, userInfo: [NSLocalizedDescriptionKey: "Mind is not pointed at a Mac. Open Mind settings → Discover, pick Grok (xAI), or paste the Phone URL from tools/lumina_mind_serve.sh."])
         }
         guard let url = URL(string: base + "/chat/completions") else {
             throw NSError(domain: "Lumind", code: 1, userInfo: [NSLocalizedDescriptionKey: "bad base URL"])
@@ -868,16 +1015,13 @@ final class LuminaMindAgent: ObservableObject {
             msgs.append(["role": m.role == "tool" ? "user" : m.role, "content": m.text])
         }
         let body: [String: Any] = [
-            "model": settings.model,
+            "model": modelName,
             "messages": msgs,
             "temperature": 0.2
         ]
-        var req = URLRequest(url: url, timeoutInterval: 120)
+        var req = URLRequest(url: url, timeoutInterval: 55)
         req.httpMethod = "POST"
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if !settings.apiKey.isEmpty {
-            req.setValue("Bearer \(settings.apiKey)", forHTTPHeaderField: "Authorization")
-        }
+        applyHeaders(&req, settings: settings)
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
         let sem = DispatchSemaphore(value: 0)
         var data: Data?
@@ -885,7 +1029,7 @@ final class LuminaMindAgent: ObservableObject {
         URLSession.shared.dataTask(with: req) { d, _, e in
             data = d; err = e; sem.signal()
         }.resume()
-        _ = sem.wait(timeout: .now() + 125)
+        _ = sem.wait(timeout: .now() + 58)
         if let err { throw err }
         guard let data,
               let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any],
@@ -991,10 +1135,18 @@ struct MindPane: View {
                         .font(T.tiny)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showSettings = true
-                    } label: {
-                        Image(systemName: "gearshape.fill")
+                    HStack(spacing: 14) {
+                        Button {
+                            settings.speakReplies.toggle()
+                            if !settings.speakReplies { MindVoice.shared.stop() }
+                        } label: {
+                            Image(systemName: settings.speakReplies ? "speaker.wave.2.fill" : "speaker.slash")
+                        }
+                        Button {
+                            showSettings = true
+                        } label: {
+                            Image(systemName: "gearshape.fill")
+                        }
                     }
                 }
             }
@@ -1007,16 +1159,16 @@ struct MindPane: View {
 
     private var banner: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("GLM-Edge / Lum1na-Mind")
+            Text("Lum1na-Mind · iOS/XNU expert")
                 .font(T.head)
                 .foregroundColor(.white)
-            if settings.isPlaceholder {
-                Text("Not connected. Open the gear: Discover, or paste the Phone URL from Mac tools/lumina_mind_serve.sh. 192.168.1.1 is usually the router, not the Mac.")
+            if settings.isPlaceholder && settings.provider != .spacexai && settings.provider != .openrouter {
+                Text("Not connected. Gear: Grok (xAI) + your key, or Discover the Mac ollama URL. llama3.1:8b and deepseek-r1:1.5b are local/free. 192.168.1.1 is the router.")
                     .font(T.tiny)
                     .foregroundColor(T.warn)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
-                Text("\(settings.provider.rawValue) · \(settings.model)\n\(settings.baseURL)\nPhone tools: run_tap, logs, laws, web_search, VA law, Cinder, mind_ping. Weights stay off-device.")
+                Text("\(settings.provider.rawValue) · \(settings.model)\n\(settings.baseURL)\nSpeak \(settings.speakReplies ? "ON" : "off"). Tools: run_tap, Cinder, logs, laws.")
                     .font(T.tiny)
                     .foregroundColor(.white.opacity(0.45))
                     .fixedSize(horizontal: false, vertical: true)
@@ -1049,11 +1201,11 @@ struct MindPane: View {
         VStack(spacing: 8) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    chip("Ping Mac") { agent.send("mind_ping the configured endpoint. Report OK/FAIL and the model list. Do not run a TAP.") }
+                    chip("Ping") { agent.send("mind_ping the configured endpoint. Report OK/FAIL and the model list. Do not run a TAP.") }
                     chip("Ident + board") { agent.send("Run ident and read_board. Summarize SKU and kreadSignal. Do not fire panic-possible probes.") }
+                    chip("Next TAP") { agent.send("Read the board and Cinder last results. Suggest the next SINGLE TAP on this SKU and why. Do not fire it.") }
                     chip("Analyze last TAP") { agent.send("Read p011_tap_log.txt, then analyze the newest matching Documents log. Cite CORE LAWS. Next TAP = one id.") }
                     chip("17 KRW path") { agent.send("chain_status then search_laws for T8150 KRW. What is the next single TAP on this SKU? Do not fire it yet.") }
-                    chip("Web CVE 27.2") { agent.send("web_search iOS 27.2 security content AVEVideoEncoder APFS IOSurface. Catalog only; do not remaining-fire.") }
                 }
                 .padding(.horizontal, 12)
             }
@@ -1188,10 +1340,10 @@ struct MindSettingsSheet: View {
         NavigationStack {
             Form {
                 Section("Mac / phone setup") {
-                    Text("1. Same Wi-Fi as this phone.\n2. Mac: tools/lumina_mind_serve.sh (binds 0.0.0.0, prints Phone URL, advertises Bonjour).\n3. Allow Local Network when iOS asks.\n4. Discover below, or paste http://<mac-lan-ip>:11434/v1 (ollama) or :8080/v1 (mlx).\n5. Test Connection, then pick a model name the server actually has.")
+                    Text("Free local (no key): Mac ollama llama3.1:8b (XNU/coding) or deepseek-r1:1.5b. GLM cloud on this Mac is quota-exhausted; glm-edge-1.5b does not exist.\nGrok: pick Grok (xAI), paste the console.x.ai key, model grok-4.7.\nOpenRouter free: pick that provider, paste a free key, model openrouter/free (Kimi :free is gone; GLM :free rotates).\nOr drop Documents/xai_key.txt / openrouter_key.txt.")
                         .font(T.tiny)
                         .foregroundColor(.secondary)
-                    if settings.isPlaceholder {
+                    if settings.isPlaceholder && settings.provider != .spacexai && settings.provider != .openrouter {
                         Text("Current URL is a placeholder / gateway. 192.168.1.1 is usually the router.")
                             .font(T.tiny)
                             .foregroundColor(T.warn)
@@ -1277,11 +1429,36 @@ struct MindSettingsSheet: View {
                         bonjour.start()
                     }
                 }
+                Section("Quick models") {
+                    modelChip("llama3.1:8b", hint: "local expert") {
+                        settings.provider = .ollama
+                        let b = settings.baseURL
+                        if b.contains("MAC_LAN_IP") || b.contains("x.ai") || b.contains("openrouter") {
+                            settings.baseURL = LuminaMindProvider.ollama.defaultBase
+                        }
+                        settings.model = "llama3.1:8b"
+                    }
+                    modelChip("deepseek-r1:1.5b", hint: "local free") {
+                        settings.provider = .ollama
+                        let b = settings.baseURL
+                        if b.contains("MAC_LAN_IP") || b.contains("x.ai") || b.contains("openrouter") {
+                            settings.baseURL = LuminaMindProvider.ollama.defaultBase
+                        }
+                        settings.model = "deepseek-r1:1.5b"
+                    }
+                    modelChip("grok-4.7", hint: "your xAI key") {
+                        settings.applyPreset(.spacexai)
+                    }
+                    modelChip("openrouter/free", hint: "free key") {
+                        settings.applyPreset(.openrouter)
+                    }
+                }
                 Section("Behavior") {
                     Toggle("Auto-analyze after TAP", isOn: $settings.autoAnalyze)
+                    Toggle("Speak replies", isOn: $settings.speakReplies)
                 }
                 Section("Notes") {
-                    Text("LAN ollama: OLLAMA_HOST=0.0.0.0:11434. mlx_lm.server --host 0.0.0.0. SpaceXAI: https://api.x.ai/v1 model grok-4.7, key from docs.x.ai. Weights are not in the IPA.")
+                    Text("LAN ollama: OLLAMA_HOST=0.0.0.0:11434. Grok: https://api.x.ai/v1 + key from console.x.ai. OpenRouter: https://openrouter.ai/api/v1 + free key. Weights stay off the IPA.")
                         .font(T.tiny)
                         .foregroundColor(.secondary)
                 }
@@ -1301,7 +1478,22 @@ struct MindSettingsSheet: View {
         .preferredColorScheme(.dark)
     }
 
+    private func modelChip(_ name: String, hint: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack {
+                Text(name).font(T.monoSm)
+                Spacer()
+                Text(hint).font(T.tiny).foregroundColor(.secondary)
+                if settings.model == name { Image(systemName: "checkmark") }
+            }
+        }
+    }
+
     private func runPing() {
+        if settings.apiKey.isEmpty {
+            let dropped = LuminaMindSettings.loadDroppedKey()
+            if !dropped.isEmpty { settings.apiKey = dropped }
+        }
         pingBusy = true
         pingText = "probing \(settings.baseURL)…"
         let base = settings.baseURL

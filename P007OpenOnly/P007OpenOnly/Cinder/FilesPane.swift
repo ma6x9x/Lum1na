@@ -558,15 +558,21 @@ struct FileInfoSheet: View {
                         }
                     }
                     if !item.isDirectory {
-                        Card {
-                            VStack(alignment: .leading, spacing: 6) {
-                                SectionLabel(text: t("files.hex"))
-                                Text(FileLoader.hexDump(at: item.path, limit: 2048) ?? "—")
-                                    .font(.system(size: 9.5, design: .monospaced))
-                                    .foregroundColor(.white.opacity(0.6))
-                                    .textSelection(.enabled)
+                        HStack(spacing: 10) {
+                            Button("Copy tail") {
+                                UIPasteboard.general.string = FileLoader.tail(at: item.path, maxBytes: FileLoader.copyCap) ?? ""
                             }
+                            .font(.system(size: 12, weight: .semibold))
+                            .tint(T.ember)
+                            Button("Copy path") {
+                                UIPasteboard.general.string = item.path
+                            }
+                            .font(.system(size: 12, weight: .semibold))
+                            .tint(T.ember)
                         }
+                        Text("Open the file for a bounded Text/Hex view. Info no longer hex-dumps on this sheet (that jetsamed the Files tab).")
+                            .font(T.tiny)
+                            .foregroundColor(.white.opacity(0.35))
                     }
                 }
                 .padding(16)

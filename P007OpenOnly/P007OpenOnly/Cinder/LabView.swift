@@ -69,6 +69,15 @@ struct LabView: View {
             .background(T.bg.ignoresSafeArea())
             .navigationTitle(t("lab.title"))
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Copy all") {
+                        UIPasteboard.general.string = engine.copyAllResults()
+                    }
+                    .font(T.tiny)
+                    .tint(T.ember)
+                }
+            }
             .sheet(item: $selected) { module in
                 ModuleDetailView(module: module)
                     .environmentObject(engine)
@@ -170,9 +179,11 @@ struct ModuleDetailView: View {
                                     Spacer()
                                     Text("\(outcome.elapsedMs) ms").font(T.monoSm).foregroundColor(.white.opacity(0.3))
                                     Button {
-                                        UIPasteboard.general.string = outcome.copyBlock(moduleId: module.id)
+                                        UIPasteboard.general.string =
+                                            CinderLogStore.readFull(id: module.id)
+                                            ?? outcome.copyBlock(moduleId: module.id)
                                     } label: {
-                                        Label("Copy", systemImage: "doc.on.doc")
+                                        Label("Copy full", systemImage: "doc.on.doc")
                                             .font(.system(size: 11, weight: .semibold))
                                     }
                                     .tint(T.ember)
@@ -182,18 +193,25 @@ struct ModuleDetailView: View {
                                     .foregroundColor(outcome.failed ? T.bad : T.good)
                                     .textSelection(.enabled)
                                 if !outcome.detail.isEmpty {
-                                    Text(outcome.detail)
+                                    let shown = outcome.detail.count > 4000
+                                        ? String(outcome.detail.prefix(4000)) + "\n…[Copy full]"
+                                        : outcome.detail
+                                    Text(shown)
                                         .font(T.monoSm)
                                         .foregroundColor(.white.opacity(0.6))
                                         .fixedSize(horizontal: false, vertical: true)
                                         .textSelection(.enabled)
                                 }
-                                ForEach(Array(outcome.evidence.enumerated()), id: \.offset) { _, line in
+                                ForEach(Array(outcome.evidence.prefix(40).enumerated()), id: \.offset) { _, line in
                                     Text("· \(line)")
                                         .font(T.monoSm)
                                         .foregroundColor(.white.opacity(0.42))
+                                        .lineLimit(4)
                                         .textSelection(.enabled)
                                 }
+                                Text("Full log: Documents/cinder/\(CinderLogStore.safeId(module.id))_log.txt  ·  Console → folder")
+                                    .font(T.tiny)
+                                    .foregroundColor(.white.opacity(0.35))
                             }
                         }
                     }
@@ -202,17 +220,26 @@ struct ModuleDetailView: View {
                     if !history.isEmpty {
                         Card {
                             VStack(alignment: .leading, spacing: 6) {
-                                SectionLabel(text: t("module.history"))
-                                ForEach(history.suffix(6)) { entry in
-                                    HStack(spacing: 8) {
+                                HStack {
+                                    SectionLabel(text: t("module.history"))
+                                    Spacer()
+                                    Button("Copy") {
+                                        let block = history.map { "\($0.phase)\t\($0.detail)" }.joined(separator: "\n")
+                                        UIPasteboard.general.string = block
+                                    }
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .tint(T.ember)
+                                }
+                                ForEach(history.suffix(8)) { entry in
+                                    VStack(alignment: .leading, spacing: 2) {
                                         Text(entry.phase)
                                             .font(T.monoSm)
                                             .foregroundColor(entry.phase == "died" ? T.ember : .white.opacity(0.4))
-                                            .frame(width: 46, alignment: .leading)
                                         Text(entry.detail)
                                             .font(T.monoSm)
                                             .foregroundColor(.white.opacity(0.35))
-                                            .lineLimit(1)
+                                            .lineLimit(3)
+                                            .textSelection(.enabled)
                                     }
                                 }
                             }

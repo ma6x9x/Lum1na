@@ -147,6 +147,32 @@ struct ChainView: View {
 }
 
 // MARK: - File preview
+//
+// UITextView, not SwiftUI Text: a 65 KB TAP log / latin1-decoded binary in one
+// Text() jetsams the Files tab. Load happens per-tab, on a background queue.
+
+struct SafeLogView: UIViewRepresentable {
+    let text: String
+    var fontSize: CGFloat = 11
+
+    func makeUIView(context: Context) -> UITextView {
+        let v = UITextView()
+        v.isEditable = false
+        v.isSelectable = true
+        v.backgroundColor = .clear
+        v.textColor = UIColor.white.withAlphaComponent(0.82)
+        v.font = UIFont.monospacedSystemFont(ofSize: fontSize, weight: .regular)
+        v.textContainerInset = UIEdgeInsets(top: 10, left: 10, bottom: 10, right: 10)
+        v.alwaysBounceVertical = true
+        v.adjustsFontForContentSizeCategory = false
+        v.dataDetectorTypes = []
+        return v
+    }
+
+    func updateUIView(_ v: UITextView, context: Context) {
+        if v.text != text { v.text = text }
+    }
+}
 
 struct FilePreviewView: View {
     let item: FileItem
@@ -161,6 +187,8 @@ struct FilePreviewView: View {
     @State private var status = ""
     @State private var copied = false
     @State private var packageEntries: [PackageEntry] = []
+    @State private var thumb: UIImage?
+    @State private var loading = false
 
     var body: some View {
         NavigationStack {
@@ -174,6 +202,7 @@ struct FilePreviewView: View {
                 .pickerStyle(.segmented)
                 .padding(.horizontal, 16)
                 .padding(.vertical, 10)
+                .onChange(of: mode) { _, _ in loadTab() }
 
                 if !status.isEmpty {
                     Text(status).font(T.monoSm)
@@ -182,63 +211,11 @@ struct FilePreviewView: View {
                         .padding(.horizontal, 16).padding(.bottom, 6)
                 }
 
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
-                        switch mode {
-                        case 0:
-                            Card {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    ForEach(Array(info.enumerated()), id: \.offset) { _, row in
-                                        KeyValueRow(key: row.0, value: row.1)
-                                    }
-                                }
-                            }
-                        case 1:
-                            if editing {
-                                Card {
-                                    TextEditor(text: $draft)
-                                        .font(.system(size: 11, design: .monospaced))
-                                        .frame(minHeight: 320)
-                                        .scrollContentBackground(.hidden)
-                                        .background(T.panelHi)
-                                        .cornerRadius(8)
-                                }
-                            } else {
-                                Card {
-                                    Text(text ?? "—")
-                                        .font(T.monoSm)
-                                        .foregroundColor(.white.opacity(0.7))
-                                        .textSelection(.enabled)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                }
-                            }
-                        case 2:
-                            Card {
-                                Text(hex ?? "—")
-                                    .font(.system(size: 9.5, design: .monospaced))
-                                    .foregroundColor(.white.opacity(0.7))
-                                    .textSelection(.enabled)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                        default:
-                            Card {
-                                VStack(alignment: .leading, spacing: 3) {
-                                    if packageEntries.isEmpty {
-                                        Text("—").font(T.monoSm).foregroundColor(.white.opacity(0.4))
-                                    } else {
-                                        ForEach(packageEntries.prefix(300)) { e in
-                                            Text("\(e.name)  \(e.size) B")
-                                                .font(T.monoSm)
-                                                .foregroundColor(.white.opacity(0.6))
-                                                .lineLimit(1)
-                                        }
-                                    }
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                        }
-                    }
-                    .padding(16)
+                if loading {
+                    ProgressView().tint(T.ember).padding(.top, 20)
+                    Spacer()
+                } else {
+                    pane
                 }
             }
             .background(T.bg.ignoresSafeArea())
@@ -246,7 +223,7 @@ struct FilePreviewView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    if mode == 1 && browser.writable {
+                    if mode == 1 && browser.writable && (text?.count ?? 0) < 24_000 {
                         Button(editing ? t("files.cancel") : t("files.save")) {
                             if editing { save() } else { editing = true; draft = text ?? "" }
                         }.tint(T.ember)
@@ -255,8 +232,7 @@ struct FilePreviewView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack {
                         Button {
-                            UIPasteboard.general.string = text ?? FileLoader.tail(at: item.path) ?? ""
-                            copied = true
+                            copyCurrent()
                         } label: {
                             Image(systemName: copied ? "checkmark" : "doc.on.doc")
                         }.tint(T.ember)
@@ -264,30 +240,122 @@ struct FilePreviewView: View {
                     }
                 }
             }
-            .onAppear(perform: load)
+            .onAppear {
+                info = browser.fileInfo(item)
+                loadTab()
+            }
         }
     }
 
-    private func load() {
-        info = browser.fileInfo(item)
+    @ViewBuilder
+    private var pane: some View {
+        switch mode {
+        case 0:
+            ScrollView {
+                VStack(alignment: .leading, spacing: 12) {
+                    Card {
+                        VStack(alignment: .leading, spacing: 2) {
+                            ForEach(Array(info.enumerated()), id: \.offset) { _, row in
+                                KeyValueRow(key: row.0, value: row.1)
+                            }
+                        }
+                    }
+                    if let thumb {
+                        Image(uiImage: thumb)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxHeight: 240)
+                            .cornerRadius(10)
+                    }
+                    Text("Screen shows a tail. Copy puts up to 256 KB on the pasteboard. Huge TAP logs stay in Documents.")
+                        .font(T.tiny)
+                        .foregroundColor(.white.opacity(0.35))
+                        .padding(.horizontal, 4)
+                }
+                .padding(16)
+            }
+        case 1:
+            if editing {
+                TextEditor(text: $draft)
+                    .font(.system(size: 11, design: .monospaced))
+                    .scrollContentBackground(.hidden)
+                    .background(T.panelHi)
+                    .padding(8)
+            } else {
+                SafeLogView(text: text ?? "—")
+            }
+        case 2:
+            SafeLogView(text: hex ?? "—", fontSize: 10)
+        default:
+            ScrollView {
+                VStack(alignment: .leading, spacing: 3) {
+                    if packageEntries.isEmpty {
+                        Text("—").font(T.monoSm).foregroundColor(.white.opacity(0.4))
+                    } else {
+                        ForEach(packageEntries.prefix(300)) { e in
+                            Text("\(e.name)  \(e.size) B")
+                                .font(T.monoSm)
+                                .foregroundColor(.white.opacity(0.6))
+                                .lineLimit(1)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(16)
+            }
+        }
+    }
+
+    private func copyCurrent() {
+        let body: String
+        switch mode {
+        case 2:
+            body = hex ?? FileLoader.hexDump(at: item.path, limit: 4096) ?? ""
+        default:
+            body = FileLoader.tail(at: item.path, maxBytes: FileLoader.copyCap) ?? text ?? ""
+        }
+        UIPasteboard.general.string = body
+        copied = true
+        status = "✓ copied \(body.count) chars"
+    }
+
+    private func loadTab() {
         let path = item.path
         let size = item.size
+        let tab = mode
+        loading = (tab != 0)
         DispatchQueue.global(qos: .userInitiated).async {
-            let kind = FileLoader.kind(of: path)
-            let preview: String?
-            switch kind {
-            case .plist: preview = FileLoader.plist(at: path) ?? FileLoader.previewText(at: path)
-            default: preview = FileLoader.previewText(at: path)
-            }
-            let dump = FileLoader.hexDump(at: path, limit: 4096)
+            var preview: String?
+            var dump: String?
             var pkg: [PackageEntry] = []
-            if PackageTool.isZip(path), size < 8_000_000 {
-                pkg = PackageTool.list(path)
+            var image: UIImage?
+            switch tab {
+            case 1:
+                preview = FileLoader.previewText(at: path, maxBytes: FileLoader.screenCap)
+                    ?? "[binary \(size) B — Hex tab / Copy tail]"
+            case 2:
+                dump = FileLoader.hexDump(at: path, limit: 2048)
+            case 3:
+                if PackageTool.isZip(path) { pkg = PackageTool.list(path) }
+            default:
+                if FileLoader.kind(of: path) == .image {
+                    image = UIImage(contentsOfFile: path)
+                    if let raw = image, raw.size.width > 800 || raw.size.height > 800 {
+                        let scale = min(800 / raw.size.width, 800 / raw.size.height)
+                        let sz = CGSize(width: raw.size.width * scale, height: raw.size.height * scale)
+                        UIGraphicsBeginImageContextWithOptions(sz, false, 1)
+                        raw.draw(in: CGRect(origin: .zero, size: sz))
+                        image = UIGraphicsGetImageFromCurrentImageContext()
+                        UIGraphicsEndImageContext()
+                    }
+                }
             }
             DispatchQueue.main.async {
-                text = preview
-                hex = dump
-                packageEntries = pkg
+                if tab == 1 { text = preview }
+                if tab == 2 { hex = dump }
+                if tab == 3 { packageEntries = pkg }
+                if tab == 0 { thumb = image }
+                loading = false
             }
         }
     }

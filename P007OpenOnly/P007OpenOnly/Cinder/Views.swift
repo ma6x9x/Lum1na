@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct RootView: View {
     @EnvironmentObject private var engine: LabEngine
@@ -104,9 +105,15 @@ struct DashboardView: View {
                     }
 
                     if tested > 0 {
-                        RunButton(title: t("ov.reset"), systemImage: "arrow.counterclockwise",
-                                  tint: T.info) {
-                            engine.journal.clear()
+                        HStack(spacing: 10) {
+                            RunButton(title: t("ov.reset"), systemImage: "arrow.counterclockwise",
+                                      tint: T.info) {
+                                engine.journal.clear()
+                            }
+                            RunButton(title: "Copy all logs", systemImage: "doc.on.doc",
+                                      tint: T.ember) {
+                                UIPasteboard.general.string = engine.copyAllResults()
+                            }
                         }
                     }
 
@@ -205,7 +212,15 @@ struct DashboardView: View {
     private var logCard: some View {
         Card {
             VStack(alignment: .leading, spacing: 8) {
-                SectionLabel(text: t("ov.log"))
+                HStack {
+                    SectionLabel(text: t("ov.log"))
+                    Spacer()
+                    Button("Copy") {
+                        UIPasteboard.general.string = engine.copyAllResults()
+                    }
+                    .font(.system(size: 11, weight: .semibold))
+                    .tint(T.ember)
+                }
                 if engine.logLines.isEmpty {
                     Text(t("ov.log.empty")).font(T.monoSm).foregroundColor(.white.opacity(0.3))
                 } else {
@@ -214,6 +229,9 @@ struct DashboardView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
+                Text("Full Cinder log: Documents/cinder_lab_log.txt  ·  per-module Documents/cinder/<id>_log.txt")
+                    .font(T.tiny)
+                    .foregroundColor(.white.opacity(0.32))
             }
         }
     }

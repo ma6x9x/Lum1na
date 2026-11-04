@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import Darwin
 
 enum Reach: String, Codable, CaseIterable {
     case inProcess = "进程内"
@@ -41,7 +42,70 @@ struct ModuleOutcome {
         if !detail.isEmpty { lines.append(detail) }
         lines.append(contentsOf: evidence)
         if elapsedMs > 0 { lines.append("elapsedMs=\(elapsedMs)") }
+        if !artifacts.isEmpty {
+            lines.append("--- artifacts ---")
+            lines.append(contentsOf: artifacts.map(\.path))
+        }
         return lines.joined(separator: "\n")
+    }
+}
+
+/// Documents/cinder/<id>_log.txt + Documents/cinder_lab_log.txt. Full text for Copy.
+enum CinderLogStore {
+    static var dir: URL {
+        let u = Container.documents.appendingPathComponent("cinder", isDirectory: true)
+        try? FileManager.default.createDirectory(at: u, withIntermediateDirectories: true)
+        return u
+    }
+    static var labLog: URL {
+        Container.documents.appendingPathComponent("cinder_lab_log.txt")
+    }
+
+    static func safeId(_ id: String) -> String {
+        id.replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: " ", with: "_")
+    }
+
+    static func url(for id: String) -> URL {
+        dir.appendingPathComponent("\(safeId(id))_log.txt")
+    }
+
+    static func persist(id: String, title: String, cve: String,
+                        outcome: ModuleOutcome, history: [JournalEntry]) -> URL {
+        var lines: [String] = []
+        lines.append("=== CINDER \(id) ===")
+        lines.append("title=\(title)")
+        lines.append("cve=\(cve)")
+        lines.append("when=\(ISO8601DateFormatter().string(from: Date()))")
+        lines.append(outcome.copyBlock(moduleId: id))
+        if !history.isEmpty {
+            lines.append("--- journal ---")
+            for e in history {
+                lines.append("\(e.phase)\t\(ISO8601DateFormatter().string(from: e.armedAt))\t\(e.detail)")
+            }
+        }
+        let body = lines.joined(separator: "\n") + "\n\n"
+        let dest = url(for: id)
+        append(body, to: dest)
+        append(body, to: labLog)
+        return dest
+    }
+
+    static func readFull(id: String) -> String? {
+        FileLoader.tail(at: url(for: id).path, maxBytes: 512_000)
+    }
+
+    static func copyAll() -> String {
+        FileLoader.tail(at: labLog.path, maxBytes: 512_000) ?? "(no Cinder runs yet — Lab → run a module, then Copy)"
+    }
+
+    static func append(_ s: String, to url: URL) {
+        guard let d = s.data(using: .utf8) else { return }
+        let fd = open(url.path, O_CREAT | O_APPEND | O_WRONLY, 0o644)
+        guard fd >= 0 else { return }
+        d.withUnsafeBytes { raw in _ = write(fd, raw.baseAddress, raw.count) }
+        fcntl(fd, F_FULLFSYNC)
+        close(fd)
     }
 }
 
@@ -140,6 +204,19 @@ final class LabEngine: ObservableObject {
             self.logLines.append(stamped)
             if self.logLines.count > 400 { self.logLines.removeFirst(self.logLines.count - 400) }
         }
+        CinderLogStore.append(stamped + "\n", to: CinderLogStore.labLog)
+    }
+
+    func copyAllResults() -> String {
+        var parts = [CinderLogStore.copyAll()]
+        let ids = outcomes.keys.sorted()
+        if !ids.isEmpty {
+            parts.append("=== IN-MEMORY OUTCOMES \(ids.count) ===")
+            for id in ids {
+                if let o = outcomes[id] { parts.append(o.copyBlock(moduleId: id)); parts.append("") }
+            }
+        }
+        return parts.joined(separator: "\n")
     }
 
     func run(_ module: ExploitModule) {
@@ -157,10 +234,14 @@ final class LabEngine: ObservableObject {
                 var out = try module.run(ctx)
                 out.elapsedMs = Int(Date().timeIntervalSince(started) * 1000)
                 let footer = LuminaLearn.finish(module.id, log: out.headline + "\n" + out.detail)
+                let hist = ctx.journal.history(for: module.id)
+                let logURL = CinderLogStore.persist(id: module.id, title: module.title,
+                                                    cve: module.cve, outcome: out, history: hist)
                 DispatchQueue.main.async {
                     self.outcomes[module.id] = out
                     self.running.remove(module.id)
                     self.log("✓ \(module.title) — \(out.headline) (\(out.elapsedMs) ms)")
+                    self.log("  log Documents/cinder/\(logURL.lastPathComponent)")
                     for line in footer.components(separatedBy: .newlines) where line.hasPrefix("id=") || line.hasPrefix("sibling:") || line.hasPrefix("hasKread") {
                         self.log("  " + line)
                     }
@@ -171,6 +252,9 @@ final class LabEngine: ObservableObject {
                 var out = ModuleOutcome(headline: tl("失败"), detail: message, failed: true)
                 out.elapsedMs = Int(Date().timeIntervalSince(started) * 1000)
                 _ = LuminaLearn.finish(module.id, log: "failed\n" + message)
+                let hist = ctx.journal.history(for: module.id)
+                _ = CinderLogStore.persist(id: module.id, title: module.title,
+                                           cve: module.cve, outcome: out, history: hist)
                 DispatchQueue.main.async {
                     self.outcomes[module.id] = out
                     self.running.remove(module.id)
@@ -219,6 +303,9 @@ extension LabEngine {
             }
             out.elapsedMs = Int(Date().timeIntervalSince(started) * 1000)
             let finished = out
+            let hist = ctx.journal.history(for: module.id)
+            _ = CinderLogStore.persist(id: module.id, title: module.title,
+                                       cve: module.cve, outcome: finished, history: hist)
             let next = index + 1
             DispatchQueue.main.async {
                 self.outcomes[module.id] = finished

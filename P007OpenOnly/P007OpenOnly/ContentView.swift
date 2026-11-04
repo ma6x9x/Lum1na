@@ -202,7 +202,7 @@ struct ContentView: View {
                         moreRow("CS calib. phys_oob race only (not KRW)", "cscali")
                         moreRow("P122 SwordForge. combined 64788 KRW test (freer→reclaim→read)", "swordforge")
                         moreRow("P123 ShapeCensus. kalloc.3072 victims with KRW vision (mini/libkrw)", "shapecensus")
-                        moreRow("KERNEL. hunt-krw-5: P139 disclose (P010 QueueCreate copyout + P063 aio kptr) then hunt P044 N=192 LIVE / 17 P114+P149 / A12X 23H30 FIELD# harvest + kread32. SKIP P099/P073 254. Occupancy / PIPE-HIT is not hasKread.", "krw")
+                        moreRow("KERNEL. hunt-krw-6: P139 disclose (P010 QueueCreate copyout + P063 aio kptr) then hunt P044 N=192 LIVE / 17 P114+P149 / A12X 23H30 FIELD# harvest + kread32. SKIP P099/P073 254. Occupancy / PIPE-HIT is not hasKread.", "krw")
                         moreRow("PATHS. Per-path scorecard + READ-ONLY tests. Hunt: P139+kread. 17: P139+P114+kread (P149 stays KERNEL/catalog). Occupancy stays P044/KERNEL solo. P110/P143 isolated.", "pathtest")
                         moreRow("KREAD. commitSlide kread32(kbase)==MH_MAGIC_64", "kreadtest")
                         moreRow("P070 five-door chain census + persist HOLD", "p070")
@@ -962,18 +962,31 @@ struct LogListSheet: View {
     private static func load() -> [(name: String, path: String, size: Int64, date: Date)] {
         let fm = FileManager.default
         guard let docs = fm.urls(for: .documentDirectory, in: .userDomainMask).first else { return [] }
-        guard let urls = try? fm.contentsOfDirectory(
+        var out: [(name: String, path: String, size: Int64, date: Date)] = []
+
+        func consider(_ url: URL, label: String) {
+            let name = url.lastPathComponent
+            let keep = name.hasSuffix("_log.txt") || name == "p007_board.json" || name == "p011_tap_log.txt"
+                || name == "cinder_lab_log.txt" || name.hasSuffix(".json") && name.contains("journal")
+            guard keep else { return }
+            let rv = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
+            out.append((label, url.path, Int64(rv?.fileSize ?? 0), rv?.contentModificationDate ?? .distantPast))
+        }
+
+        if let urls = try? fm.contentsOfDirectory(
             at: docs,
             includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey],
             options: [.skipsHiddenFiles]
-        ) else { return [] }
-        var out: [(name: String, path: String, size: Int64, date: Date)] = []
-        for url in urls {
-            let name = url.lastPathComponent
-            let keep = name.hasSuffix("_log.txt") || name == "p007_board.json" || name == "p011_tap_log.txt"
-            guard keep else { continue }
-            let rv = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
-            out.append((name, url.path, Int64(rv?.fileSize ?? 0), rv?.contentModificationDate ?? .distantPast))
+        ) {
+            for url in urls { consider(url, label: url.lastPathComponent) }
+        }
+        let cinder = docs.appendingPathComponent("cinder", isDirectory: true)
+        if let urls = try? fm.contentsOfDirectory(
+            at: cinder,
+            includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey],
+            options: [.skipsHiddenFiles]
+        ) {
+            for url in urls { consider(url, label: "cinder/\(url.lastPathComponent)") }
         }
         return out.sorted { $0.date > $1.date }
     }

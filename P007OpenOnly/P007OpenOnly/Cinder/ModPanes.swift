@@ -287,13 +287,22 @@ struct PlistEditorView: View {
     }
 
     private func load() {
-        if let s = FileLoader.plist(at: item.path) ?? FileLoader.text(at: item.path) {
+        let size = FileLoader.fileSize(at: item.path)
+        if size > 256_000 {
+            text = FileLoader.previewText(at: item.path, maxBytes: FileLoader.screenCap) ?? FileLoader.hexDump(at: item.path, limit: 2048) ?? "—"
+            editable = false
+            status = "\(size) B — too large to edit in-app. Copy tail from Files."
+            dirty = false
+            return
+        }
+        if let s = FileLoader.plist(at: item.path) ?? FileLoader.text(at: item.path, limit: FileLoader.screenCap) {
             text = s
-            editable = true
+            editable = s.count < 24_000
             status = "\(s.count) chars"
         } else {
-            text = FileLoader.hexDump(at: item.path) ?? "—"
+            text = FileLoader.hexDump(at: item.path, limit: 2048) ?? "—"
             status = "binary"
+            editable = false
         }
         dirty = false
     }

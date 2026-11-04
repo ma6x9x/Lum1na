@@ -65,8 +65,8 @@
     },
     {
       "id": "law.glm.edge",
-      "title": "GLM-Edge / Lum1na-Mind",
-      "text": "Phone cannot run ollama. GLM-Edge is served over OpenAI-compat LAN. Mac: tools/lumina_mind_serve.sh binds 0.0.0.0, prints Phone URL, advertises _lumina-mind._tcp. Phone Mind gear: Discover or paste http://<mac-lan-ip>:11434/v1 (ollama) or :8080/v1 (mlx), then Test Connection. 192.168.1.1 is usually the Wi-Fi gateway, not the Mac. ollama must not bind 127.0.0.1 only. Weights are not bundled. Tools run on the phone (run_tap, mind_ping, bandit_plan, stage_ladder, promote_status, promote_apply, oracle_export). SpaceXAI https://api.x.ai/v1 grok-4.7 is optional cloud."
+      "title": "Lum1na-Mind models",
+      "text": "Phone cannot run ollama. Default local expert is llama3.1:8b; free local DeepSeek is deepseek-r1:1.5b. glm-edge-1.5b is not an ollama tag. glm-5.3-flash:cloud is Ollama-cloud quota (this lab Mac hit the monthly cap). Kimi is also :cloud on the same quota. Grok is https://api.x.ai/v1 model grok-4.7 with the console.x.ai key (or Documents/xai_key.txt). OpenRouter free is https://openrouter.ai/api/v1 model openrouter/free. Mac: tools/lumina_mind_serve.sh binds 0.0.0.0, warms llama3.1:8b, advertises _lumina-mind._tcp. 192.168.1.1 is usually the router. Weights are not in the IPA. Tools run on the phone."
     },
     {
       "id": "law.promote",
