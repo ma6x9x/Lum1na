@@ -202,7 +202,7 @@ struct ContentView: View {
                         moreRow("CS calib. phys_oob race only (not KRW)", "cscali")
                         moreRow("P122 SwordForge. combined 64788 KRW test (freer→reclaim→read)", "swordforge")
                         moreRow("P123 ShapeCensus. kalloc.3072 victims with KRW vision (mini/libkrw)", "shapecensus")
-                        moreRow("KERNEL. hunt-krw-4: P139 disclose (P010 QueueCreate copyout + P063 aio kptr) then hunt P044 N=192 LIVE / 17 P114+P149 + kread32. SKIP P099/P073 254. Occupancy / PIPE-HIT is not hasKread.", "krw")
+                        moreRow("KERNEL. hunt-krw-5: P139 disclose (P010 QueueCreate copyout + P063 aio kptr) then hunt P044 N=192 LIVE / 17 P114+P149 / A12X 23H30 FIELD# harvest + kread32. SKIP P099/P073 254. Occupancy / PIPE-HIT is not hasKread.", "krw")
                         moreRow("PATHS. Per-path scorecard + READ-ONLY tests. Hunt: P139+kread. 17: P139+P114+kread (P149 stays KERNEL/catalog). Occupancy stays P044/KERNEL solo. P110/P143 isolated.", "pathtest")
                         moreRow("KREAD. commitSlide kread32(kbase)==MH_MAGIC_64", "kreadtest")
                         moreRow("P070 five-door chain census + persist HOLD", "p070")
@@ -242,7 +242,7 @@ struct ContentView: View {
                         moreRow("P086. 43684 dmaCommand fingerprint sweep (3 UCs, no fires)", "p086")
                         moreRow("P101. 43684 dmaCommand FIRE (bounded reuse IOMD+0x68; one setup + one reuse; isolate from T7)", "p101")
                         moreRow("P102. Titan write TEST (MapMemory IORVBAR look-for + CacheMode canary; SKIPs MMIO without window; no titan.m ROP)", "p102")
-                        moreRow("P010 qleak. Queue leak word1=+0x558 (K− only)", "p010qleak")
+                        moreRow("P010 qleak. QueueCreate copyout. LabOff word1=+0x558 A14 / +0x550 A12X (layout disclose, not KRW)", "p010qleak")
                     }
                     Section("F · Census / map") {
                         moreRow("P109 v4. ANE sel sweep w/ Stage-B oracle — 23F77 + T8150/27.x (H16 names + types 0..4, sels 0..213; the direct-UC reachability answer for 43748-out-of-framework + 112696/84494)", "p109")

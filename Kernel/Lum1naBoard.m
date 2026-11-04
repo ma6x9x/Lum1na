@@ -215,6 +215,13 @@ static int64_t LabBoardBootTime(void) {
             pins[@"pmap_cs_allow"] = [NSString stringWithFormat:@"0x%llx", off->pmap_cs_allow];
             pins[@"pmap_cs_allow_off"] = [NSString stringWithFormat:@"0x%x", off->pmap_cs_allow_off];
             pins[@"owns_replaceable"] = @(off->owns_replaceable);
+            pins[@"queue_create_sel"] = @(off->queue_create_sel);
+            pins[@"queue_create_size"] = [NSString stringWithFormat:@"0x%x", off->queue_create_size];
+            pins[@"queue_leak"] = [NSString stringWithFormat:@"+0x%x", off->queue_leak];
+            pins[@"static_base"] = [NSString stringWithFormat:@"0x%llx", off->static_base];
+            pins[@"ane_fill_cap"] = @(off->ane_fill_cap);
+            pins[@"ane_table_size"] = [NSString stringWithFormat:@"0x%x", off->ane_table_size];
+            pins[@"icmp6filt"] = @"+0x148";
         }
         _d[@"pins"] = pins;
         boardSet(_d, @"updated", LabLocalMilitaryNow() ?: @"?");   // ← nil-guarded now

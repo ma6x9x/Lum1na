@@ -17,14 +17,20 @@ typedef enum {
     LabSkuA14_21D50,     /* iPhone13,* + 21D* (17.3.x) — 12 mini, Dopamine rootless */
     LabSkuA14_other,     /* iPhone13,* but not 23F77/21D* */
     LabSkuA12X_23G71,    /* iPad8,* + 23G71 — 26.6 patch filter */
-    LabSkuA12X_other,    /* iPad8,* but not 23G71 */
+    LabSkuA12X_other,    /* iPad8,* but not 23G71/23H30 — FIELD# only */
     LabSkuXR_22H311,     /* XR A12 18.7.x (22H*) — user device on 18.7.2; ladder-only row */
     LabSkuA13_22G100,    /* iPhone12,* + 22x build (18.6.x) — reference rig (Dopamine KRW) */
     LabSkuA13_19F77,     /* iPhone12,5 + 19F77 (15.5) — usbliter8 tethered rig (stock 15.5) */
     LabSkuA13_other,     /* iPhone12,* but not 18.x/19F77 */
     LabSkuT8150_24A435,  /* iPhone18,2 + 24A435 — 17 Pro Max iOS 27.0 */
-    LabSkuT8150_other    /* iPhone18,2 + other 24A* — static_base only */
+    LabSkuT8150_other,   /* iPhone18,2 + other 24A* — static_base only */
+    LabSkuA12X_23H30     /* iPad8,* + 23H30 — iPadOS 26.7.1 FIELD# only; no 23G71 VA paste */
 } LabSku;
+
+/* A12X family: T8020 iPad8,*. 23G71 has unslid VAs; 23H30/other are FIELD# only. */
+static inline int LabSkuIsA12X(LabSku sku) {
+    return sku == LabSkuA12X_23G71 || sku == LabSkuA12X_other || sku == LabSkuA12X_23H30;
+}
 
 // Build versions as C strings (const char *) - works in C structs
 #define BUILD_23F77    "23F77"
@@ -34,6 +40,7 @@ typedef enum {
 #define BUILD_21D50    "21D50"
 #define BUILD_22H311   "22H311"
 #define BUILD_24A435   "24A435"
+#define BUILD_23H30    "23H30"
 
 // MARK: - Offset Table Structure
 typedef struct {

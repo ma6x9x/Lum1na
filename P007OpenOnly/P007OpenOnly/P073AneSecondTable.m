@@ -1045,10 +1045,11 @@ static NSURL *p073_model_url(NSString *name) {
        occur on this SKU at all. Printing MISS-ADJACENCY there is a lie; the
        honest output is SKIP. Documents/p073_force_fire.txt overrides
        (forensics only, panic possible). */
-    if ([LabDeviceProfile detectedSku] == LabSkuA12X_23G71
+    if ([LabDeviceProfile aneFillCapped]
         && ![[NSFileManager defaultManager] fileExistsAtPath:
             [docs stringByAppendingPathComponent:@"p073_force_fire.txt"]]) {
-        p073_log(@"[SKIP] 254 CheckandPrewire is fill_cap-dead on 23G71 (EXPECT-BAD).");
+        p073_log(@"[SKIP] 254 CheckandPrewire is fill_cap-dead on %@ (EXPECT-BAD).",
+                 [LabDeviceProfile skuString]);
         p073_log(@"[SKIP] The 43748 OOB cannot occur on this SKU — hunt lane is 23F77-only.");
         p073_log(@"[SKIP] Force with Documents/p073_force_fire.txt (forensics only).");
         p073_log(@"[VERDICT] kind=skip first_fail_stage=none fires=0 ok=0");

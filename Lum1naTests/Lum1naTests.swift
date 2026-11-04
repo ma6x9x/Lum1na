@@ -161,10 +161,17 @@ struct Lum1naOffsetTests {
             #expect(tag(live).hasPrefix("A14"))
             #expect(live?.pointee.queue_create_size == 0x410)
             #expect(live?.pointee.owns_replaceable == 0)
-        case .A12X_23G71, .A12X_other:
-            #expect(tag(live).hasPrefix("A12X"))
+        case .A12X_23G71:
+            #expect(tag(live) == "A12X_23G71")
             #expect(live?.pointee.queue_create_size == 0x408)
             #expect(live?.pointee.owns_replaceable == 1)
+        case .A12X_other, .A12X_23H30:
+            #expect(tag(live).hasPrefix("A12X"))
+            #expect(live?.pointee.queue_create_size == 0x408)
+            #expect(live?.pointee.queue_leak == 0x550)
+            #expect(live?.pointee.ane_checkandprewire == 0)
+            #expect(live?.pointee.ane_fill_cap == 1)
+            #expect(live?.pointee.owns_replaceable == 0)
         case .T8150_24A435:
             #expect(tag(live) == "T8150_24A435")
             #expect(live?.pointee.static_base == 0xFFFFFE0007004000)
@@ -180,9 +187,38 @@ struct Lum1naOffsetTests {
 
     @Test func siblingBuildAliasesShareTable() {
         #expect(LabOffForSku(.A14_other) == LabOffForSku(.A14_23F77))
-        #expect(LabOffForSku(.A12X_other) == LabOffForSku(.A12X_23G71))
         #expect(LabOffForSku(.unknown) == nil)
-        #expect(LabOffForSku(.XR_22H311) == nil)
+        #expect(tag(LabOffForSku(.XR_22H311)) == "XR_22H311")
+    }
+
+    @Test func a12x23H30AndOtherAreFieldOnly() {
+        let g71 = LabOffForSku(.A12X_23G71)!.pointee
+        let other = LabOffForSku(.A12X_other)!.pointee
+        let h30 = LabOffForSku(.A12X_23H30)!.pointee
+
+        #expect(tag(LabOffForSku(.A12X_other)) == "A12X_other")
+        #expect(tag(LabOffForSku(.A12X_23H30)) == "A12X_23H30")
+        #expect(LabOffForSku(.A12X_other) != LabOffForSku(.A12X_23G71))
+        #expect(LabOffForSku(.A12X_23H30) != LabOffForSku(.A12X_23G71))
+
+        #expect(other.static_base == 0xFFFFFFF007004000)
+        #expect(h30.static_base == 0xFFFFFFF007004000)
+        #expect(other.queue_create_size == 0x408)
+        #expect(h30.queue_create_size == 0x408)
+        #expect(other.queue_leak == 0x550)
+        #expect(h30.queue_leak == 0x550)
+        #expect(other.ane_fill_cap == 1)
+        #expect(h30.ane_fill_cap == 1)
+        #expect(other.ane_table_size == 0)
+        #expect(h30.ane_table_size == 0)
+        #expect(other.ane_checkandprewire == 0)
+        #expect(h30.ane_checkandprewire == 0)
+        #expect(other.amfi_loadtc == 0)
+        #expect(h30.amfi_loadtc == 0)
+        #expect(other.fn4 == 0)
+        #expect(h30.fn4 == 0)
+        #expect(g71.ane_checkandprewire == 0xFFFFFFF008701990)
+        #expect(g71.ane_table_size == 0x820)
     }
 
     @Test @MainActor func catalogWiresColdForgeRapierAnvilAndABC() {

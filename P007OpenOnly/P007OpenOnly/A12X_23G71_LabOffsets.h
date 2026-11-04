@@ -1,5 +1,9 @@
 // A12X_23G71_LabOffsets.h — iPad Pro 12.9" 3rd gen (iPad8,7) A12X / iPadOS 26.6
 // Do not paste these VAs into A14 23F77 probes. CLASS / FIELD# only.
+// iPadOS 26.7.1 is 23H30 (LabSkuA12X_23H30). FIELD# (queue 0x408, leak +0x550,
+// static_base, icmp6filt 0x148) may transfer. Unslid VAs in this header do NOT.
+// LabOffForSku(A12X_23H30/A12X_other) is FIELD#-only. 43748 patched in 26.6.
+// 64788 Facet A live until 23G82 / 26.6.1. PPL-only AfterKread.
 //
 // Patch filter, not a second KRW hunt:
 //   64788 still live on 23G71 (fix is 23G82 / 26.6.1)

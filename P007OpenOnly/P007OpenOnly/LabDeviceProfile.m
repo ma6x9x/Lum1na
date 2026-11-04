@@ -36,6 +36,7 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
     switch (sku) {
         case LabSkuA12X_23G71: return "A12X_23G71";
         case LabSkuA12X_other: return "A12X_other";
+        case LabSkuA12X_23H30: return "A12X_23H30";
         case LabSkuXR_22H311:  return "XR_22H311";
         case LabSkuA13_22G100:    return "A13_22G100";
         case LabSkuA13_19F77:     return "A13_19F77";
@@ -69,6 +70,7 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
         case LabSkuA14_other: return @"A14_other";
         case LabSkuA12X_23G71: return @"A12X_23G71";
         case LabSkuA12X_other: return @"A12X_other";
+        case LabSkuA12X_23H30: return @"A12X_23H30";
         case LabSkuXR_22H311: return @"XR_22H311";
         case LabSkuA13_22G100: return @"A13_22G100";
         case LabSkuA13_19F77:  return @"A13_19F77";
@@ -94,6 +96,7 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
     if (a14 && [v hasPrefix:@"21D"]) return LabSkuA14_21D50; /* 17.3.x — 12 mini */
     if (a14) return LabSkuA14_other;
     if (a12x && [v isEqualToString:@"23G71"]) return LabSkuA12X_23G71;
+    if (a12x && [v isEqualToString:@"23H30"]) return LabSkuA12X_23H30;
     if (a12x) return LabSkuA12X_other;
     if (xr) return LabSkuXR_22H311;
     if (a13 && [v isEqualToString:@"22G100"]) return LabSkuA13_22G100;
@@ -112,7 +115,8 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
         case LabSkuA14_21D50:  return @"iPhone13,* A14 / 21D* (17.3.x) — 12 mini, Dopamine rootless";
         case LabSkuA14_other:  return @"iPhone13,* A14 / not 23F77 or 21D*";
         case LabSkuA12X_23G71: return @"iPad8,* A12X / 23G71";
-        case LabSkuA12X_other: return @"iPad8,* A12X / not 23G71";
+        case LabSkuA12X_other: return @"iPad8,* A12X / not 23G71 or 23H30 — FIELD# only";
+        case LabSkuA12X_23H30: return @"iPad8,* A12X / 23H30 — iPadOS 26.7.1 FIELD# only, PPL";
         case LabSkuXR_22H311:  return @"XR A12 / 18.7.x — momentarius-ready";
         case LabSkuA13_22G100:    return @"iPhone12,* A13 / 22x build — reference rig";
         case LabSkuA13_19F77:     return @"iPhone12,5 A13 / 19F77 — usbliter8 tethered rig (15.5 stock)";
@@ -232,6 +236,42 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
     return o && o->ane_table_size == 0x820u;
 }
 
++ (BOOL)skuIsA12X {
+    return LabSkuIsA12X([self detectedSku]);
+}
+
++ (NSString *)armDump {
+    NSMutableString *s = [NSMutableString string];
+    const LabOffTab *off = LabOff();
+    LabSku sku = [self detectedSku];
+    [s appendString:@"=== ARM (LabOff static_base + FIELD# + unslid VAs) ===\n"];
+    [s appendFormat:@"sku=%@ table=%s\n",
+     [self skuString], (off && off->tag) ? off->tag : "NULL"];
+    if (!off) {
+        [s appendString:@"LabOff NULL — unslid VAs HOLD. Debugger still fires EXPECT-BAD.\n"];
+        return s;
+    }
+    [s appendFormat:@"static_base=0x%llx (link base; live kbase = static_base+slide after commitSlide)\n",
+     (unsigned long long)off->static_base];
+    [s appendFormat:@"QueueCreate sel=%u size=0x%x leak=+0x%x destroy=%u submit=%u MD+0x%x sel36=%u\n",
+     off->queue_create_sel, off->queue_create_size, off->queue_leak,
+     off->queue_destroy_sel, off->submit_sel, off->sysmem_md, off->sel36];
+    [s appendFormat:@"socket_usecount=+0x%x so_necp=0x%x icmp6filt=+0x148 (xnu FIELD#)\n",
+     off->socket_usecount, off->so_necp];
+    [s appendFormat:@"pmap_cs_allow_off=+0x%x owns_replaceable=%u fill_cap=%u table_size=0x%x\n",
+     off->pmap_cs_allow_off, off->owns_replaceable, off->ane_fill_cap, off->ane_table_size];
+    [s appendFormat:@"unslid CheckandPrewire=0x%llx AMFI_loadtc=0x%llx fn4=0x%llx getter=0x%llx\n",
+     (unsigned long long)off->ane_checkandprewire,
+     (unsigned long long)off->amfi_loadtc,
+     (unsigned long long)off->fn4,
+     (unsigned long long)off->getter];
+    if (off->ane_checkandprewire == 0)
+        [s appendString:@"unslid VA 0 = HOLD that poke (no kslide+wrong-KC smash).\n"];
+    if (LabSkuIsA12X(sku) && sku != LabSkuA12X_23G71)
+        [s appendString:@"A12X FIELD# row: 23G71 unslid VAs not pasted. 43748/254 SKIP. P010/P063 harvest live kptrs.\n"];
+    return s;
+}
+
 + (NSString *)beta1Matrix {
     NSMutableString *s = [NSMutableString string];
     const LabOffTab *off = LabOff();
@@ -259,6 +299,18 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
             [s appendString:@"  hop-1 SKIP. CS2 phys_oob READ scan with kbase=0 is setup until pcb_start_offset + magic.\n"];
             [s appendString:@"  LightSword detach expect 0xe00002e2 abort-after-first. Momentarius needs kreadbuf first.\n"];
             [s appendString:@"  Hot: T2 Facet A, aio84530, KREAD, CHAINS. CS2 honesty last.\n"];
+            break;
+        case LabSkuA12X_23H30:
+            [s appendString:@"A12X 23H30 iPadOS 26.7.1. PPL-only (no SPTM) AfterKread. First KRW is still disclose→convert→Arm→kread32.\n"];
+            [s appendString:@"  FIELD# only: queue 0x408 leak=+0x550 static_base=0xfffffff007004000 icmp6filt=+0x148. 23G71 unslid VAs HOLD.\n"];
+            [s appendString:@"  43748 patched in 26.6. SKIP P044/P099/P073 254. 64788 Facet A patched 23G82 — P065 EXPECT-BAD oracle.\n"];
+            [s appendString:@"  First doors: P010 QueueCreate copyout + P063 aio HEAP (via P139). CS2 phys_oob READ scan kbase=0 is setup.\n"];
+            [s appendString:@"  hop-1 EINVAL since 26.1. Do not fuse iPad READ with iPhone 43748 WRITE.\n"];
+            [s appendString:@"  Hot: KERNEL (P139 harvest), P010, P063, P065 oracle, CS2, KREAD.\n"];
+            break;
+        case LabSkuA12X_other:
+            [s appendString:@"A12X_other iPad8,* not 23G71/23H30. FIELD# only — 23G71 unslid VAs HOLD.\n"];
+            [s appendString:@"  SKIP 254 remaining-fire. Ident + P010/P063 harvest. CS2 kbase=0 is setup.\n"];
             break;
         case LabSkuA13_22G100:
             [s appendString:@"A13 22G100 rig: CS2 KRW proven. Introspection harness. Separate from hunt A14/A12X.\n"];
@@ -291,7 +343,8 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
                     @"  LIVE A14: KERNEL T1 sequencer (P044 N=192 + P139 + P113 + kread32); P057 65343 KASLR sel16; P099 254 occupancy isolated; 64788 Facet A P065 0x2be oracle; P063 aio84530 HEAP\n"
                     @"  LIVE T8150: KERNEL T1 P139 + P114 serializer + kread32. Isolated p110/p142/p143. 43748 clamp-CLOSED. LightSword SKIP.\n"
                     @"  LIVE 12 mini 21D50: 127-in in-bounds ANE (43748 not live); CS2/libkrw KRW; kread32\n"
-                    @"  LIVE A12X: P065 Facet A; P063 aio84530 HEAP; P057 sel16; CS2 phys_oob READ scan; P034 occupancy class; KREAD; P070 census. 254 SKIP.\n"
+                    @"  LIVE A12X 23G71: P065 Facet A; P063 aio84530 HEAP; P057 sel16; CS2 phys_oob READ scan; P034 occupancy class; KREAD; P070 census. 254 SKIP.\n"
+                    @"  LIVE A12X 23H30: FIELD# only (queue 0x408/+0x550, static_base). P139 harvest P010+P063. P065 EXPECT-BAD. CS2 kbase=0 setup. 43748/254 SKIP. PPL AfterKread.\n"
                     @"  CLOSED: 84523 sandbox (P057/P051/P052); P045 recv; LightSword last-wire GPU OOM; type-3 PACGA; hop-1 since 26.1; 43748 254 on fill_cap\n"
                     @"  PARKED: 28968 reap fire; 163-sel; 0x800; AfterKread persist; 86950 CG; file-ACE payloads (P072 is census)\n"
                     @"  NOTE: Lum1na catalog p064 = AVE racer. HT149041 print map id = ht149041. P007 p064 = that map.\n"];
@@ -319,6 +372,7 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
         [out appendString:@"QueueCreate    (NO SKU LAW ROW — this table has no QueueCreate lane values;"
                           @" zeros = honest, not decoded. The 17's queue door = the IOGPU RocketDoor lane)\n"];
     }
+    [out appendString:[self armDump]];
     switch ([self detectedSku]) {
         case LabSkuA14_23F77:
             [out appendString:@"TRACK: iPhone13 A14 23F77 ACTIVE. First door=KERNEL T1 (P044 N=192 + P139 + P113 + kread32). Home KERNEL pad / PATHS button. Catalog p097 is lock/unlock solo. hop-1 SKIP.\n"];
@@ -332,8 +386,11 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
         case LabSkuA12X_23G71:
             [out appendString:@"TRACK: iPad A12X 23G71. First door=64788 Facet A + aio84530 HEAP. 254 SKIP fill_cap. hop-1 SKIP. CS2 kbase=0 is setup.\n"];
             break;
+        case LabSkuA12X_23H30:
+            [out appendString:@"TRACK: iPad A12X 23H30 (26.7.1). FIELD# only. PPL AfterKread. SKIP 43748/254. Facet A EXPECT-BAD. First door=P010+P063 harvest. CS2 kbase=0 is setup.\n"];
+            break;
         case LabSkuA12X_other:
-            [out appendFormat:@"TRACK: iPad A12X osversion=%@.\n", [self osversion]];
+            [out appendFormat:@"TRACK: iPad A12X osversion=%@ FIELD# only. 23G71 unslid VAs HOLD. SKIP 254.\n", [self osversion]];
             break;
         case LabSkuXR_22H311:
             [out appendString:@"TRACK: XR A12 18.7.x — momentarius-ready (ladder row).\n"];

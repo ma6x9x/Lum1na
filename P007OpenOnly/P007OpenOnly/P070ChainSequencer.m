@@ -103,9 +103,9 @@ static void p070_svc(void (^L)(NSString *), const char *name) {
     L(@"Same-process AMFI UC + board JSON + userspace reboot. No iBoot, no NVRAM,");
     L(@"no launchdhook, no firmware write this pass. This TAP does not kwrite.");
     L(@"=== ORDER ===");
-    if ([LabDeviceProfile sku] == LabSkuA12X_23G71) {
-        L(@"A12X: 1 Ident  2 P070 census  3 P065 or P063  4 force-quit  5 KREAD after kread32");
-        L(@"254 EXPECT-BAD on probe (public SKIP). hop-1 SKIP. CS2 is a READ scan until magic.");
+    if (LabSkuIsA12X([LabDeviceProfile sku])) {
+        L(@"A12X: 1 Ident  2 P070 census  3 KERNEL P139 (P010+P063)  4 force-quit  5 P065 oracle / CS2  6 KREAD after kread32");
+        L(@"254 SKIP (fill_cap / 26.6 patch). hop-1 SKIP. CS2 is a READ scan until magic. 23H30 FIELD# only.");
     } else if ([LabDeviceProfile sku] == LabSkuA14_23F77) {
         L(@"A14: 1 Ident  2 P070 census  3 KERNEL (P139 disclose P010/P063 then P044 N=192)");
         L(@"4 force-quit  5 conversion on LIVE neighbor  6 SocketKRW.Arm(rw_inpcb)  7 KREAD magic");

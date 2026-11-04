@@ -40,6 +40,8 @@ const char *LabDeviceProfile_sku_string(LabSku sku);
 + (void)stampLastTap:(NSString *)tapId; /* Documents/p007_last_tap.txt + kern.boottime. */
 + (NSString *)huntTapWarn:(NSString *)thisTap; /* dirty-boot / thermal / GM-off. Probe still fires. */
 + (NSString *)beta1Matrix; /* SKU-honest first KRW door. iPad READ and iPhone WRITE stay independent. */
++ (BOOL)skuIsA12X;         /* iPad8,* T8020 family (23G71 / 23H30 / other) */
++ (NSString *)armDump;     /* LabOff static_base + FIELD# + unslid VAs. 0 VA = HOLD that poke. */
 + (BOOL)aneFillCapped;     /* LabOff()->ane_fill_cap: 1 on 23G71 (>=0x80 -> 0xe00002c2) */
 + (BOOL)aneTableIsA14_0x820; /* T8101 0x820. T8150 is 0x10b8. 0 if LabOff NULL. */
 + (NSString *)patchOracleMap;

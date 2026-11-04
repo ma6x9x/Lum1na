@@ -188,12 +188,12 @@ static NSString *p010_finish(void) {
         p010_log(@"%@", stop);
         return p010_finish();
     }
-    p010_log(@"A14 pins: create sel=%u stIn=0x%x word1=+0x%x  destroy sel=%u  submit sel=%u  SysMem MD +0x%x",
+    p010_log(@"LabOff pins: create sel=%u stIn=0x%x word1=+0x%x  destroy sel=%u  submit sel=%u  SysMem MD +0x%x",
              [LabDeviceProfile queueCreateSel], [LabDeviceProfile queueCreateSize],
              [LabDeviceProfile queueLeakOff], [LabDeviceProfile queueDestroySel],
              [LabDeviceProfile queueSubmitSel], [LabDeviceProfile sysmemMdOff]);
     p010_log(@"expect: %@ ", [LabDeviceProfile expectQueueCreate]);
-    p010_log(@"FKT twin: 21D50 word1 was +0x550. Do not paste +0x550. NOT KRW.");
+    p010_log(@"A12X FIELD# word1=+0x550. A14 23F77 word1=+0x558. Layout disclose, not KRW.");
     p010_log(@"2026-09-02 device: sel=6 0x410 SUCCESS; word1 ~0x9012134 not-kptr; 0 kptrs.");
     p010_log(@"sel=5/8/23/36/49 BadArgument is expected. Reconfirm of 2026-08-31. Not K.");
     p010_log(@"========================================");
