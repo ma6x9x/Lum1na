@@ -6,35 +6,37 @@ import AppKit
 #endif
 import UniformTypeIdentifiers
 
-// RigSettings — the StikDebug-style setup menu (v1: scaffolding).
-//
-// Copied design (StikDebug, AGPL-3.0 — github.com/StikDebug/StikDebug):
-//   1. LocalDevVPN (a separate user-run app) provides the loopback tunnel.
-//   2. The user imports the PAIRING RECORD (.plist / .mobiledevicepairing).
-//   3. Over the tunnel: lockdown session → syslog_relay-connect (the TRUE
-//      in-app console, incl. kernel klog lines) and mountPersonalDDI for
-//      the /System/Developer DDI (debugserver).
-// v1 implements: pairing-file import + persistence + validation, the
-// console-source preferences, and the LocalDevVPN/DDI status rows.
-// v2 (next session): the RSD+lockdown client (syslog_relay / DDI mount).
-
 struct DeviceConsoleSheet: View {
     @StateObject private var console = DeviceConsole()
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 0) {
-                Text("status: \(console.status)").font(.caption.monospaced()).foregroundColor(.secondary).padding(6)
+                Text("status: \(console.status)")
+                    .font(.caption.monospaced())
+                    .foregroundColor(.secondary)
+                    .padding(6)
                 List(console.lines.indices.reversed(), id: \.self) { i in
-                    Text(console.lines[i]).font(.system(size: 10, design: .monospaced)).lineLimit(2)
-                }.listStyle(.plain)
+                    Text(console.lines[i])
+                        .font(.system(size: 10, design: .monospaced))
+                        .lineLimit(2)
+                }
+                .listStyle(.plain)
             }
-            .toolbar { ToolbarItem(placement: .automatic) {
-                #if canImport(UIKit)
-                Button { UIPasteboard.general.string = console.logText() } label: { Image(systemName: "doc.on.doc") }
-#else
-                Button { let pb = NSPasteboard.general; pb.clearContents(); pb.setString(console.logText(), forType: .string) } label: { Image(systemName: "doc.on.doc") }
-#endif
-            } }
+            .toolbar {
+                ToolbarItem(placement: .automatic) {
+                    #if canImport(UIKit)
+                    Button { UIPasteboard.general.string = console.logText() } label: {
+                        Image(systemName: "doc.on.doc")
+                    }
+                    #else
+                    Button {
+                        let pb = NSPasteboard.general
+                        pb.clearContents()
+                        pb.setString(console.logText(), forType: .string)
+                    } label: { Image(systemName: "doc.on.doc") }
+                    #endif
+                }
+            }
             .navigationTitle("Live Device Console")
             .onAppear { console.start() }
             .onDisappear { console.stop() }
@@ -43,32 +45,74 @@ struct DeviceConsoleSheet: View {
 }
 
 struct RigSettingsView: View {
+    var onHour: (() -> Void)?
+    var onLogs: (() -> Void)?
+    var onAllTaps: (() -> Void)?
+
+    @Environment(\.dismiss) private var dismiss
     @State private var showConsole = false
     @State private var pairingName: String = ""
     @State private var pairingStatus: String = ""
     @State private var consoleSource: String = UserDefaults.standard.string(forKey: "rig.consoleSource") ?? "klog-only"
     @State private var showImporter = false
+    @State private var snap = BoardSnapshot.current()
 
     private let pairingDocFile = "Pairing.plist"
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
-                Section("Console (live, filtered)") {
-                    Button("Open LIVE DEVICE CONSOLE (syslog_relay v2)") { showConsole = true }
-                    Text("Streams the device syslog in-app (self-over-WiFi lockdown → STARTTLS → syslog_relay). Persists to Documents/device_console_log.txt; copy button inside.")
+                Section("Isolation") {
+                    Text("One TAP per force-quit. KERNEL is the hunt door. P099/P073/P130 254-in stay catalog-solo. Unlock UI frees Console buttons while a probe is still in flight.")
+                        .font(.footnote)
+                    LabeledContent("Build") { Text(LuminaStamp.ui).font(.footnote.monospaced()) }
+                    LabeledContent("Board") {
+                        Text(snap.kreadSignal)
+                            .font(.footnote.monospaced())
+                            .textSelection(.enabled)
+                    }
+                }
+
+                Section("SKU door") {
+                    Text(snap.sku + "  " + snap.osversion)
+                        .font(.footnote.monospaced())
+                    Text("NEXT \(snap.nextID) — \(snap.nextWhy)")
+                        .font(.footnote)
+                    Button("Copy NEXT TAP") {
+                        LuminaCopyBus.shared.copy(snap.copyBlock, label: "Next TAP · \(snap.nextID)")
+                    }
+                    Button("Jump to Lab catalog") {
+                        LuminaTabs.shared.index = 1
+                        dismiss()
+                    }
+                    Button("Jump to Chain") {
+                        LuminaTabs.shared.index = 2
+                        dismiss()
+                    }
+                }
+
+                Section("Logs") {
+                    Button("Open log files") { onLogs?() }
+                    Button("Hour gallery") { onHour?() }
+                    Button("All TAP ids") { onAllTaps?() }
+                    Text("Copy full lives on each TAP card in Lab, on Console Copy, and on the HUD NEXT chip.")
                         .font(.footnote)
                         .foregroundColor(.secondary)
+                }
+
+                Section("Console (live, filtered)") {
+                    Button("Open LIVE DEVICE CONSOLE (syslog_relay v2)") { showConsole = true }
                     Picker("Source", selection: $consoleSource) {
                         Text("In-app (own process os_log)").tag("own-oslog")
                         Text("klog oracle lines only").tag("klog-only")
                         Text("Everything klog-side").tag("klog-all")
                     }
-                    .onChange(of: consoleSource) { v in
+                    .onChange(of: consoleSource) { _, v in
                         UserDefaults.standard.set(v, forKey: "rig.consoleSource")
                     }
-                    Text("klog sources need the paired connection: run LocalDevVPN, import the pairing record, then the syslog_relay client (v2) streams the device syslog in-app. Until v2: run tools/logwatch.sh on the Mac.")
-                        .font(.footnote).foregroundColor(.secondary)
+                    Text("klog sources need the paired connection. Until that lands, use tools/logwatch.sh on the Mac.")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
                 }
 
                 Section("Pairing record") {
@@ -82,29 +126,35 @@ struct RigSettingsView: View {
                     }
                 }
 
-                Section("LocalDevVPN") {
-                    Text("Status: NOT implemented in-app (v2). Run the LocalDevVPN app first, keep Wi-Fi ON (Airplane-Mode-on-then-off if needed), then re-open the rig. StikDebug uses the same external-VPN model — it is a separate app, not an in-app entitlement.")
-                        .font(.footnote).foregroundColor(.secondary)
-                }
-
-                Section("Developer Disk Image (DDI)") {
-                    Text("mountPersonalDDI(imagePath:trustcachePath:manifestPath:) lands in v2 over the paired session. Post-mount, debugserver is reachable for the lab lane (Developer Mode ON); the 23F77 hunt lane needs none of this.")
-                        .font(.footnote).foregroundColor(.secondary)
+                Section("PARK remaining-fire") {
+                    Text("Debugger fires every catalog TAP, including EXPECT-BAD. These stay STOP: hop-1, 163-sel AKS sweep, TrollRestore/WVEK, leftover XR close-vs-method (iogpu_close / T014 / p010obj). 86950 glyph is control/oracle, not a Messages/AirDrop payload. AfterKread persist HOLD until kread32.")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
                 }
 
                 Section("License note") {
-                    Text("Design adapted from StikDebug (AGPL-3.0). Keep this distribution's sources open under a compatible license.")
-                        .font(.footnote).foregroundColor(.secondary)
+                    Text("Pairing-console layout adapted from StikDebug (AGPL-3.0). Keep this distribution's sources open under a compatible license.")
+                        .font(.footnote)
+                        .foregroundColor(.secondary)
                 }
             }
-            .navigationTitle("Rig Settings")
+            .navigationTitle("Settings")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
             .fileImporter(isPresented: $showImporter,
                           allowedContentTypes: [.propertyList, .data],
                           allowsMultipleSelection: false) { result in
                 importPairing(result)
             }
             .sheet(isPresented: $showConsole) { DeviceConsoleSheet() }
-            .onAppear { refreshPairingStatus() }
+            .onAppear {
+                refreshPairingStatus()
+                snap = BoardSnapshot.current()
+            }
         }
     }
 
@@ -143,13 +193,10 @@ struct RigSettingsView: View {
         }
     }
 
-    /// Light validation: plist-dict with the pairing-rec keys; prints the
-    /// device UDID + hostId presence (no crypto verification in v1 —
-    /// the lockdown TLS handshake in v2 does the real verify).
     private func validatePairing(_ data: Data) -> String {
         guard let plist = try? PropertyListSerialization.propertyList(from: data, format: nil),
               let dict = plist as? [String: Any] else {
-            return "Not a plist — StikDebug also accepts .mobiledevicepairing bundles; paste its plist entry."
+            return "Not a plist — also accepts .mobiledevicepairing bundles; paste its plist entry."
         }
         let udid = dict["DeviceCertificate"] != nil
         let escrow = dict["EscrowBag"] != nil

@@ -4,10 +4,10 @@ import UIKit
 struct RootView: View {
     @EnvironmentObject private var engine: LabEngine
     @Environment(\.gateInfo) private var gate
-    @State private var tab = Int(ProcessInfo.processInfo.environment["CINDER27_TAB"] ?? "0") ?? 0
+    @ObservedObject private var tabs = LuminaTabs.shared
 
     var body: some View {
-        TabView(selection: $tab) {
+        TabView(selection: $tabs.index) {
             DashboardView().tabItem {
                 Label(t("tab.overview"), systemImage: "square.grid.2x2.fill")
             }.tag(0)
@@ -36,9 +36,15 @@ struct RootView: View {
                 Label(t("tab.system"), systemImage: "cpu")
             }.tag(6)
         }
-        .tint(T.ember)
+        .tint(T.violet)
         .safeAreaInset(edge: .top, spacing: 0) {
-            BoardHUD(tab: $tab)
+            BoardHUD(tab: $tabs.index)
+        }
+        .onAppear {
+            if let env = ProcessInfo.processInfo.environment["CINDER27_TAB"],
+               let n = Int(env) {
+                tabs.index = n
+            }
         }
         .overlay(alignment: .bottom) {
             CopyToastOverlay()
@@ -84,6 +90,7 @@ struct DashboardView: View {
     @EnvironmentObject private var engine: LabEngine
     @Environment(\.gateInfo) private var gate
     @State private var device = DeviceModel.current()
+    @State private var showSettings = false
 
     private var tested: Int { Catalog.all.filter { engine.journal.verdict(for: $0.id) != .untested }.count }
     private var died: Int { Catalog.all.filter { engine.journal.verdict(for: $0.id) == .processDied }.count }
@@ -124,6 +131,19 @@ struct DashboardView: View {
             .luminaCanvas()
             .navigationTitle("Lum1na")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showSettings = true
+                    } label: {
+                        Image(systemName: "gearshape")
+                    }
+                    .tint(T.cyan)
+                }
+            }
+            .sheet(isPresented: $showSettings) {
+                RigSettingsView()
+            }
         }
     }
 
@@ -134,7 +154,7 @@ struct DashboardView: View {
                 Text("Lum1na")
                     .font(T.title)
                     .foregroundStyle(
-                        LinearGradient(colors: [T.emberSoft, .white],
+                        LinearGradient(colors: [T.emberSoft, T.violet, T.cyan],
                                        startPoint: .leading, endPoint: .trailing)
                     )
                 Text(t("ov.headline"))

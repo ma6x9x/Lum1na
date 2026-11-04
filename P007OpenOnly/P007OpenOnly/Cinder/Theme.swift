@@ -3,19 +3,20 @@ import UIKit
 
 enum T {
     /// Solid sheet/splash fill. Tab screens use luminaCanvas() over LuminaBackdrop.
-    static let void = Color(red: 0.035, green: 0.032, blue: 0.055)
+    static let void = Color(red: 0.035, green: 0.028, blue: 0.07)
     static let bg = void
-    static let panel = Color(red: 0.10, green: 0.10, blue: 0.14).opacity(0.82)
-    static let panelHi = Color(red: 0.16, green: 0.14, blue: 0.20)
+    static let panel = Color(red: 0.11, green: 0.08, blue: 0.18).opacity(0.82)
+    static let panelHi = Color(red: 0.18, green: 0.12, blue: 0.28)
     static let stroke = Color.white.opacity(0.12)
-    static let ember = Color(red: 1.00, green: 0.42, blue: 0.16)
-    static let emberSoft = Color(red: 1.00, green: 0.60, blue: 0.32)
-    static let cyan = Color(red: 0.28, green: 0.92, blue: 0.95)
-    static let good = Color(red: 0.32, green: 0.85, blue: 0.55)
-    static let warn = Color(red: 1.00, green: 0.76, blue: 0.28)
-    static let bad = Color(red: 1.00, green: 0.34, blue: 0.34)
-    static let info = Color(red: 0.44, green: 0.70, blue: 1.00)
-    static let violet = Color(red: 0.68, green: 0.52, blue: 1.00)
+    /// Galaxy pink (call-site name `ember` kept so existing chrome compiles).
+    static let ember = Color(red: 1.00, green: 0.38, blue: 0.72)
+    static let emberSoft = Color(red: 1.00, green: 0.62, blue: 0.86)
+    static let cyan = Color(red: 0.42, green: 0.72, blue: 1.00)
+    static let good = Color(red: 0.42, green: 0.90, blue: 0.72)
+    static let warn = Color(red: 1.00, green: 0.78, blue: 0.42)
+    static let bad = Color(red: 1.00, green: 0.38, blue: 0.48)
+    static let info = Color(red: 0.52, green: 0.70, blue: 1.00)
+    static let violet = Color(red: 0.62, green: 0.42, blue: 1.00)
 
     static let mono = Font.system(size: 12, design: .monospaced)
     static let monoSm = Font.system(size: 10.5, design: .monospaced)
@@ -39,18 +40,18 @@ struct Card<Content: View>: View {
                 ZStack {
                     shape.fill(T.panel)
                     shape.fill(
-                        LinearGradient(colors: [T.ember.opacity(0.10), T.cyan.opacity(0.05), .clear],
+                        LinearGradient(colors: [T.ember.opacity(0.12), T.violet.opacity(0.10), T.cyan.opacity(0.06), .clear],
                                        startPoint: .topLeading, endPoint: .bottomTrailing)
                     )
                 }
             }
             .overlay(
                 shape.strokeBorder(
-                    LinearGradient(colors: [T.ember.opacity(0.40), Color.white.opacity(0.14), T.cyan.opacity(0.28)],
+                    LinearGradient(colors: [T.ember.opacity(0.45), T.violet.opacity(0.28), Color.white.opacity(0.12), T.cyan.opacity(0.32)],
                                    startPoint: .topLeading, endPoint: .bottomTrailing),
                     lineWidth: 1)
             )
-            .shadow(color: T.ember.opacity(0.08), radius: 12, y: 6)
+            .shadow(color: T.violet.opacity(0.14), radius: 12, y: 6)
     }
 }
 

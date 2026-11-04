@@ -98,7 +98,7 @@ struct GateView: View {
                 Text("Lum1na")
                     .font(.system(size: 36, weight: .bold, design: .rounded))
                     .foregroundStyle(
-                        LinearGradient(colors: [T.emberSoft, .white, T.cyan],
+                        LinearGradient(colors: [T.emberSoft, T.violet, T.cyan],
                                        startPoint: .leading, endPoint: .trailing)
                     )
                 Text("Debugger · \(LuminaStamp.ui)")
@@ -113,7 +113,7 @@ struct GateView: View {
             switch phase {
             case .checking:
                 VStack(spacing: 12) {
-                    ProgressView().tint(T.ember)
+                    ProgressView().tint(T.violet)
                     Text(t("gate.checking"))
                         .font(T.body).foregroundColor(.white.opacity(0.5))
                 }
@@ -137,7 +137,7 @@ struct GateView: View {
                 }
                 .padding(.horizontal, 24)
 
-                RunButton(title: t("gate.enter"), systemImage: "arrow.right.circle.fill", tint: T.ember) {
+                RunButton(title: t("gate.enter"), systemImage: "arrow.right.circle.fill", tint: T.violet) {
                     entered = true
                 }
                 .padding(.horizontal, 24)

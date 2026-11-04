@@ -3,7 +3,7 @@ import UIKit
 import Darwin
 
 struct ContentView: View {
-    @State private var text = "Lum1na \(LuminaStamp.ui). Ident first. One TAP per force-quit. EXPECT-BAD still fires. HUD NEXT is a suggestion — it never auto-fires."
+    @State private var text = "Lum1na \(LuminaStamp.ui). Ident first. One TAP per force-quit. Catalog lives in Lab. Unlock UI stays tappable during a TAP."
     @State private var copiedFlash = false
     @State private var running = false
     @State private var showMore = false
@@ -38,50 +38,48 @@ struct ContentView: View {
                 .allowsHitTesting(!running)
 
                 VStack(spacing: 8) {
+                    if running {
+                        Button {
+                            running = false
+                            text = "UI unlocked. Probe may still run in background.\n" + text
+                        } label: {
+                            HStack(spacing: 10) {
+                                ProgressView().controlSize(.small).tint(T.emberSoft)
+                                Text("Unlock UI")
+                                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                                Spacer()
+                                Text("frees buttons")
+                                    .font(T.tiny)
+                                    .foregroundColor(.white.opacity(0.55))
+                            }
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 11)
+                        }
+                        .luminaGlass(RoundedRectangle(cornerRadius: 12, style: .continuous),
+                                     interactive: true, tint: T.ember)
+                    }
                     HStack(spacing: 8) {
                         hotButton("KERNEL", id: "krw")
                         hotButton("PATHS", id: "pathtest")
                     }
                     HStack(spacing: 8) {
-                        hotButton("P044 v73 GM192", id: "p044")
-                        hotButton("P139 intel", id: "p139")
-                    }
-                    HStack(spacing: 8) {
+                        hotButton("Ident", id: "ident")
                         hotButton("KREAD", id: "kreadtest")
-                        hotButton("P057 AKS v9", id: "p057")
-                    }
-                    HStack(spacing: 8) {
-                        hotButton("P084 PUAF", id: "p084")
-                        hotButton("P085 84607 racer", id: "p085")
-                    }
-                    HStack(spacing: 8) {
-                        hotButton("CHAINS", id: "p070")
-                        hotButton("P010 disclose", id: "p010qleak")
-                    }
-                    HStack(spacing: 8) {
-                        hotButton("P063 leak", id: "p063")
-                        hotButton("CS2", id: "cs2")
                     }
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
-                            utilButton("Ident") { run("ident") }
-                            utilIcon("doc.text.magnifyingglass", "Recover") { showRecoveredLog() }
-                            utilIcon("folder", "Logs") { showLogs = true }
-                            utilButton("Hour") { showHour = true }
-                            utilIcon("gearshape", "Settings") { showSettings = true }
                             utilIcon(copiedFlash ? "checkmark" : "doc.on.doc", "Copy") {
                                 LuminaCopyBus.shared.copy(text, label: "Console copied")
                                 copiedFlash = true
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { copiedFlash = false }
                             }
-                            utilButton("More…") { showMore = true }
-                            if running {
-                                ProgressView().controlSize(.small).tint(T.ember)
-                                utilButton("Unlock") {
-                                    running = false
-                                    text = "Manually unlocked UI (probe may still run in background).\n" + text
-                                }
-                            }
+                            utilIcon("doc.text.magnifyingglass", "Recover") { showRecoveredLog() }
+                            utilIcon("folder", "Logs") { showLogs = true }
+                            utilButton("Lab") { LuminaTabs.shared.index = 1 }
+                            utilButton("Chain") { LuminaTabs.shared.index = 2 }
+                            utilIcon("gearshape", "Settings") { showSettings = true }
+                            utilButton("All TAPs") { showMore = true }
                         }
                     }
                 }
@@ -102,7 +100,11 @@ struct ContentView: View {
         }
         // Do NOT scan Documents on first frame — that caused ~1s freeze.
         .sheet(isPresented: $showSettings) {
-            RigSettingsView()
+            RigSettingsView(
+                onHour: { showSettings = false; showHour = true },
+                onLogs: { showSettings = false; showLogs = true },
+                onAllTaps: { showSettings = false; showMore = true }
+            )
         }
         .sheet(isPresented: $showHour) {
             HourLogGallery { body in
@@ -180,7 +182,7 @@ struct ContentView: View {
                         moreRow("CS calib. phys_oob race only (not KRW)", "cscali")
                         moreRow("P122 SwordForge. combined 64788 KRW test (freer→reclaim→read)", "swordforge")
                         moreRow("P123 ShapeCensus. kalloc.3072 victims with KRW vision (mini/libkrw)", "shapecensus")
-                        moreRow("KERNEL. hunt-krw-7: P139 disclose (P010 QueueCreate copyout + P063 aio kptr) then hunt P044 N=192 LIVE / 17 P114+P149 / A12X 23H30 FIELD# harvest + kread32. SKIP P099/P073 254. Occupancy / PIPE-HIT is not hasKread.", "krw")
+                        moreRow("KERNEL. hunt-krw-9: P139 disclose (P010 QueueCreate copyout + P063 aio kptr) then hunt P044 N=192 LIVE / 17 P114+P149 / A12X 23H30 FIELD# harvest + kread32. SKIP P099/P073 254. Occupancy / PIPE-HIT is not hasKread.", "krw")
                         moreRow("PATHS. Per-path scorecard + READ-ONLY tests. Hunt: P139+kread. 17: P139+P114+kread (P149 stays KERNEL/catalog). Occupancy stays P044/KERNEL solo. P110/P143 isolated.", "pathtest")
                         moreRow("KREAD. commitSlide kread32(kbase)==MH_MAGIC_64", "kreadtest")
                         moreRow("P070 five-door chain census + persist HOLD", "p070")
@@ -374,8 +376,7 @@ struct ContentView: View {
                 .padding(.vertical, 7)
                 .foregroundColor(.white)
         }
-        .luminaGlass(Capsule(), interactive: !running, tint: T.cyan)
-        .disabled(running)
+        .luminaGlass(Capsule(), interactive: true, tint: T.cyan)
     }
 
     @ViewBuilder
@@ -387,8 +388,7 @@ struct ContentView: View {
                 .padding(.vertical, 7)
                 .foregroundColor(.white)
         }
-        .luminaGlass(Capsule(), interactive: !running, tint: T.cyan)
-        .disabled(running)
+        .luminaGlass(Capsule(), interactive: true, tint: T.cyan)
         .accessibilityLabel(label)
     }
 
@@ -762,9 +762,9 @@ struct ContentView: View {
         if !planText.isEmpty {
             text = "[PLAN]\n" + planText
                 + "lattice: sandbox → leak → race → write → krw → sptm HOLD\n"
-                + "Running \(id)…\nDon't touch UI. Classify ips after reboot.\n"
+                + "Running \(id)…\nUnlock UI stays tappable. Classify ips after reboot.\n"
         } else {
-            text = "Running \(id)…\nDon't touch UI. Classify ips after reboot.\n"
+            text = "Running \(id)…\nUnlock UI stays tappable. Classify ips after reboot.\n"
         }
         logTap(id)
 

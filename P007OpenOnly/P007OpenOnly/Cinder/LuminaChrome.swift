@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import Combine
 
 // MARK: - Stamp
 //
@@ -7,7 +8,12 @@ import UIKit
 // phone still has hunt-krw-6. Glass is chrome only — TAP bodies unchanged.
 
 enum LuminaStamp {
-    static let ui = "hunt-krw-7"
+    static let ui = "hunt-krw-9"
+}
+
+final class LuminaTabs: ObservableObject {
+    static let shared = LuminaTabs()
+    @Published var index: Int = 0
 }
 
 // MARK: - Glass tier (liquid-glass-fallbacks-and-tiering)
@@ -128,9 +134,10 @@ private struct LuminaGlassMod<S: InsettableShape>: ViewModifier {
                 shape.strokeBorder(
                     AngularGradient(stops: [
                         .init(color: .white.opacity(0.55), location: 0.00),
-                        .init(color: T.ember.opacity(0.35), location: 0.22),
-                        .init(color: .white.opacity(0.08), location: 0.42),
-                        .init(color: T.cyan.opacity(0.30), location: 0.62),
+                        .init(color: T.ember.opacity(0.40), location: 0.18),
+                        .init(color: T.violet.opacity(0.32), location: 0.38),
+                        .init(color: .white.opacity(0.08), location: 0.52),
+                        .init(color: T.cyan.opacity(0.32), location: 0.70),
                         .init(color: .white.opacity(0.10), location: 0.80),
                         .init(color: .white.opacity(0.55), location: 1.00)
                     ], center: .center, angle: .degrees(-135)),
@@ -188,15 +195,15 @@ struct LuminaBackdrop: View {
                     SIMD2<Float>(0, 1), SIMD2<Float>(0.5, 1), SIMD2<Float>(1, 1)
                 ],
                 colors: [
-                    Color(red: 0.04, green: 0.03, blue: 0.08),
-                    T.ember.opacity(0.55),
-                    Color(red: 0.06, green: 0.04, blue: 0.12),
-                    T.cyan.opacity(0.28),
-                    Color(red: 0.10, green: 0.05, blue: 0.16),
-                    T.violet.opacity(0.30),
-                    Color(red: 0.02, green: 0.04, blue: 0.08),
+                    Color(red: 0.05, green: 0.02, blue: 0.10),
+                    T.ember.opacity(0.50),
+                    Color(red: 0.04, green: 0.04, blue: 0.14),
+                    T.cyan.opacity(0.32),
+                    Color(red: 0.10, green: 0.04, blue: 0.18),
+                    T.violet.opacity(0.42),
+                    Color(red: 0.02, green: 0.03, blue: 0.10),
                     T.ember.opacity(0.22),
-                    Color(red: 0.03, green: 0.03, blue: 0.07)
+                    Color(red: 0.03, green: 0.02, blue: 0.08)
                 ]
             )
             .ignoresSafeArea()
@@ -204,20 +211,24 @@ struct LuminaBackdrop: View {
         } else {
             LinearGradient(
                 colors: [
-                    Color(red: 0.10, green: 0.04, blue: 0.08),
-                    Color(red: 0.03, green: 0.05, blue: 0.10),
-                    Color(red: 0.04, green: 0.03, blue: 0.08)
+                    Color(red: 0.12, green: 0.04, blue: 0.12),
+                    Color(red: 0.03, green: 0.05, blue: 0.14),
+                    Color(red: 0.05, green: 0.02, blue: 0.10)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
             .ignoresSafeArea()
             .overlay(
-                RadialGradient(colors: [T.ember.opacity(0.28), .clear],
+                RadialGradient(colors: [T.ember.opacity(0.30), .clear],
                                center: .top, startRadius: 20, endRadius: 380)
             )
             .overlay(
-                RadialGradient(colors: [T.cyan.opacity(0.16), .clear],
+                RadialGradient(colors: [T.violet.opacity(0.22), .clear],
+                               center: .center, startRadius: 10, endRadius: 360)
+            )
+            .overlay(
+                RadialGradient(colors: [T.cyan.opacity(0.18), .clear],
                                center: .bottomTrailing, startRadius: 10, endRadius: 340)
             )
         }
@@ -229,11 +240,17 @@ struct LuminaBackdrop: View {
             let h = geo.size.height
             ZStack {
                 Circle()
-                    .fill(T.ember.opacity(0.22))
+                    .fill(T.ember.opacity(0.24))
                     .frame(width: 220, height: 220)
                     .blur(radius: 70)
                     .offset(x: w * 0.18 + CGFloat(12 * sin(t * 0.21)),
                             y: -h * 0.18 + CGFloat(10 * cos(t * 0.17)))
+                Circle()
+                    .fill(T.violet.opacity(0.20))
+                    .frame(width: 200, height: 200)
+                    .blur(radius: 74)
+                    .offset(x: -w * 0.22 + CGFloat(9 * cos(t * 0.16)),
+                            y: h * 0.12 + CGFloat(11 * sin(t * 0.13)))
                 Circle()
                     .fill(T.cyan.opacity(0.16))
                     .frame(width: 260, height: 260)
@@ -253,7 +270,7 @@ struct LuminaBackdrop: View {
                 let y = (seed * 29).truncatingRemainder(dividingBy: max(size.height, 1))
                 let twinkle = 0.22 + 0.55 * (0.5 + 0.5 * sin(t * 0.65 + Double(i)))
                 let r: CGFloat = i % 7 == 0 ? 1.5 : 0.7
-                let col: Color = i % 4 == 0 ? T.cyan : (i % 4 == 1 ? T.emberSoft : .white)
+                let col: Color = i % 4 == 0 ? T.cyan : (i % 4 == 1 ? T.emberSoft : (i % 4 == 2 ? T.violet : .white))
                 ctx.fill(Path(ellipseIn: CGRect(x: x, y: y, width: r * 2, height: r * 2)),
                          with: .color(col.opacity(twinkle * 0.55)))
             }
@@ -294,18 +311,24 @@ struct LuminaMark: View {
     var body: some View {
         ZStack {
             Circle()
-                .fill(T.ember.opacity(0.22))
-                .frame(width: size, height: size)
-                .blur(radius: size * 0.28)
-            Text("1")
-                .font(.system(size: size * 0.62, weight: .bold, design: .rounded))
-                .foregroundStyle(
-                    LinearGradient(colors: [T.emberSoft, T.cyan],
-                                   startPoint: .topLeading, endPoint: .bottomTrailing)
+                .fill(
+                    RadialGradient(colors: [
+                        T.ember.opacity(0.55),
+                        T.violet.opacity(0.28),
+                        T.cyan.opacity(0.0)
+                    ], center: .center, startRadius: 2, endRadius: size * 0.55)
                 )
-                .shadow(color: T.ember.opacity(0.6), radius: 10)
+                .frame(width: size, height: size)
+                .blur(radius: size * 0.14)
+            Circle()
+                .strokeBorder(
+                    AngularGradient(colors: [T.ember, T.violet, T.cyan, T.ember],
+                                    center: .center),
+                    lineWidth: max(1.0, size * 0.018))
+                .frame(width: size * 0.70, height: size * 0.70)
         }
         .accessibilityHidden(true)
+        .accessibilityLabel("Lum1na")
     }
 }
 
@@ -497,7 +520,7 @@ struct BoardHUD: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .luminaGlass(RoundedRectangle(cornerRadius: 16, style: .continuous), interactive: true, tint: T.ember)
+        .luminaGlass(RoundedRectangle(cornerRadius: 16, style: .continuous), interactive: true, tint: T.violet)
         .padding(.horizontal, 10)
         .padding(.top, 4)
         .onAppear { snap = BoardSnapshot.current() }
@@ -522,7 +545,7 @@ struct BoardHUD: View {
     private func reveal(_ id: String) {
         let console = Set(["ident", "krw", "pathtest", "kreadtest", "p044", "p139",
                            "p010qleak", "p063", "p149", "p114", "board", "cs2", "p100"])
-        tab = console.contains(id) ? 4 : 1
+        LuminaTabs.shared.index = console.contains(id) ? 4 : 1
     }
 }
 
