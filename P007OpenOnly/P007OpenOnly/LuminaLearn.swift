@@ -222,17 +222,17 @@ enum LuminaLearn {
             stage = .krw
             outcome = "ok"
             note = "live board hasKread. kread32(kbase)==MH_MAGIC_64 this process."
-        } else if log.contains("PIPE-HIT") || log.contains("QUEUE-INIT") || lower.contains("conversion=yes") {
+        } else if log.contains("PIPE-HIT") || log.contains("QUEUE-INIT") || liveConversionReceipt(log) {
             conversion = true
             stage = .write
             outcome = "door"
             note = "write/conversion receipt. hasKread stays NO until kread32(kbase)==0xfeedfacf."
-        } else if lower.contains("occupancy") && (log.contains("HIT") || lower.contains("occupancy=yes")) {
+        } else if lower.contains("occupancy=yes") || log.contains("occupancy HIT") {
             occupancy = true
             stage = .write
             outcome = "occupancy"
             note = "occupancy WRITE fingerprint. Not conversion. Not hasKread."
-        } else if lower.contains("element modified after free") || lower.contains("kalloc.3072") {
+        } else if lower.contains("element modified after free") {
             occupancy = true
             stage = .write
             outcome = "fires"
@@ -262,6 +262,18 @@ enum LuminaLearn {
                                   knob: knob, sibling: sibling(id),
                                   hasKread: hasKread, conversion: conversion,
                                   occupancy: occupancy)
+    }
+
+    /// Live conversion tokens only. P073/P044 print
+    /// `Bar: conversion=YES is desc_type_forged` as the definition — that
+    /// substring is instructional and must not mint outcome=door.
+    private static func liveConversionReceipt(_ log: String) -> Bool {
+        if log.contains("conversion SIGNAL") || log.contains("desc DOOR HIT")
+            || log.contains("kind=conversion") {
+            return true
+        }
+        guard let r = log.range(of: "conversion=YES") else { return false }
+        return !log[..<r.lowerBound].hasSuffix("Bar: ")
     }
 
     static func defaultStage(_ id: String) -> LuminaStage {
