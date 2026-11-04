@@ -179,10 +179,13 @@ static CFNumberRef RCNUM(int64_t v) {
        so pre-rename accumulated warm sets survive. Writes under the new name. */
     uint64_t rc_warm[64]; uint32_t warmN = 0;
     char hotfile[512];
+    char wrongfile[512];
     {
         NSString *docs = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
         NSString *hp2 = [docs stringByAppendingPathComponent:@"lightsword_hot.txt"];
+        NSString *wp2 = [docs stringByAppendingPathComponent:@"lightsword_wrong.txt"];
         snprintf(hotfile, sizeof hotfile, "%s", [hp2 fileSystemRepresentation]);
+        snprintf(wrongfile, sizeof wrongfile, "%s", [wp2 fileSystemRepresentation]);
         NSString *hpl = [docs stringByAppendingPathComponent:@"racecalib_hot.txt"];
         NSString *readFrom = [NSFileManager.defaultManager fileExistsAtPath:hp2] ? hp2 : hpl;
         NSString *srcName = [NSFileManager.defaultManager fileExistsAtPath:hp2] ? @"lightsword_hot.txt"
@@ -475,8 +478,22 @@ static CFNumberRef RCNUM(int64_t v) {
                 pread(fdMark, rbBuf, sizeof(rbBuf), 0x4000);
                 uint64_t got = 0; int32_t delta = 0;
                 rc_cls_t c2 = rc_cls(rbBuf, pg + 1, npages, &got, &delta);
-                if (c2 == C_WRONG) { hw++; if (hr2 < 8) { rc_log("  v10 WRONG hot=0x%llx q0=0x%llx q1=0x%llx", off, rbBuf[0], rbBuf[1]); hr2++; } }
-                else if (c2 == C_FOREIGN) { hf++; if (hr2 < 8) { rc_log("  v10 FOREIGN hot=0x%llx q0=0x%llx q1=0x%llx", off, rbBuf[0], rbBuf[1]); hr2++; } }
+                if (c2 == C_WRONG) {
+                    hw++;
+                    if (hr2 < 8) {
+                        rc_log("  v10 WRONG hot=0x%llx q0=0x%llx q1=0x%llx (spray page tag, not kptr)",
+                               off, rbBuf[0], rbBuf[1]);
+                        hr2++;
+                    }
+                    int wfd = open(wrongfile, O_WRONLY | O_CREAT | O_APPEND, 0644);
+                    if (wfd >= 0) {
+                        char wl[48];
+                        int n = snprintf(wl, sizeof wl, "0x%llx\n", (unsigned long long)off);
+                        if (n > 0) write(wfd, wl, (size_t)n);
+                        close(wfd);
+                    }
+                }
+                else if (c2 == C_FOREIGN) { hf++; if (hr2 < 8) { rc_log("  v10 FOREIGN hot=0x%llx q0=0x%llx q1=0x%llx (kptr-class if >>36==0xfffffff0)", off, rbBuf[0], rbBuf[1]); hr2++; } }
                 else if (c2 == C_PARTIAL) hp++;
             }
         }
