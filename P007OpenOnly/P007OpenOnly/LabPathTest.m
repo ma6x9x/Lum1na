@@ -18,7 +18,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define PATH_BUILD @"hunt-krw-10"
+#define PATH_BUILD @"hunt-krw-12"
 
 @implementation LabPathTest
 

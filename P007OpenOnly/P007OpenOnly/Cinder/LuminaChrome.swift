@@ -5,10 +5,10 @@ import Combine
 // MARK: - Stamp
 //
 // Sideload check: Ident / KERNEL session banner must print this, or the
-// phone still has hunt-krw-6. Glass is chrome only — TAP bodies unchanged.
+// phone still has an older IPA. Glass is chrome only — TAP bodies unchanged.
 
 enum LuminaStamp {
-    static let ui = "hunt-krw-10"
+    static let ui = "hunt-krw-12"
 }
 
 final class LuminaTabs: ObservableObject {

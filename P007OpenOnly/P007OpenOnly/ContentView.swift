@@ -182,7 +182,7 @@ struct ContentView: View {
                         moreRow("CS calib. phys_oob race only (not KRW)", "cscali")
                         moreRow("P122 SwordForge. combined 64788 KRW test (freer→reclaim→read)", "swordforge")
                         moreRow("P123 ShapeCensus. kalloc.3072 victims with KRW vision (mini/libkrw)", "shapecensus")
-                        moreRow("KERNEL. hunt-krw-10: P139 disclose (P010 QueueCreate copyout + P063 aio kptr) then hunt P044 N=192 LIVE / 17 P114+P149 / A12X 23H30 FIELD# harvest + kread32. SKIP P099/P073 254. Occupancy / PIPE-HIT is not hasKread.", "krw")
+                        moreRow("KERNEL. hunt-krw-12: P139 disclose then hunt P044 N=192 LIVE / 17 P114+P149 / A12X 23H30 harvest + kread32. CS2 on 27.0 is copy-confusion (not CS verbatim). SKIP P099/P073 254. Occupancy / PIPE-HIT is not hasKread.", "krw")
                         moreRow("PATHS. Per-path scorecard + READ-ONLY tests. Hunt: P139+kread. 17: P139+P114+kread (P149 stays KERNEL/catalog). Occupancy stays P044/KERNEL solo. P110/P143 isolated.", "pathtest")
                         moreRow("KREAD. commitSlide kread32(kbase)==MH_MAGIC_64", "kreadtest")
                         moreRow("P070 five-door chain census + persist HOLD", "p070")

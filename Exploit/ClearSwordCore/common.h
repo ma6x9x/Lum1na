@@ -125,6 +125,10 @@ typedef struct pe_context {
     struct iovec iov;
     uint64_t highiest_success_idx;
     uint64_t success_read_count;
+    /* 1 on 23B+/24A+ (CVE-2025-43520 patched): inspect successful pwritev
+       copies (LightSword calib FILE-COPY / PARTIAL-WRONG class). 0 = OG
+       EFAULT-only lane (A13 18.x ClearSword verbatim). hop-1 stays closed. */
+    int copy_confusion_lane;
 
     int control_socket;
     int rw_socket;

