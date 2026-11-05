@@ -10,7 +10,7 @@
 		<true/>
 	</dict>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Lum1na-Mind talks to a GLM-Edge / mlx / ollama server on your LAN.</string>
+	<string>Lum1na-Mind talks to Ollama on your Mac (port 11434) and other OpenAI-compatible endpoints on this Wi-Fi. Allow Local Network so Test Connection can reach 192.168.1.236.</string>
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_lumina-mind._tcp</string>

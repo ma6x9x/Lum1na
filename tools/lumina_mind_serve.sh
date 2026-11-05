@@ -36,9 +36,11 @@ print_phone() {
   echo "========== PHONE =========="
   echo "  Phone URL : http://${LAN_IP}:${port}/v1"
   echo "  Bonjour   : Lum1na-Mind  _lumina-mind._tcp  port ${port}"
+  echo "  IPA lab hint: http://192.168.1.236:11434/v1 (this Mac en0)."
   echo "  Same Wi-Fi as the phone. Allow Local Network on first connect."
-  echo "  Mind → gear → Test Connection. Pick a model name from GET /models."
-  echo "  Do not use http://192.168.1.1:… — that is usually the router."
+  echo "  Mind tab auto-probes. Gear → Test Connection must be HTTP 200."
+  echo "  Do not use http://192.168.1.1 — that is the router."
+  echo "  Grok: https://api.x.ai/v1 + console.x.ai key (not Grok CLI login)."
   echo "==========================="
   echo
 }

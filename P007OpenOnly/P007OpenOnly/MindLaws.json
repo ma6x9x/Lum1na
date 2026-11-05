@@ -66,7 +66,32 @@
     {
       "id": "law.glm.edge",
       "title": "Lum1na-Mind models",
-      "text": "Phone cannot run ollama. Default local expert is llama3.1:8b; free local DeepSeek is deepseek-r1:1.5b. glm-edge-1.5b is not an ollama tag. glm-5.3-flash:cloud is Ollama-cloud quota (this lab Mac hit the monthly cap). Kimi is also :cloud on the same quota. Grok is https://api.x.ai/v1 model grok-4.7 with the console.x.ai key (or Documents/xai_key.txt). OpenRouter free is https://openrouter.ai/api/v1 model openrouter/free. Mac: tools/lumina_mind_serve.sh binds 0.0.0.0, warms llama3.1:8b, advertises _lumina-mind._tcp. 192.168.1.1 is usually the router. Weights are not in the IPA. Tools run on the phone."
+      "text": "Phone cannot run ollama. Default local expert is llama3.1:8b at http://192.168.1.236:11434/v1 (this lab Mac). deepseek-r1:1.5b is local/free. glm-edge-1.5b is not an ollama tag. glm-5.3-flash:cloud is Ollama-cloud quota. Grok is https://api.x.ai/v1 model grok-4.7 with a console.x.ai API key (Documents/xai_key.txt). Grok CLI login is a different token. OpenRouter: https://openrouter.ai/api/v1 model openrouter/free. Mac: tools/lumina_mind_serve.sh advertises _lumina-mind._tcp. 192.168.1.1 is the router. Weights stay off the IPA. Tools run on the phone."
+    },
+    {
+      "id": "law.cs2.copy27",
+      "title": "CS2 27.0 copy-confusion",
+      "text": "T8150 24A435: copy27 lane is success pwritev + 16KB iov. HIT is any unmarked qword in the 0xf00 buffer (PARTIAL if q0 still marker, WHOLESALE if q0 foreign). cls=KERNEL POINTER needs (q>>36)==0xfffffff0. spray-page tag / WRONG offs (c0dec0de) are SOCK_DGRAM pages. 8-try cap then 16; 20ms yield every 32 pages so configd can check in. hop-1 KEEP CLOSED (EINVAL since 26.1). Scan without pcb_start_offset is setup, not KRW."
+    },
+    {
+      "id": "law.watchdog.volume",
+      "title": "configd watchdog is volume",
+      "text": "24A435 userspace watchdog timeout (no configd checkin 180s) during CS2 is VM machine-gun (100 tries x 8 x 128MiB plus pread), not a kernel data abort. IPS KernelCache slide is that dead boot — never commitSlide. ANECompilerService disk-writes resource IPS is compiler cache, not kread."
+    },
+    {
+      "id": "law.xnu.gate",
+      "title": "ios-xnu hunt gate",
+      "text": "SKU = hw.machine + kern.osversion. Never paste T8101 VAs onto T8020/T8150. hasKread is false until kread32(kbase)==0xfeedfacf on that SKU. Heap pointers, occupancy, panic PCs, PIPE-HIT, and CS2 oob HIT without pcb are classify-only. Crash is not exploitable. One failed TAP does not close a class. File with Apple after the gate; validator HOLD until then."
+    },
+    {
+      "id": "law.xnu.card",
+      "title": "Finding card shape",
+      "text": "Each finding is one card: surface, build/SKU, class, reach, evidence (address/insn/panic/readback), validator HOLD until kread32(kbase)==0xfeedfacf, rubric unscored pre-gate, recommendation hold. Crash is not exploitable. File Apple after the gate. Mind tools classify_primitive and xnu_card write this card from a TAP log."
+    },
+    {
+      "id": "law.p149.not.arm",
+      "title": "P149 cannot Arm SocketKRW",
+      "text": "P149 PIPE-HIT/QUEUE-INIT is AVE queue_init self-pointers in 16KB kernel pipes. SocketKRW.Arm needs rw_inpcb_kaddr (rw_slot = inpcb+0x148 icmp6filt). Wrong zone. Do not stack P149+CS2 same boot. first_this is AfterKread target only after hasKread."
     },
     {
       "id": "law.promote",
