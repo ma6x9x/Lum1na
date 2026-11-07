@@ -705,8 +705,8 @@ static BOOL p110_leak_capture(NSString *tag, BOOL print, P110LeakSnap *snap) {
             }
             for (int wi = 0; wi < g_p110_wakeSbN; wi++) CFRelease(g_p110_wakeSb[wi]);
             g_p110_wakeSbN = 0;
-            Lf(@"[leak] DECODE-ARM: %d/3 decoded; session st=%d frame errs=[%d %d %d] — recapture sel-8",
-               dec, (int)dst, (int)dstErr[0], (int)dstErr[1], (int)dstErr[2]);
+            Lf(@"[leak] DECODE-ARM: %d/3 decoded; frame errs=[%d %d %d] (session-create st in the earlier row) — recapture sel-8",
+               dec, (int)dstErr[0], (int)dstErr[1], (int)dstErr[2]);
             in64 = (uint64_t)(uintptr_t)g_p110_leak_out;
             memset(g_p110_leak_out, 0, sizeof(g_p110_leak_out));
             outLen = sizeof(g_p110_leak_out);
