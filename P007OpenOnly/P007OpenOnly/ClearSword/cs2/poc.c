@@ -102,7 +102,16 @@ kern_return_t cs2_pe_v1(void) {
     /* pass-2 wedge law: fire #2 froze at pass-2's first read after a fully
        healthy pass-1 (1.6M one-shot maps). Decode pending — tonight: one pass. */
     bool success = false;
-    for (size_t pass = 0; pass < 1; pass++) {
+    /* Dopamine runs this loop until success. The 2026-11-06 one-pass bound
+       was a 24A435 pass-2 wedge workaround; on the 18.x/17.3 trains it makes
+       a single unlucky sweep fatal for the tap. Retry a few times (the pass
+       end already releases sockets/mappings) but stay inside the tap budget. */
+    uint64_t max_passes = cs2_ctx.copy_confusion_lane ? 1 : 4;
+    for (size_t pass = 0; pass < max_passes; pass++) {
+        if (pass && cs2_expired()) {
+            LOG("budget expired before pass %lu — stop after %lu completes", pass + 1, pass);
+            break;
+        }
         {
             struct task_vm_info tvi; mach_msg_type_number_t tc = TASK_VM_INFO_COUNT;
             if (task_info(mach_task_self(), TASK_VM_INFO, (task_info_t)&tvi, &tc) == KERN_SUCCESS)

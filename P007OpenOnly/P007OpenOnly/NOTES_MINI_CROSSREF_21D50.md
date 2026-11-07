@@ -1593,3 +1593,35 @@ These describe bugs that exist on our PRE-FIX builds: 23F77 (26.5), 24A435 (27.0
 - Fixed IPSWs: full 24B119 for iPhone13,2 + iPhone18,2 in `~/Downloads/fixed_full`.
   24A435 full IPSW is still missing (only the `.download` folder), so the
   proper 24A435↔24B119 `ipsw diff` is the next diff step.
+
+## 2026-11-07 (later) — iPhone 11 is 18.6.2/22G100; panic decode; jailbreak port
+- **Device correction:** the USB-connected iPhone 11 reads ProductVersion 18.6.2,
+  BuildVersion 22G100 (not 18.7.1). This is the exact A13_22G100 row, so the
+  22H31/22H124 gate work still matters only if that unit is updated later.
+- **Panics pulled from the device** (idevicecrashreport, local only):
+  - panic-full-2026-11-01-224302 (P007OpenOnly) and -11-02-182738 (P007OpenOnly):
+    "Unexpected fault in kernel static region", pc unslid 0xfffffff0070158d0.
+  - panic-full-2026-11-02-185702 (Lum1na): zone bound checks, buffer length 32
+    overflows a 984-byte object in zone [socket].
+  - All three share the same unslid CS2/socket backtrace (0x70521c8, 0x719e360,
+    0x719caa0, 0x700b940, 0x70522ec, 0x77e047c, 0x77eae40). Tasks: P007OpenOnly
+    (debug) x2, Lum1na (main) x1 → both apps sprayed in one boot.
+- **ClearSword mis-target revert:** `cs2_spray_socket`'s 2026-10-24 gencnt
+  self-calibration could match a DIFFERENT pcb gencnt; `find_and_corrupt`
+  then accepts the wrong inpcb and the write lands on a neighbor. Restored
+  Dopamine 3.0.12's fixed blob+0x110. One-pass scan -> 4 passes (copy27 lane
+  stays 1). Added a per-boot one-tap gate (`kern.bootsessionuuid`, override
+  Documents/lum1na_cs2_retry) to both CS2 cores.
+- **Novel post-KRW chain (docs/JAILBREAK_PORT.md):**
+  - Kernel/Lum1naProcFind.m: mach_port_kobject(task_self) -> task_t, scan
+    task for bsd_info (pid + proc_ro validate) -> our proc. NO allproc,
+    NO kernproc, NO XPF.
+  - Lum1naElevate now runs without kernproc via that locator; uid0, audit
+    token, label unsandbox, CS_PLATFORM all unchanged (Dopamine kernel.c).
+  - ak_installJbroot installs basebin.tar into /var/jb/basebin after elevate;
+    ak_searchRoots now includes /var/jb/basebin + /var/jb/usr/bin.
+  - AMFI UC selectors 2/7 enabled on A13_22G100 and A14_21D50 (proven on
+    23F77; kext-global assumption, refusal is logged).
+- **Known gap:** Procursus bootstrap (dpkg/shells) is not in Resources;
+  `dpkg -i` still HOLDs on a stock device. basebin only (jbctl/opainject/
+  launchdhook/ElleKit) is installed.

@@ -260,8 +260,12 @@ static LabOffTab gA14_21D50 = {
     .socket_usecount = 0x24c,               /* info.c ladder darwin>=23.1,<23.4 (17.3 = 23.3.0) */
     .socket_proto_off = 0x18,               /* info.c default through 17.3; 0x20 only at 23.4+ */
     .iosurface_md = 0x40,                   /* ladder: pre-23.4 layout (23.4+ is 0x30) */
-    .amfi_sel_copy = 0,                     /* unproven — pokes skipped */
-    .amfi_sel_manifest = 0,                 /* unproven — pokes skipped */
+    /* AMFI UC external-method selectors are a property of the AMFI kext, not
+       the SoC/train: 2 = copyTrustCacheFromInputArguments, 7 = copyTrustCache
+       AndManifest, proven on 23F77 (A14_23F77 row). Same kext family on 17.3.
+       Test with the elevate+inject path; a refusal is logged, never silent. */
+    .amfi_sel_copy = 2,
+    .amfi_sel_manifest = 7,
     .pmap_cs_allow_off = 0,                 /* unproven — pokes skipped */
     .owns_replaceable = 0,
     .build_number = BUILD_21D50,
@@ -304,8 +308,9 @@ static LabOffTab gA13_22G100 = {
     .tag = "A13_22G100",
     .static_base = 0xFFFFFFF007004000ULL,   /* verified link base only */
     .socket_usecount = 0x254,               /* info.c ladder darwin>=23.4 (rig 24.6.0); iOS 26+ would be 0x23c */
-    .amfi_sel_copy = 0,                     /* unproven — poke skipped */
-    .amfi_sel_manifest = 0,                 /* unproven — poke skipped */
+    /* Same AMFI UC selector pair as the 23F77 row (kext-global 2/7). */
+    .amfi_sel_copy = 2,
+    .amfi_sel_manifest = 7,
     .pmap_cs_allow_off = 0,                  /* unproven — poke skipped */
     .owns_replaceable = 0,
     .build_number = BUILD_22G100,
