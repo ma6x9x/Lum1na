@@ -130,12 +130,25 @@
                      : @"miss (no provider; CS2 fallback next)"]);
         }
         if (!bb.hasKread) {
-            NSString *cs = nil;
-            @try { cs = [CS2Runner runUpstream]; }
-            @catch (NSException *e) { L([NSString stringWithFormat:@"[-] cs2 %@", e.name]); }
-            if (cs.length) {
-                NSUInteger n = cs.length > 240 ? 240 : cs.length;
-                L([cs substringToIndex:n]);
+            /* The ClearSword spray is main-app owned: the debug app and the
+               main app have separate containers, so their one-tap guards
+               cannot see each other. Running both in one boot is the
+               2026-11-01/02 iPhone 11 double-spray panic class. Debug CS2 is
+               opt-in only. */
+            NSString *docs = [NSSearchPathForDirectoriesInDomains(
+                NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
+            BOOL allowCS2 = docs && [[NSFileManager defaultManager]
+                fileExistsAtPath:[docs stringByAppendingPathComponent:@"p007_allow_cs2"]];
+            if (!allowCS2) {
+                L(@"[*] CS2 spray SKIP — main-app owned. Create Documents/p007_allow_cs2 to test it here (PANIC-POSSIBLE).");
+            } else {
+                NSString *cs = nil;
+                @try { cs = [CS2Runner runUpstream]; }
+                @catch (NSException *e) { L([NSString stringWithFormat:@"[-] cs2 %@", e.name]); }
+                if (cs.length) {
+                    NSUInteger n = cs.length > 240 ? 240 : cs.length;
+                    L([cs substringToIndex:n]);
+                }
             }
         }
     } else if (LabSkuIsA12X(sku)) {

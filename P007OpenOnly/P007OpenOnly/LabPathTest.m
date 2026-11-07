@@ -261,12 +261,22 @@ static int path_int_after(NSString *s, const char *key) {
         L([NSString stringWithFormat:@"[*] libkrw P007LaneArmBoard %@",
            armed ? @"YES (provider lane live)" : @"miss (no provider)"]);
         if (![P007Board shared].hasKread) {
-            NSString *cs = nil;
-            @try { cs = [CS2Runner runUpstream]; }
-            @catch (NSException *e) { L([NSString stringWithFormat:@"[-] cs2 %@", e.name]); }
-            if (cs.length) {
-                NSUInteger n = cs.length > 240 ? 240 : cs.length;
-                L([cs substringToIndex:n]);
+            /* Main-app owned spray: separate containers defeat the one-tap
+               guard. Debug CS2 is opt-in (Documents/p007_allow_cs2). */
+            NSString *docs = [NSSearchPathForDirectoriesInDomains(
+                NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
+            BOOL allowCS2 = docs && [[NSFileManager defaultManager]
+                fileExistsAtPath:[docs stringByAppendingPathComponent:@"p007_allow_cs2"]];
+            if (!allowCS2) {
+                L(@"[*] CS2 spray SKIP — main-app owned; Documents/p007_allow_cs2 to enable (PANIC-POSSIBLE)");
+            } else {
+                NSString *cs = nil;
+                @try { cs = [CS2Runner runUpstream]; }
+                @catch (NSException *e) { L([NSString stringWithFormat:@"[-] cs2 %@", e.name]); }
+                if (cs.length) {
+                    NSUInteger n = cs.length > 240 ? 240 : cs.length;
+                    L([cs substringToIndex:n]);
+                }
             }
         }
     }
