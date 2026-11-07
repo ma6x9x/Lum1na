@@ -305,8 +305,8 @@ static void p110_pin(void) {
 static CMSampleBufferRef g_p110_wakeSb[3] = {0};
 static int g_p110_wakeSbN = 0;
 static void p110_decOutCB(void *rc, void *sh, OSStatus st, VTDecodeInfoFlags f,
-                          CVBufferRef pb, VTDecodeInfoFlags *fi) {
-    (void)rc; (void)sh; (void)st; (void)f; (void)fi;
+                          CVBufferRef pb, CMTime pts, CMTime dur) {
+    (void)rc; (void)sh; (void)st; (void)f; (void)pts; (void)dur;
     if (pb) CFRelease(pb); }
 static void p110_flushCB(void *r, void *e, OSStatus st, VTEncodeInfoFlags f, CMSampleBufferRef sb) {
     (void)r; (void)e; (void)st; (void)f; (void)sb;
@@ -689,7 +689,7 @@ static BOOL p110_leak_capture(NSString *tag, BOOL print, P110LeakSnap *snap) {
                         for (int wi = 0; wi < g_p110_wakeSbN; wi++) {
                             VTDecodeInfoFlags dflags = 0;
                             OSStatus dkr = VTDecompressionSessionDecodeFrame(
-                                ds, g_p110_wakeSb[wi], dflags, NULL);
+                                ds, g_p110_wakeSb[wi], dflags, NULL, &dflags);
                             if (dkr == noErr) dec++;
                         }
                         VTDecompressionSessionWaitForAsynchronousFrames(ds);
