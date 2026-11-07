@@ -65,7 +65,7 @@
 
 + (NSString *)tap {
     NSMutableString *out = [NSMutableString string];
-    [out appendFormat:@"=== p151 session %@ BUILD p151-ane-deviceopen-v2 ===\n",
+    [out appendFormat:@"=== p151 session %@ BUILD p151-ane-deviceopen-v3 ===\n",
         LabLocalMilitaryNow()];
     [out appendString:[LabDeviceProfile identBlock]];
 
@@ -117,6 +117,11 @@
                 [out appendFormat:@"%02x", o[i]];
             }
             [out appendString:@"\n"];
+        }
+        {
+            uint32_t sc = 0;
+            kern_return_t ckr = IOConnectCallScalarMethod(conn, 1, NULL, 0, NULL, &sc);
+            [out appendFormat:@"    [sel1 DeviceClose] kr=0x%x\n", ckr];
         }
         IOServiceClose(conn);
     }
