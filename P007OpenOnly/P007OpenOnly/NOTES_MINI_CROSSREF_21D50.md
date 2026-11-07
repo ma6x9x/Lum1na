@@ -1292,3 +1292,22 @@ door/stride laws; the p110 claim rows.
   classifier bands (0xfffffff0/0xfffffe00) apply.
 - HONESTY: leak = not kread by itself; this lane = the disclosure primitive + the aim. The
   attach entitlement = the open census row (p108 re-run on the newest build = the tap).
+
+## 2026-11-07 — the Cinder CVE-tool fleet decoded (5 new classes from the device)
+- **kern.decmpfs (CVE-2026-113910) = THE GROOM-AWAITING LEAK LANE**: the under-produce read WORKS
+  at real scale (xattr=true + 262KB/524KB read-backs, x5 runs) and the classifier says hits=0 —
+  i.e. **the read primitive is live but the heap was clean every time: THE GROOM IS THE MISSING
+  PIECE, NOT THE PRIMITIVE.** Next build = spray (socket/IOSurface pressure) THEN the under-produce
+  read: whatever lands adjacent to the chunk buffers = kernel heap INTO OUR FILE. With the pointer
+  classifier = the receipt class.
+- **kern.ipc (CVE-2026-112507/112476) = the ipc_port request-table index race** — the oracles fire
+  (2 error classes: kr=-300 x12288 + MACH_SEND_INVALID_DEST x3072; converged at ops=512 by the
+  resource budget — deliberate). Decode-owed: the full race design (alloc/notify/send/dealloc
+  interleave + which reply-table slot the win lands in). Mach port-index races = the classic
+  port-confusion class IF the window opens; needs the table-state decode first.
+- **kext.gpt (CVE-2026-112554)** = the attach-door census (p108 re-run) remains the open row.
+- **aud.immersive (CVE-2026-113907)** = entry probe NEGATIVE (no 'lpcm' deserialization hits on
+  this build — the capacity-gap vector does not open here).
+- **cm.fdleak.boundary (CVE-2026-112706)** = the honest sandbox map re-attested (13 refused, 1
+  openable = .GlobalPreferences; the p116-family law holds).
+- HONESTY: all = disclosure/race CANDIDATE classes; hasKread stays NO until a kread32 receipt.
