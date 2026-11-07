@@ -578,6 +578,8 @@ enum LuminaTAP {
             result = P149T8150Krw.tap()
         case "p150", "aneucreach":
             result = P150ANEUCPReach.tap()
+        case "p151", "anedeviceopen":
+            result = P151ANEDeviceOpen.tap()
         case "p152", "iosurfgate":
             result = P152IOSurfaceLookupGate.tap()
         case "p099", "anegroom":
