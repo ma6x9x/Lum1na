@@ -238,14 +238,14 @@ enum Catalog {
         out.append(m0)
                 let mAut0: ExploitModule = ExploitModule(
             id: "kext.autopanic",
-            titleZh: "自动 panic 签名扫描（每个 .ips）",
+            titleZh: "Auto panic signature scan (every .ips)",
             cve: "—",
             component: "Lum1na · crash-log auto-scan",
             primitive: .probe,
             reach: .inProcess,
             tier: 3,
-            summaryZh: "自容器的所有崩溃报告逐个以 stale-slot 签名（lr-pc==0x115F3C，x0==0x59）分类；内核 panic-full 仍为沙盒拒绝，Mac 端处理。",
-            notesZh: "规则分类器（非 ML）；结果写入 learn；跨启动去重。",
+            summaryZh: "Classifies every crash report in the app container by the device-verified signature law (lr-pc==0x115F3C, x0==0x59); system panic-full stays sandbox-refused, handled on the Mac.",
+            notesZh: "Rule classifier, not ML; results into learn; dedup across boots.",
             run: Catalog1Runs.kext_autopanic)
         out.append(mAut0)
 let m1: ExploitModule = ExploitModule(
@@ -768,7 +768,7 @@ let baseline = KernelIPC.baseline()
             ctx.arm("kext.autopanic", "stale-sig x\(stale)")
             ctx.disarm("kext.autopanic", "stale=\(stale) other=\(other)")
         }
-        return ModuleOutcome(headline: stale > 0 ? tl("自动扫描完成：x") + "\(stale)" + tl(" 个 stale-slot 签名") : tl("自动扫描完成：无新报告或无签名"),
+        return ModuleOutcome(headline: stale > 0 ? "AUTO-SCAN: \(stale) stale-slot signature(s)" : "AUTO-SCAN: no new reports or no signature",
                              detail: lines.joined(separator: "\n"),
                              artifacts: [])
     }
