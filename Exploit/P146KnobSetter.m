@@ -23,7 +23,7 @@
 #import <Foundation/Foundation.h>
 #import <objc/message.h>
 
-#define P146_BUILD @"p146-knobsetter-v5.3-chainknobs"
+#define P146_BUILD @"p146-knobsetter-v5.4-pidhandoff"
 
 @implementation P146KnobSetter
 
@@ -214,6 +214,48 @@
                                 : @"(was absent — tonight's 4141..5050 was the code default)"];
         } else {
             [out appendFormat:@"[kept] p044_fill.txt = 5eaf (the chosen fill)\n"];
+        }
+        /* v5.4: the STAGE-B PID handoff — same pasteboard law as the sid
+           handoff. Copy "p044_pid=<n>" anywhere on the device (Universal
+           Clipboard from the Mac, or the console), tap p146, and the knob
+           p044_proc_idx.txt = <n> is written (absent-only; an existing
+           file stays authoritative). The pid is the real daemon pid from
+           syslog (e.g. aned[342] -> 342); the 8739b14 consumer validates
+           THAT pid's entitlements. */
+        {
+            NSString *pidPath = [docs stringByAppendingPathComponent:@"p044_proc_idx.txt"];
+            if (![NSFileManager.defaultManager fileExistsAtPath:pidPath]) {
+                id pb = ((id (*)(Class, SEL))objc_msgSend)(
+                    NSClassFromString(@"UIPasteboard"),
+                    NSSelectorFromString(@"generalPasteboard"));
+                NSString *pbs = pb ? ((NSString *(*)(id, SEL))objc_msgSend)(
+                    pb, NSSelectorFromString(@"string")) : nil;
+                long pidv = 0;
+                if (pbs.length) {
+                    NSRange mk = [pbs rangeOfString:@"p044_pid="];
+                    NSUInteger at = 0;
+                    if (mk.location != NSNotFound) at = mk.location + mk.length;
+                    NSUInteger e = at;
+                    while (e < pbs.length) {
+                        unichar ch = [pbs characterAtIndex:e];
+                        if (ch < '0' || ch > '9') break;
+                        e++;
+                    }
+                    if (e > at) pidv = [[pbs substringWithRange:
+                        NSMakeRange(at, e - at)] intValue];
+                }
+                if (pidv >= 1 && pidv <= 100000) {
+                    BOOL ok = [[NSString stringWithFormat:@"%ld\n", pidv]
+                        writeToFile:pidPath atomically:YES
+                                    encoding:NSUTF8StringEncoding error:nil];
+                    [out appendFormat:@"[%@] p044_proc_idx.txt %@ = %ld (the [v5.4] pasteboard pid handoff — Stage-B validates THIS pid's entitlements)\n",
+                        ok ? @"VERIFY" : @"FAILED", ok ? @"auto-written" : @"", pidv];
+                } else {
+                    [out appendString:@"[ ] pasteboard has no p044_pid=<n> — p044_proc_idx.txt stays absent (procIdx=0)\n"];
+                }
+            } else {
+                [out appendString:@"[kept] p044_proc_idx.txt present — the user's pid is authoritative\n"];
+            }
         }
         /* v5.3: the FGROOM knob auto-write (chain 1). ABSENT-ONLY — the
            groom qword is a user-ownable config, not a one-shot proof value
