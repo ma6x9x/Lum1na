@@ -304,6 +304,10 @@ static void p110_pin(void) {
 /* ---- (b) in-process Family-B catch: async-signal-safe honest verdict --- */
 static CMSampleBufferRef g_p110_wakeSb[3] = {0};
 static int g_p110_wakeSbN = 0;
+static void p110_decOutCB(void *rc, void *sh, OSStatus st, VTDecodeInfoFlags f,
+                          CVBufferRef pb, VTDecodeInfoFlags *fi) {
+    (void)rc; (void)sh; (void)st; (void)f; (void)fi;
+    if (pb) CFRelease(pb); }
 static void p110_flushCB(void *r, void *e, OSStatus st, VTEncodeInfoFlags f, CMSampleBufferRef sb) {
     (void)r; (void)e; (void)st; (void)f; (void)sb;
     /* v3.1: RETAIN the compressor's output so the DECOMPRESSION render
@@ -665,7 +669,7 @@ static BOOL p110_leak_capture(NSString *tag, BOOL print, P110LeakSnap *snap) {
                 if (fd) {
                     VTDecompressionSessionRef ds = NULL;
                     VTDecompressionOutputCallbackRecord ocb = {
-                        .decompressionOutputCallback = NULL,
+                        .decompressionOutputCallback = p110_decOutCB,
                         .decompressionOutputRefCon = NULL };
                     /* the destination attrs: hand-built dictionary via the
                        string keys (the kVTDecompression* constants drift
@@ -678,17 +682,15 @@ static BOOL p110_leak_capture(NSString *tag, BOOL print, P110LeakSnap *snap) {
                         @"CVPixelBufferHeightKey": @720 };
                     OSStatus dst = VTDecompressionSessionCreate(
                         kCFAllocatorDefault, fd,
-                        (__bridge CFDictionaryRef)@{(__bridge NSString *)"EnableHardwareAcceleratedVideoDecoder": @YES},
+                        (__bridge CFDictionaryRef)@{@"EnableHardwareAcceleratedVideoDecoder": @YES},
                         (__bridge CFDictionaryRef)dstAttrs,
                         &ocb, &ds);
                     if (dst == noErr && ds) {
                         for (int wi = 0; wi < g_p110_wakeSbN; wi++) {
                             VTDecodeInfoFlags dflags = 0;
-                            CVPixelBufferRef outbuf = NULL;
                             OSStatus dkr = VTDecompressionSessionDecodeFrame(
-                                ds, g_p110_wakeSb[wi], dflags, &outbuf);
+                                ds, g_p110_wakeSb[wi], dflags, NULL);
                             if (dkr == noErr) dec++;
-                            if (outbuf) CFRelease(outbuf);
                         }
                         VTDecompressionSessionWaitForAsynchronousFrames(ds);
                         VTDecompressionSessionInvalidate(ds);
