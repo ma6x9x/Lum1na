@@ -48,7 +48,7 @@ enum ChainPlan {
                    title: "v63 guest-loop capstone",
                    goal: "The chosen-content cross-process proof. GUEST install: p146+p044 = GUEST HOLD (0x4b1d-tiled surface, sid stamped to the pasteboard). STANDALONE: p146 consumes p044_sid=<n> into p044_target.txt (marker parse first), p044 fires the copyout model at the guest's surface — target_pre.bin must show 0x4b1d (the round-trip gate) — then GUEST p146+p044 = OBSERVE. Guest-side base u16 = 0x5eaf = the cross-process chosen-content write.",
                    moduleIDs: ["p146", "p044"],
-                   unlock: "NO clipboard churn between the two p146 taps. One fire per fresh boot per install."),
+                   unlock: "RUN AS INDIVIDUAL TAPS, not this Run button — the sequence fires BOTH modules in ONE install, but the handoff needs the GUEST install's p146. No clipboard churn between the two p146 taps. One fire per fresh boot per install."),
 
         ChainStage(id: "sF4", index: 6,
                    title: "Desc-consume conversion",
