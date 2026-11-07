@@ -1243,3 +1243,15 @@ door/stride laws; the p110 claim rows.
   reconfirmed; __LATE_CONST NOT fully zero-file (2658 nonzero bytes; boot zeroes only 0x27024000..0x34000).
 - Report: ~/Desktop/lumina_primitives/notes/sptm_t8150_arch_map_20261102.md. THE FULL SPTM MAP = the
   standing artifact set: notes/sptm_t8150_{arch,state}_map_20261102.md + scripts/sptm_t8150/.
+
+## 2026-11-06 — the P149-era kernel panic DECODED (panic-full-2026-11-06-192212): the stale-slot UAF = 4-FOR-4, now via P149's prepare-first lane
+- `Kernel data abort. pc 0xfffffe004056f188, lr 0xfffffe00406850c4, x0=0x59` under KCS=0x30E40000
+  unslides to **pc=0x872B188 / lr=0x88410C4 — byte-identical to the three prior 24A435 panics**
+  (the list-init leaf `stp x0,x0,[x0]` through the garbage slot, x0 = 1+0x58, the session-reset
+  wrapper). The stale-slot teardown UAF = REPRODUCIBLE 4/4 now — P149's consistent panic = the
+  primitive firing, NOT a bug in the lane (the user's p149 consistency = the repro receipt).
+- Honest class: the write still carries the slot's own garbage class (1+0x58); conversion needs
+  the chosen-content step. The repro = the most deterministic kernel-write event on 24A435.
+- The p110 ips 193506 = the client (b) (p110 v2.9's leak-on: QueueCreate 2c2 tags-verdict + the
+  t8150 law 2bf engine-asleep — the pairing HELD and the class ran clean 64 rounds; (b) at the end).
+- ANECompilerService diskwrites = the established noise class (compiler cache), not a kernel abort.
