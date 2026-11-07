@@ -1500,3 +1500,36 @@ door/stride laws; the p110 claim rows.
   only while the port is active; it is not a Dopamine/Momentarius target on 26.7.1. On the
   phones, T020 (read) outranks Momentarius (post-KRW PPL). Momentarius mining is still useful
   for the post-KRW PPL layer and for comparing with Titan, but it cannot unblock KRW.
+
+## 2026-11-07 — the Oct 26, 2026 security wave (26.7.2 / 27.2): new app-reachable kernel CVEs
+Apple advisories 149227 (26.7.2, 134 CVEs) and 149230 (27.2, 163 CVEs), both 2026-10-26.
+These describe bugs that exist on our PRE-FIX builds: 23F77 (26.5), 24A435 (27.0), iPad 23H30
+(26.7.1). None are flagged exploited-in-the-wild except the prior 26.7.1 CVE.
+- **Apple Neural Engine (27.2 only)**: CVE-2026-112696 "app may ... corrupt kernel memory"
+  (OOB write, improved bounds checking, Jaeyeong Lee); CVE-2026-84494 "app may ... write
+  kernel memory" (OOB write, Meta Red Team X). Availability: **iPhone 11 and later**, iPad Pro
+  12.9" 4th gen+/11" 2nd gen+ (A12Z+) — so the **12 (A14) and 17 (A19) are affected; the A12X
+  iPad8,7 is BELOW the floor**. This is a fresh ANE OOB-write pair on our exact harness (p044/
+  p153/p088), fixed only in the 27.2 wave.
+- **AVEVideoEncoder (both advisories)**: CVE-2026-112466 "app may ... **read kernel memory**";
+  112689/112470/112469/112468 "corrupt kernel memory"; 112705 (Josh Maine, Calif.io)
+  termination. The 26.7.2 availability includes iPad Pro 3rd gen/11" 1st gen — **applies to the
+  A12X iPad on 26.7.1**, and this is our AVE2 lane (p148/p149/p142). The read-kernel-memory
+  entry is the missing read half, on the iPad.
+- **IOSurface (both)**: CVE-2026-112477 race, "corrupt kernel memory" — all platforms incl.
+  A12X; our IOSurface/ANE surface work is adjacent (p152, prewire lookup).
+- **Kernel (both)**: 112507 / 84495 / 112474 "write kernel memory"; 112665 "determine kernel
+  memory layout"; 112576 COW integrity; 112606 type confusion; 65350/112517/112514/112516
+  UAFs/termination; 112624 privacy bypass. Many list "An app may...".
+- **iPhone Duo / Calif context**: Calif demoed a launch-day iPhone Duo (27.1) jailbreak and an
+  untethered iPhone 18 Pro (27.0.1) jailbreak at Hexacon (Oct 16); not public, no tool. The
+  27.2 advisory is the patch list for that class of bugs — our 17 on 27.0/24A435 is pre-fix.
+- **Weaponization plan**: the advisory maps component+impact only. The diff oracle is the
+  FIXED binary: iPad 26.7.2 IPSW vs 23H24/23H30; iPhone 26.7.2 (iPhone13,2) vs 23F77;
+  iPhone 27.2 (iPhone18,2) vs 24A435. Extract the fixed AppleAVE2 / AppleH11ANEInterface /
+  IOSurface kexts, diff against the vulnerable ones, and locate the added bounds checks.
+  No device update and no IPSW needed for the map; the fixed IPSW is needed only for the diff.
+- **p090 status**: P090MomentariusTest is a POST-KRW census (gates on kread32(kbase)==
+  0xfeedfacf, needs libkrw/CS2c). It cannot move the iPad; Momentarius likewise needs kread/
+  kwrite first. The iPad's move from last to first, if it happens, comes from the AVE2
+  112466 read bug / IOSurface race, not from p090 or Momentarius.
