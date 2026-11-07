@@ -218,3 +218,37 @@ Kernelcaches: 24A435 release (iPhone18,2) and 24B119 release (iPhone18,2).
   before the `ldp` at the vulnerable `add w26,sxtw #4 ; ldp [x8,#-8]` site.
   This remains the iPad's read/corrupt candidate; p155 not built (needs the
   iPad VT encode path; p017 stays forbidden).
+
+## 2026-11-07 — full iPad 26.7 (23H24) vs 26.7.2 (23H128) diff
+
+`ipsw diff` completed (kernelcache + 47 updated kexts). Function-level
+extraction + `kextdiff2`/global pairing on the four relevant kexts:
+
+### AppleAVE2 905.41.1 → 905.43.1
+- Already isolated: the index check (`sub/ubfiz/cmp/csel`) before the
+  vulnerable `add w26,sxtw #4 ; ldp [x8,#-8]`. Functions 2782→2785.
+
+### IOSurface 393.5.8 → 393.5.10
+- Same fix as the iPhone: fixed `0xfffffff009745520` (vuln `0xfffffff00973d9b0`)
+  adds `ldrb w8,[x21,#0xf1] ; tbz ; w20 += 0x1b ; return` — not-ready
+  `0xe00002d8` before the list insert.
+
+### IOHIDFamily (CVE-2026-112515)
+- Fixed `0xfffffff00954312c` and `0xfffffff009543398` (vuln
+  `0xfffffff00953b61c`): added
+  `ldr w9,[x20] ; cmp w8,w9 ; b.ge ; ... csel x10,... ; ldr w8,[x10]` —
+  clamps a user/table index to the array length before the load.
+- Two further functions add `ldursw/ldrsw + cmp wN,wM ; b.ge` sign-extended
+  index checks.
+
+### AppleH11ANEInterface 9.512.0 → 9.512.2 (CVE-2026-112696 / 84494)
+- 8 B-only functions. Fixed `0xfffffff008776fdc` (vuln `0xfffffff00876fb98`)
+  is rebuilt with bounds-safety pointer arithmetic:
+  `cmp xN,wN,sxtw ; add xM,base,wN,sxtw ; ... csel xM,xM,poison,eq ;
+   cmp x9,x10 ; b.ls` — sign-extended index/address checks and a poisoned
+  pointer on overflow. The vulnerable 23H24 build lacks the final range
+  compare and goes straight to the buffer operation.
+- Other fixed functions add `cmp w8,# ; b.hi` table-index checks and an
+  `umulh/cmp xzr` multiplication-overflow check. This is the ANE OOB-write
+  hardening class; the iPhone H16 kext shows the same rebuild (278 B-only)
+  but the exact function map still needs the 24A435↔24B119 full diff.

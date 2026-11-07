@@ -1644,3 +1644,15 @@ These describe bugs that exist on our PRE-FIX builds: 23F77 (26.5), 24A435 (27.0
   `p153_create=1`, `p153_map=1`, counts 0; then a separate boot with
   `p153_send=1`, `p153_send_size=0xc50` zero counts. DeviceOpen success is
   the receipt; it is not KRW.
+
+## 2026-11-07 — full iPad diff + 27.x bounds-safety finding
+- `ipsw diff` 23H24→23H128 completed (47 kexts). IOSurface fix is the same
+  ready-byte check at 0x9745520 (vuln 0x973d9b0): ldrb [x21,#0xf1]; tbz;
+  return 0xe00002d8 before the list insert.
+- IOHIDFamily fix: 0x954312c/0x9543398 clamp a table index
+  (`cmp w8,w9; b.ge; csel`) before the load; two more sign-extended checks.
+- H11ANEInterface 9.512.0→9.512.2: 8 rebuilt functions. Fixed 0x8776fdc is
+  bounds-safety pointer arithmetic (cmp xN,wN,sxtw; add base+wN,sxtw;
+  csel poison; cmp x9,x10; b.ls). This is the 112696/84494 OOB-write class.
+  The iPhone H16 kext has the same rebuild (278 B-only); exact map still
+  pending the 24A435↔24B119 full diff.
