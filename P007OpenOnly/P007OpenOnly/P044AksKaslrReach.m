@@ -164,7 +164,7 @@ extern int proc_name(int pid, void *buffer, uint32_t buffersize);
 #import <math.h>
 #import <objc/message.h>
 
-#define P044_BUILD @"p044-v75-neonctl"
+#define P044_BUILD @"p044-v75.1-neonread"
 
 #define INPUT_COUNT 191
 /* v73: P034 class. kdata = msgh_size + 0x24. ANE table view is 0x820.
@@ -2081,29 +2081,54 @@ static void *watch_worker(void *arg) {
             }
         }
 
-        thread_act_t port = w->port;
-        int (^readNeon)(arm_neon_state64_t *) = ^int(arm_neon_state64_t *st) {
-            if (thread_suspend(port) != KERN_SUCCESS) return -1;
-            memset(st, 0, sizeof(*st));
-            mach_msg_type_number_t cnt = ARM_NEON_STATE64_COUNT;
-            kern_return_t kr = thread_get_state(port, ARM_NEON_STATE64,
-                                                (thread_state_t)st, &cnt);
-            thread_resume(port);
-            return (kr == KERN_SUCCESS) ? 0 : -2;
-        };
+        /* v75.1: resolve the port FRESH for every scan - a stored name can
+           outlive its rights. CONTROL 1 above already proved expect is this
+           pthread's port; use that and refresh w->port. */
+        thread_act_t port = expect;
+        w->port = port;
+
+        /* 0 = ok; nonzero packs the failing kr (0x80000000 = suspend,
+           0x40000000 = get_state). */
+        int (^readNeon)(arm_neon_state64_t *, mach_msg_type_number_t *) =
+            ^int(arm_neon_state64_t *st, mach_msg_type_number_t *cntOut) {
+                kern_return_t skr = thread_suspend(port);
+                if (skr != KERN_SUCCESS) return (int)(0x80000000u | (skr & 0x7fffffffu));
+                memset(st, 0, sizeof(*st));
+                mach_msg_type_number_t cnt = ARM_NEON_STATE64_COUNT;
+                kern_return_t gkr = thread_get_state(port, ARM_NEON_STATE64,
+                                                     (thread_state_t)st, &cnt);
+                thread_resume(port);
+                if (cntOut) *cntOut = cnt;
+                if (gkr != KERN_SUCCESS) return (int)(0x40000000u | (gkr & 0x3fffffffu));
+                return 0;
+            };
 
         arm_neon_state64_t st1;
-        if (readNeon(&st1) != 0) {
+        mach_msg_type_number_t cnt1 = 0;
+        int kr1 = readNeon(&st1, &cnt1);
+        if (kr1 != 0) {
+            /* Diagnostic: does ANY flavor read on this port? */
+            kern_return_t skr2 = thread_suspend(port);
+            arm_thread_state64_t ts;
+            mach_msg_type_number_t tcnt = ARM_THREAD_STATE64_COUNT;
+            kern_return_t tkr = (skr2 == KERN_SUCCESS)
+                ? thread_get_state(port, ARM_THREAD_STATE64,
+                                   (thread_state_t)&ts, &tcnt)
+                : skr2;
+            if (skr2 == KERN_SUCCESS) thread_resume(port);
             deadPort++;
-            [out appendFormat:@"  [NEON-CTRL] READ FAIL wid=%d port=0x%x (dead or refused)\n",
-                k, (unsigned)port];
+            [out appendFormat:@"  [NEON-CTRL] READ FAIL wid=%d port=0x%x kr=0x%x cnt=%u alt_kr=0x%x alt_cnt=%u\n",
+                k, (unsigned)port, (unsigned)kr1, (unsigned)cnt1,
+                (unsigned)tkr, (unsigned)tcnt];
             continue;
         }
         /* CONTROL 3 - second independent read: a transient read (suspend
            race / mid-context-switch) differs between the two; a real PCB
            change is stable. */
         arm_neon_state64_t st2;
-        BOOL have2 = (readNeon(&st2) == 0);
+        mach_msg_type_number_t cnt2 = 0;
+        int kr2 = readNeon(&st2, &cnt2);
+        BOOL have2 = (kr2 == 0);
         uint64_t *v1 = (uint64_t *)st1.__v;
         uint64_t *v2 = have2 ? (uint64_t *)st2.__v : NULL;
         BOOL sawMismatch = NO;
