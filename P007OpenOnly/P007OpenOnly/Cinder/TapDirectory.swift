@@ -74,6 +74,7 @@ enum TapDirectory {
         .init(id: "krw", title: "KERNEL. hunt-krw-14: Mind talks Ollama 192.168.1.236:11434 or Grok api.x.ai. P139 then P044 N=192 / 17 P114+P149 / CS2 copy27 PARTIAL. SKIP 254. Occupancy / PIPE-HIT is not hasKread.", group: "C · ACTIVE KRW — 43748 / M2Scaler / 64788 / T020"),
         .init(id: "pathtest", title: "PATHS. Per-path scorecard + READ-ONLY tests. Hunt: P139+kread. 17: P139+P114+kread (P149 stays KERNEL/catalog). Occupancy stays P044/KERNEL solo. P110/P143 isolated.", group: "C · ACTIVE KRW — 43748 / M2Scaler / 64788 / T020"),
         .init(id: "kreadtest", title: "KREAD. commitSlide kread32(kbase)==MH_MAGIC_64", group: "C · ACTIVE KRW — 43748 / M2Scaler / 64788 / T020"),
+        .init(id: "p156", title: "P156. Symbol-free self-proc locator: mach_port_kobject(task/thread) -> task_t, scan bsd_info (pid + proc_ro); no allproc/kernproc/XPF. Receipt only, not hasKread.", group: "C · ACTIVE KRW — 43748 / M2Scaler / 64788 / T020"),
         .init(id: "p070", title: "P070 five-door chain census + persist HOLD", group: "C · ACTIVE KRW — 43748 / M2Scaler / 64788 / T020"),
         .init(id: "p113", title: "P113. DescForge CONTROL (KRW krw hand-forged desc -> recv oracle; A13 rig)", group: "C · ACTIVE KRW — 43748 / M2Scaler / 64788 / T020"),
         .init(id: "p094", title: "P094. kernproc derive + ucred ladder (READ-ONLY, sysctl anchor + allproc walk; v3 fold runs P095's ladder in the same tap — one boot, unlocks elevate)", group: "C · ACTIVE KRW — 43748 / M2Scaler / 64788 / T020"),

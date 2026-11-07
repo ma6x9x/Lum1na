@@ -75,3 +75,19 @@ and the post-KRW chain now locates our `proc` without `allproc`/`kernproc`.
   entry can make `find_and_corrupt` accept a different inpcb. Reverted to
   Dopamine's fixed blob+0x110. Also restored multi-pass retry and added the
   per-boot one-tap gate.
+
+## Test receipts added for the next build
+
+- `P156ProcLocate` (debug app, tap `p156`): calls `mach_port_kobject` on the
+  task and thread ports, logs type/kaddr, and when a KRW lane is live scans
+  the task struct for `bsd_info` (pid + proc_ro validate). This is the
+  standalone receipt for the symbol-free locator before running Full Chain.
+- `p153` (24A435): table-driven sizes — send `0xc50`/out `0x40`, create
+  struct `0x28`, map `0x828`, stale-service retry, knob source. Use
+  `p153_force=1` + `p153_map=1`/`p153_create=1`/`p153_send=1` on a fresh
+  boot; DeviceOpen 0x88 success is the receipt, not KRW.
+- `Resources/tweaks/src/RespringLogo.m` + `build.sh`: SpringBoard post-respring
+  LUM1NA plate. Build with full Xcode (`-arch arm64e`, ldid), drop the dylib
+  in `Documents/tweaks`; it is inert until TweakLoader injects it.
+- `UIFileSharingEnabled` on the main app: `afcclient --documents
+  com.ma6x9x.Lum1na.<team>` can pull Documents logs after reinstall.

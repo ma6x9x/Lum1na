@@ -1625,3 +1625,22 @@ These describe bugs that exist on our PRE-FIX builds: 23F77 (26.5), 24A435 (27.0
 - **Known gap:** Procursus bootstrap (dpkg/shells) is not in Resources;
   `dpkg -i` still HOLDs on a stock device. basebin only (jbctl/opainject/
   launchdhook/ElleKit) is installed.
+
+## 2026-11-07 — T8150 ANE table decode (p153 24A435 receipt)
+- The 17 Pro Max p153 runs: first run was a stale-knob run (svc=H11ANEIn,
+  pid=481) → open kr=0xe00002c7 (Unsupported). Second run (H1xANELoadBalancer,
+  pid=0) opened type 1 and 4, and **sel0 DeviceOpen 0x88 succeeded on both**
+  (out 0x88 zeros). sel7 both shapes returned 2c2, so sel7 is not the class
+  oracle on 24A435; sel0 is the receipt. hasKread=NO (honest).
+- Static table: `0xfffffe00080554f8` (11 selectors, 0x28 stride, PAC-signed
+  fn pointers). Decode: s0 DeviceOpen 0/0x88/0/0x88; s1 close 0; s2 SendRequest
+  scalarIn 1, structIn 0xc50, structOut 0x40, async; s3 ProgramCreate
+  structIn 0x28; s4 structIn 0xc20; s5 MemoryMap 1/0x828/1/0; s6 0x828;
+  s7 SessionHint 0x10/0x18; s8 0x20; s9 0x208/1; s10 scalarIn 1.
+- p153 was sending 0xd88 for sel2 and 0x20 for sel3 (23F77 shapes). Now:
+  send 0xc50/out 0x40, create struct 0x28, stale-service retry, knob-source
+  log, and a hint to use p153_force for map/create when sel7 can't classify.
+- Next 17 test (PANIC-POSSIBLE, fresh boot, one tap): `p153_force=1`,
+  `p153_create=1`, `p153_map=1`, counts 0; then a separate boot with
+  `p153_send=1`, `p153_send_size=0xc50` zero counts. DeviceOpen success is
+  the receipt; it is not KRW.

@@ -136,6 +136,7 @@ enum LuminaTAP {
         case "cskrw":       result = LuminaClearSword.runKRW()
         case "cs2":         result = CS2Runner.runUpstream()
         case "intel":       result = P093IntelCrossCheck.tap()
+        case "p156":        result = P156ProcLocate.tap()
         case "p014ane", "p014b", "p015", "p017":
             result = "STOP \(id) intercepted — leftover. Use p017v2 for holder/install."
         case "p016":        result = JPEGDestTimeoutProbe.runP016SoutDestUnlock()
