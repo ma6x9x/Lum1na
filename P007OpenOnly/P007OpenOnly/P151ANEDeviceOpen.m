@@ -96,7 +96,7 @@
 }
 
 + (uint32_t)pidFromPasteboardOrDefault {
-    return [self knobUInt:@"p151_pid" def:(uint32_t)getpid()];
+    return [self knobUInt:@"p151_pid" def:0];
 }
 
 + (io_connect_t)openType:(const char *)name type:(uint32_t)type kr:(kern_return_t *)outKr {
@@ -170,7 +170,7 @@
     uint8_t *in = calloc(1, inSz);
     uint8_t *ob = calloc(1, outSz ? outSz : 8);
     if (!in || !ob) { free(in); free(ob); return kIOReturnNoMemory; }
-    if (off + 4 <= inSz) {
+    if (pid != 0 && off + 4 <= inSz) {
         uint32_t p = pid;
         memcpy(in + off, &p, sizeof(p));
     }
@@ -182,7 +182,7 @@
     kern_return_t kr = IOConnectCallStructMethod(conn, 0, in, inSz, ob, &osz);
     const char *why = "";
     if (kr == 0) why = "  <-- DEVICEOPEN OK";
-    else if (kr == 0xe00002f0) why = "  (Client %p not found / not in ANE list)";
+    else if (kr == 0xe00002f0) why = "  (lookup/registration miss; 24A435 = send path only)";
     else if (kr == 0xe00002e3) why = "  (NoPower: client FOUND, engine unpowered)";
     else if (kr == 0xe00002c2) why = "  (bad struct size)";
     else if (kr == 0xe00002e2) why = "  (NotPermitted: entitlement)";
@@ -204,7 +204,7 @@
         io_connect_t conn = [self openType:svcName.UTF8String type:1 kr:&okr];
         [o appendFormat:@"  [inline] open %@ type=1 kr=0x%x\n", svcName, okr];
         if (!conn) continue;
-        [self callDeviceOpen:conn pid:pid inSz:0x68 outSz:0x68 off:0 qword:NO qoff:8 out:o];
+        [self callDeviceOpen:conn pid:0 inSz:0x88 outSz:0x88 off:0 qword:NO qoff:8 out:o];
         { uint32_t sc = 0; IOConnectCallScalarMethod(conn, 1, NULL, 0, NULL, &sc); }
         IOServiceClose(conn);
     }
@@ -232,8 +232,8 @@
     [out appendFormat:@"  [thermal] %@ (ANE returns NoPower at serious/critical)\n", therm];
 
     uint32_t pid   = [self pidFromPasteboardOrDefault];
-    uint32_t inSz  = [self knobUInt:@"p151_in" def:0x68];
-    uint32_t outSz = [self knobUInt:@"p151_out" def:0x68];
+    uint32_t inSz  = [self knobUInt:@"p151_in" def:0x88];
+    uint32_t outSz = [self knobUInt:@"p151_out" def:0x88];
     uint32_t off   = [self knobUInt:@"p151_off" def:0x00];
     uint32_t oneT  = [self knobUInt:@"p151_type" def:1];
     uint32_t sweep = [self knobUInt:@"p151_sweep" def:1];
@@ -242,8 +242,8 @@
 
     [out appendFormat:@"  [knobs] pid=%u type=%u sweep=%u in=0x%x out=0x%x pid@0x%02x qword=%d qoff=0x%x\n",
         pid, oneT, sweep, inSz, outSz, off, (int)qword, qoff];
-    [out appendString:@"  [note] DeviceOpen is NOT pid-resolved: 2f0 = UC not in the ANE client list;\n"
-                       @"         [UC+0x24]==2 takes an early-success branch (type sweep tests this)\n"];
+    [out appendString:@"  [note] 24A435 sel0 = 0x88/0x88, no pid read, success when AddClient has\n"
+                       @"         out[0]==0; 23F77 sel0 = 0x68/0x68, pid is log-only, 2f0 = client-list miss\n"];
 
     [self wakeANE:out];
 

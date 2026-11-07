@@ -1379,3 +1379,39 @@ door/stride laws; the p110 claim rows.
 - p153 built: class-ID by sel7 shape (UC 0/0x20 vs DP 0x10/0x18), optional async sel2 reach
   with zero counts (cannot OOB), optional sel5 map / sel3 create; DeviceOpen re-check after.
   PANIC-POSSIBLE only with send/map/create enabled; one tap per force-quit.
+
+## 2026-11-07 (day) — 24A435 corrections from the renamed project (agent memo, verified by decompile)
+- **newUserClient 0x8c096f0**: type **1 and 4** -> direct evaluate client (start FUN_8caf080;
+  skips `com.apple.ane.iokit-user-access`, dataChaining bit only); **every other type** ->
+  program-loading client (start FUN_8caede8; requires the iokit entitlement, else 0xe00002c9).
+  The reachable service on 24A435 is **H1xANELoadBalancer** types 1/4 (H11ANEIn service is a
+  different IOService whose default newUserClient = 0xe00002c7).
+- **DirectPath table 0xfffffe00080554f8, 11 entries (stride 0x28)**:
+  0 DeviceOpen, 1 DeviceClose, 2 SendRequest, 3 OutputSetEnqueue, 4 InputsReady,
+  5 MemoryMapRequest, 6 MemoryUnMapRequest, 7 SessionHint, 8 ChainingSetActive,
+  9 MapMutableWeightsBuffer, 10 UnmapMutableWeightsBuffer.
+  Program-loading table 0xfffffe0008055278, 16 entries (ProgramCreate 0x8cb028c, etc.).
+  NOTE: P044's "sel4 = ProgramPrepare" is 23F77-only; on 24A435 DirectPath sel4 = InputsReady.
+- **DeviceOpen (24A435) 0x8cb004c/body 0x8cb0050**: requires in>=0x88 and out>=0x88, copies
+  exactly 0x88, no pid/flags/client-index read, no proc lookup. Tail FUN_8ca817c; AddClient
+  failure is **non-fatal when out[0]==0** ("no open programs") -> returns 0. So a zeroed
+  0x88/0x88 struct is the correct 17 probe. 0xe00002c2 = size/null output; 0xe00002e2 =
+  wrapper state !=2 / DataVault / entitlement; **0xe00002f0 is a send-path error**
+  (FUN_8c0b4c4 client-registry miss / FUN_8c11dc8 program-handle miss), not DeviceOpen.
+  0xe00002e3 was not found on 24A435 DeviceOpen.
+- **Send request 0x8cb0ee4**: 0xd88 structureInput; +0 programHandle (u64), +0x1c procedureId,
+  +0x20 totInputBuffers, +0x24.. input ids, +0x420.. symbols, +0x81c totOutputBuffers;
+  clamp in+out<=0xff; prewire map object ANE_MapAlloc = 0x10b8 -> max index 254 ends 0x107f,
+  trailer to 0x1097 => **255 in-bounds, OOB class patched on 24A435**. Needs a registered
+  client AND a valid program handle -> not app-reachable via the direct client.
+- **ANE_stageb_pid_borrow 0x8cb33f0**: proc_find + proc_name only; no entitlement query on the
+  pid. App pid satisfies it trivially. Effect = transfer a driver memory descriptor's ownership
+  to that pid's task (confused-deputy ownership), NOT entitlement bypass, NOT kW.
+- **ProgramCreate**: FUN_8d51dd4 = always-allow stub; DataVault 0x8d51434 is the real gate
+  (APFS auth 0x80104118 or aned-cache / MobileAsset paths; 4-char suffixes .hwx/.bin).
+  argsOutput double-fetch (consumer FUN_8c426b0 re-reads req+0xd8) exists but PopulateProgramOutput
+  requires a valid program resource and lives on the entitlement-gated client -> not reachable.
+- Probe changes this pass: p151 defaults 0x88/0x88 + pid default 0 (never writes the buffer);
+  p150 adds H1xANELoadBalancer and sweeps types 0..5; p153 gained p153_svc /
+  p153_send_size (0x948|0xd88) / p153_map_size (0x2008|0x828) / p153_dev_size and uses
+  IOConnectCallAsyncMethod with 8 async refs for sel2.

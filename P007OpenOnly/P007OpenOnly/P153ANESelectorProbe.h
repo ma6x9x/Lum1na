@@ -23,13 +23,18 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface P153ANESelectorProbe : NSObject
 /// Knobs (Documents/p153_knobs.txt first, pasteboard fallback; key=value):
-///   p153_t1=1 p153_t4=1        type 1 / type 4 on H11ANEIn
+///   p153_svc=H11ANEIn|H1xANELoadBalancer   (default H11ANEIn; 24A435 direct
+///                                           client is on the LoadBalancer)
+///   p153_t1=1 p153_t4=1        type 1 / type 4
 ///   p153_send=0|1              async sel2 reach test (zero counts)
-///   p153_map=0|1               sel5 MemoryMapRequest 0x2008 (DP class)
-///   p153_create=0|1            sel3 ProgramCreate 0x20 (User class)
+///   p153_map=0|1               sel5 MemoryMapRequest (DP class)
+///   p153_create=0|1            sel3 ProgramCreate 0x20 (UC class)
 ///   p153_in_count / p153_out_count / p153_off_in=0x1c / p153_off_out=0x51c
+///   p153_send_size=0x948 (23F77) | 0xd88 (24A435)
+///   p153_map_size=0x2008 (23F77) | 0x828 (24A435)
+///   p153_dev_size=0x88 (24A435; 23F77 accepts >=0x68)
 ///   p153_create_size=0xd88 p153_create_magic=0xac738
-///   p153_pid=<n>
+///   p153_pid=<n> (0 = leave the buffer zeroed; default)
 + (NSString *)tap;
 @end
 

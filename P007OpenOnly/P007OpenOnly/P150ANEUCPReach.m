@@ -41,6 +41,7 @@
 
     NSArray<NSString *> *names = @[
         @"AppleH11ANEInterface", @"H11ANEIn", @"AppleH11ANEIn",
+        @"H1xANELoadBalancer",
         @"H11ANEInUserClient", @"AppleH11ANEInterfaceUserClient",
         @"ANEDevice", @"AppleNeuralEngineDevice", @"ANEUserClient",
         @"AppleNeuralEngineUserClient"
@@ -65,12 +66,14 @@
         IORegistryEntryGetName(svc, rn);
         IOObjectGetClass(svc, cn);
         [out appendFormat:@"  [svc] %@ -> reg=%s class=%s\n", name, rn, cn];
-        for (uint32_t type = 0; type <= 2; type++) {
+        for (uint32_t type = 0; type <= 5; type++) {
             io_connect_t conn = 0;
             kern_return_t kr = IOServiceOpen(svc, mach_task_self(), type, &conn);
             BOOL ok = (kr == KERN_SUCCESS && conn != 0);
             [out appendFormat:@"    open type=%u kr=0x%x%s\n", type, kr,
-                ok ? "  <-- OPEN" : ""];
+                ok ? (type == 1 || type == 4
+                        ? "  <-- OPEN (direct evaluate client; no iokit entitlement)"
+                        : "  <-- OPEN") : ""];
             if (ok) { opened++; IOServiceClose(conn); }
         }
         IOObjectRelease(svc);

@@ -61,6 +61,22 @@
     return (uint32_t)v;
 }
 
++ (NSString *)knobString:(NSString *)key def:(NSString *)d {
+    NSString *fileText = [self knobsFileText];
+    NSString *pbs = fileText.length ? fileText : [self pasteboardString];
+    if (!pbs.length) return d;
+    NSString *needle = [key stringByAppendingString:@"="];
+    NSRange mk = [pbs rangeOfString:needle];
+    if (mk.location == NSNotFound) return d;
+    NSUInteger at = mk.location + mk.length, e = at;
+    while (e < pbs.length) {
+        unichar ch = [pbs characterAtIndex:e];
+        if (ch == ' ' || ch == '\n' || ch == '\t' || ch == '\r') break;
+        e++;
+    }
+    return e > at ? [pbs substringWithRange:NSMakeRange(at, e - at)] : d;
+}
+
 + (io_connect_t)openType1:(const char *)name kr:(kern_return_t *)outKr {
     *outKr = kIOReturnNoDevice;
     CFMutableDictionaryRef m = IOServiceMatching(name);
@@ -97,28 +113,34 @@
 + (kern_return_t)asyncSend:(io_connect_t)conn
                      inCnt:(uint32_t)inCnt outCnt:(uint32_t)outCnt
                      offIn:(uint32_t)offIn offOut:(uint32_t)offOut
+                       size:(uint32_t)sendSz
                         log:(NSMutableString *)o refOut:(uint64_t *)refOut {
+    if (sendSz < 0x100) sendSz = 0x948;
     mach_port_t wp = MACH_PORT_NULL;
     kern_return_t kr = mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &wp);
     if (kr != KERN_SUCCESS) { [o appendFormat:@"      async port alloc kr=0x%x\n", kr]; return kr; }
     mach_port_insert_right(mach_task_self(), wp, wp, MACH_MSG_TYPE_MAKE_SEND);
 
-    uint8_t *in = calloc(1, 0x948);
+    uint8_t *in = calloc(1, sendSz);
     uint8_t ob[0x28];
     memset(ob, 0, sizeof(ob));
     if (!in) { mach_port_destroy(mach_task_self(), wp); return kIOReturnNoMemory; }
-    if (inCnt && offIn + 4 <= 0x948) memcpy(in + offIn, &inCnt, 4);
-    if (outCnt && offOut + 4 <= 0x948) memcpy(in + offOut, &outCnt, 4);
+    if (inCnt && offIn + 4 <= sendSz) memcpy(in + offIn, &inCnt, 4);
+    if (outCnt && offOut + 4 <= sendSz) memcpy(in + offOut, &outCnt, 4);
 
-    uint64_t scalar = 0, ref = 0;
+    uint64_t scalar = 0;
+    uint64_t refs[8]; memset(refs, 0, sizeof(refs));
     size_t osz = sizeof(ob);
-    kr = IOConnectCallAsyncStructMethod(conn, 2, wp, &ref, 1,
-                                       &scalar, 1, in, 0x948, ob, &osz);
-    [o appendFormat:@"      sel2 async in=%u@0x%x out=%u@0x%x kr=0x%x ref=0x%llx osz=%zu\n",
-        inCnt, offIn, outCnt, offOut, kr, (unsigned long long)ref, osz];
+    kr = IOConnectCallAsyncMethod(conn, 2, wp, refs, 8,
+                                  &scalar, 1, in, sendSz,
+                                  NULL, NULL, ob, &osz);
+    [o appendFormat:@"      sel2 async in=%u@0x%x out=%u@0x%x size=0x%x kr=0x%x refs=%llu,0 "
+                       @"osz=%zu\n",
+        inCnt, offIn, outCnt, offOut, sendSz, kr,
+        (unsigned long long)refs[0], osz];
     for (size_t i = 0; i < 24 && i < osz; i++) [o appendFormat:@"%02x", ob[i]];
     [o appendString:@"\n"];
-    if (refOut) *refOut = ref;
+    if (refOut) *refOut = refs[0];
     free(in);
     mach_port_destroy(mach_task_self(), wp);
     return kr;
@@ -142,11 +164,18 @@
     uint32_t offOut = [self knobUInt:@"p153_off_out" def:0x51c];
     uint32_t createSz = [self knobUInt:@"p153_create_size" def:0xd88];
     uint32_t createMagic = [self knobUInt:@"p153_create_magic" def:0xac738];
+    NSString *svc = [self knobString:@"p153_svc" def:@"H11ANEIn"];
+    uint32_t sendSz = [self knobUInt:@"p153_send_size" def:0x948];
+    uint32_t mapSz = [self knobUInt:@"p153_map_size" def:0x2008];
+    uint32_t devSz = [self knobUInt:@"p153_dev_size" def:0x88];
+    if (devSz < 0x40 || devSz > 0x200) devSz = 0x88;
+    if (mapSz < 0x828) mapSz = 0x828;
 
-    [out appendFormat:@"  [knobs] pid=%u types=%u/%u send=%u map=%u create=%u "
-                       @"counts=%u/%u offs=0x%x/0x%x create=0x%x/0x%x\n",
-        pid, t1, t4, doSend, doMap, doCreate, inCnt, outCnt, offIn, offOut,
-        createSz, createMagic];
+    [out appendFormat:@"  [knobs] pid=%u svc=%@ types=%u/%u send=%u map=%u create=%u "
+                       @"counts=%u/%u offs=0x%x/0x%x sizes send=0x%x map=0x%x dev=0x%x "
+                       @"create=0x%x/0x%x\n",
+        pid, svc, t1, t4, doSend, doMap, doCreate, inCnt, outCnt, offIn, offOut,
+        sendSz, mapSz, devSz, createSz, createMagic];
     if (doSend || doMap || doCreate)
         [out appendString:@"  [PANIC-POSSIBLE] map/create/send enabled: one tap, fresh boot\n"];
 
@@ -156,8 +185,8 @@
         uint32_t type = tn.unsignedIntValue;
         if ((type == 1 && !t1) || (type == 4 && !t4)) continue;
         kern_return_t okr = 0;
-        io_connect_t conn = [self openType1:"H11ANEIn" kr:&okr];
-        [out appendFormat:@"  [open] H11ANEIn type=%u kr=0x%x\n", type, okr];
+        io_connect_t conn = [self openType1:svc.UTF8String kr:&okr];
+        [out appendFormat:@"  [open] %@ type=%u kr=0x%x\n", svc, type, okr];
         if (!conn) continue;
         opened++;
 
@@ -185,15 +214,15 @@
                             : @"unidentified (both 2c2)")];
 
         if (doMap && isDP) {
-            uint8_t *map = calloc(1, 0x2008);
-            uint64_t scalars[1] = {0};
+            uint8_t *map = calloc(1, mapSz);
+            uint64_t scalars[1] = {1};
             uint64_t mout = 0;
             uint32_t moutCnt = 1;
             size_t moutStructSz = 0;
-            kern_return_t mkr = IOConnectCallMethod(conn, 5, scalars, 1, map, 0x2008,
+            kern_return_t mkr = IOConnectCallMethod(conn, 5, scalars, 1, map, mapSz,
                                                     &mout, &moutCnt, NULL, &moutStructSz);
-            [out appendFormat:@"      sel5 map 0x2008 count=0 kr=0x%x scalar_out=0x%llx\n",
-                mkr, (unsigned long long)mout];
+            [out appendFormat:@"      sel5 map 0x%x scalar=1 kr=0x%x scalar_out=0x%llx\n",
+                mapSz, mkr, (unsigned long long)mout];
             free(map);
         }
         if (doMap && !isDP)
@@ -216,18 +245,20 @@
         if (doSend) {
             uint64_t ref = 0;
             kern_return_t skr = [self asyncSend:conn inCnt:inCnt outCnt:outCnt
-                                          offIn:offIn offOut:offOut log:out refOut:&ref];
+                                          offIn:offIn offOut:offOut size:sendSz
+                                            log:out refOut:&ref];
             [out appendFormat:@"    [send] reach test kr=0x%x (zero counts unless knobs set)\n", skr];
         }
 
         /* DeviceOpen after any preceding calls, to see whether they registered
            this UC in the ANE client list. */
-        uint8_t din[0x68]; memset(din, 0, sizeof(din));
-        uint8_t dob[0x68]; memset(dob, 0, sizeof(dob));
-        memcpy(din, &pid, 4);
-        osz = sizeof(dob);
-        kern_return_t dkr = IOConnectCallStructMethod(conn, 0, din, sizeof(din), dob, &osz);
-        [self logKr:out tag:@"sel0 DeviceOpen 0x68" kr:dkr out:dob osz:osz];
+        uint8_t din[0x200], dob[0x200];
+        memset(din, 0, devSz); memset(dob, 0, devSz);
+        if (pid != 0) memcpy(din, &pid, 4);
+        osz = devSz;
+        kern_return_t dkr = IOConnectCallStructMethod(conn, 0, din, devSz, dob, &osz);
+        [self logKr:out tag:[NSString stringWithFormat:@"sel0 DeviceOpen 0x%x", devSz]
+               kr:dkr out:dob osz:osz];
         if (dkr == 0) success++;
 
         uint32_t sc = 0;
