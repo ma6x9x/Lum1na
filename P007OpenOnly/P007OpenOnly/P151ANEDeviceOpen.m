@@ -1,17 +1,31 @@
 //
-//  P151ANEDeviceOpen.m — ANE DirectPath DeviceOpen pid probe. p151 (v1).
+//  P151ANEDeviceOpen.m — ANE DirectPath DeviceOpen probe. p151 (v5).
 //  Lum1na-Debug (P007 rig). iOS kernel research (Lum1na).
 //
-//  DeviceOpen is the first DirectPath selector. The handler copies the
-//  0x68 input struct into the 0x68 output, then calls the driver's
-//  ANE_AddClientForProgram; the observed 0xe00002f0 is the kernel's
-//  "Cannot find task from the given pid" branch (p071, p109 note).
-//  This probe fills the struct with a real pid at four offsets and reads
-//  the kr matrix. It does NOT call ProgramSendRequest; nothing fires.
+//  STATIC RE (23F77, capstone, 2026-11-07): sel0 is NOT pid-resolved.
+//  ------------------------------------------------------------------
+//  sel0 handler 0xfffffff008757dc0: requires structIn>=0x68 && structOut>=0x68,
+//  copies 0x68 bytes in->out, tail-calls ANE_DeviceOpen 0xfffffff008752524.
+//  ANE_DeviceOpen reads:
+//    [UC+0x20] = pid (log only)   [UC+0x2a] = client name
+//    [UC+0x28]/[UC+0x29] bits -> out+0x1c / out+0x5d
+//    if [UC+0x24] == 2  ->  return 0 EARLY (no AddClient, no power)
+//    else buffer+8 q0 (16B) -> [UC+0xb0], then provider vtable+0x558
+//    = ANE_AddClientForProgram_gated (0xfffffff0086f3624).
+//  AddClientForProgram calls 0xfffffff0086ef7d0(self,buf,&ctx): that helper
+//  scans the ANE client list at [self+0xe0] (count vtable+0x90, element
+//  vtable+0x118) and matches the USER-CLIENT OBJECT POINTER. No pid is read.
+//  Failure => 0xE00002F0 with "Client %p not found" (0xfffffff0073d4278),
+//  and the second call (revalidation after the program loop) returns 0x2F0
+//  too. The three "Cannot find task from the given pid" helpers
+//  (0x8718728 / 0x8739b14 / 0x87ac4b8) are NOT on this path.
+//  => writing pid 1 / aned's pid / any pid into the 0x68 buffer cannot fix
+//  DeviceOpen. What matters is (a) whether the UC is in the ANE client list,
+//  or (b) whether [UC+0x24] == 2 takes the early-success branch.
 //
-//  Offsets are candidates from the handler: it copies the whole 0x68 and
-//  uses bytes at +0x28/+0x29 for flags and fields at +0x0c/+0x54 for the
-//  client; +0x00 and +0x10 cover the remaining likely pid slots.
+//  v5 therefore sweeps IOServiceOpen type 0..4 and makes the struct sizes and
+//  pid offsets pasteboard knobs. It never calls ProgramSendRequest; nothing
+//  fires. One tap per run.
 //
 
 #import "P151ANEDeviceOpen.h"
@@ -26,39 +40,60 @@
 
 @implementation P151ANEDeviceOpen
 
-+ (uint32_t)pidFromPasteboardOrDefault {
++ (NSString *)pasteboardString {
     id pb = ((id (*)(Class, SEL))objc_msgSend)(
         NSClassFromString(@"UIPasteboard"),
         NSSelectorFromString(@"generalPasteboard"));
-    NSString *pbs = pb ? ((NSString *(*)(id, SEL))objc_msgSend)(
+    return pb ? ((NSString *(*)(id, SEL))objc_msgSend)(
         pb, NSSelectorFromString(@"string")) : nil;
-    if (pbs.length) {
-        NSRange mk = [pbs rangeOfString:@"p151_pid="];
-        if (mk.location != NSNotFound) {
-            NSUInteger at = mk.location + mk.length;
-            NSUInteger e = at;
-            while (e < pbs.length) {
-                unichar ch = [pbs characterAtIndex:e];
-                if (ch < '0' || ch > '9') break;
-                e++;
-            }
-            if (e > at) {
-                long v = [[pbs substringWithRange:NSMakeRange(at, e - at)] intValue];
-                if (v >= 1 && v <= 100000) return (uint32_t)v;
-            }
-        }
-    }
-    return (uint32_t)getpid();
 }
 
-+ (io_connect_t)openType1:(const char *)name kr:(kern_return_t *)outKr {
++ (uint32_t)knobUInt:(NSString *)key def:(uint32_t)d {
+    NSString *pbs = [self pasteboardString];
+    if (!pbs.length) return d;
+    NSString *needle = [key stringByAppendingString:@"="];
+    NSRange mk = [pbs rangeOfString:needle];
+    if (mk.location == NSNotFound) return d;
+    NSUInteger at = mk.location + mk.length;
+    NSUInteger e = at;
+    BOOL hex = NO;
+    if (e < pbs.length) {
+        unichar c0 = [pbs characterAtIndex:e];
+        if (c0 == '0' && e + 1 < pbs.length) {
+            unichar c1 = [pbs characterAtIndex:e + 1];
+            if (c1 == 'x' || c1 == 'X') { hex = YES; e += 2; at = e; }
+        }
+    }
+    NSUInteger start = e;
+    while (e < pbs.length) {
+        unichar ch = [pbs characterAtIndex:e];
+        if (hex) {
+            if (!((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') ||
+                  (ch >= 'A' && ch <= 'F'))) break;
+        } else {
+            if (ch < '0' || ch > '9') break;
+        }
+        e++;
+    }
+    if (e == start) return d;
+    NSString *num = [pbs substringWithRange:NSMakeRange(start, e - start)];
+    unsigned long v = hex ? strtoul(num.UTF8String, NULL, 16)
+                          : strtoul(num.UTF8String, NULL, 10);
+    return (uint32_t)v;
+}
+
++ (uint32_t)pidFromPasteboardOrDefault {
+    return [self knobUInt:@"p151_pid" def:(uint32_t)getpid()];
+}
+
++ (io_connect_t)openType:(const char *)name type:(uint32_t)type kr:(kern_return_t *)outKr {
     *outKr = kIOReturnNoDevice;
     CFMutableDictionaryRef m = IOServiceMatching(name);
     if (!m) return 0;
     io_service_t svc = IOServiceGetMatchingService(kIOMainPortDefault, m);
     if (!svc) return 0;
     io_connect_t conn = 0;
-    *outKr = IOServiceOpen(svc, mach_task_self(), 1, &conn);
+    *outKr = IOServiceOpen(svc, mach_task_self(), type, &conn);
     IOObjectRelease(svc);
     if (*outKr != KERN_SUCCESS) return 0;
     return conn;
@@ -66,10 +101,7 @@
 
 /// v4: power + register in the SAME tap. A successful CoreML predict makes
 /// this pid an ANE client and powers the engine; DeviceOpen is then called
-/// immediately in the same process. This is the missing ingredient from the
-/// p151 v1-v3 runs: 0xe00002e3 (kIOReturnNoPower) fired for pids that WERE
-/// clients (aned 342, our own 5830 after ANE use), 0xe00002f0 for fresh
-/// pids that were not.
+/// immediately in the same process.
 + (BOOL)wakeANE:(NSMutableString *)out {
     NSURL *url = [NSBundle.mainBundle URLForResource:@"simple_1in1out"
                                        withExtension:@"mlmodelc"];
@@ -113,29 +145,53 @@
     return pred != nil;
 }
 
+/// v5: one sel0 call with configurable sizes + pid placement. Returns the kr
+/// and logs the output bytes. Caller closes the connection.
++ (kern_return_t)callDeviceOpen:(io_connect_t)conn pid:(uint32_t)pid
+                         inSz:(uint32_t)inSz outSz:(uint32_t)outSz
+                          off:(uint32_t)off qword:(BOOL)qword qoff:(uint32_t)qoff
+                            out:(NSMutableString *)log {
+    if (inSz < 4) inSz = 4;
+    if (inSz > 0x2000) inSz = 0x2000;
+    if (outSz > 0x2000) outSz = 0x2000;
+    uint8_t *in = calloc(1, inSz);
+    uint8_t *ob = calloc(1, outSz ? outSz : 8);
+    if (!in || !ob) { free(in); free(ob); return kIOReturnNoMemory; }
+    if (off + 4 <= inSz) {
+        uint32_t p = pid;
+        memcpy(in + off, &p, sizeof(p));
+    }
+    if (qword && qoff + 8 <= inSz) {
+        uint64_t p = (uint64_t)pid;
+        memcpy(in + qoff, &p, sizeof(p));
+    }
+    size_t osz = outSz;
+    kern_return_t kr = IOConnectCallStructMethod(conn, 0, in, inSz, ob, &osz);
+    const char *why = "";
+    if (kr == 0) why = "  <-- DEVICEOPEN OK";
+    else if (kr == 0xe00002f0) why = "  (Client %p not found / not in ANE list)";
+    else if (kr == 0xe00002e3) why = "  (NoPower: client FOUND, engine unpowered)";
+    else if (kr == 0xe00002c2) why = "  (bad struct size)";
+    else if (kr == 0xe00002e2) why = "  (NotPermitted: entitlement)";
+    else if (kr == 0xe00002c7) why = "  (Unsupported)";
+    [log appendFormat:@"      sel0 pid=%u @0x%02x in=0x%x out=0x%x kr=0x%x%s osz=%zu out=",
+        pid, off, inSz, outSz, kr, why, osz];
+    for (size_t i = 0; i < 32 && i < osz; i++) [log appendFormat:@"%02x", ob[i]];
+    [log appendString:@"\n"];
+    free(in); free(ob);
+    return kr;
+}
+
 + (NSString *)probeInline {
     NSMutableString *o = [NSMutableString string];
     uint32_t pid = (uint32_t)getpid();
     NSArray<NSString *> *svcs = @[@"H11ANEIn", @"H1xANELoadBalancer"];
     for (NSString *svcName in svcs) {
         kern_return_t okr = 0;
-        io_connect_t conn = [self openType1:svcName.UTF8String kr:&okr];
+        io_connect_t conn = [self openType:svcName.UTF8String type:1 kr:&okr];
         [o appendFormat:@"  [inline] open %@ type=1 kr=0x%x\n", svcName, okr];
         if (!conn) continue;
-        uint8_t in[0x68];
-        uint8_t ob[0x68];
-        memset(in, 0, sizeof(in));
-        memset(ob, 0, sizeof(ob));
-        uint32_t p = pid;
-        memcpy(in, &p, sizeof(p));
-        size_t outSz = sizeof(ob);
-        kern_return_t kr = IOConnectCallStructMethod(conn, 0, in, sizeof(in),
-                                                     ob, &outSz);
-        const char *why = "";
-        if (kr == 0) why = "  <-- DEVICEOPEN OK";
-        else if (kr == 0xe00002e3) why = "  (NoPower)";
-        else if (kr == 0xe00002f0) why = "  (NotFound)";
-        [o appendFormat:@"    [inline sel0 pid=%u] kr=0x%x%s\n", pid, kr, why];
+        [self callDeviceOpen:conn pid:pid inSz:0x68 outSz:0x68 off:0 qword:NO qoff:8 out:o];
         { uint32_t sc = 0; IOConnectCallScalarMethod(conn, 1, NULL, 0, NULL, &sc); }
         IOServiceClose(conn);
     }
@@ -144,7 +200,7 @@
 
 + (NSString *)tap {
     NSMutableString *out = [NSMutableString string];
-    [out appendFormat:@"=== p151 session %@ BUILD p151-ane-deviceopen-v4-wake ===\n",
+    [out appendFormat:@"=== p151 session %@ BUILD p151-ane-deviceopen-v5-typesweep ===\n",
         LabLocalMilitaryNow()];
     [out appendString:[LabDeviceProfile identBlock]];
 
@@ -158,59 +214,49 @@
     }
     [out appendFormat:@"  [thermal] %@ (ANE returns NoPower at serious/critical)\n", therm];
 
-    uint32_t pid = [self pidFromPasteboardOrDefault];
-    [out appendFormat:@"  [pid] using %u (pasteboard p151_pid= or getpid)\n", pid];
+    uint32_t pid   = [self pidFromPasteboardOrDefault];
+    uint32_t inSz  = [self knobUInt:@"p151_in" def:0x68];
+    uint32_t outSz = [self knobUInt:@"p151_out" def:0x68];
+    uint32_t off   = [self knobUInt:@"p151_off" def:0x00];
+    uint32_t oneT  = [self knobUInt:@"p151_type" def:1];
+    uint32_t sweep = [self knobUInt:@"p151_sweep" def:1];
+    BOOL qword     = [self knobUInt:@"p151_qword" def:0] != 0;
+    uint32_t qoff  = [self knobUInt:@"p151_qoff" def:8];
 
-    /* v4: a live ANE predict first - registration + power in one tap. */
+    [out appendFormat:@"  [knobs] pid=%u type=%u sweep=%u in=0x%x out=0x%x pid@0x%02x qword=%d qoff=0x%x\n",
+        pid, oneT, sweep, inSz, outSz, off, (int)qword, qoff];
+    [out appendString:@"  [note] DeviceOpen is NOT pid-resolved: 2f0 = UC not in the ANE client list;\n"
+                       @"         [UC+0x24]==2 takes an early-success branch (type sweep tests this)\n"];
+
     [self wakeANE:out];
 
     NSArray<NSString *> *svcs = @[@"H11ANEIn", @"H1xANELoadBalancer"];
-    NSArray<NSNumber *> *offs = @[@0x00, @0x0c, @0x10, @0x54];
     int opens = 0, zeros = 0;
 
     for (NSString *svcName in svcs) {
-        kern_return_t okr = 0;
-        io_connect_t conn = [self openType1:svcName.UTF8String kr:&okr];
-        [out appendFormat:@"  [open] %@ type=1 kr=0x%x\n", svcName, okr];
-        if (!conn) continue;
-        opens++;
-
-        for (NSNumber *on in offs) {
-            uint8_t in[0x68];
-            uint8_t o[0x68];
-            memset(in, 0, sizeof(in));
-            memset(o, 0, sizeof(o));
-            uint32_t o2 = (uint32_t)pid;
-            memcpy(in + on.unsignedIntValue, &o2, sizeof(o2));
-
-            size_t outSz = sizeof(o);
-            kern_return_t kr = IOConnectCallStructMethod(conn, 0, in, sizeof(in),
-                                                         o, &outSz);
+        uint32_t t0 = sweep ? 0 : oneT;
+        uint32_t t1 = sweep ? 4 : oneT;
+        for (uint32_t type = t0; type <= t1; type++) {
+            kern_return_t okr = 0;
+            io_connect_t conn = [self openType:svcName.UTF8String type:type kr:&okr];
+            [out appendFormat:@"  [open] %@ type=%u kr=0x%x\n", svcName, type, okr];
+            if (!conn) continue;
+            opens++;
+            kern_return_t kr = [self callDeviceOpen:conn pid:pid inSz:inSz outSz:outSz
+                                                off:off qword:qword qoff:qoff out:out];
             if (kr == KERN_SUCCESS) zeros++;
-            const char *why = "";
-            if (kr == 0) why = "  <-- DEVICEOPEN OK";
-            else if (kr == 0xe00002f0) why = "  (NotFound: pid not at this offset)";
-            else if (kr == 0xe00002e3) why = "  (NoPower: ANE powered down — cool/reboot)";
-            else if (kr == 0xe00002c2) why = "  (bad struct size)";
-            else if (kr == 0xe00002e2) why = "  (NotPermitted: task entitlement)";
-            [out appendFormat:@"    [sel0 pid@0x%02x] kr=0x%x%s outSz=%zu out[0..31]=",
-                on.unsignedIntValue, kr, why, outSz];
-            for (size_t i = 0; i < 32 && i < outSz; i++) {
-                [out appendFormat:@"%02x", o[i]];
+            {
+                uint32_t sc = 0;
+                kern_return_t ckr = IOConnectCallScalarMethod(conn, 1, NULL, 0, NULL, &sc);
+                [out appendFormat:@"      sel1 DeviceClose kr=0x%x\n", ckr];
             }
-            [out appendString:@"\n"];
+            IOServiceClose(conn);
         }
-        {
-            uint32_t sc = 0;
-            kern_return_t ckr = IOConnectCallScalarMethod(conn, 1, NULL, 0, NULL, &sc);
-            [out appendFormat:@"    [sel1 DeviceClose] kr=0x%x\n", ckr];
-        }
-        IOServiceClose(conn);
     }
     [out appendFormat:@"  [res] opens=%d deviceOpen_success=%d\n", opens, zeros];
     [out appendFormat:@"  [verdict] %@\n",
-        zeros ? @"DeviceOpen accepted a pid — DirectPath client is live"
-              : (opens ? @"opened but DeviceOpen refused every pid slot"
+        zeros ? @"DeviceOpen accepted (early-success or registered UC) — record the type"
+              : (opens ? @"opened but DeviceOpen refused every type/size/pid slot"
                        : @"no DirectPath open on this boot")];
     [out appendFormat:@"=== p151 end %@ ===\n", LabLocalMilitaryNow()];
     return out;

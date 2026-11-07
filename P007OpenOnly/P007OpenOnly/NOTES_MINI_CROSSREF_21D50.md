@@ -1323,3 +1323,32 @@ door/stride laws; the p110 claim rows.
   conversion itself. The 12's fresh-boot p130 = the first FRESH-ANE co-driver fire of the campaign.
 - The .ips = sync-pending (not yet in ~/Downloads / CloudDocs at decode time); the moment it
   arrives = the panic_decode pass + the law-row.
+
+## 2026-11-07 (day) — the 12 re-fire receipt + the DeviceOpen pid anomaly, measured
+- **p044 v75.2-inlineopen (iPhone 12 / 23F77)**: `request inputs=127 outputs=1 procIdx=0
+  sids=363..489 validate=1`; programHandle 0x2dc60b418; `doEvaluateDirectWithModel ok=1`.
+  PHASE 5d inline DirectPath DeviceOpen in the SAME process, immediately after the evaluate:
+  `[inline] open H11ANEIn type=1 kr=0x0` and `H1xANELoadBalancer type=1 kr=0x0`
+  (both open), but `[inline sel0 pid=512] kr=0xe00002f0 (NotFound)`.
+- **PHASE 6f foreign sid=170**: useCount 0->0, lockRO=ok, diff=512/16384, now0=af5eaf5e,
+  words 0x0000..0x00fc all `00000000 -> 5eaf5eaf` = **the v63 chosen-content write into a
+  foreign IOSurface, re-proven** (write primitive; NOT kread/KRW).
+- **DeviceOpen pid law — correction to the "aned-only client table" theory**: an earlier run
+  got 0xe00002e3 (NoPower = pid FOUND, engine unpowered) for aned pid 342 AND for our own app
+  pid 5830; tonight our pid 512 (post-successful-evaluate, same process) = 0xe00002f0
+  (NotFound). A table that contained only aned could not have resolved 5830. So the found-vs-
+  not-found split is a **lookup/registration law we do not yet have** (candidate: the pid a
+  DirectPath DeviceOpen resolves must be the pid that owns an _ANEClient/aned-side registration;
+  5830 had run earlier v63 fires, 512 was a fresh process). Open: determine whether a
+  pre-registration step exists, and whether the lookup is proc_find or a driver client table.
+  Handed to the 24A435 hunt (same handler shape) to settle from the code.
+- **NEON witness transport is DEAD on the 12**: every scan = `READ FAIL kr=0x90000003 cnt=0
+  alt_kr=0x10000003 alt_cnt=68`, dead_port=32 at every scan. Decode: 0x80000000|0x10000003 =>
+  thread_suspend = 0x10000003 = MACH_SEND_INVALID_DEST, alt flavor same. The ports are dead;
+  **every historical "NEON clean" scan is a NO-READ**, not evidence. The only successful read
+  ever = the 17's wid=4 event. Oracle needs port pinning/restart or the p062 exception
+  transport (which is a live-register snapshot, not the PCB oracle).
+- **Carrier limit confirmed**: the CoreML carrier cannot deliver >192-record requests on
+  23F77 (addchain-254 inference reject is procIdx-independent; passthrough compile fails at
+  200 live 16KB inputs). The intended bypass = direct-path sel2 ProgramSendRequest, gated on
+  a working DeviceOpen.

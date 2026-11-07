@@ -32,6 +32,14 @@ NS_ASSUME_NONNULL_BEGIN
 /// is actually powered. Opens H11ANEIn/H1xANELoadBalancer type 1 and calls
 /// sel0 DeviceOpen with getpid; returns the log rows. No send request.
 + (NSString *)probeInline;
+
+/// v5 knobs (pasteboard, no push): p151_type=<0..4> single type,
+/// p151_sweep=0|1 (default 1 = types 0..4), p151_in=<bytes>, p151_out=<bytes>,
+/// p151_off=<offset of the u32 pid>, p151_pid=<pid>, p151_qword=0|1 plus
+/// p151_qoff=<offset> to also place the pid as a u64.
+/// Static law: sel0 is not pid-resolved; 2f0 = UC not in the ANE client list.
+/// [UC+0x24]==2 returns success early (no AddClient), so the type sweep is the
+/// live test for the DirectPath early-success branch.
 @end
 
 NS_ASSUME_NONNULL_END
