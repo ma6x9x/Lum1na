@@ -23,7 +23,7 @@
 #import <Foundation/Foundation.h>
 #import <objc/message.h>
 
-#define P146_BUILD @"p146-knobsetter-v5.5-oobarm"
+#define P146_BUILD @"p146-knobsetter-v5.6-passarm"
 
 @implementation P146KnobSetter
 
@@ -133,7 +133,11 @@
        records 193..255 are the LIVE OOB write. 24A435 widened the object
        to 255 slots — safe there; run this on the 12 (23F77) ONLY.
        PANIC-POSSIBLE. The marker wins over the v3.4 model upgrade and the
-       absent-only req_in default; it touches nothing else. */
+       absent-only req_in default; it touches nothing else.
+       v5.6: the arm model is XVRC27_254in_passthrough, NOT addchain —
+       v60 (2026-10-12) proved the addchain-254 is rejected on 23F77
+       (0x2/0x9 Program Inference error) while passthrough is ACCEPTED and
+       reaches the fill. The addchain arm never reached the prewire. */
     {
         id pb = ((id (*)(Class, SEL))objc_msgSend)(
             NSClassFromString(@"UIPasteboard"),
@@ -156,15 +160,15 @@
             }
         }
         if (oob >= 193 && oob <= 254) {
-            BOOL m = [@"XVRC27_254in_1out_addchain\n" writeToFile:modelPath
+            BOOL m = [@"XVRC27_254in_passthrough\n" writeToFile:modelPath
                         atomically:YES encoding:NSUTF8StringEncoding error:nil];
             BOOL r = [[NSString stringWithFormat:@"%ld\n", oob]
                         writeToFile:reqPath atomically:YES
                         encoding:NSUTF8StringEncoding error:nil];
-            [out appendFormat:@"[v5.5] OOB ARM %@: p044_model.txt=XVRC27_254in_1out_addchain, p044_req_in.txt=%ld (23F77 43748 crossing: gate 255 vs 192-record object; PANIC-POSSIBLE — one tap, fresh boot, 12 only)\n",
+            [out appendFormat:@"[v5.6] OOB ARM %@: p044_model.txt=XVRC27_254in_passthrough, p044_req_in.txt=%ld (23F77 43748 crossing: gate 255 vs 192-record object; passthrough is the 23F77-ACCEPTED 254-in model, v60; PANIC-POSSIBLE — one tap, fresh boot, 12 only)\n",
                 (m && r) ? @"VERIFY" : @"FAILED", oob];
         } else if (oob != 0) {
-            [out appendFormat:@"[v5.5] p044_oob=%ld outside 193..254 — NOT armed (OOB knob only)\n", oob];
+            [out appendFormat:@"[v5.6] p044_oob=%ld outside 193..254 — NOT armed (OOB knob only)\n", oob];
         }
     }
 
