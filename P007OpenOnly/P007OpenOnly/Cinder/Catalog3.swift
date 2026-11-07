@@ -135,7 +135,9 @@ ctx.arm("cm.fdleak", "handshake + vend")
                     lines.append("  CrashReporter entries=\(pentries.count)")
                     let panics = pentries.filter { $0.contains("panic") }.sorted().reversed()
                     if let newest = panics.first {
-                        if let (panData, pv) = session.read("/var/mobile/Library/Logs/CrashReporter/\(newest)", limit: 1_200_000) {
+                        let panPair = session.read("/var/mobile/Library/Logs/CrashReporter/\(newest)", limit: 1_200_000)
+                        let panData = panPair.data
+                        if let panData = panData {
                             let txt = String(decoding: panData ?? Data(), as: UTF8.self)
                             var cls = "watchdog/other"
                             if let pcr = txt.range(of: "pc 0x([0-9a-f]+), lr 0x([0-9a-f]+)", options: .regularExpression) {
