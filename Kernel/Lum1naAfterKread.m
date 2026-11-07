@@ -85,9 +85,25 @@ static NSArray<NSString *> *ak_tweakDylibs(void) {
     NSString *docs = NSSearchPathForDirectoriesInDomains(
         NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
     if (!docs) return out;
+    NSFileManager *fm = [NSFileManager defaultManager];
     NSString *tweaks = [docs stringByAppendingPathComponent:@"tweaks"];
-    NSArray<NSString *> *names = [[NSFileManager defaultManager]
-                                  contentsOfDirectoryAtPath:tweaks error:nil];
+    /* Bundle tweaks (e.g. a built RespringLogo.dylib dropped into
+       Resources/tweaks) are copied into Documents/tweaks once, so the app
+       stages them without an AFC/manual step. */
+    NSString *bundleTweaks = [[[NSBundle mainBundle] resourcePath]
+                              stringByAppendingPathComponent:@"tweaks"];
+    NSArray<NSString *> *bundled = [fm contentsOfDirectoryAtPath:bundleTweaks error:nil];
+    for (NSString *n in bundled) {
+        if (![n.pathExtension.lowercaseString isEqualToString:@"dylib"]) continue;
+        NSString *dst = [tweaks stringByAppendingPathComponent:n];
+        if (![fm fileExistsAtPath:dst]) {
+            [fm createDirectoryAtPath:tweaks withIntermediateDirectories:YES
+                            attributes:nil error:nil];
+            [fm copyItemAtPath:[bundleTweaks stringByAppendingPathComponent:n]
+                        toPath:dst error:nil];
+        }
+    }
+    NSArray<NSString *> *names = [fm contentsOfDirectoryAtPath:tweaks error:nil];
     for (NSString *n in names) {
         if ([n.pathExtension.lowercaseString isEqualToString:@"dylib"] ||
             [n.pathExtension.lowercaseString isEqualToString:@"deb"]) {
