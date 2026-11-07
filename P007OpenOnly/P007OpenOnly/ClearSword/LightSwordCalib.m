@@ -75,6 +75,10 @@ static void *rc_swap_thread(void *arg) {
     return NULL;
 }
 
+#define RC_HOLD_MAX 4096
+static int rc_hold[RC_HOLD_MAX];
+static int rc_holdN = 0;
+
 /* The ClearSword Socket Spray Thread (SOCK_DGRAM) */
 static void *rc_socket_spray_thread(void *arg) {
     (void)arg;
@@ -131,9 +135,7 @@ static void *rc_socket_spray_thread(void *arg) {
 @implementation LightSwordCalib
 
 static int g_rc_log_fd = -1;
-#define RC_HOLD_MAX 4096
-static int rc_hold[RC_HOLD_MAX];
-static int rc_holdN = 0;
+
 static NSMutableString *g_rc_log_str = nil;
 
 static void rc_log(const char *fmt, ...) {
