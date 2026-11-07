@@ -164,7 +164,7 @@ extern int proc_name(int pid, void *buffer, uint32_t buffersize);
 #import <math.h>
 #import <objc/message.h>
 
-#define P044_BUILD @"p044-v74-sku-cap"
+#define P044_BUILD @"p044-v75-neonctl"
 
 #define INPUT_COUNT 191
 /* v73: P034 class. kdata = msgh_size + 0x24. ANE table view is 0x820.
@@ -2045,28 +2045,83 @@ static void *watch_worker(void *arg) {
     int mismatches = 0;
     int fingerprints = 0;
     int printed = 0;
+    int portDrift = 0;
+    int magicClobber = 0;
+    int unstable = 0;
+    int deadPort = 0;
     const int printCap = 32;
     for (int k = 0; k < NEON_WITNESS_COUNT; k++) {
         neon_wit_t *w = &g_witness[k];
         if (!w->th || !w->port) continue;
-        if (thread_suspend(w->port) != KERN_SUCCESS) continue;
-        arm_neon_state64_t st;
-        memset(&st, 0, sizeof(st));
-        mach_msg_type_number_t cnt = ARM_NEON_STATE64_COUNT;
-        kern_return_t kr = thread_get_state(w->port, ARM_NEON_STATE64,
-                                            (thread_state_t)&st, &cnt);
-        thread_resume(w->port);
-        if (kr != KERN_SUCCESS) continue;
 
-        uint64_t *v = (uint64_t *)st.__v;
+        /* CONTROL 1 - port identity. The stored port must still be the
+           port of this pthread. If the pthread handle was reused (thread
+           died / was terminated), the stale name samples a DIFFERENT
+           thread - that is the wid=4 foreign-state class, not a kernel
+           write. Skip instead of mis-attributing. */
+        thread_act_t expect = (thread_act_t)pthread_mach_thread_np(w->th);
+        if (expect != w->port) {
+            portDrift++;
+            [out appendFormat:@"  [NEON-CTRL] PORT DRIFT wid=%d stored=0x%x pthread=0x%x - skipped (stale name would sample a foreign thread)\n",
+                k, (unsigned)w->port, (unsigned)expect];
+            continue;
+        }
+
+        /* CONTROL 2 - baseline integrity. If w->magic was clobbered the
+           comparison baseline is wrong and every qword looks like a hit
+           while the kernel state is untouched. Only canonical magic
+           counts as a baseline. */
         for (int q = 0; q < 64; q++) {
-            uint64_t cur = v[q];
+            uint64_t canonical = 0x4e45000000000000ULL | ((uint64_t)k << 32) | (uint64_t)q;
+            if (w->magic[q] != canonical) {
+                magicClobber++;
+                [out appendFormat:@"  [NEON-CTRL] MAGIC CLOBBER wid=%d qword=%d magic=0x%016llx canonical=0x%016llx - baseline invalid, HITs suppressed\n",
+                    k, q, (unsigned long long)w->magic[q], (unsigned long long)canonical];
+                break;
+            }
+        }
+
+        thread_act_t port = w->port;
+        int (^readNeon)(arm_neon_state64_t *) = ^int(arm_neon_state64_t *st) {
+            if (thread_suspend(port) != KERN_SUCCESS) return -1;
+            memset(st, 0, sizeof(*st));
+            mach_msg_type_number_t cnt = ARM_NEON_STATE64_COUNT;
+            kern_return_t kr = thread_get_state(port, ARM_NEON_STATE64,
+                                                (thread_state_t)st, &cnt);
+            thread_resume(port);
+            return (kr == KERN_SUCCESS) ? 0 : -2;
+        };
+
+        arm_neon_state64_t st1;
+        if (readNeon(&st1) != 0) {
+            deadPort++;
+            [out appendFormat:@"  [NEON-CTRL] READ FAIL wid=%d port=0x%x (dead or refused)\n",
+                k, (unsigned)port];
+            continue;
+        }
+        /* CONTROL 3 - second independent read: a transient read (suspend
+           race / mid-context-switch) differs between the two; a real PCB
+           change is stable. */
+        arm_neon_state64_t st2;
+        BOOL have2 = (readNeon(&st2) == 0);
+        uint64_t *v1 = (uint64_t *)st1.__v;
+        uint64_t *v2 = have2 ? (uint64_t *)st2.__v : NULL;
+        BOOL sawMismatch = NO;
+        BOOL sawUnstable = NO;
+
+        for (int q = 0; q < 64; q++) {
+            uint64_t cur = v1[q];
             uint64_t was = w->magic[q];
+            uint64_t canonical = 0x4e45000000000000ULL | ((uint64_t)k << 32) | (uint64_t)q;
+            if (was != canonical) continue;
             if (cur != was) {
+                sawMismatch = YES;
+                if (v2 && v2[q] != cur) sawUnstable = YES;
                 mismatches++;
                 if (printed < printCap) {
-                    [out appendFormat:@"  *** NEON-WITNESS HIT wid=%d qword=%d val=0x%016llx (was 0x%016llx) ***\n",
-                        k, q, (unsigned long long)cur, (unsigned long long)was];
+                    [out appendFormat:@"  *** NEON-WITNESS HIT wid=%d qword=%d val=0x%016llx (was 0x%016llx)%s ***\n",
+                        k, q, (unsigned long long)cur, (unsigned long long)was,
+                        (v2 && v2[q] == cur) ? " [stable x2]" : " [UNSTABLE]"];
                     printed++;
                 }
             }
@@ -2074,24 +2129,32 @@ static void *watch_worker(void *arg) {
             if (hi >= 0x000000c0u && hi <= 0x000000ffu) {
                 fingerprints++;
                 if (printed < printCap) {
-                    [out appendFormat:@"  *** NEON-FINGERPRINT wid=%d qword=%d val=0x%016llx (0xcN counter) ***\n",
-                        k, q, (unsigned long long)cur];
+                    [out appendFormat:@"  *** NEON-FINGERPRINT wid=%d qword=%d val=0x%016llx%s ***\n",
+                        k, q, (unsigned long long)cur,
+                        (v2 && v2[q] == cur) ? " [stable x2]" : " [UNSTABLE]"];
                     printed++;
                 }
             }
             if (q + 1 < 64 &&
                 hi >= 0x000000c0u && hi <= 0x000000ffu &&
-                v[q + 1] == 0x0000000100000001ULL) {
+                v1[q + 1] == 0x0000000100000001ULL &&
+                !(v2 && v2[q] != cur)) {
                 if (printed < printCap) {
-                    [out appendFormat:@"  *** NEON-FILL-STRIDE wid=%d qword=%d val=0x%016llx nxt=0x%016llx (16B fill fingerprint) ***\n",
-                        k, q, (unsigned long long)cur, (unsigned long long)v[q + 1]];
+                    [out appendFormat:@"  *** NEON-FILL-STRIDE wid=%d qword=%d val=0x%016llx nxt=0x%016llx (16B fill fingerprint)%s ***\n",
+                        k, q, (unsigned long long)cur, (unsigned long long)v1[q + 1],
+                        (v2 && v2[q] == cur && v2[q + 1] == v1[q + 1]) ? " [stable x2]" : " [UNSTABLE]"];
                     printed++;
                 }
             }
         }
+        if (sawMismatch && !have2) {
+            [out appendFormat:@"  [NEON-CTRL] SINGLE READ ONLY wid=%d (second read failed; hit unconfirmed)\n", k];
+        }
+        if (sawUnstable) unstable++;
     }
-    [out appendFormat:@"  NEON-WITNESS[%@]: baseline_mismatch=%d fingerprint=%d printed=%d/%d\n",
-        tag, mismatches, fingerprints, printed, printCap];
+    [out appendFormat:@"  NEON-WITNESS[%@]: baseline_mismatch=%d fingerprint=%d printed=%d/%d port_drift=%d magic_clobber=%d unstable=%d dead_port=%d\n",
+        tag, mismatches, fingerprints, printed, printCap,
+        portDrift, magicClobber, unstable, deadPort];
     return mismatches + fingerprints;
 }
 
