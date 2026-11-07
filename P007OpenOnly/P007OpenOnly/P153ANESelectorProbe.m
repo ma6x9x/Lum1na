@@ -113,24 +113,24 @@
 + (kern_return_t)asyncSend:(io_connect_t)conn
                      inCnt:(uint32_t)inCnt outCnt:(uint32_t)outCnt
                      offIn:(uint32_t)offIn offOut:(uint32_t)offOut
-                       size:(uint32_t)sendSz
+                       size:(uint32_t)sendSz outSize:(uint32_t)sendOutSz
                         log:(NSMutableString *)o refOut:(uint64_t *)refOut {
     if (sendSz < 0x100) sendSz = 0x948;
+    if (sendOutSz < 0x28 || sendOutSz > 0x200) sendOutSz = 0x28;
     mach_port_t wp = MACH_PORT_NULL;
     kern_return_t kr = mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE, &wp);
     if (kr != KERN_SUCCESS) { [o appendFormat:@"      async port alloc kr=0x%x\n", kr]; return kr; }
     mach_port_insert_right(mach_task_self(), wp, wp, MACH_MSG_TYPE_MAKE_SEND);
 
     uint8_t *in = calloc(1, sendSz);
-    uint8_t ob[0x28];
-    memset(ob, 0, sizeof(ob));
-    if (!in) { mach_port_destroy(mach_task_self(), wp); return kIOReturnNoMemory; }
+    uint8_t *ob = calloc(1, sendOutSz);
+    if (!in || !ob) { free(in); free(ob); mach_port_destroy(mach_task_self(), wp); return kIOReturnNoMemory; }
     if (inCnt && offIn + 4 <= sendSz) memcpy(in + offIn, &inCnt, 4);
     if (outCnt && offOut + 4 <= sendSz) memcpy(in + offOut, &outCnt, 4);
 
     uint64_t scalar = 0;
     uint64_t refs[8]; memset(refs, 0, sizeof(refs));
-    size_t osz = sizeof(ob);
+    size_t osz = sendOutSz;
     kr = IOConnectCallAsyncMethod(conn, 2, wp, refs, 8,
                                   &scalar, 1, in, sendSz,
                                   NULL, NULL, ob, &osz);
@@ -141,7 +141,7 @@
     for (size_t i = 0; i < 24 && i < osz; i++) [o appendFormat:@"%02x", ob[i]];
     [o appendString:@"\n"];
     if (refOut) *refOut = refs[0];
-    free(in);
+    free(in); free(ob);
     mach_port_destroy(mach_task_self(), wp);
     return kr;
 }
@@ -166,19 +166,33 @@
     uint32_t createSz = [self knobUInt:@"p153_create_size" def:0xd88];
     uint32_t createMagic = [self knobUInt:@"p153_create_magic" def:0xac738];
     BOOL is26 = ![[LabDeviceProfile osversion] hasPrefix:@"24"];
-    NSString *svc = [self knobString:@"p153_svc"
-                                 def:(is26 ? @"H11ANEIn" : @"H1xANELoadBalancer")];
-    uint32_t sendSz = [self knobUInt:@"p153_send_size" def:(is26 ? 0x948 : 0xd88)];
+    BOOL is27 = [[LabDeviceProfile osversion] hasPrefix:@"24"];
+    NSString *defaultSvc = is26 ? @"H11ANEIn" : @"H1xANELoadBalancer";
+    NSString *svc = [self knobString:@"p153_svc" def:defaultSvc];
+    /* 24A435 table @0xfffffe00080554f8 (11 sels, capstone): sel2 SendRequest
+       structIn 0xc50/structOut 0x40; sel3 ProgramCreate structIn 0x28;
+       sel5 MemoryMapRequest 1 scalar in + 0x828 + 1 scalar out; sel7 0x10/0x18.
+       p153 v1 used 0xd88 send and 0x20 create from the 23F77 row. */
+    uint32_t sendSz = [self knobUInt:@"p153_send_size" def:(is26 ? 0x948 : 0xc50)];
+    uint32_t sendOutSz = [self knobUInt:@"p153_send_out_size" def:(is26 ? 0x28 : 0x40)];
     uint32_t mapSz = [self knobUInt:@"p153_map_size" def:(is26 ? 0x2008 : 0x828)];
     uint32_t devSz = [self knobUInt:@"p153_dev_size" def:(is26 ? 0x68 : 0x88)];
+    uint32_t createStructSz = [self knobUInt:@"p153_create_struct_size" def:(is27 ? 0x28 : 0x20)];
     if (devSz < 0x40 || devSz > 0x200) devSz = is26 ? 0x68 : 0x88;
     if (mapSz < 0x828) mapSz = 0x828;
+    if (sendOutSz < 0x28) sendOutSz = is26 ? 0x28 : 0x40;
+    if (createStructSz < 0x20 || createStructSz > 0x80) createStructSz = is27 ? 0x28 : 0x20;
+    NSString *knobSrc = [self knobsFileText].length ? @"Documents/p153_knobs.txt"
+        : ([self pasteboardString].length ? @"pasteboard" : @"defaults");
+    if (![svc isEqualToString:defaultSvc])
+        [out appendFormat:@"  [warn] p153_svc=%@ overrides this SKU default %@\n", svc, defaultSvc];
 
+    [out appendString:[NSString stringWithFormat:@"  [knobsrc] %@\n", knobSrc]];
     [out appendFormat:@"  [knobs] pid=%u svc=%@ types=%u/%u send=%u map=%u create=%u force=%u "
-                       @"counts=%u/%u offs=0x%x/0x%x sizes send=0x%x map=0x%x dev=0x%x "
-                       @"create=0x%x/0x%x\n",
+                       @"counts=%u/%u offs=0x%x/0x%x sizes send=0x%x out=0x%x map=0x%x dev=0x%x "
+                       @"create=0x%x/0x%x struct=0x%x\n",
         pid, svc, t1, t4, doSend, doMap, doCreate, force, inCnt, outCnt, offIn, offOut,
-        sendSz, mapSz, devSz, createSz, createMagic];
+        sendSz, sendOutSz, mapSz, devSz, createSz, createMagic, createStructSz];
     if (doSend || doMap || doCreate)
         [out appendString:@"  [PANIC-POSSIBLE] map/create/send enabled: one tap, fresh boot\n"];
 
@@ -190,6 +204,15 @@
         kern_return_t okr = 0;
         io_connect_t conn = [self openType1:svc.UTF8String kr:&okr];
         [out appendFormat:@"  [open] %@ type=%u kr=0x%x\n", svc, type, okr];
+        if (!conn && okr == 0xe00002c7 && ![svc isEqualToString:defaultSvc]) {
+            /* Stale p153_svc knob from another SKU (the 2026-11-07 14:52 run
+               opened H11ANEIn on 27.0 -> 2c7). Fall back to the SKU default. */
+            [out appendFormat:@"  [warn] %@ unsupported here (2c7) — retrying SKU default %@\n",
+                svc, defaultSvc];
+            svc = defaultSvc;
+            conn = [self openType1:svc.UTF8String kr:&okr];
+            [out appendFormat:@"  [open] %@ type=%u kr=0x%x (default retry)\n", svc, type, okr];
+        }
         if (!conn) continue;
         opened++;
 
@@ -216,6 +239,10 @@
             : isUC && !isDP ? @"UserClient (table1)"
             : (isDP && isUC ? @"ambiguous (both shapes accepted)"
                             : @"unidentified (both 2c2)")];
+        if (!isDP && !isUC)
+            [out appendString:@"    [hint] sel7 is not the class oracle on this train; "
+                               @"sel0 DeviceOpen below is the receipt. Use p153_force=1 "
+                               @"to exercise map/create (PANIC-POSSIBLE).\n"];
 
         if (doMap && (isDP || force)) {
             uint8_t *map = calloc(1, mapSz);
@@ -233,13 +260,13 @@
             [out appendString:@"      sel5 map skipped (not DirectPath class)\n"];
 
         if (doCreate && (isUC || force)) {
-            uint8_t cr[0x20]; memset(cr, 0, sizeof(cr));
+            uint8_t cr[0x80]; memset(cr, 0, sizeof(cr));
             uint64_t sz = createSz, magic = createMagic;
             memcpy(cr + 0x08, &sz, 8);
             memcpy(cr + 0x18, &magic, 8);
             uint8_t cb[8]; memset(cb, 0, sizeof(cb));
             size_t cosz = sizeof(cb);
-            kern_return_t ckr = IOConnectCallStructMethod(conn, 3, cr, sizeof(cr),
+            kern_return_t ckr = IOConnectCallStructMethod(conn, 3, cr, createStructSz,
                                                           cb, &cosz);
             [self logKr:out tag:@"sel3 ProgramCreate (size/magic)" kr:ckr out:cb osz:cosz];
         }
@@ -249,7 +276,7 @@
         if (doSend) {
             uint64_t ref = 0;
             kern_return_t skr = [self asyncSend:conn inCnt:inCnt outCnt:outCnt
-                                          offIn:offIn offOut:offOut size:sendSz
+                                          offIn:offIn offOut:offOut size:sendSz outSize:sendOutSz
                                             log:out refOut:&ref];
             [out appendFormat:@"    [send] reach test kr=0x%x (zero counts unless knobs set)\n", skr];
         }
