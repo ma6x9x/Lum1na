@@ -165,13 +165,13 @@
     uint32_t offOut = [self knobUInt:@"p153_off_out" def:0x51c];
     uint32_t createSz = [self knobUInt:@"p153_create_size" def:0xd88];
     uint32_t createMagic = [self knobUInt:@"p153_create_magic" def:0xac738];
-    BOOL is23 = [[LabDeviceProfile osversion] isEqualToString:@"23F77"];
+    BOOL is26 = ![[LabDeviceProfile osversion] hasPrefix:@"24"];
     NSString *svc = [self knobString:@"p153_svc"
-                                 def:(is23 ? @"H11ANEIn" : @"H1xANELoadBalancer")];
-    uint32_t sendSz = [self knobUInt:@"p153_send_size" def:(is23 ? 0x948 : 0xd88)];
-    uint32_t mapSz = [self knobUInt:@"p153_map_size" def:(is23 ? 0x2008 : 0x828)];
-    uint32_t devSz = [self knobUInt:@"p153_dev_size" def:(is23 ? 0x68 : 0x88)];
-    if (devSz < 0x40 || devSz > 0x200) devSz = is23 ? 0x68 : 0x88;
+                                 def:(is26 ? @"H11ANEIn" : @"H1xANELoadBalancer")];
+    uint32_t sendSz = [self knobUInt:@"p153_send_size" def:(is26 ? 0x948 : 0xd88)];
+    uint32_t mapSz = [self knobUInt:@"p153_map_size" def:(is26 ? 0x2008 : 0x828)];
+    uint32_t devSz = [self knobUInt:@"p153_dev_size" def:(is26 ? 0x68 : 0x88)];
+    if (devSz < 0x40 || devSz > 0x200) devSz = is26 ? 0x68 : 0x88;
     if (mapSz < 0x828) mapSz = 0x828;
 
     [out appendFormat:@"  [knobs] pid=%u svc=%@ types=%u/%u send=%u map=%u create=%u force=%u "

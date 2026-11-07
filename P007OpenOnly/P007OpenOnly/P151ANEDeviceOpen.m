@@ -198,8 +198,8 @@
 + (NSString *)probeInline {
     NSMutableString *o = [NSMutableString string];
     uint32_t pid = (uint32_t)getpid();
-    BOOL is23 = [[LabDeviceProfile osversion] isEqualToString:@"23F77"];
-    uint32_t sz = is23 ? 0x68 : 0x88;   /* table-declared sizes are enforced exactly */
+    BOOL is27 = [[LabDeviceProfile osversion] hasPrefix:@"24"];
+    uint32_t sz = is27 ? 0x88 : 0x68;   /* table-declared sizes are enforced exactly */
     NSArray<NSString *> *svcs = @[@"H11ANEIn", @"H1xANELoadBalancer"];
     for (NSString *svcName in svcs) {
         kern_return_t okr = 0;
@@ -234,8 +234,8 @@
     [out appendFormat:@"  [thermal] %@ (ANE returns NoPower at serious/critical)\n", therm];
 
     uint32_t pid   = [self pidFromPasteboardOrDefault];
-    BOOL is23 = [[LabDeviceProfile osversion] isEqualToString:@"23F77"];
-    uint32_t defSz = is23 ? 0x68 : 0x88;  /* 23F77 tables declare 0x68; 24A435 0x88 */
+    BOOL is27 = [[LabDeviceProfile osversion] hasPrefix:@"24"];
+    uint32_t defSz = is27 ? 0x88 : 0x68;  /* 23xx (26.x, incl. A12X iPad) = 0x68; 24xx (27.x) = 0x88 */
     uint32_t inSz  = [self knobUInt:@"p151_in" def:defSz];
     uint32_t outSz = [self knobUInt:@"p151_out" def:defSz];
     uint32_t off   = [self knobUInt:@"p151_off" def:0x00];
