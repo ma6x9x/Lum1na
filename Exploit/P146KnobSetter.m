@@ -100,9 +100,9 @@
        stays the census's OWN pick (absent = honest census law). */
     NSString *modelPath = [docs stringByAppendingPathComponent:@"p044_model.txt"];
     if (![NSFileManager.defaultManager fileExistsAtPath:modelPath]) {
-        BOOL ok = [@"XVRC27_254in_passthrough\n" writeToFile:modelPath
+        BOOL ok = [@"XVRC27_127in_copyout\n" writeToFile:modelPath
                        atomically:YES encoding:NSUTF8StringEncoding error:nil];
-        [out appendFormat:@"[%@] p044_model.txt auto-written = XVRC27_254in_passthrough\n",
+        [out appendFormat:@"[%@] p044_model.txt auto-written = XVRC27_127in_copyout (the in-bounds chosen-write; the 21:26 kernel line: sid-validation gates the OOB — the v61c census target rides the OUTPUT record)\n",
             ok ? @"VERIFY" : @"FAILED"];
     } else {
         NSString *cur = [NSString stringWithContentsOfFile:modelPath
@@ -112,9 +112,9 @@
     }
     NSString *reqPath = [docs stringByAppendingPathComponent:@"p044_req_in.txt"];
     if (![NSFileManager.defaultManager fileExistsAtPath:reqPath]) {
-        BOOL ok = [@"192\n" writeToFile:reqPath atomically:YES
+        BOOL ok = [@"127\n" writeToFile:reqPath atomically:YES
                         encoding:NSUTF8StringEncoding error:nil];
-        [out appendFormat:@"[%@] p044_req_in.txt auto-written = 192 (1-record OOB)\n",
+        [out appendFormat:@"[%@] p044_req_in.txt auto-written = 127 (in-bounds; all sids resolve -> inference RUNS; the copyout model = chosen tiles)\n",
             ok ? @"VERIFY" : @"FAILED"];
     }
 
