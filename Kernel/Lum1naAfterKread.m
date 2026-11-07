@@ -516,9 +516,11 @@ static void ak_respringSplashPrelude(NSMutableString *s) {
 }
 
 static void ak_tryRespring(NSMutableString *s) {
-    ak_respringSplashPrelude(s);
     NSString *jbctl = ak_findFile(@"jbctl");
     if (jbctl) {
+        /* Only the real payload path paints the splash — the killall
+           fallback must not leave a "jailbreak active" flag behind. */
+        ak_respringSplashPrelude(s);
         ak_log(s, @"[*] respring via jbctl (Dopamine 3 name: sbreload / backboardd SIGTERM)");
         int rc = ak_spawn(jbctl, @[ @"respring" ], s);
         if (rc == 0) return;
