@@ -239,7 +239,7 @@
                     }
                     digits.length = e - digits.location;
                     if (digits.length)
-                        sidv = [[pbs substringWithRange:digits] longValue];
+                        sidv = [[pbs substringWithRange:digits] intValue];
                 } else {
                     sidv = strtol(pbs.UTF8String, NULL, 10);
                 }
