@@ -170,9 +170,11 @@
                 if (hit.location != NSNotFound) {
                     NSUInteger at = hit.location + hit.length;
                     NSUInteger end = at;
-                    while (end < log.length &&
-                           isdigit((unsigned char)[log characterAtIndex:end]))
+                    while (end < log.length) {
+                        unichar ch = [log characterAtIndex:end];
+                        if (ch < '0' || ch > '9') break;
                         end++;
+                    }
                     if (end > at)
                         sidOut = (uint32_t)[[log substringWithRange:
                             NSMakeRange(at, end - at)] intValue];
@@ -230,9 +232,11 @@
                 if (mk.location != NSNotFound) {
                     NSRange digits = NSMakeRange(mk.location + mk.length, 0);
                     NSUInteger e = digits.location;
-                    while (e < pbs.length &&
-                           isdigit((unsigned char)[pbs characterAtIndex:e]))
+                    while (e < pbs.length) {
+                        unichar ch = [pbs characterAtIndex:e];
+                        if (ch < '0' || ch > '9') break;
                         e++;
+                    }
                     digits.length = e - digits.location;
                     if (digits.length)
                         sidv = [[pbs substringWithRange:digits] longValue];
