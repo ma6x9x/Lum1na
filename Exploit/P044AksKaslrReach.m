@@ -2765,7 +2765,21 @@ static void *watch_worker(void *arg) {
             g_guestHoldTile = tile;
             [out appendFormat:@"\n=== v62 GUEST HOLD: sid=%u tile=0x%04x (LE %02x %02x x8192) ===\n",
                 g_guestHoldSid, tile, tile & 0xff, tile >> 8];
-            [out appendString:@"  KEEP THIS APP BACKGROUND-ALIVE (no force-quit — the surface dies with the process). Push this sid as p044_target.txt into the STANDALONE app's Documents (house_arrest), push p044_fill.txt with a DIFFERENT tile there (e.g. 5eaf) + p044_req_in.txt=127 + p044_model.txt=min model, tap the STANDALONE, then return here and tap with p044_guest.txt again to observe. p044_guest_pre.bin written.\n"];
+            [out appendString:@"  KEEP THIS APP BACKGROUND-ALIVE (no force-quit — the surface dies with the process). Tap p146 in the STANDALONE install NEXT (it reads this sid from the system pasteboard and writes p044_target.txt — no house_arrest needed, v78), tap the STANDALONE P044, then return here and tap p146+p044 again to observe. p044_guest_pre.bin written.\n"];
+            /* v78: the sid HANDOFF rides the system pasteboard (the
+               Documents/house_arrest channel cannot deliver files between
+               installs on this build — 2026-11-01 law). Decimal sid only;
+               p146 in the STANDALONE consumes it into p044_target.txt. */
+            {
+                id pb = ((id (*)(Class, SEL))objc_msgSend)(
+                    NSClassFromString(@"UIPasteboard"),
+                    NSSelectorFromString(@"generalPasteboard"));
+                if (pb)
+                    ((void (*)(id, SEL, id))objc_msgSend)(pb,
+                        NSSelectorFromString(@"setString:"),
+                        [NSString stringWithFormat:@"%u", g_guestHoldSid]);
+                [out appendString:@"  [v78] sid also placed on the system pasteboard\n"];
+            }
             if (p044_sfLock(srf, 1, NULL) == 0) {
                 uint8_t *b = (uint8_t *)p044_sfBase(srf);
                 if (b) {

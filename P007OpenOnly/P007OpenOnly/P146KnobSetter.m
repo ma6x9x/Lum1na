@@ -21,8 +21,9 @@
 #import "LabLocalTime.h"
 
 #import <Foundation/Foundation.h>
+#import <objc/message.h>
 
-#define P146_BUILD @"p146-knobsetter-v5-upgrade"
+#define P146_BUILD @"p146-knobsetter-v5.1-installsplit"
 
 @implementation P146KnobSetter
 
@@ -122,6 +123,72 @@
                         encoding:NSUTF8StringEncoding error:nil];
         [out appendFormat:@"[%@] p044_req_in.txt auto-written = 127 (in-bounds; all sids resolve -> inference RUNS; the copyout model = chosen tiles)\n",
             ok ? @"VERIFY" : @"FAILED"];
+    }
+
+    /* v5.1: the per-install split — the SAME binary ships two installs, and
+       house_arrest cannot deliver files between them (2026-11-01 law), so
+       p146 writes each side's own knob set in-app:
+         GUEST install (bundle id contains "guest"): p044_guest.txt = 4b1d
+           (the round-1 boundary tile; EVERY tap consumes one copy, so p146
+           re-writes it before both the HOLD and the OBSERVE tap).
+         STANDALONE install: p044_fill.txt = 5eaf (the user-chosen content
+           value; in-place upgrade law) + the sid HANDOFF — if the system
+           pasteboard carries a decimal in sid range, p044_target.txt = it
+           (absent-only: an existing target is KEPT). */
+    BOOL isGuestInstall = [NSBundle.mainBundle.bundleIdentifier.lowercaseString
+        containsString:@"guest"];
+    if (isGuestInstall) {
+        NSString *gPath = [docs stringByAppendingPathComponent:@"p044_guest.txt"];
+        BOOL ok = [@"4b1d\n" writeToFile:gPath atomically:YES
+                          encoding:NSUTF8StringEncoding error:nil];
+        [out appendFormat:@"[%@] p044_guest.txt %@ = 4b1d (GUEST install law: tap p044 next = HOLD; after the standalone's fire tap p146 + p044 again = OBSERVE)\n",
+            ok ? @"VERIFY" : @"FAILED", ok ? @"auto-written" : @""];
+    } else {
+        /* the STANDALONE must never carry p044_guest.txt — a stray copy
+           would turn the standalone's own fire into a GUEST HOLD tap. */
+        NSString *gPath = [docs stringByAppendingPathComponent:@"p044_guest.txt"];
+        if ([NSFileManager.defaultManager fileExistsAtPath:gPath]) {
+            unlink(gPath.fileSystemRepresentation);
+            [out appendString:@"[clean] stray p044_guest.txt REMOVED from the standalone (guest-mode guard)\n"];
+        }
+        NSString *fillPath = [docs stringByAppendingPathComponent:@"p044_fill.txt"];
+        NSString *curFill = [[NSString stringWithContentsOfFile:fillPath
+            encoding:NSUTF8StringEncoding error:nil] ?: @""
+            stringByTrimmingCharactersInSet:
+            [NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        if (![curFill isEqualToString:@"5eaf"]) {
+            BOOL ok = [@"5eaf\n" writeToFile:fillPath atomically:YES
+                              encoding:NSUTF8StringEncoding error:nil];
+            [out appendFormat:@"[%@] p044_fill.txt %@ = 5eaf %@ (the USER-CHOSEN fill value; uniform 512 B at the output base)\n",
+                ok ? @"UPGRADED" : @"FAILED", ok ? @"auto-written" : @"",
+                curFill.length ? [NSString stringWithFormat:@"(was '%@')", curFill]
+                                : @"(was absent — tonight's 4141..5050 was the code default)"];
+        } else {
+            [out appendFormat:@"[kept] p044_fill.txt = 5eaf (the chosen fill)\n"];
+        }
+        /* the v78 sid handoff: pasteboard decimal in sid range -> the target,
+           absent-only (an existing target file is authoritative). */
+        NSString *targetPath = [docs stringByAppendingPathComponent:@"p044_target.txt"];
+        if (![NSFileManager.defaultManager fileExistsAtPath:targetPath]) {
+            id pb = ((id (*)(Class, SEL))objc_msgSend)(
+                NSClassFromString(@"UIPasteboard"),
+                NSSelectorFromString(@"generalPasteboard"));
+            NSString *pbs = pb ? ((NSString *(*)(id, SEL))objc_msgSend)(
+                pb, NSSelectorFromString(@"string")) : nil;
+            long sidv = pbs.length ? strtol(pbs.UTF8String, NULL, 10) : 0;
+            if (sidv >= 16 && sidv <= 1000000) {
+                BOOL ok = [[NSString stringWithFormat:@"%ld\n", sidv]
+                    writeToFile:targetPath atomically:YES
+                                encoding:NSUTF8StringEncoding error:nil];
+                [out appendFormat:@"[%@] p044_target.txt %@ = %ld (the [v78] pasteboard sid handoff — tap this GUEST's p044 within the same boot first)\n",
+                    ok ? @"VERIFY" : @"FAILED", ok ? @"auto-written" : @"", sidv];
+            } else {
+                [out appendFormat:@"[ ] pasteboard not a sid (%@) — p044_target.txt stays census-owned\n",
+                    pbs.length ? @"non-numeric" : @"empty"];
+            }
+        } else {
+            [out appendFormat:@"[kept] p044_target.txt present — the existing target is authoritative\n"];
+        }
     }
 
     /* the other composition flags' presence (the tap order's state) */
