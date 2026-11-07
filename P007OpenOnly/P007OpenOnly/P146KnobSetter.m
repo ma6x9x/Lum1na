@@ -23,7 +23,7 @@
 #import <Foundation/Foundation.h>
 #import <objc/message.h>
 
-#define P146_BUILD @"p146-knobsetter-v5.7-oobidx"
+#define P146_BUILD @"p146-knobsetter-v5.8-oobmodel"
 
 @implementation P146KnobSetter
 
@@ -160,8 +160,37 @@
             }
         }
         if (oob >= 193 && oob <= 254) {
-            BOOL m = [@"XVRC27_254in_passthrough\n" writeToFile:modelPath
-                        atomically:YES encoding:NSUTF8StringEncoding error:nil];
+            /* v5.8: the arm MODEL is selectable. The 23F77 direct lane
+               REJECTS the passthrough 254-in at COMPILE time with
+               MaxLiveInLiveOutExceeded (200 live 16 KB ins), so it can
+               never carry the OOB request. The addchain-254 DOES compile
+               (programHandle 0x7a9e366cf) and its 0x2/0x9 came with
+               procIdx=0 - the untested pair is addchain + procIdx=1.
+               Default = addchain; "p044_oob_model=passthrough" selects the
+               other. */
+            NSString *armModel = @"XVRC27_254in_1out_addchain";
+            {
+                NSRange mk3 = [pbs rangeOfString:@"p044_oob_model="];
+                if (mk3.location != NSNotFound) {
+                    NSUInteger at3 = mk3.location + mk3.length;
+                    NSUInteger e3 = at3;
+                    while (e3 < pbs.length) {
+                        unichar ch = [pbs characterAtIndex:e3];
+                        if (!((ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z')
+                              || (ch >= '0' && ch <= '9') || ch == '_')) break;
+                        e3++;
+                    }
+                    if (e3 > at3) {
+                        NSString *want = [pbs substringWithRange:
+                            NSMakeRange(at3, e3 - at3)];
+                        if ([want.lowercaseString containsString:@"pass"])
+                            armModel = @"XVRC27_254in_passthrough";
+                    }
+                }
+            }
+            BOOL m = [[NSString stringWithFormat:@"%@\n", armModel]
+                        writeToFile:modelPath atomically:YES
+                        encoding:NSUTF8StringEncoding error:nil];
             BOOL r = [[NSString stringWithFormat:@"%ld\n", oob]
                         writeToFile:reqPath atomically:YES
                         encoding:NSUTF8StringEncoding error:nil];
@@ -196,8 +225,8 @@
             BOOL iok = [[NSString stringWithFormat:@"%ld\n", idx]
                 writeToFile:idxPath atomically:YES
                 encoding:NSUTF8StringEncoding error:nil];
-            [out appendFormat:@"[v5.7] OOB ARM %@: p044_model.txt=XVRC27_254in_passthrough, p044_req_in.txt=%ld, p044_proc_idx.txt=%ld (23F77 43748 crossing; procIdx nonzero per the measured 0/1/2 law; PANIC-POSSIBLE — one tap, fresh boot, 12 only)\n",
-                (m && r && iok) ? @"VERIFY" : @"FAILED", oob, idx];
+            [out appendFormat:@"[v5.8] OOB ARM %@: p044_model.txt=%@, p044_req_in.txt=%ld, p044_proc_idx.txt=%ld (23F77 43748 crossing; procIdx nonzero per the measured 0/1/2 law; addchain compiles, passthrough hits MaxLiveInLiveOut at 200 ins; PANIC-POSSIBLE — one tap, fresh boot, 12 only)\n",
+                (m && r && iok) ? @"VERIFY" : @"FAILED", armModel, oob, idx];
         } else if (oob != 0) {
             [out appendFormat:@"[v5.6] p044_oob=%ld outside 193..254 — NOT armed (OOB knob only)\n", oob];
         }
