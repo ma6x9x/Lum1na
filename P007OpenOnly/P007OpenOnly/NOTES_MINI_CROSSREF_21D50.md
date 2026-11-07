@@ -1533,3 +1533,25 @@ These describe bugs that exist on our PRE-FIX builds: 23F77 (26.5), 24A435 (27.0
   0xfeedfacf, needs libkrw/CS2c). It cannot move the iPad; Momentarius likewise needs kread/
   kwrite first. The iPad's move from last to first, if it happens, comes from the AVE2
   112466 read bug / IOSurface race, not from p090 or Momentarius.
+
+## 2026-11-07 — fixed IPSW pull + first CVE diffs (26.7.2 / 27.2)
+- Fixed kernelcaches downloaded with `ipsw download ipsw --kernel` (remote extraction, no full IPSW):
+  iPad8,7 26.7.2 = 23H128; iPhone13,2/18,2 27.2 = 24B119. Kext versions:
+  iPad 23H128 AVE2 905.43.1 / ANE 9.512.2 / IOSurface 393.5.10 (vuln 23H24: 905.41.1 /
+  9.512.0 / 393.5.8); iPhone13,2 24B119 AVE2 913.64.1 / H11ANE 10.102.4 / IOSurface 403.1
+  (23F77: 905.36.1 / 9.511.3 / 393.5.7); iPhone18,2 24B119 AVE2 913.64.1 /
+  AppleH16ANEInterface 10.102.4 / T8150ANEHAL 10.102.0 / IOSurface 403.1 (24A435: H16).
+- **AVE2 iPad fix found (candidate for CVE-2026-112466 read / 112689 corrupt):**
+  vuln 905.41.1 @0xfffffff0083303b0 after `cbz w26` does
+  `add x8, x8, w26, sxtw #4 ; ldp w8, w9, [x8, #-8]` (unchecked sign-extended index).
+  fixed 905.43.1 @0xfffffff008337370 replaces it with
+  `sub w9, w26, #1 ; ubfiz x9, x9, #4, #0x20 ; cmp x9, w9, sxtw ; ... csel x10, ... ;
+   ldp w9, w8, [x10, #8]` — the "improved bounds checking": a 32-bit index
+  zero-extension/overflow check before the load. This is an app-reachable AVE2
+  index path, exactly the iPad's new read/corrupt candidate.
+- **ANE diff status**: 24A435 (H16, 27.0) vs 24B119 (H16, 27.2) yields 278 B-only functions
+  (27.0→27.2 churn); the naive VA/similarity matcher is too noisy. Next: full-IPSW
+  `ipsw diff` (its Mach-O differ) or Ghidra Version Tracking. Full 24B119 IPSWs are
+  downloading to ~/Downloads/fixed_full for that.
+- Diff tooling: /tmp/kextdiff2.py (LC_FUNCTION_STARTS + capstone normalized hashes,
+  similarity pairing, prints B-inserted instructions).
