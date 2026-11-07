@@ -654,8 +654,15 @@ static BOOL p110_leak_capture(NSString *tag, BOOL print, P110LeakSnap *snap) {
             int dec = 0;
             if (g_p110_wakeSbN > 0) {
                 CMVideoFormatDescriptionRef fd = NULL;
-                if (g_p110_wakeSb[0] &&
-                    CMSampleBufferGetFormatDescription(g_p110_wakeSb[0], &fd) == 0 && fd) {
+                {   /* v3.3: construct the fd DIRECTLY — the codec is ours
+                       (HEVC 1280x720, the wake's own session); no
+                       sample-header API (the macro/prototype drift the
+                       local clang flagged). */
+                    if (CMVideoFormatDescriptionCreate(
+                            kCFAllocatorDefault, kCMVideoCodecType_HEVC,
+                            1280, 720, NULL, &fd) != 0 || !fd) fd = NULL;
+                }
+                if (fd) {
                     VTDecompressionSessionRef ds = NULL;
                     VTDecompressionOutputCallbackRecord ocb = { .decompressionOutputCallback = NULL };
                     OSStatus dst = VTDecompressionSessionCreate(
