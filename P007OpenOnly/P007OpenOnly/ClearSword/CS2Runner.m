@@ -85,7 +85,7 @@ static void cs2_write_banner(void) {
     NSString *osv = cs2_sysctl_string(@"kern.osversion");
     const LabOffTab *off = LabOff();
     cs2_log("time %s", [[[NSDate date] description] UTF8String]);
-    cs2_log("=== cs2 session BUILD cs2-27.0-partial ===");
+    cs2_log("=== cs2 session BUILD cs2-27.0-partial-v2-zerofix ===");
     cs2_log("core: 27.0 T8150 PARTIAL-window HIT (mixed qwords) + 8-try cap. hop-1 KEEP CLOSED.");
     cs2_log("machine=%s osversion=%s sku=%s",
             mach.UTF8String ?: "?", osv.UTF8String ?: "?",

