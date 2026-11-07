@@ -22,6 +22,7 @@
 #import <IOKit/IOKitLib.h>
 #import <mach/mach.h>
 #import <objc/message.h>
+#import <CoreML/CoreML.h>
 
 @implementation P151ANEDeviceOpen
 
@@ -63,9 +64,58 @@
     return conn;
 }
 
+/// v4: power + register in the SAME tap. A successful CoreML predict makes
+/// this pid an ANE client and powers the engine; DeviceOpen is then called
+/// immediately in the same process. This is the missing ingredient from the
+/// p151 v1-v3 runs: 0xe00002e3 (kIOReturnNoPower) fired for pids that WERE
+/// clients (aned 342, our own 5830 after ANE use), 0xe00002f0 for fresh
+/// pids that were not.
++ (BOOL)wakeANE:(NSMutableString *)out {
+    NSURL *url = [NSBundle.mainBundle URLForResource:@"simple_1in1out"
+                                       withExtension:@"mlmodelc"];
+    if (!url) {
+        [out appendString:@"  [wake] simple_1in1out.mlmodelc missing\n"];
+        return NO;
+    }
+    NSError *err = nil;
+    MLModelConfiguration *cfg = [MLModelConfiguration new];
+    cfg.computeUnits = MLComputeUnitsCPUAndNeuralEngine;
+    MLModel *m = [MLModel modelWithContentsOfURL:url configuration:cfg error:&err];
+    if (!m) {
+        [out appendFormat:@"  [wake] load failed: %@\n", err.localizedDescription];
+        return NO;
+    }
+    NSString *name = m.modelDescription.inputDescriptionsByName.allKeys.firstObject;
+    MLFeatureDescription *fd = name ? m.modelDescription.inputDescriptionsByName[name] : nil;
+    MLMultiArray *arr = nil;
+    if (fd.multiArrayConstraint) {
+        arr = [[MLMultiArray alloc] initWithShape:fd.multiArrayConstraint.shape
+                                         dataType:fd.multiArrayConstraint.dataType
+                                            error:&err];
+    }
+    if (!arr || !name) {
+        [out appendFormat:@"  [wake] feature array unavailable (%@)\n",
+            fd ? @"no multiArrayConstraint" : @"no input description"];
+        return NO;
+    }
+    MLDictionaryFeatureProvider *fp =
+        [[MLDictionaryFeatureProvider alloc] initWithDictionary:@{name: arr} error:&err];
+    if (!fp) {
+        [out appendFormat:@"  [wake] provider failed: %@\n", err.localizedDescription];
+        return NO;
+    }
+    NSDate *t0 = [NSDate date];
+    id<MLFeatureProvider> pred = [m predictionFromFeatures:fp error:&err];
+    double ms = -[t0 timeIntervalSinceNow] * 1000.0;
+    [out appendFormat:@"  [wake] predict %@ in %.1f ms err=%@ (registers this pid + powers the ANE)\n",
+        pred ? @"ok" : @"FAILED", ms,
+        err ? err.localizedDescription : @"none"];
+    return pred != nil;
+}
+
 + (NSString *)tap {
     NSMutableString *out = [NSMutableString string];
-    [out appendFormat:@"=== p151 session %@ BUILD p151-ane-deviceopen-v3 ===\n",
+    [out appendFormat:@"=== p151 session %@ BUILD p151-ane-deviceopen-v4-wake ===\n",
         LabLocalMilitaryNow()];
     [out appendString:[LabDeviceProfile identBlock]];
 
@@ -81,6 +131,9 @@
 
     uint32_t pid = [self pidFromPasteboardOrDefault];
     [out appendFormat:@"  [pid] using %u (pasteboard p151_pid= or getpid)\n", pid];
+
+    /* v4: a live ANE predict first - registration + power in one tap. */
+    [self wakeANE:out];
 
     NSArray<NSString *> *svcs = @[@"H11ANEIn", @"H1xANELoadBalancer"];
     NSArray<NSNumber *> *offs = @[@0x00, @0x0c, @0x10, @0x54];
