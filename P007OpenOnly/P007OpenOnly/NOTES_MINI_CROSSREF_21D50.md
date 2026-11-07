@@ -1268,3 +1268,11 @@ door/stride laws; the p110 claim rows.
   {surfaceId-class 0xc0N …} = the fill's write shape, again byte-verified from the kernel side.
 - **2 OTHER** (091118/091246/091453 class): pc/lr deltas WILD (garbage lr bands), x0 = userspace-class
   values — DECODE-OWED (full panic strings + the GZ/driver table law needed; do not classify).
+
+## 2026-11-06 — the 13-panic batch ATTRIBUTION CORRECTED (the user's catch — build field per file)
+- The **9 stale-slot SIG receipts = ALL the 17** (24A435). The 11-receipt repro corpus = all-17.
+- The **3 GZ kalloc.3072 MAFs = the 12 (23F77)** — the 43748-fill record class on the HUNT device
+  from this week's fires (the fill landed in FREE elements = the GZ catch; the 10-15 panic's law,
+  now re-attested by 3 fresh receipts 135503/134910/083959).
+- The **3 wild-delta odd panics = the 12 mini (21D50)** — device-attributed to the mini's
+  CS2/libkrw era (path-test-3); decode-owed (the 17.3 banding + the lkrw lane's frames).
