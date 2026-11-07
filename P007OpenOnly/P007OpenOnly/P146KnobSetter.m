@@ -23,7 +23,7 @@
 #import <Foundation/Foundation.h>
 #import <objc/message.h>
 
-#define P146_BUILD @"p146-knobsetter-v5.6-passarm"
+#define P146_BUILD @"p146-knobsetter-v5.7-oobidx"
 
 @implementation P146KnobSetter
 
@@ -165,8 +165,39 @@
             BOOL r = [[NSString stringWithFormat:@"%ld\n", oob]
                         writeToFile:reqPath atomically:YES
                         encoding:NSUTF8StringEncoding error:nil];
-            [out appendFormat:@"[v5.6] OOB ARM %@: p044_model.txt=XVRC27_254in_passthrough, p044_req_in.txt=%ld (23F77 43748 crossing: gate 255 vs 192-record object; passthrough is the 23F77-ACCEPTED 254-in model, v60; PANIC-POSSIBLE — one tap, fresh boot, 12 only)\n",
-                (m && r) ? @"VERIFY" : @"FAILED", oob];
+            /* v5.7: the OOB arm also sets procIdx. On the 17 the law is
+               measured: index 0 = kernel reject status=0x2/statusType=0x9,
+               any nonzero in-range index (1, 2) = accepted, aned 342 =
+               silent client refuse. The 12's 09:51 fire had procIdx=0 and
+               returned the SAME 0x2/0x9, so index 0 is the first suspect
+               for the reject (the old addchain attribution is confounded).
+               Default = 1; an explicit p044_pid=<n> marker on the same
+               pasteboard overrides. */
+            long idx = 1;
+            {
+                NSRange mk2 = [pbs rangeOfString:@"p044_pid="];
+                if (mk2.location != NSNotFound) {
+                    NSUInteger at2 = mk2.location + mk2.length;
+                    NSUInteger e2 = at2;
+                    while (e2 < pbs.length) {
+                        unichar ch = [pbs characterAtIndex:e2];
+                        if (ch < '0' || ch > '9') break;
+                        e2++;
+                    }
+                    if (e2 > at2) {
+                        long v = [[pbs substringWithRange:
+                            NSMakeRange(at2, e2 - at2)] intValue];
+                        if (v >= 1 && v <= 100000) idx = v;
+                    }
+                }
+            }
+            NSString *idxPath = [docs stringByAppendingPathComponent:
+                @"p044_proc_idx.txt"];
+            BOOL iok = [[NSString stringWithFormat:@"%ld\n", idx]
+                writeToFile:idxPath atomically:YES
+                encoding:NSUTF8StringEncoding error:nil];
+            [out appendFormat:@"[v5.7] OOB ARM %@: p044_model.txt=XVRC27_254in_passthrough, p044_req_in.txt=%ld, p044_proc_idx.txt=%ld (23F77 43748 crossing; procIdx nonzero per the measured 0/1/2 law; PANIC-POSSIBLE — one tap, fresh boot, 12 only)\n",
+                (m && r && iok) ? @"VERIFY" : @"FAILED", oob, idx];
         } else if (oob != 0) {
             [out appendFormat:@"[v5.6] p044_oob=%ld outside 193..254 — NOT armed (OOB knob only)\n", oob];
         }
