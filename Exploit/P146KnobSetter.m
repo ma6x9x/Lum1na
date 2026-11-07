@@ -22,7 +22,7 @@
 
 #import <Foundation/Foundation.h>
 
-#define P146_BUILD @"p146-knobsetter-v4"
+#define P146_BUILD @"p146-knobsetter-v5-upgrade"
 
 @implementation P146KnobSetter
 
@@ -99,16 +99,22 @@
        192 (the 1-record OOB). ABSENT = write the defaults. p044_target.txt
        stays the census's OWN pick (absent = honest census law). */
     NSString *modelPath = [docs stringByAppendingPathComponent:@"p044_model.txt"];
-    if (![NSFileManager.defaultManager fileExistsAtPath:modelPath]) {
-        BOOL ok = [@"XVRC27_127in_copyout\n" writeToFile:modelPath
-                       atomically:YES encoding:NSUTF8StringEncoding error:nil];
-        [out appendFormat:@"[%@] p044_model.txt auto-written = XVRC27_127in_copyout (the in-bounds chosen-write; the 21:26 kernel line: sid-validation gates the OOB — the v61c census target rides the OUTPUT record)\n",
-            ok ? @"VERIFY" : @"FAILED"];
-    } else {
-        NSString *cur = [NSString stringWithContentsOfFile:modelPath
-                            encoding:NSUTF8StringEncoding error:nil] ?: @"";
-        [out appendFormat:@"[kept] p044_model.txt = %@\n",
-            [cur stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]]];
+    {   /* v3.4: the model UPGRADE law — a stale non-copyout value is
+           replaced, not kept (the in-bounds chosen-write is the only
+           route the sid-validation kernel line leaves open). */
+        NSString *cur = [[NSString stringWithContentsOfFile:modelPath
+            encoding:NSUTF8StringEncoding error:nil] ?: @"" 
+            stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+        BOOL isV63 = [cur isEqualToString:@"XVRC27_127in_copyout"];
+        BOOL ok = YES;
+        if (!isV63) {
+            ok = [@"XVRC27_127in_copyout\n" writeToFile:modelPath
+                          atomically:YES encoding:NSUTF8StringEncoding error:nil];
+            [out appendFormat:@"[%@] p044_model.txt %@ = XVRC27_127in_copyout (upgraded from '%@' — the v63 in-bounds chosen-write; target stays census-owned)\n",
+                ok ? @"UPGRADED" : @"FAILED", ok ? @"auto-written" : @"", cur];
+        } else {
+            [out appendFormat:@"[kept] p044_model.txt = XVRC27_127in_copyout (the v63 config)\n"];
+        }
     }
     NSString *reqPath = [docs stringByAppendingPathComponent:@"p044_req_in.txt"];
     if (![NSFileManager.defaultManager fileExistsAtPath:reqPath]) {
