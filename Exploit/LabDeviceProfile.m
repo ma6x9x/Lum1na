@@ -99,7 +99,13 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
     if (a12x && [v isEqualToString:@"23H30"]) return LabSkuA12X_23H30;
     if (a12x) return LabSkuA12X_other;
     if (xr) return LabSkuXR_22H311;
-    if (a13 && [v isEqualToString:@"22G100"]) return LabSkuA13_22G100;
+    /* Any A13 on the 18.x train uses the reference-rig harness row.
+       22G = 18.6.x (proven rig); 22H = 18.7.x (iPhone 11). The info.c
+       ladder is the same generation; CS2 stays train/rev-gated so a
+       patched 22H never fires the heavy spray. Without this mapping the
+       iPhone 11 fell through to LabSkuA13_other -> LabOff()==NULL, so
+       every KERNEL step that reads the table aborted before the door. */
+    if (a13 && [v hasPrefix:@"22"]) return LabSkuA13_22G100;
     if (a13 && [v isEqualToString:@"19F77"]) return LabSkuA13_19F77;
     if (a13) return LabSkuA13_other;
     return LabSkuUnknown;
@@ -118,7 +124,7 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
         case LabSkuA12X_other: return @"iPad8,* A12X / not 23G71 or 23H30 — FIELD# only";
         case LabSkuA12X_23H30: return @"iPad8,* A12X / 23H30 — iPadOS 26.7.1 FIELD# only, PPL";
         case LabSkuXR_22H311:  return @"XR A12 / 18.7.x — momentarius-ready";
-        case LabSkuA13_22G100:    return @"iPhone12,* A13 / 22x build — reference rig";
+        case LabSkuA13_22G100:    return @"iPhone12,* A13 / 22x build (18.x) — reference rig; 22H 18.7.x harness";
         case LabSkuA13_19F77:     return @"iPhone12,5 A13 / 19F77 — usbliter8 tethered rig (15.5 stock)";
         case LabSkuA13_other:  return @"iPhone12,* A13 / not 18.x";
         case LabSkuT8150_24A435: return @"iPhone18,2 T8150 / 24A435 — 17 Pro Max iOS 27.0";

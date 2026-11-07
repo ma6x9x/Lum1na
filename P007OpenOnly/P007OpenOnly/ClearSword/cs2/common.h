@@ -32,7 +32,9 @@ extern void cs2_log(const char *fmt, ...);
 #define CS2_KOFF_inpcb_pcbinfo 0x38
 #define CS2_KOFF_inpcbinfo_ipi_zone 0x68
 #define CS2_KOFF_kalloc_type_view_kt_zv_zv_name 0x10
-#define CS2_KOFF_socket_proto 0x20
+/* info.c: 0x18 through iOS 17.3, 0x20 at 23.4+. Wrong so_proto slot =
+   garbage kernel_base walk -> data abort (2026-11-07 rig panic class). */
+#define CS2_KOFF_socket_proto (LabOff()->socket_proto_off ? LabOff()->socket_proto_off : 0x20)
 #define CS2_KOFF_protosw_input 0x28
 #define CS2_KOFF_socket_usecount (LabOff()->socket_usecount)
 #define kconstant(staticBase) (LabOff()->static_base)

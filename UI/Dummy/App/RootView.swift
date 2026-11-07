@@ -20,6 +20,14 @@ struct RootView: View {
             // then always take the dark branch.
             .preferredColorScheme(.dark)
             .tint(Palette.violet)
+            .overlay {
+                if bootstrap.respringSplashVisible {
+                    Lum1naRespringSplash()
+                        .transition(.opacity)
+                        .zIndex(1000)
+                }
+            }
+            .animation(.easeInOut(duration: 0.28), value: bootstrap.respringSplashVisible)
             .onAppear {
                 // Post-respring truth: a jbroot dpkg either exists or it
                 // does not. Detection only — never a claim of success.

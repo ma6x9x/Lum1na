@@ -18,6 +18,8 @@
 #import <spawn.h>
 #import <sys/wait.h>
 #import <errno.h>
+#import <time.h>
+#include <unistd.h>
 
 #ifndef MH_MAGIC_64
 #define MH_MAGIC_64 LUMINA_MH_MAGIC_64
@@ -497,7 +499,24 @@ static void ak_tryInject(NSMutableString *s) {
            (unsigned long)tweaks.count);
 }
 
+/* Dopamine-style custom respring logo. Stamp a short-lived flag and notify
+   the app, then hold briefly so the splash is actually on screen before
+   SpringBoard is torn down. The flag is consumed on the next app launch. */
+static void ak_respringSplashPrelude(NSMutableString *s) {
+    NSString *docs = NSSearchPathForDirectoriesInDomains(
+        NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+    if (docs) {
+        NSString *path = [docs stringByAppendingPathComponent:@"lum1na_respring_splash"];
+        NSString *stamp = [NSString stringWithFormat:@"%lld\n", (long long)time(NULL)];
+        [stamp writeToFile:path atomically:YES encoding:NSUTF8StringEncoding error:NULL];
+    }
+    [[NSNotificationCenter defaultCenter] postNotificationName:@"Lum1naWillRespring" object:nil];
+    ak_log(s, @"[*] respring splash: LUM1NA plate up, 1.5 s hold");
+    usleep(1500000);
+}
+
 static void ak_tryRespring(NSMutableString *s) {
+    ak_respringSplashPrelude(s);
     NSString *jbctl = ak_findFile(@"jbctl");
     if (jbctl) {
         ak_log(s, @"[*] respring via jbctl (Dopamine 3 name: sbreload / backboardd SIGTERM)");

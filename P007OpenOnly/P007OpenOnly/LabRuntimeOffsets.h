@@ -68,6 +68,9 @@ typedef struct {
     uint32_t sel7_min_in;
     uint32_t queue_leak;
     uint32_t socket_usecount;
+    /* struct socket::so_proto. Dopamine info.c keeps 0x18 through iOS 17.3
+       and switches to 0x20 at darwin 23.4 (iOS 17.4+). 0 = 0x20. */
+    uint32_t socket_proto_off;
     uint32_t so_necp;
     uint32_t sol_socket;
     uint32_t necp_tlv;

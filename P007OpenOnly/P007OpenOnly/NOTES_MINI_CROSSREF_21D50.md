@@ -1555,3 +1555,41 @@ These describe bugs that exist on our PRE-FIX builds: 23F77 (26.5), 24A435 (27.0
   downloading to ~/Downloads/fixed_full for that.
 - Diff tooling: /tmp/kextdiff2.py (LC_FUNCTION_STARTS + capstone normalized hashes,
   similarity pairing, prints B-inserted instructions).
+
+## 2026-11-07 — rig panic root cause + KERNEL sequencer fixes (all SKUs)
+- **21D50 panic root cause (static):** `Exploit/ClearSwordCore/common.h` hardcoded
+  `CS2_KOFF_socket_proto = 0x20`. Dopamine `info.c` keeps `socket.proto = 0x18`
+  through iOS 17.3 (darwin 23.3) and only switches to `0x20` at darwin 23.4
+  (iOS 17.4+). On 21D50 the kernel_base discovery read `so_proto` at 0x20 —
+  the wrong pointer — and the walk could data-abort. Fix: the `LabOffTab` row
+  now carries `socket_proto_off` (21D50/19F77 = 0x18; 0 = 0x20) and both CS2
+  `common.h` copies use it. This is `info.c`-sourced, not a guess.
+- **18.7.1 gate was wrong:** 18.7.1 = **22H31** (2025-09-29), 18.7.2 = **22H124**
+  (2025-11-05, the CVE-2025-43520 fix). The old `22A-22G` gate skipped 22H
+  entirely, so the iPhone 11 could not use our own clearsword core. Both gates
+  now return `rev < 124` for train 22H — 22H31 fires, 22H124 skips.
+- **Order law change (12 mini / A13 / iPhone 11):** libkrw (already-jailbroken
+  provider) is asked FIRST; CS2 is the fallback. The 22528-socket spray ahead
+  of a live provider is the panic/tears-down class from the 2026-11-07 rigs.
+  `Documents/lum1na_force_cs2` flips it back to CS2-first for independence
+  testing. Debug CS2Runner no longer auto-licenses LightSword from a calib hot
+  set; `Documents/lswkrw_arm.txt` is the only arm path.
+- **A13 18.x detection:** any `iPhone12,*` on a `22*` build now maps to the
+  `A13_22G100` harness row (`LabDeviceProfile`), so the iPhone 11 on 18.7.1
+  stops falling through to `LabSkuA13_other -> LabOff()==NULL`.
+- **KERNEL taps:** per-SKU `KERNEL SELF-TEST: PASS/FAIL — missing link` line in
+  both apps; A12X now scores P010/P063 from P139 and names IOSurface p154 as
+  the next door. Auto `tryCS2/tryLibkrw` removed from hunt/17 KERNEL; auto
+  `tryLightSword` removed from A13 (LightSword only after CONFIRMED conversion).
+- **Respring logo:** `Lum1naAfterKread` writes `Documents/lum1na_respring_splash`,
+  posts `Lum1naWillRespring`, and holds 1.5 s before `jbctl respring`; the app
+  paints `UI/RespringSplash.swift` (pink→violet, four-point star) during the
+  hold and for 2.4 s on a relaunch within 10 minutes. In-app plate only —
+  a system-wide logo needs a SpringBoard dylib after injection.
+
+## Build state
+- ObjC syntax checked locally with `clang -fsyntax-only` (macOS SDK) on every
+  touched `.m`; Swift/CI gate is `Lum1na Build` on push.
+- Fixed IPSWs: full 24B119 for iPhone13,2 + iPhone18,2 in `~/Downloads/fixed_full`.
+  24A435 full IPSW is still missing (only the `.download` folder), so the
+  proper 24A435↔24B119 `ipsw diff` is the next diff step.

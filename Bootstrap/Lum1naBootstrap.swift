@@ -22,6 +22,48 @@ final class Lum1naBootstrap: ObservableObject, BootstrapCoordinator {
 
     static let shared = Lum1naBootstrap()
 
+    /// Dopamine-style custom respring logo. The C respring path writes a
+    /// timestamp flag and posts `Lum1naWillRespring` immediately before the
+    /// jbctl spawn, then holds for 1.5 s; this boolean paints the full-screen
+    /// LUM1NA splash in that window (and once after relaunch, briefly).
+    @Published private(set) var respringSplashVisible = false
+    private var respringObserver: NSObjectProtocol?
+
+    init() {
+        respringObserver = NotificationCenter.default.addObserver(
+            forName: .lum1naWillRespring, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                self?.respringSplashVisible = true
+            }
+        }
+        consumeRespringSplashFlag()
+    }
+
+    func dismissRespringSplash() {
+        respringSplashVisible = false
+    }
+
+    /// Post-respring logo: the flag is written by ak_tryRespring() just before
+    /// the real respring. Show it once if the relaunch is recent, then delete.
+    private func consumeRespringSplashFlag() {
+        let fm = FileManager.default
+        guard let docs = fm.urls(for: .documentDirectory, in: .userDomainMask).first else {
+            return
+        }
+        let url = docs.appendingPathComponent("lum1na_respring_splash")
+        guard let text = try? String(contentsOf: url, encoding: .utf8) else { return }
+        try? fm.removeItem(at: url)
+        let stamp = TimeInterval(text.split(separator: "\n").first.flatMap { Double(String($0)) } ?? 0)
+        let age = Date().timeIntervalSince1970 - stamp
+        guard stamp > 0, age >= 0, age < 600 else { return }
+        respringSplashVisible = true
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 2_400_000_000)
+            self?.respringSplashVisible = false
+        }
+    }
+
     enum Phase: String {
         case idle      = "IDLE"
         case staging   = "STAGING"
@@ -158,4 +200,10 @@ final class Lum1naBootstrap: ObservableObject, BootstrapCoordinator {
             forResource: base.deletingPathExtension,
             ofType: base.pathExtension.isEmpty ? nil : base.pathExtension)
     }
+}
+extension Notification.Name {
+    /// Posted by ak_tryRespring() in Lum1naAfterKread.m immediately before the
+    /// jbctl respring spawn. The app paints the LUM1NA respring splash inside
+    /// the deliberate 1.5 s hold (Dopamine-style custom respring logo).
+    static let lum1naWillRespring = Notification.Name("Lum1naWillRespring")
 }

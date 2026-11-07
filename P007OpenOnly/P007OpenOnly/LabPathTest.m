@@ -59,6 +59,12 @@ static int path_int_after(NSString *s, const char *key) {
             return @"PASS";
         return @"FAIL";
     }
+    if ([pathId isEqualToString:@"p063"]) {
+        if ([log containsString:@"aio"] &&
+            ([log containsString:@"kptr"] || [log containsString:@"0xffffff"]))
+            return @"PASS";
+        return @"FAIL";
+    }
     if ([pathId isEqualToString:@"p114"]) {
         int kq = path_int_after(log, "kernel_range_q");
         int nq = path_int_after(log, "nonzero_q");
@@ -246,16 +252,19 @@ static int path_int_after(NSString *s, const char *key) {
     L(@"=== RUN kread32 GATE ===");
     if ((sku == LabSkuA14_21D50 || sku == LabSkuA13_22G100) &&
         ![P007Board shared].hasKread) {
-        L(@"[*] 12 mini / A13: CS2 then libkrw before kreadtest");
-        NSString *cs = nil;
-        @try { cs = [CS2Runner runUpstream]; }
-        @catch (NSException *e) { L([NSString stringWithFormat:@"[-] cs2 %@", e.name]); }
+        L(@"[*] 12 mini / A13: libkrw first, CS2 fallback (train-gated) before kreadtest");
+        bool armed = P007LaneArmBoard();
+        L([NSString stringWithFormat:@"[*] libkrw P007LaneArmBoard %@",
+           armed ? @"YES (provider lane live)" : @"miss (no provider)"]);
         if (![P007Board shared].hasKread) {
-            bool armed = P007LaneArmBoard();
-            L([NSString stringWithFormat:@"[*] libkrw P007LaneArmBoard %@",
-               armed ? @"YES" : @"miss"]);
+            NSString *cs = nil;
+            @try { cs = [CS2Runner runUpstream]; }
+            @catch (NSException *e) { L([NSString stringWithFormat:@"[-] cs2 %@", e.name]); }
+            if (cs.length) {
+                NSUInteger n = cs.length > 240 ? 240 : cs.length;
+                L([cs substringToIndex:n]);
+            }
         }
-        (void)cs;
     }
     NSString *kt = nil;
     @try { kt = [P007Board tapKreadTest]; }

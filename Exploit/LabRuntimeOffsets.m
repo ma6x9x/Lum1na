@@ -228,8 +228,9 @@ static LabOffTab gA12X_23H30 = {
    007004000 — arm64e fileset base proven on 22G100 + 23F77; on-device
    confirm = kbase minus static_base page-aligned) + info.c ladder
    socket_usecount (18.7.x = darwin 24.x -> 0x254). Every VA 0 = unproven:
-   T8010 needs its own Ghidra pass; cs2core gate honest-skips 22H (43520
-   patched in exactly 18.7.2). Read/write here comes from libkrw only. */
+   T8010 needs its own Ghidra pass; cs2core gate is 22H rev-specific —
+   22H31 (18.7.1) is pre-fix and viable, 22H124 (18.7.2) is patched.
+   Read/write here comes from libkrw only. */
 static LabOffTab gXR_22H = {
     .tag = "XR_22H311",
     .static_base = 0xFFFFFFF007004000ULL,   /* link base; verify slide on device */
@@ -257,6 +258,7 @@ static LabOffTab gA14_21D50 = {
     .tag = "A14_21D50",
     .static_base = 0xFFFFFFF007004000ULL,   /* link base; verify slide on device */
     .socket_usecount = 0x24c,               /* info.c ladder darwin>=23.1,<23.4 (17.3 = 23.3.0) */
+    .socket_proto_off = 0x18,               /* info.c default through 17.3; 0x20 only at 23.4+ */
     .iosurface_md = 0x40,                   /* ladder: pre-23.4 layout (23.4+ is 0x30) */
     .amfi_sel_copy = 0,                     /* unproven — pokes skipped */
     .amfi_sel_manifest = 0,                 /* unproven — pokes skipped */
@@ -290,6 +292,7 @@ static LabOffTab gA13_19F77 = {
     .tag = "A13_19F77",
     .static_base = 0xFFFFFFF007004000ULL,
     .socket_usecount = 0x228,
+    .socket_proto_off = 0x18,               /* darwin-21 branch (iOS 15.x) */
     .amfi_sel_copy = 0,
     .amfi_sel_manifest = 0,
     .pmap_cs_allow_off = 0,
