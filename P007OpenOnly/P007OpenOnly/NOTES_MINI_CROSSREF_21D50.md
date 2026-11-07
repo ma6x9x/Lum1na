@@ -1471,3 +1471,32 @@ door/stride laws; the p110 claim rows.
   v3 sends a mach_exception_raise_state reply (KERN_SUCCESS, same flavor/count/state) before
   terminating the worker and absorbs a repeat fault. PHASE 2 (suspend/get_state) is the
   measurement that settles the witness channel.
+
+## 2026-11-07 — corpus sweep: A12X / usbliter8 / Momentarius / Dopamine (decision record)
+- **iPad identity**: iPad8,7 = A12X = **T8027, CPID 0x8027**; current build **23H30 = 26.7.1**
+  (Darwin 25.6.0). `A12X_23G71` pins are stale; **p017 is forbidden** (2026-10-21 wedge,
+  note 256). "T8020" is the XR's A12 — never iPad8,7/T8020.
+- **Momentarius (local Dopamine 3.0.12 source, `Exploits/momentarius/`)**: `exploit_init` uses
+  `proc_self`/`proc_find(0)`/`kread64`/`kread_ptr`/`koffsetof`/`map_phys_data`, then installs
+  `gPrimitives.physwritebuf = momentarius_pplwrite_buf`. It **requires kreadbuf/kwritebuf to
+  exist first** — it is a PPL-on-KRW layer, not a KRW or JB primitive. CPU gates:
+  `CPUFAMILY_ARM_VORTEX_TEMPEST` (A12/X/Z) and `LIGHTNING_THUNDER` (A13); no A14/A19.
+  Info.plist type=PPL, End **26.0.1**. It cannot start on our targets (no kread/kwrite).
+- **Public Dopamine 26**: A12/A13 **26.0–26.0.1 only**; 26.6/26.7 patched. ClearSword/DarkSword
+  hop CVE-2025-43520 fixed in 26.1, and the same contig-UPL hop is dead on 23F77 (26.5).
+  Do not bump Info.plist End — it only runs a patched primitive.
+- **Old A12X usbliter8 port (state)**: `~/Downloads/exploit_t8027_snippet.c` wires CPID 0x8027
+  with HYP offsets (ov_start 0x19C02960C, ov_size 0xB04, new_sp 0x19C028BC0, shc_base
+  0x19C018000, usb_req_handler_cb 0x19C01048); success criterion = **PWND only**;
+  demote / PLATFORM_SET_REMOTE_BOOT / handle_usb_req / jump_away remain TODO. SecureROM dump
+  `SecureROM for t8027si, iBoot-4172.0.0.100.14` (160 KB) is on disk; Pico2/waveshare RP2350
+  UF2s are on disk. The local usbliter8 tree has **no 0x8027 case and no offsets.experimental.h**;
+  upstream README explicitly excludes A12X/Z. The port is early-stage, not integrated.
+- **Read-half lead for the phones**: note 282 **T020 stale-UPL physrw** (designed 2026-08-19,
+  never executed) — GPU holds a stale UPL → physical read of freed pages → kernel_pmap+0x8 ttep
+  → PPL. Owed per build: kernel_pmap VA, 0x82 UC-type law, wire/prepare/detach/replace rows.
+  This is more directly useful to KRW than Momentarius.
+- **Decision**: the iPad stays as the **usbliter8 T8027 bench** (bootrom is iOS-independent)
+  only while the port is active; it is not a Dopamine/Momentarius target on 26.7.1. On the
+  phones, T020 (read) outranks Momentarius (post-KRW PPL). Momentarius mining is still useful
+  for the post-KRW PPL layer and for comparing with Titan, but it cannot unblock KRW.
