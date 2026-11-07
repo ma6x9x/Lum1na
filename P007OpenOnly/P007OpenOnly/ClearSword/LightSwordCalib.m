@@ -381,7 +381,7 @@ static CFNumberRef RCNUM(int64_t v) {
                bands (0xfffffff0 = 26.x/23F77, 0xfffffe00 = 24A-band) — then
                walk +/-4 pages in this map hunting the pointer-bearing page.
                THE KPTR ROW HERE = the receipt-class lane on REAL calib hits. */
-            if (c == C_WRONG || c == C_FOREIGN) {
+            if (c == C_WRONG || c == C_FOREIGN || c == C_PARTIAL) {
                 static uint64_t calibAim = 0;
                 if (calibAim++ < 12) {
                     uint64_t kptrs[8] = {0}; int kn = 0, cont = 0, zro = 0;
@@ -396,6 +396,7 @@ static CFNumberRef RCNUM(int64_t v) {
                         cont++;
                     }
                     rc_log("  AIM %s: content-qwords=%llu zero=%llu KPTR=%llu%s",
+                           c == C_PARTIAL ? "PARTIAL" : (c == C_WRONG ? "WRONG" : "FOREIGN"),
                            c == C_WRONG ? "WRONG" : "FOREIGN",
                            (unsigned long long)cont, (unsigned long long)zro,
                            (unsigned long long)kn, kn ? "  <-- POINTERS" : "");
@@ -404,7 +405,7 @@ static CFNumberRef RCNUM(int64_t v) {
                     /* the +/-4-page walk in THIS map */
                     for (int st = 1; st <= 4 && kn == 0; st++) {
                         uint8_t wb[sizeof(rbBuf)];
-                        ssize_t wn = pread(fdMark, wb, sizeof(wb), 0x4000 + (off_t)st * 0x4000);
+                        ssize_t wn = pread(fdMark, wb, sizeof(wb), 0x4000 + (off_t)st * (off_t)vm_page_size);
                         if (wn < 8) break;
                         uint64_t *wq8 = (uint64_t *)wb;
                         int wkn = 0, wcont = 0; uint64_t wfirst = 0;
