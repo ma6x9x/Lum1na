@@ -48,8 +48,21 @@
         pb, NSSelectorFromString(@"string")) : nil;
 }
 
+/// v5.1: file knobs first, pasteboard second. Write the same key=value text to
+/// Documents/p151_knobs.txt and no paste prompt is involved at all.
++ (NSString *)knobsFileText {
+    NSArray<NSString *> *dirs = NSSearchPathForDirectoriesInDomains(
+        NSDocumentDirectory, NSUserDomainMask, YES);
+    NSString *docs = dirs.count ? dirs.firstObject : nil;
+    if (!docs) return nil;
+    return [NSString stringWithContentsOfFile:
+        [docs stringByAppendingPathComponent:@"p151_knobs.txt"]
+        encoding:NSUTF8StringEncoding error:NULL];
+}
+
 + (uint32_t)knobUInt:(NSString *)key def:(uint32_t)d {
-    NSString *pbs = [self pasteboardString];
+    NSString *fileText = [self knobsFileText];
+    NSString *pbs = fileText.length ? fileText : [self pasteboardString];
     if (!pbs.length) return d;
     NSString *needle = [key stringByAppendingString:@"="];
     NSRange mk = [pbs rangeOfString:needle];
@@ -200,9 +213,13 @@
 
 + (NSString *)tap {
     NSMutableString *out = [NSMutableString string];
-    [out appendFormat:@"=== p151 session %@ BUILD p151-ane-deviceopen-v5-typesweep ===\n",
+    [out appendFormat:@"=== p151 session %@ BUILD p151-ane-deviceopen-v5.1-knobs ===\n",
         LabLocalMilitaryNow()];
     [out appendString:[LabDeviceProfile identBlock]];
+
+    [out appendFormat:@"  [knobsrc] %@\n",
+        [self knobsFileText].length ? @"Documents/p151_knobs.txt"
+                                    : @"pasteboard (prompt only when content exists)"];
 
     NSString *therm = @"?";
     switch (NSProcessInfo.processInfo.thermalState) {
