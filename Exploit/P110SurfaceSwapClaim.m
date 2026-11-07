@@ -107,7 +107,7 @@ static void p110_flushCB(void *r, void *e, OSStatus st, VTEncodeInfoFlags f, CMS
 #import <IOKit/IOKitLib.h>       /* dlsym'd calls still; only the UC types  */
 #import <sys/qos.h>
 
-#define P110_BUILD      @"p110-swapclaim-v3.9-wakestatus"
+#define P110_BUILD      @"p110-swapclaim-v4.0-cleanprops"
 #define P110_GROOM_KDATA 0x1000        /* the groom kmsg's kdata size       */
 #define P110_ROUNDS     64
 #define P110_PREFILL_MAX  8     /* bandit arm room: prefill 6 (default) vs 8 */
@@ -708,10 +708,8 @@ static BOOL p110_leak_capture(NSString *tag, BOOL print, P110LeakSnap *snap) {
                    VTCompressionSession may REJECT it (the -12900 class) and
                    then never complete a frame. Log every property status;
                    drop RCMode when it errors. */
-                OSStatus wStRC = VTSessionSetProperty(ws, (__bridge CFStringRef)@"RCMode",
-                                     (__bridge CFTypeRef)[NSNumber numberWithInt:20]);
-                OSStatus wStHW = VTSessionSetProperty(ws, (__bridge CFStringRef)@"EnableHardwareAcceleratedVideoEncoder",
-                                     (__bridge CFTypeRef)@YES);
+                OSStatus wStRC = -9999;   /* v4.0 DROPPED (v3.9 measured -12900) */
+                OSStatus wStHW = -9999;   /* v4.0 DROPPED (v3.9 measured -12900) */
                 OSStatus wStRT = VTSessionSetProperty(ws, kVTCompressionPropertyKey_RealTime,
                                      kCFBooleanTrue);
                 OSStatus wprep = VTCompressionSessionPrepareToEncodeFrames(ws);
