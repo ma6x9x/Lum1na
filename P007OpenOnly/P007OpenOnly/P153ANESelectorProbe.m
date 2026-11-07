@@ -152,7 +152,7 @@
         LabLocalMilitaryNow()];
     [out appendString:[LabDeviceProfile identBlock]];
 
-    uint32_t pid = [self knobUInt:@"p153_pid" def:(uint32_t)getpid()];
+    uint32_t pid = [self knobUInt:@"p153_pid" def:0];
     uint32_t t1 = [self knobUInt:@"p153_t1" def:1];
     uint32_t t4 = [self knobUInt:@"p153_t4" def:1];
     uint32_t doSend = [self knobUInt:@"p153_send" def:0];

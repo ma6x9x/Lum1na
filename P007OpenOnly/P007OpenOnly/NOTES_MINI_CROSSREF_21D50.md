@@ -1415,3 +1415,29 @@ door/stride laws; the p110 claim rows.
   p150 adds H1xANELoadBalancer and sweeps types 0..5; p153 gained p153_svc /
   p153_send_size (0x948|0xd88) / p153_map_size (0x2008|0x828) / p153_dev_size and uses
   IOConnectCallAsyncMethod with 8 async refs for sel2.
+
+## 2026-11-07 14:09-15:09 — app logs pulled over AFC from the 17 (24A435)
+- AFC access: `afcclient -u <udid> --container ma6x9x.P007OpenOnly.GLVKP6RZ39`
+  (`--documents` root gave Permission denied; `--container` + `ls Documents` works).
+  Logs live in Documents and Documents/cinder; the cinder aggregate (`cinder_lab_log.txt`)
+  carries per-tap full output for probes with no dedicated file (p150/p151/p153).
+- **p044 v75.2-inlineopen on the 17 at 14:42 fired the v63 chosen write**: census target
+  sid=279 (16384 B), foreign-lane `target=279 use 0->0 diff=512/16384`, word map 0x0000..0x00fc
+  all `00000000 -> 5eaf5eaf`. So the `_ANEClient doEvaluateDirectWithModel` foreign-surface
+  chosen-content write is **live on 24A435 too** (correction to the "17 has no live write"
+  summary; the 24A435 *prewire* is in-bounds, but the framework consumer path still writes).
+  The prediction itself reports FAILED; the write lands via the consumer cold path.
+- NEON on the 17: all 32 witnesses READ FAIL kr=0x90000003 / alt 0x10000003 (dead ports),
+  same as the 12 — the oracle is dead on both.
+- **p109 selsweep on 17 at 14:54**: H11ANEIn all types 2c7; H1xANELoadBalancer type 1 opened
+  (conn 0x1e25b); sels 0..213 swept with struct 0x200/0x400/0x800 ALL return 2c2 — those sizes
+  match none of the per-selector contracts (0x88 open, 0xd88 send, 0x2008/0x828 map), so the
+  sweep is uninformative; the Stage-B pid premise in its banner is the falsified theory.
+- **p153 v1 on 17 at 14:52**: default svc=H11ANEIn -> types 1/4 both 2c7, opens=0.
+  The 17 needs `p153_svc=H1xANELoadBalancer p153_send_size=0xd88 p153_map_size=0x828`.
+  Also v1 still defaulted pid=getpid and would write it at +0; fixed to default 0 (the +0
+  qword is the program-handle key and must be 0 for the out[0]==0 success branch).
+- p099 fired at 14:57 then the app aborted: `malloc` "pointer being freed was not allocated"
+  in p099_send_msg (probe bug, userland; one tap per force-quit respected).
+- Panic correlation: the two 24A435 panics today (10:27, 14:46) are AVE2 stale-slot in
+  videocodecd, unrelated to the ANE probes; 01:15 forceReset = btn_rst.
