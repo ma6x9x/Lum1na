@@ -158,6 +158,7 @@
     uint32_t doSend = [self knobUInt:@"p153_send" def:0];
     uint32_t doMap = [self knobUInt:@"p153_map" def:0];
     uint32_t doCreate = [self knobUInt:@"p153_create" def:0];
+    uint32_t force = [self knobUInt:@"p153_force" def:0];
     uint32_t inCnt = [self knobUInt:@"p153_in_count" def:0];
     uint32_t outCnt = [self knobUInt:@"p153_out_count" def:0];
     uint32_t offIn = [self knobUInt:@"p153_off_in" def:0x1c];
@@ -173,10 +174,10 @@
     if (devSz < 0x40 || devSz > 0x200) devSz = is23 ? 0x68 : 0x88;
     if (mapSz < 0x828) mapSz = 0x828;
 
-    [out appendFormat:@"  [knobs] pid=%u svc=%@ types=%u/%u send=%u map=%u create=%u "
+    [out appendFormat:@"  [knobs] pid=%u svc=%@ types=%u/%u send=%u map=%u create=%u force=%u "
                        @"counts=%u/%u offs=0x%x/0x%x sizes send=0x%x map=0x%x dev=0x%x "
                        @"create=0x%x/0x%x\n",
-        pid, svc, t1, t4, doSend, doMap, doCreate, inCnt, outCnt, offIn, offOut,
+        pid, svc, t1, t4, doSend, doMap, doCreate, force, inCnt, outCnt, offIn, offOut,
         sendSz, mapSz, devSz, createSz, createMagic];
     if (doSend || doMap || doCreate)
         [out appendString:@"  [PANIC-POSSIBLE] map/create/send enabled: one tap, fresh boot\n"];
@@ -216,7 +217,7 @@
             : (isDP && isUC ? @"ambiguous (both shapes accepted)"
                             : @"unidentified (both 2c2)")];
 
-        if (doMap && isDP) {
+        if (doMap && (isDP || force)) {
             uint8_t *map = calloc(1, mapSz);
             uint64_t scalars[1] = {1};
             uint64_t mout = 0;
@@ -228,10 +229,10 @@
                 mapSz, mkr, (unsigned long long)mout];
             free(map);
         }
-        if (doMap && !isDP)
+        if (doMap && !isDP && !force)
             [out appendString:@"      sel5 map skipped (not DirectPath class)\n"];
 
-        if (doCreate && isUC) {
+        if (doCreate && (isUC || force)) {
             uint8_t cr[0x20]; memset(cr, 0, sizeof(cr));
             uint64_t sz = createSz, magic = createMagic;
             memcpy(cr + 0x08, &sz, 8);
@@ -242,7 +243,7 @@
                                                           cb, &cosz);
             [self logKr:out tag:@"sel3 ProgramCreate (size/magic)" kr:ckr out:cb osz:cosz];
         }
-        if (doCreate && !isUC)
+        if (doCreate && !isUC && !force)
             [out appendString:@"      sel3 create skipped (not UserClient class)\n"];
 
         if (doSend) {

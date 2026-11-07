@@ -29,6 +29,7 @@ NS_ASSUME_NONNULL_BEGIN
 ///   p153_send=0|1              async sel2 reach test (zero counts)
 ///   p153_map=0|1               sel5 MemoryMapRequest (DP class)
 ///   p153_create=0|1            sel3 ProgramCreate 0x20 (UC class)
+///   p153_force=0|1             run map/create even when class-ID is inconclusive
 ///   p153_in_count / p153_out_count / p153_off_in=0x1c / p153_off_out=0x51c
 ///   p153_send_size=0x948 (23F77) | 0xd88 (24A435)
 ///   p153_map_size=0x2008 (23F77) | 0x828 (24A435)
