@@ -9,8 +9,22 @@
 
 #import <mach/mach.h>
 #import <mach/mach_port.h>
+#import <dlfcn.h>
 
 #include <unistd.h>
+
+/* The iOS SDK does not always expose the MIG prototype; P140 resolves the
+   same routine with dlsym. Signature matches mach/mach_port.h. */
+typedef kern_return_t (*lp_kobject_fn)(ipc_space_t, mach_port_name_t,
+                                       mach_port_type_t *, mach_vm_address_t *);
+static lp_kobject_fn lp_kobject(void) {
+    static lp_kobject_fn fn;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        fn = (lp_kobject_fn)dlsym(RTLD_DEFAULT, "mach_port_kobject");
+    });
+    return fn;
+}
 
 /* task->map is stable at 0x28 across the iOS 15/16/17/18 ladders
    (Dopamine info.c task.map = 0x28). Used only to sanity-check that the
@@ -40,8 +54,13 @@ uint64_t Lum1naFindSelfProc(uint32_t pid, uint32_t pidOff, uint32_t procRoOff,
 
     mach_port_type_t ptype = 0;
     mach_vm_address_t kobj = 0;
-    kern_return_t kr = mach_port_kobject(mach_task_self(), mach_task_self(),
-                                         &ptype, &kobj);
+    lp_kobject_fn kobj_fn = lp_kobject();
+    if (!kobj_fn) {
+        if (how) *how = @"mach_port_kobject symbol missing";
+        return 0;
+    }
+    kern_return_t kr = kobj_fn(mach_task_self(), mach_task_self(),
+                               &ptype, &kobj);
     if (kr != KERN_SUCCESS || !kobj) {
         if (how) *how = [NSString stringWithFormat:
             @"mach_port_kobject refused (kr=0x%x type=0x%x)", kr, ptype];
