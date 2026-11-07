@@ -1311,3 +1311,15 @@ door/stride laws; the p110 claim rows.
 - **cm.fdleak.boundary (CVE-2026-112706)** = the honest sandbox map re-attested (13 refused, 1
   openable = .GlobalPreferences; the p116-family law holds).
 - HONESTY: all = disclosure/race CANDIDATE classes; hasKread stays NO until a kread32 receipt.
+
+## 2026-11-07 01:00 EST — the 12's post-p130 INSTANT panic (the co-driver receipt, pending the .ips)
+- The sequence: the 20:57 p130 = clean in-tap (fence churn 1540 commits, 0 fails) + the 254-fill
+  3x pre-marshal rejects (dirty ANE) — then MINUTES LATER the device PANICS; the user rebooted and
+  re-fired p130+p073 FRESH (21:00:09) = another INSTANT panic. Two timing receipts within 3 minutes
+  on the same co-driver pair.
+- The predicted classes (in decode order once the .ips lands): (a) the fence-append corrupt-count
+  window = PC in the 0x984fa-0x985cb band (the 2/2 abort class catching the co-driver pair);
+  (b) [data.kalloc.3072] MAF = the fill's write into a free element; (c) anything OOL/desc = the
+  conversion itself. The 12's fresh-boot p130 = the first FRESH-ANE co-driver fire of the campaign.
+- The .ips = sync-pending (not yet in ~/Downloads / CloudDocs at decode time); the moment it
+  arrives = the panic_decode pass + the law-row.
