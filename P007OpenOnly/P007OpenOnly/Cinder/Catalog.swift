@@ -242,7 +242,7 @@ enum Catalog {
             cve: "—",
             component: "Lum1na · crash-log auto-scan",
             primitive: .probe,
-            reach: .sandbox,
+            reach: .inProcess,
             tier: 3,
             summaryZh: "自容器的所有崩溃报告逐个以 stale-slot 签名（lr-pc==0x115F3C，x0==0x59）分类；内核 panic-full 仍为沙盒拒绝，Mac 端处理。",
             notesZh: "规则分类器（非 ML）；结果写入 learn；跨启动去重。",
