@@ -1255,3 +1255,16 @@ door/stride laws; the p110 claim rows.
 - The p110 ips 193506 = the client (b) (p110 v2.9's leak-on: QueueCreate 2c2 tags-verdict + the
   t8150 law 2bf engine-asleep — the pairing HELD and the class ran clean 64 rounds; (b) at the end).
 - ANECompilerService diskwrites = the established noise class (compiler cache), not a kernel abort.
+
+## 2026-11-06 — the 11-03/11-04 corpus batch DECODED (13 panics): the stale-slot SIG = 9 MORE receipts; 3 MAFs; 2 odd
+- **9 more STALE-SLOT SIGNATURE panics** (delta law lr−pc = 0x115F3C, x0 = 0x59 EVERY one:
+  072610, 134527, 134831, 134751→134951, panic-base-134736, 100339, 100451, 135503, + the
+  192212 from tonight = **THE REPRO CORPUS: 11 byte-identical receipts on 24A435**, different
+  slides every boot — the panic is slide-independent and deterministic by construction.
+- **3 = the GZ "element modified after free" MAF class** (135503/134910/083959):
+  `[data.kalloc.3072] element modified after free (off:0, val:0x000000c00000026a/0x211/0x16a …)`
+  = the 43748-fill's record shape captured mid-fire by the GZ guard — the same class that generated
+  the operator rule; these = the 11-03 fire-era receipts. The val's payload = the record stream
+  {surfaceId-class 0xc0N …} = the fill's write shape, again byte-verified from the kernel side.
+- **2 OTHER** (091118/091246/091453 class): pc/lr deltas WILD (garbage lr bands), x0 = userspace-class
+  values — DECODE-OWED (full panic strings + the GZ/driver table law needed; do not classify).
