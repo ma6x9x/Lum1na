@@ -27,6 +27,11 @@ NS_ASSUME_NONNULL_BEGIN
 /// All 2f0 = the kernel still cannot resolve the pid (wrong offset, or the
 /// pid's task is gone). 2c2 = struct size wrong. 2e2 = entitlement refuse.
 + (NSString *)tap;
+
+/// v5: called from p044 IMMEDIATELY after the direct evaluate, when the ANE
+/// is actually powered. Opens H11ANEIn/H1xANELoadBalancer type 1 and calls
+/// sel0 DeviceOpen with getpid; returns the log rows. No send request.
++ (NSString *)probeInline;
 @end
 
 NS_ASSUME_NONNULL_END

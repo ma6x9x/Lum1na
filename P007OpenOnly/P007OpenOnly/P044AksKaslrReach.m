@@ -140,6 +140,7 @@
 
 #import <Foundation/Foundation.h>
 #import <CoreML/CoreML.h>
+#import "P151ANEDeviceOpen.h"
 #import <AVFoundation/AVAudioEngine.h>
 #import <AVFoundation/AVAudioMixerNode.h>
 #import <AVFoundation/AVAudioPlayerNode.h>
@@ -164,7 +165,7 @@ extern int proc_name(int pid, void *buffer, uint32_t buffersize);
 #import <math.h>
 #import <objc/message.h>
 
-#define P044_BUILD @"p044-v75.1-neonread"
+#define P044_BUILD @"p044-v75.2-inlineopen"
 
 #define INPUT_COUNT 191
 /* v73: P034 class. kdata = msgh_size + 0x24. ANE table view is 0x820.
@@ -3470,6 +3471,13 @@ static void *watch_worker(void *arg) {
         [out appendString:@"  _ANEClient lane unavailable — falling back to CoreML 191 predict (ids[] neutered)\n"];
         fireMode = @"coreml-fallback";
     }
+
+    /* v75.2: INLINE DirectPath DeviceOpen immediately after the evaluate.
+       This is the only moment the ANE is actually powered (the direct
+       evaluate engaged it); p151's CPU-model wake could not power it. */
+    [out appendString:@"\n=== PHASE 5d: INLINE DirectPath DeviceOpen (post-evaluate) ===\n"];
+    [out appendString:[P151ANEDeviceOpen probeInline]];
+    p044_write_log(out);
     if ([fireMode isEqual:@"coreml-fallback"]) {
     if (!model) {
         [out appendString:@"  model A absent (MIL lane) — CoreML fallback predict skipped; "

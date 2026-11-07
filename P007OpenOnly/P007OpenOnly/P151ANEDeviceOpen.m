@@ -113,6 +113,35 @@
     return pred != nil;
 }
 
++ (NSString *)probeInline {
+    NSMutableString *o = [NSMutableString string];
+    uint32_t pid = (uint32_t)getpid();
+    NSArray<NSString *> *svcs = @[@"H11ANEIn", @"H1xANELoadBalancer"];
+    for (NSString *svcName in svcs) {
+        kern_return_t okr = 0;
+        io_connect_t conn = [self openType1:svcName.UTF8String kr:&okr];
+        [o appendFormat:@"  [inline] open %@ type=1 kr=0x%x\n", svcName, okr];
+        if (!conn) continue;
+        uint8_t in[0x68];
+        uint8_t ob[0x68];
+        memset(in, 0, sizeof(in));
+        memset(ob, 0, sizeof(ob));
+        uint32_t p = pid;
+        memcpy(in, &p, sizeof(p));
+        size_t outSz = sizeof(ob);
+        kern_return_t kr = IOConnectCallStructMethod(conn, 0, in, sizeof(in),
+                                                     ob, &outSz);
+        const char *why = "";
+        if (kr == 0) why = "  <-- DEVICEOPEN OK";
+        else if (kr == 0xe00002e3) why = "  (NoPower)";
+        else if (kr == 0xe00002f0) why = "  (NotFound)";
+        [o appendFormat:@"    [inline sel0 pid=%u] kr=0x%x%s\n", pid, kr, why];
+        { uint32_t sc = 0; IOConnectCallScalarMethod(conn, 1, NULL, 0, NULL, &sc); }
+        IOServiceClose(conn);
+    }
+    return o;
+}
+
 + (NSString *)tap {
     NSMutableString *out = [NSMutableString string];
     [out appendFormat:@"=== p151 session %@ BUILD p151-ane-deviceopen-v4-wake ===\n",
