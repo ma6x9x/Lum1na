@@ -151,7 +151,7 @@ ctx.arm("cm.fdleak", "handshake + vend")
                             } else if txt.contains("element modified after free") {
                                 cls = "GZ-MAF (the 43748 fill class)"
                             }
-                            lines.append("  PANIC-RDR \(newest) bytes=\(panData?.count ?? 0) -> \(cls)")
+                            lines.append("  PANIC-RDR \(newest) bytes=\(panData.count) -> \(cls)")
                             if cls.contains("STALE-SLOT") {
                                 lines.append("  --- THE AUTO-SCAN PATH WORKS THROUGH THE DAEMON")
                             }
