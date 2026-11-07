@@ -102,7 +102,6 @@ enum ChainPlan {
                    moduleIDs: ["tool.ipa", "tool.zip", "tool.hex", "tool.macho", "tool.paths"],
                    unlock: tl("自检全绿意味着工具链本身可信 —— 此后出现的问题是选择问题，不是工具问题。")),
     ]
-    ]
 
     static func modules(for stage: ChainStage) -> [ExploitModule] {
         stage.moduleIDs.compactMap { Catalog.byID[$0] }
