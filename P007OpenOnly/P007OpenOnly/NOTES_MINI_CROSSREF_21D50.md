@@ -1352,3 +1352,30 @@ door/stride laws; the p110 claim rows.
   23F77 (addchain-254 inference reject is procIdx-independent; passthrough compile fails at
   200 live 16KB inputs). The intended bypass = direct-path sel2 ProgramSendRequest, gated on
   a working DeviceOpen.
+
+## 2026-11-07 (day) — 23F77 ANE UC class map + selector tables (capstone, static)
+- Five UC classes built in one init `0x8757c18` (metaclass globals 0xa9de918/940/968/990/9b8):
+  `ANEClientInterface`, `H11ANEInUserClient`, `H11ANEInDirectPathClient`,
+  `H1xANELoadBalancerClient`, `H1xANELoadBalancerDirectPathClient` (0xe0-byte instances).
+- Class -> dispatch table proven by adjacency (slot at meta_vtable-0x20, encoding 0x80415d9d|low32):
+  - **H11ANEInUserClient -> table1 0x7cbfa30, 17 sels** (externalMethod 0x875791c, w4=0x11):
+    0 DeviceOpen(0x68/0x68) 1 DeviceClose 2 SendRequest(1 sc + 0x948/0x28)
+    3 **ProgramCreate**(0x20) 4 ProgramPrepare(0x38/0x38) 5 ProgramUnprepare 6 ProgramDestroy
+    7 GetStatus(0/0x20); sels 8..0x10 not yet decoded (p104 census saw 10/11/14/16 ungated).
+  - **H11ANEInDirectPathClient -> table2 0x7cbfcd8, 9 sels** (externalMethod 0x8757af0, w4=9):
+    0 DeviceOpen 1 DeviceClose 2 SendRequest(async, 1 sc + 0x948/0x28)
+    3 OutputSetEnqueue(0x28) 4 InputsReady(0x200c) 5 **MemoryMapRequest**(1 sc + 0x2008, 1 sc out)
+    6 MemoryUnMapRequest(0x2008) 7 SessionHintRequest(0x10/0x18) 8 unknown.
+  - LB pair mirrors it (table1 0x7cbfa30 slot @0x7cbf2f0, table2 0x7cbfcd8 @0x7cbf978).
+- **ProgramCreate (UserClient sel3)** handler 0x87582d0 requires the 0x20 struct to have
+  `[+8]==0xd88` and `[+0x18]==0x000ac738`, else `0xe00002c2`; callee 0x8753574 allocates a
+  fixed **0xd88** buffer (x0=struct[0], w2=0x20003) -> this is the ANE firmware program load,
+  i.e. the daemon/interface path, not an app model. 23F77 create gate callee = `return 1` (open).
+- **DeviceOpen registration law (static)**: ANE_DeviceOpen 0x8752524 -> provider vtable+0x558
+  = ANE_AddClientForProgram_gated 0x86f3624 -> helper 0x86ef7d0 scans `[self+0xe0]`
+  (count vtable+0x90, element vtable+0x118) and matches the **UC object pointer**; failure =
+  `0xe00002f0` "Client %p not found". No pid. The 2f0 is a list-membership gate; which selector
+  populates that list is still OPEN (candidate: the DirectPath MemoryMapRequest/InputsReady path).
+- p153 built: class-ID by sel7 shape (UC 0/0x20 vs DP 0x10/0x18), optional async sel2 reach
+  with zero counts (cannot OOB), optional sel5 map / sel3 create; DeviceOpen re-check after.
+  PANIC-POSSIBLE only with send/map/create enabled; one tap per force-quit.

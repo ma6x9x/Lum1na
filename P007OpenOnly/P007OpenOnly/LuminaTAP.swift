@@ -582,6 +582,8 @@ enum LuminaTAP {
             result = P151ANEDeviceOpen.tap()
         case "p152", "iosurfgate":
             result = P152IOSurfaceLookupGate.tap()
+        case "p153", "anesel":
+            result = P153ANESelectorProbe.tap()
         case "p099", "anegroom":
             result = hunt12MafBanner(id) + P099AnePrewireGroom.tap()
             if result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
