@@ -107,7 +107,7 @@ static void p110_flushCB(void *r, void *e, OSStatus st, VTEncodeInfoFlags f, CMS
 #import <IOKit/IOKitLib.h>       /* dlsym'd calls still; only the UC types  */
 #import <sys/qos.h>
 
-#define P110_BUILD      @"p110-swapclaim-v3.6-fgroom"
+#define P110_BUILD      @"p110-swapclaim-v3.7-fgroomdelta"
 #define P110_GROOM_KDATA 0x1000        /* the groom kmsg's kdata size       */
 #define P110_ROUNDS     64
 #define P110_PREFILL_MAX  8     /* bandit arm room: prefill 6 (default) vs 8 */
@@ -264,6 +264,7 @@ static uint64_t g_p110_groom_q = 0;
 static int      g_p110_groom_n = 48;
 static mach_port_t g_p110_groom_port = MACH_PORT_NULL;
 static atomic_int g_p110_groom_fired;
+static int g_groomPrev;   /* v3.7 per-round delta (tap-local) */
 static int  g_p110_prefillN = P110_PREFILL_DEF;
 static BOOL g_p110_dialBase0;                 /* arms 0/3: the dial stays 0  */
 static BOOL g_p110_popEarly;                  /* arm 3: +2 pop pre-window    */
@@ -1344,13 +1345,17 @@ static NSString *p110_flags_law(void) {
                                  : @"n/a (no prior victim this round)",
            g_pop_sid[0], g_pop_sid[1]);
 
-        /* v3.6 FGROOM round row: what the reclaim window actually did. */
+        /* v3.6 FGROOM round row: what the reclaim window actually did.
+           v3.7: this-round delta + cumulative total (the v3.6 row printed
+           the cumulative counter against the per-round count). */
         if (g_p110_groom) {
-            Lf(@"[fgroom r%d] fired=%d/%d qword=0x%016llx — if a groom kmsg "
-               @"took the freed slot, the stale +0x30 read saw OUR qword "
-               @"(conversion receipt = (c)-anomaly ON groomed rounds)",
-               r, atomic_load(&g_p110_groom_fired), g_p110_groom_n,
+            int gNow = atomic_load(&g_p110_groom_fired);
+            Lf(@"[fgroom r%d] fired this round=%d/%d total=%d qword=0x%016llx "
+               @"— if a groom kmsg took the freed slot, the stale +0x30 read "
+               @"saw OUR qword (conversion receipt = (c)-anomaly ON groomed rounds)",
+               r, gNow - g_groomPrev, g_p110_groom_n, gNow,
                g_p110_groom_q);
+            g_groomPrev = gNow;
         }
 
         /* ---- post-round evidence pass (design §4 per-round print law) ---- */
