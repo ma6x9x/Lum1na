@@ -65,9 +65,19 @@
 
 + (NSString *)tap {
     NSMutableString *out = [NSMutableString string];
-    [out appendFormat:@"=== p151 session %@ BUILD p151-ane-deviceopen-v1 ===\n",
+    [out appendFormat:@"=== p151 session %@ BUILD p151-ane-deviceopen-v2 ===\n",
         LabLocalMilitaryNow()];
     [out appendString:[LabDeviceProfile identBlock]];
+
+    NSString *therm = @"?";
+    switch (NSProcessInfo.processInfo.thermalState) {
+        case NSProcessInfoThermalStateNominal: therm = @"nominal"; break;
+        case NSProcessInfoThermalStateFair: therm = @"fair"; break;
+        case NSProcessInfoThermalStateSerious: therm = @"serious"; break;
+        case NSProcessInfoThermalStateCritical: therm = @"critical"; break;
+        default: break;
+    }
+    [out appendFormat:@"  [thermal] %@ (ANE returns NoPower at serious/critical)\n", therm];
 
     uint32_t pid = [self pidFromPasteboardOrDefault];
     [out appendFormat:@"  [pid] using %u (pasteboard p151_pid= or getpid)\n", pid];
@@ -95,8 +105,14 @@
             kern_return_t kr = IOConnectCallStructMethod(conn, 0, in, sizeof(in),
                                                          o, &outSz);
             if (kr == KERN_SUCCESS) zeros++;
-            [out appendFormat:@"    [sel0 pid@0x%02x] kr=0x%x outSz=%zu out[0..31]=",
-                on.unsignedIntValue, kr, outSz];
+            const char *why = "";
+            if (kr == 0) why = "  <-- DEVICEOPEN OK";
+            else if (kr == 0xe00002f0) why = "  (NotFound: pid not at this offset)";
+            else if (kr == 0xe00002e3) why = "  (NoPower: ANE powered down — cool/reboot)";
+            else if (kr == 0xe00002c2) why = "  (bad struct size)";
+            else if (kr == 0xe00002e2) why = "  (NotPermitted: task entitlement)";
+            [out appendFormat:@"    [sel0 pid@0x%02x] kr=0x%x%s outSz=%zu out[0..31]=",
+                on.unsignedIntValue, kr, why, outSz];
             for (size_t i = 0; i < 32 && i < outSz; i++) {
                 [out appendFormat:@"%02x", o[i]];
             }
