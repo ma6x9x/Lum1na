@@ -164,11 +164,13 @@
     uint32_t offOut = [self knobUInt:@"p153_off_out" def:0x51c];
     uint32_t createSz = [self knobUInt:@"p153_create_size" def:0xd88];
     uint32_t createMagic = [self knobUInt:@"p153_create_magic" def:0xac738];
-    NSString *svc = [self knobString:@"p153_svc" def:@"H11ANEIn"];
-    uint32_t sendSz = [self knobUInt:@"p153_send_size" def:0x948];
-    uint32_t mapSz = [self knobUInt:@"p153_map_size" def:0x2008];
-    uint32_t devSz = [self knobUInt:@"p153_dev_size" def:0x88];
-    if (devSz < 0x40 || devSz > 0x200) devSz = 0x88;
+    BOOL is23 = [[LabDeviceProfile osversion] isEqualToString:@"23F77"];
+    NSString *svc = [self knobString:@"p153_svc"
+                                 def:(is23 ? @"H11ANEIn" : @"H1xANELoadBalancer")];
+    uint32_t sendSz = [self knobUInt:@"p153_send_size" def:(is23 ? 0x948 : 0xd88)];
+    uint32_t mapSz = [self knobUInt:@"p153_map_size" def:(is23 ? 0x2008 : 0x828)];
+    uint32_t devSz = [self knobUInt:@"p153_dev_size" def:(is23 ? 0x68 : 0x88)];
+    if (devSz < 0x40 || devSz > 0x200) devSz = is23 ? 0x68 : 0x88;
     if (mapSz < 0x828) mapSz = 0x828;
 
     [out appendFormat:@"  [knobs] pid=%u svc=%@ types=%u/%u send=%u map=%u create=%u "
@@ -200,8 +202,9 @@
         [self logKr:out tag:@"sel7 DP-shape (0x10/0x18)" kr:krDP out:out18 osz:osz];
 
         uint8_t out20[0x20]; memset(out20, 0, sizeof(out20));
+        uint8_t dummy[1] = {0};
         osz = sizeof(out20);
-        kern_return_t krUC = [self structMethod:conn sel:7 inBuf:NULL inSz:0
+        kern_return_t krUC = [self structMethod:conn sel:7 inBuf:dummy inSz:0
                                          outBuf:out20 outSz:&osz];
         [self logKr:out tag:@"sel7 UC-shape (0/0x20)" kr:krUC out:out20 osz:osz];
 

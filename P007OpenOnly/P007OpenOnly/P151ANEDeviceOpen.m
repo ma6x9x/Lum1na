@@ -198,13 +198,15 @@
 + (NSString *)probeInline {
     NSMutableString *o = [NSMutableString string];
     uint32_t pid = (uint32_t)getpid();
+    BOOL is23 = [[LabDeviceProfile osversion] isEqualToString:@"23F77"];
+    uint32_t sz = is23 ? 0x68 : 0x88;   /* table-declared sizes are enforced exactly */
     NSArray<NSString *> *svcs = @[@"H11ANEIn", @"H1xANELoadBalancer"];
     for (NSString *svcName in svcs) {
         kern_return_t okr = 0;
         io_connect_t conn = [self openType:svcName.UTF8String type:1 kr:&okr];
         [o appendFormat:@"  [inline] open %@ type=1 kr=0x%x\n", svcName, okr];
         if (!conn) continue;
-        [self callDeviceOpen:conn pid:0 inSz:0x88 outSz:0x88 off:0 qword:NO qoff:8 out:o];
+        [self callDeviceOpen:conn pid:0 inSz:sz outSz:sz off:0 qword:NO qoff:8 out:o];
         { uint32_t sc = 0; IOConnectCallScalarMethod(conn, 1, NULL, 0, NULL, &sc); }
         IOServiceClose(conn);
     }
@@ -232,8 +234,10 @@
     [out appendFormat:@"  [thermal] %@ (ANE returns NoPower at serious/critical)\n", therm];
 
     uint32_t pid   = [self pidFromPasteboardOrDefault];
-    uint32_t inSz  = [self knobUInt:@"p151_in" def:0x88];
-    uint32_t outSz = [self knobUInt:@"p151_out" def:0x88];
+    BOOL is23 = [[LabDeviceProfile osversion] isEqualToString:@"23F77"];
+    uint32_t defSz = is23 ? 0x68 : 0x88;  /* 23F77 tables declare 0x68; 24A435 0x88 */
+    uint32_t inSz  = [self knobUInt:@"p151_in" def:defSz];
+    uint32_t outSz = [self knobUInt:@"p151_out" def:defSz];
     uint32_t off   = [self knobUInt:@"p151_off" def:0x00];
     uint32_t oneT  = [self knobUInt:@"p151_type" def:1];
     uint32_t sweep = [self knobUInt:@"p151_sweep" def:1];

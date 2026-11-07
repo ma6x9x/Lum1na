@@ -1441,3 +1441,33 @@ door/stride laws; the p110 claim rows.
   in p099_send_msg (probe bug, userland; one tap per force-quit respected).
 - Panic correlation: the two 24A435 panics today (10:27, 14:46) are AVE2 stale-slot in
   videocodecd, unrelated to the ANE probes; 01:15 forceReset = btn_rst.
+
+## 2026-11-07 15:1x — the 12's app logs (AFC) + the 23F77 dispatcher contract (Ghidra)
+- AFC bundle ids differ per install: iPhone13,2 = `ma6x9x.P007OpenOnly.V467U8LP46`;
+  iPhone18,2 = `ma6x9x.P007OpenOnly.GLVKP6RZ39`. `--container` + `get Documents/...` works.
+- **12 p044 14:47:29** (v75.2): the v63 write fired again — `foreign-lane: target=178
+  use 0->0 diff=512/16384`, word map 0x0000..0x00fc `00000000 -> 5eaf5eaf`.
+- **12 p151 v5.1 at 14:34 with 0x88: sel0 = 0xe00002c2.** Cause: the 23F77 tables declare
+  sel0 as 0x68/0x68, and dispatcher FUN_fffffff00a55037c compares the entry's declared
+  sizes to the IOExternalMethodArguments fields with **equality**. So 0x88 is rejected
+  before the handler. Defaults are now per-SKU: 0x68 on 23F77, 0x88 on 24A435.
+- **12 p153 v1 at 14:33**: sel7 DP shape (0x10/0x18) and UC shape (0/0x20) both 2c2.
+  The UC-shape call passed a NULL struct input; zero-size struct inputs need a non-NULL
+  buffer (fixed in p153). Class ID remains unmeasured on the 12.
+- **Dispatcher 0xa55037c contract** (entry stride 0x28): +0x00 handler fn; +0x08
+  scalarInputCount (0xffffffff = any); +0x0c structInputSize (exact, or -1); +0x10
+  scalarOutputCount; +0x14 structOutputSize (exact, or -1); +0x18 async byte; +0x20
+  entitlement token (checked via DAT_7b68778 vtable+0x1c0, failure 0xe00002c1).
+  Table ptr 0 -> 0xe00002bc; selector >= count -> 0xe00002c2.
+- **ANE_newUserClient 0x86ee174 (23F77)**: `type == 1` -> H11ANEInDirectPathClient_init
+  0x8757a1c; **every other type** -> program-loading client (FUN_87577b8). So on the 12,
+  type 1 = DirectPath (table2), type 4 = program-loading (table1). (On 24A435 both 1 and 4
+  are direct — the SKUs differ.)
+- **Ghidra label correction**: `cve43748_ANE_DirectPath_sel2_ProgramCreate @0x8757ff0` is
+  actually **ProgramSendRequest** — the handler logs "Program Send Request" (0x73ee3e6) and
+  the table entry is 1 scalar + 0x948/0x28 async. Trust the log strings over that label.
+- **P062 v3**: the exception handler never replied, so the brk propagated and killed the app
+  (P007OpenOnly-2026-11-07-150937.ips, EXC_BREAKPOINT in p062_worker_fn) — PHASE 2 never ran.
+  v3 sends a mach_exception_raise_state reply (KERN_SUCCESS, same flavor/count/state) before
+  terminating the worker and absorbs a repeat fault. PHASE 2 (suspend/get_state) is the
+  measurement that settles the witness channel.

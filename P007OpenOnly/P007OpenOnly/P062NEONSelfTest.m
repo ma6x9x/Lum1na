@@ -51,7 +51,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P062_BUILD @"p062-neon-selftest-v2"
+#define P062_BUILD @"p062-neon-selftest-v3-reply"
 
 /* 32 NEON 128-bit registers = 64 qwords. COUNT is 132 (528/4), not 64. */
 #define P062_NEON_QWORDS 64
@@ -112,6 +112,12 @@ static volatile int g_excReceived = 0;
 static int g_neonFlavorSeen = 0;
 static uint32_t g_neonCountSeen = 0;
 static uint64_t g_neonSeen[P062_NEON_QWORDS];
+/* v3: reply state — the exception must be answered with a state reply or the
+   brk propagates to the crash reporter (observed: P007OpenOnly 15:09:37). */
+static int g_replyHave = 0;
+static int g_replyFlavor = 0;
+static uint32_t g_replyCnt = 0;
+static arm_neon_state64_t g_replyState;
 static int g_neonMatchCount = 0;
 static int g_p1_pass = 0;
 static int g_p2_pass = 0;
@@ -135,6 +141,9 @@ static void p062_reset_globals(void)
     g_neonFlavorSeen = 0;
     g_neonCountSeen = 0;
     memset(g_neonSeen, 0, sizeof(g_neonSeen));
+    g_replyHave = 0;
+    g_replyCnt = 0;
+    memset(&g_replyState, 0, sizeof(g_replyState));
     g_neonMatchCount = 0;
     g_p1_pass = 0;
     g_p2_pass = 0;
@@ -232,6 +241,12 @@ static void p062_parse_exc_msg(mach_msg_header_t *mh, uint8_t *msgbuf)
             foundIdx = (int)i;
             g_neonFlavorSeen = 1;
             g_neonCountSeen = cnt;
+            if (cnt <= ARM_NEON_STATE64_COUNT) {
+                g_replyFlavor = (int)ARM_NEON_STATE64;
+                g_replyCnt = cnt;
+                memcpy(&g_replyState, &words[i + 2], (size_t)cnt * 4);
+                g_replyHave = 1;
+            }
             uint64_t *st = (uint64_t *)&words[i + 2];
             uint32_t nq = cnt / 2;
             if (nq > P062_NEON_QWORDS)
@@ -273,6 +288,46 @@ static void p062_parse_exc_msg(mach_msg_header_t *mh, uint8_t *msgbuf)
     }
 }
 
+/* v3: answer a MACH_EXCEPTION state request. A MIG state reply is
+   header + NDR_record + retcode + flavor + new_stateCnt + new_state.
+   Without this the exception is not marked handled and the brk is
+   re-delivered to the task/crash reporter (the 15:09:37 app kill). */
+static kern_return_t p062_send_state_reply(mach_msg_header_t *req, const uint8_t *reqBody)
+{
+    if (!g_replyHave) {
+        p062_log(@"[P1] handler: no NEON state captured — replying FAILURE");
+        return KERN_FAILURE;
+    }
+    size_t stateBytes = (size_t)g_replyCnt * 4;
+    if (stateBytes > sizeof(g_replyState)) stateBytes = sizeof(g_replyState);
+    uint8_t buf[sizeof(mach_msg_header_t) + 8 + 4 + 4 + 4 + sizeof(arm_neon_state64_t)];
+    memset(buf, 0, sizeof(buf));
+    size_t total = sizeof(mach_msg_header_t) + 8 + 4 + 4 + 4 + stateBytes;
+
+    mach_msg_header_t *rh = (mach_msg_header_t *)buf;
+    rh->msgh_bits = MACH_MSGH_BITS(MACH_MSG_TYPE_MOVE_SEND_ONCE, 0);
+    rh->msgh_size = (mach_msg_size_t)total;
+    rh->msgh_remote_port = req->msgh_local_port;
+    rh->msgh_local_port = MACH_PORT_NULL;
+    rh->msgh_voucher_port = MACH_PORT_NULL;
+    rh->msgh_id = req->msgh_id + 1;
+
+    uint8_t *p = buf + sizeof(mach_msg_header_t);
+    memcpy(p, reqBody, 8);              /* NDR_record_t from the request */
+    p += 8;
+    *(kern_return_t *)p = KERN_SUCCESS; p += 4;
+    *(int *)p = g_replyFlavor;          p += 4;
+    *(uint32_t *)p = g_replyCnt;        p += 4;
+    memcpy(p, &g_replyState, stateBytes);
+
+    kern_return_t kr = mach_msg(rh, MACH_SEND_MSG, (mach_msg_size_t)total, 0,
+                                MACH_PORT_NULL, 0, MACH_PORT_NULL);
+    p062_log(@"[P1] handler: state reply id=%d flavor=%d cnt=%u remote=0x%x kr=0x%x",
+             rh->msgh_id, g_replyFlavor, g_replyCnt,
+             (unsigned)rh->msgh_remote_port, kr);
+    return kr;
+}
+
 static void *p062_exc_handler_fn(void *arg)
 {
     (void)arg;
@@ -293,7 +348,11 @@ static void *p062_exc_handler_fn(void *arg)
         return NULL;
     }
     g_excReceived = 1;
+    p062_log(@"[P1] handler: msg remote=0x%x local=0x%x",
+             (unsigned)mh->msgh_remote_port, (unsigned)mh->msgh_local_port);
     p062_parse_exc_msg(mh, msgbuf);
+
+    kern_return_t rkr = p062_send_state_reply(mh, msgbuf + sizeof(mach_msg_header_t));
 
     if (g_workerThread != MACH_PORT_NULL) {
         /* brk #0 parks the pthread in exception-wait. Terminate often
@@ -301,6 +360,21 @@ static void *p062_exc_handler_fn(void *arg)
         (void)thread_abort(g_workerThread);
         kern_return_t tr = thread_terminate(g_workerThread);
         p062_log(@"[P1] worker thread_abort+terminate kr=0x%x (0x35 = already dying; TAP will not join)", tr);
+    }
+
+    /* v3: if the thread re-executed the brk before dying, absorb the repeat
+       so it does not reach the crash reporter. */
+    for (int i = 0; i < 3 && rkr == KERN_SUCCESS; i++) {
+        memset(msgbuf, 0, sizeof(msgbuf));
+        kr = mach_msg(mh, MACH_RCV_MSG | MACH_RCV_TIMEOUT, 0, sizeof(msgbuf),
+                      g_excPort, 150, MACH_PORT_NULL);
+        if (kr != MACH_MSG_SUCCESS) break;
+        p062_log(@"[P1] handler: repeat exception id=%d — absorbing", mh->msgh_id);
+        p062_send_state_reply(mh, msgbuf + sizeof(mach_msg_header_t));
+        if (g_workerThread != MACH_PORT_NULL) {
+            (void)thread_abort(g_workerThread);
+            (void)thread_terminate(g_workerThread);
+        }
     }
     return NULL;
 }
