@@ -61,18 +61,47 @@ enum ChainPlan {
                    unlock: "PANIC-POSSIBLE; one tap per fresh boot (the dtor panics by design on stale slots). Zone/size of the AVE2 session struct still owed from Ghidra (the kalloc zone DAT_fffffe0007f976d8 view). Not KRW until a read pairs."),
         ChainStage(id: "s0", index: 9,
                    title: tl("权限面测绘"),
+                   goal: tl("确定该构建上的实际起点：进程持有哪些 entitlement、沙盒放行到哪一层、mach 命名空间如何组织。后续每一步的收益都要以该基线折算。"),
+                   moduleIDs: ["probe.privset", "kern.baseline"],
+                   unlock: tl("缺少该基线，无法区分「漏洞所得」与「签名所授」。")),
+
         ChainStage(id: "s1", index: 10,
                    title: tl("信息泄露"),
+                   goal: tl("先取得地址与内容。decmpfs 欠产出将内核页缓冲尾部交回用户态；TIFF 截断条带与 EXIF 短读将进程堆残留交回图像与元数据；CoreMedia bytestream 与 sandbox_extension 越过沙盒边界取回文件内容。"),
+                   moduleIDs: ["kern.decmpfs", "iio.tiff.trunc", "iio.jpeg.comment",
+                               "cm.fdleak", "sbx.toctou"],
+                   unlock: tl("在取得稳定泄露之后，才有条件讨论将溢出写成什么值；否则只能触发崩溃。")),
+
         ChainStage(id: "s2", index: 11,
                    title: tl("溢出阈值标定"),
+                   goal: tl("Type-5 阴影的写入是值可控的，但短溢出会被相邻 VLA 吸收。逐级抬升 R，确定该构建上栈布局开始失效的维度。"),
+                   moduleIDs: ["cg.shading.sweep"],
+                   unlock: tl("该阈值决定后续所有负载的长度预算。")),
+
         ChainStage(id: "s3", index: 12,
                    title: tl("值可控写"),
+                   goal: tl("在标定所得长度上，以 PDF 中选定的 double 位模式决定被覆盖的指针。崩溃地址即证据 —— 它证明写入内容由攻击者控制，而非仅证明发生了崩溃。"),
+                   moduleIDs: ["cg.shading"],
+                   unlock: tl("值可控写与地址泄露相加，构成构造可控状态的全部要素；所缺的是将写转为执行的环节。")),
+
         ChainStage(id: "s4", index: 13,
                    title: tl("内核面"),
+                   goal: tl("用户态可触及的内核入口数量有限。ipc_port 请求表索引竞态无 entitlement 门槛；decmpfs 已在泄露层验证。本层度量的是「能否将用户态的错误转为内核侧的状态变化」。"),
+                   moduleIDs: ["kern.ipc"],
+                   unlock: tl("需达到可复现阈值；低于该阈值时，越狱路径不成立。")),
+
         ChainStage(id: "s5", index: 14,
                    title: tl("解析器面"),
+                   goal: tl("libarchive 的 2 字节堆越界与 CoreMedia 的 28 字节结构体外写，是整套中仅有的两个「写穿过对象边界」的形状。前者精确但浅，后者深且落在保存寄存器区。同一 CVE 下的 CAB 站点与 GPT 分区名越界读一并标定。"),
+                   moduleIDs: ["arc.iso.stress", "arc.cab", "cm.rpu.sweep", "kext.gpt"],
+                   unlock: tl("两者都需要稳定的堆布局控制，而这正是上一阶段泄露所提供的。")),
+
         ChainStage(id: "s6", index: 15,
                    title: tl("工具链落地"),
+                   goal: tl("将上述产物转为可用形式：IPA 改包、二进制注入、字节级替换、属性改写、数据库读取。本层不依赖任何漏洞，但它是「漏洞能力」最终交付到手上的形态。"),
+                   moduleIDs: ["tool.ipa", "tool.zip", "tool.hex", "tool.macho", "tool.paths"],
+                   unlock: tl("自检全绿意味着工具链本身可信 —— 此后出现的问题是选择问题，不是工具问题。")),
+    ]
     ]
 
     static func modules(for stage: ChainStage) -> [ExploitModule] {
