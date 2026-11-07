@@ -94,6 +94,30 @@
         got[i] = rbv;
     }
 
+    /* v3.2: the P044 v47 knobs (no-push law): p044_model.txt = the
+       passthrough marshal class (the post-marshal fill), p044_req_in.txt =
+       192 (the 1-record OOB). ABSENT = write the defaults. p044_target.txt
+       stays the census's OWN pick (absent = honest census law). */
+    NSString *modelPath = [docs stringByAppendingPathComponent:@"p044_model.txt"];
+    if (![NSFileManager.defaultManager fileExistsAtPath:modelPath]) {
+        BOOL ok = [@"XVRC27_254in_passthrough\n" writeToFile:modelPath
+                       atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        [out appendFormat:@"[%@] p044_model.txt auto-written = XVRC27_254in_passthrough\n",
+            ok ? @"VERIFY" : @"FAILED"];
+    } else {
+        NSString *cur = [NSString stringWithContentsOfFile:modelPath
+                            encoding:NSUTF8StringEncoding error:nil] ?: @"";
+        [out appendFormat:@"[kept] p044_model.txt = %@\n",
+            [cur stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]]];
+    }
+    NSString *reqPath = [docs stringByAppendingPathComponent:@"p044_req_in.txt"];
+    if (![NSFileManager.defaultManager fileExistsAtPath:reqPath]) {
+        BOOL ok = [@"192\n" writeToFile:reqPath atomically:YES
+                        encoding:NSUTF8StringEncoding error:nil];
+        [out appendFormat:@"[%@] p044_req_in.txt auto-written = 192 (1-record OOB)\n",
+            ok ? @"VERIFY" : @"FAILED"];
+    }
+
     /* the other composition flags' presence (the tap order's state) */
     NSArray *flags = @[ @"p131_stage3.txt", @"p132_land.txt",
                         @"lswkrw_arm.txt", @"p084_mode_massunmap.txt" ];
