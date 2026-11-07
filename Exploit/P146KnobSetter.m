@@ -23,7 +23,7 @@
 #import <Foundation/Foundation.h>
 #import <objc/message.h>
 
-#define P146_BUILD @"p146-knobsetter-v5.1-installsplit"
+#define P146_BUILD @"p146-knobsetter-v5.2-sidreput"
 
 @implementation P146KnobSetter
 
@@ -143,6 +143,53 @@
                           encoding:NSUTF8StringEncoding error:nil];
         [out appendFormat:@"[%@] p044_guest.txt %@ = 4b1d (GUEST install law: tap p044 next = HOLD; after the standalone's fire tap p146 + p044 again = OBSERVE)\n",
             ok ? @"VERIFY" : @"FAILED", ok ? @"auto-written" : @""];
+        /* v5.2: RE-PUT the last GUEST HOLD sid from this install's own p044
+           log. The pasteboard is volatile (anything the user copies — e.g.
+           tonight's log text — clobbers the raw number), so the guest re-
+           stamps it with a marker prefix. Sequence law: tap guest p146 ->
+           switch -> tap standalone p146 WITHOUT copying anything between. */
+        {
+            NSString *logPath = [docs stringByAppendingPathComponent:
+                @"p044_aks_kaslr_reach_log.txt"];
+            NSString *log = [NSString stringWithContentsOfFile:logPath
+                encoding:NSUTF8StringEncoding error:nil];
+            uint32_t sidOut = 0;
+            if (log) {
+                NSRange r = {0, log.length};
+                NSRange hit = {NSNotFound, 0};
+                /* take the LAST GUEST HOLD match */
+                for (long guard = 0; guard < 64; guard++) {
+                    NSRange n = [log rangeOfString:@"GUEST HOLD: sid="
+                        options:0 range:r];
+                    if (n.location == NSNotFound || n.location + n.length >= log.length)
+                        break;
+                    hit = n;
+                    r.location = n.location + n.length;
+                    r.length = log.length - r.location;
+                }
+                if (hit.location != NSNotFound) {
+                    NSUInteger at = hit.location + hit.length;
+                    NSUInteger end = at;
+                    while (end < log.length &&
+                           isdigit((unsigned char)[log characterAtIndex:end]))
+                        end++;
+                    if (end > at)
+                        sidOut = (uint32_t)[[log substringWithRange:
+                            NSMakeRange(at, end - at)] intValue];
+                }
+            }
+            id pb = ((id (*)(Class, SEL))objc_msgSend)(
+                NSClassFromString(@"UIPasteboard"),
+                NSSelectorFromString(@"generalPasteboard"));
+            if (pb && sidOut) {
+                ((void (*)(id, SEL, id))objc_msgSend)(pb,
+                    NSSelectorFromString(@"setString:"),
+                    [NSString stringWithFormat:@"p044_sid=%u", sidOut]);
+                [out appendFormat:@"[v5.2] pasteboard re-set = p044_sid=%u (from this install's own p044 log; standalone p146 consumes it — no clipboard churn between taps)\n", sidOut];
+            } else {
+                [out appendString:@"[v5.2] no GUEST HOLD sid found in this install's p044 log — hold first (p146+p044), then re-run p146\n"];
+            }
+        }
     } else {
         /* the STANDALONE must never carry p044_guest.txt — a stray copy
            would turn the standalone's own fire into a GUEST HOLD tap. */
@@ -175,7 +222,24 @@
                 NSSelectorFromString(@"generalPasteboard"));
             NSString *pbs = pb ? ((NSString *(*)(id, SEL))objc_msgSend)(
                 pb, NSSelectorFromString(@"string")) : nil;
-            long sidv = pbs.length ? strtol(pbs.UTF8String, NULL, 10) : 0;
+            /* v5.2: the [v78] handoff stamps "p044_sid=<n>" — parse the
+               marker first, then a bare decimal as the v5.1 fallback. */
+            long sidv = 0;
+            if (pbs.length) {
+                NSRange mk = [pbs rangeOfString:@"p044_sid="];
+                if (mk.location != NSNotFound) {
+                    NSRange digits = NSMakeRange(mk.location + mk.length, 0);
+                    NSUInteger e = digits.location;
+                    while (e < pbs.length &&
+                           isdigit((unsigned char)[pbs characterAtIndex:e]))
+                        e++;
+                    digits.length = e - digits.location;
+                    if (digits.length)
+                        sidv = [[pbs substringWithRange:digits] longValue];
+                } else {
+                    sidv = strtol(pbs.UTF8String, NULL, 10);
+                }
+            }
             if (sidv >= 16 && sidv <= 1000000) {
                 BOOL ok = [[NSString stringWithFormat:@"%ld\n", sidv]
                     writeToFile:targetPath atomically:YES
@@ -183,7 +247,7 @@
                 [out appendFormat:@"[%@] p044_target.txt %@ = %ld (the [v78] pasteboard sid handoff — tap this GUEST's p044 within the same boot first)\n",
                     ok ? @"VERIFY" : @"FAILED", ok ? @"auto-written" : @"", sidv];
             } else {
-                [out appendFormat:@"[ ] pasteboard not a sid (%@) — p044_target.txt stays census-owned\n",
+                [out appendFormat:@"[ ] pasteboard not a sid (%@) — p044_target.txt stays census-owned (re-run the guest p146 to re-stamp p044_sid=<n>)\n",
                     pbs.length ? @"non-numeric" : @"empty"];
             }
         } else {
