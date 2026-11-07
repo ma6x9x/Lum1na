@@ -23,7 +23,7 @@
 #import <Foundation/Foundation.h>
 #import <objc/message.h>
 
-#define P146_BUILD @"p146-knobsetter-v5.8-oobmodel"
+#define P146_BUILD @"p146-knobsetter-v5.9-knobs"
 
 @implementation P146KnobSetter
 
@@ -229,6 +229,65 @@
                 (m && r && iok) ? @"VERIFY" : @"FAILED", armModel, oob, idx];
         } else if (oob != 0) {
             [out appendFormat:@"[v5.6] p044_oob=%ld outside 193..254 — NOT armed (OOB knob only)\n", oob];
+        }
+    }
+
+    /* v5.9: explicit p044 knobs from the pasteboard, read HERE (after the
+       model/req_in defaults) so they override any leftover arm state:
+         p044_req_in=<16..300>   -> p044_req_in.txt (127 = the v63 wake fire;
+                                    193..254 = the 43748 crossing)
+         p044_pid=<0..100000>    -> p044_proc_idx.txt (0 restores index 0;
+                                    nonzero = the measured Stage-B index law)
+       Both are one-shot text; no clipboard churn needed between taps. */
+    {
+        id pb = ((id (*)(Class, SEL))objc_msgSend)(
+            NSClassFromString(@"UIPasteboard"),
+            NSSelectorFromString(@"generalPasteboard"));
+        NSString *pbs = pb ? ((NSString *(*)(id, SEL))objc_msgSend)(
+            pb, NSSelectorFromString(@"string")) : nil;
+        if (pbs.length) {
+            NSRange mk = [pbs rangeOfString:@"p044_req_in="];
+            if (mk.location != NSNotFound) {
+                NSUInteger at = mk.location + mk.length;
+                NSUInteger e = at;
+                while (e < pbs.length) {
+                    unichar ch = [pbs characterAtIndex:e];
+                    if (ch < '0' || ch > '9') break;
+                    e++;
+                }
+                if (e > at) {
+                    long v = [[pbs substringWithRange:NSMakeRange(at, e - at)] intValue];
+                    if (v >= 16 && v <= 300) {
+                        BOOL ok = [[NSString stringWithFormat:@"%ld\n", v]
+                            writeToFile:reqPath atomically:YES
+                            encoding:NSUTF8StringEncoding error:nil];
+                        [out appendFormat:@"[v5.9] p044_req_in.txt %@ = %ld (explicit pasteboard knob; 127 = the v63 wake fire)\n",
+                            ok ? @"VERIFY" : @"FAILED", v];
+                    }
+                }
+            }
+            NSRange mk2 = [pbs rangeOfString:@"p044_pid="];
+            if (mk2.location != NSNotFound) {
+                NSUInteger at = mk2.location + mk2.length;
+                NSUInteger e = at;
+                while (e < pbs.length) {
+                    unichar ch = [pbs characterAtIndex:e];
+                    if (ch < '0' || ch > '9') break;
+                    e++;
+                }
+                if (e > at) {
+                    long v = [[pbs substringWithRange:NSMakeRange(at, e - at)] intValue];
+                    if (v >= 0 && v <= 100000) {
+                        NSString *idxPath = [docs stringByAppendingPathComponent:
+                            @"p044_proc_idx.txt"];
+                        BOOL ok = [[NSString stringWithFormat:@"%ld\n", v]
+                            writeToFile:idxPath atomically:YES
+                            encoding:NSUTF8StringEncoding error:nil];
+                        [out appendFormat:@"[v5.9] p044_proc_idx.txt %@ = %ld (explicit pasteboard knob; 0 restores index 0)\n",
+                            ok ? @"VERIFY" : @"FAILED", v];
+                    }
+                }
+            }
         }
     }
 
