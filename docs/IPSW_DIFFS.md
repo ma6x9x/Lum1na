@@ -176,3 +176,45 @@ Need `ipsw` (this machine has 3.1.706). Optional: [blacktop/symbolicator](https:
 Watchlist is `tools/ipsw-diff-watchlist.txt`. Output goes to `ipsw-diffs-out/` (gitignored).
 
 Confirm every interesting string on the **T8101 23F77** binary in Ghidra before changing a probe.
+
+## 2026-11-07 — 27.0 (24A435) vs 27.2 (24B119) kext isolation
+
+Kernelcaches: 24A435 release (iPhone18,2) and 24B119 release (iPhone18,2).
+`ipsw kernel extract` + `kextdiff2.py`/global similarity pairing.
+
+### IOSurface — CVE-2026-112477 fix, exact
+- IOSurface kext has only 3 B-only functions.
+- Fixed `0xfffffe000a3944c0` (A 24A435 `0xfffffe000a3460f0`): after the lock,
+  the new check is
+  `ldrb w8,[x21,#0xf1] ; tbz w8,#0,#+0x10 ; add w20,w20,#0x1b ; b return`
+  with `w20` seeded `0xe00002bd`, so the not-ready return is **0xe00002d8**.
+  The vulnerable build goes straight to the list insert
+  (`stp x8,x21,[x24,#0x50]` under `[x19+0x188]`).
+- The other two B-only functions set/clear the ready byte (`strb` at +0xf1):
+  the fix adds a ready flag and gates the insert on it. This is the p154 race.
+
+### IOHIDFamily — CVE-2026-112515 candidate
+- B `0xfffffe000a15ec54` (A `0xfffffe000a10fb20`): fixed adds
+  `cmp w21,w0 ; b.hs` immediately after the count call, before using `w21`
+  as the table index. The vulnerable build only checks `cbz w0`. The index
+  path then calls a virtual `[x16+0x118]` accessor with `x1 = w21`.
+- 45/44 B/A-only functions; most other diffs are codegen shifts (`and/cmp`
+  refcount sequences repeated across many functions).
+
+### ANE — CVE-2026-112696 / 84494 status
+- AppleH16ANEInterface 10.19.6 → 10.102.4 (278 B-only functions; big version
+  jump, noisy).
+- Prewire `ANE_ProgramCheckAndPrewireBuffers` A `0x8c16a84` ~ B `0x8cc7634`
+  (r=0.93, 448→449 insns). B saves `x0` in `x20` and adds one state gate
+  (`ldrb/tbz` class) but the caller fence `0x8c14310` ~ B `0x8cc4fb4` is
+  **byte-identical** (r=1.00, no added check). The dispatcher `0x8cb0ee0` ~
+  B `0x8cb0378` is also identical.
+- The exact 112696/84494 OOB-write check still needs the full `ipsw diff`
+  run (24A435↔24B119, in progress); the prewire gate is the best candidate
+  but not proven from this pairing alone.
+
+### AVE2 iPad — CVE-2026-112466 (already isolated)
+- iPad 905.41.1 → 905.43.1 added the `sub/ubfiz/cmp/csel` index bounds check
+  before the `ldp` at the vulnerable `add w26,sxtw #4 ; ldp [x8,#-8]` site.
+  This remains the iPad's read/corrupt candidate; p155 not built (needs the
+  iPad VT encode path; p017 stays forbidden).
