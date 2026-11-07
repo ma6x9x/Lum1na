@@ -244,6 +244,10 @@ static int path_int_after(NSString *s, const char *key) {
         [LabLearn recordPath:@"p010" result:r010 evidence:@"via p139"];
         L([NSString stringWithFormat:@"PATH_TEST id=p010 class=trunc-kva sku=%@ result=%@",
            skuName, r010]);
+        NSString *r063 = [self scoreLog:p139 forPath:@"p063"];
+        [LabLearn recordPath:@"p063" result:r063 evidence:@"via p139 (aio HEAP)"];
+        L([NSString stringWithFormat:@"PATH_TEST id=p063 class=disclose sku=%@ result=%@",
+           skuName, r063]);
         ran = YES;
     } else {
         L(@"[*] No extra harvest TAP on this SKU. kreadtest still runs.");
