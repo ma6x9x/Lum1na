@@ -236,7 +236,19 @@ enum Catalog {
             notesZh: "该路径上无 entitlement 门槛的入口为 mach_msg 与端口通知注册。本模块以 8 线程运行 6 秒，统计内核返回码分布 —— 任何非 KERN_SUCCESS 的出现频次变化都是索引越界的候选信号。",
             run: Catalog1Runs.kern_ipc)
         out.append(m0)
-        let m1: ExploitModule = ExploitModule(
+                let mAut0: ExploitModule = ExploitModule(
+            id: "kext.autopanic",
+            titleZh: "自动 panic 签名扫描（每个 .ips）",
+            cve: "—",
+            component: "Lum1na · crash-log auto-scan",
+            primitive: .probe,
+            reach: .sandbox,
+            tier: 3,
+            summaryZh: "自容器的所有崩溃报告逐个以 stale-slot 签名（lr-pc==0x115F3C，x0==0x59）分类；内核 panic-full 仍为沙盒拒绝，Mac 端处理。",
+            notesZh: "规则分类器（非 ML）；结果写入 learn；跨启动去重。",
+            run: Catalog1Runs.kext_autopanic)
+        out.append(mAut0)
+let m1: ExploitModule = ExploitModule(
             id: "kern.decmpfs",
             titleZh: "decmpfs 分块解压欠产出 → 内核堆泄露",
             cve: "CVE-2026-113910",
@@ -700,6 +712,67 @@ let baseline = KernelIPC.baseline()
     }
 
     // kern.decmpfs
+    // THE AUTO-PANIC SCANNER (2026-11-07, the user's ask): every own-container
+    // .ips (Lum1naDebugger DiagnosticReports — READABLE, the crash-report tool's
+    // searchPaths) classified per-tap with the device-verified SIGNATURE law:
+    //   lr-pc == 0x115F3C && x0 == 0x59  -> the stale-slot UAF receipt (17, 24A435)
+    // Kernel panic-full = system sandbox-refused (the cm.fdleak law) = Mac-side.
+    // NO ML: a rule classifier + the Mind summary = deterministic and auditable.
+    static func kext_autopanic(_ ctx: RunContext) throws -> ModuleOutcome {
+        var lines: [String] = []
+        var stale = 0, other = 0, skipped = 0
+        let fm = FileManager.default
+        let dirs = [fm.temporaryDirectory.path,
+                    NSHomeDirectory() + "/Library/Logs/DiagnosticReports",
+                    NSHomeDirectory() + "/Library/Logs/CrashReporter"]
+        let seenKey = "panic_autoscan.seen"
+        var seen = UserDefaults.standard.stringArray(forKey: seenKey) ?? []
+        let seenSet = Set(seen)
+        for dir in dirs {
+            guard let names = try? fm.contentsOfDirectory(atPath: dir) else { continue }
+            for name in names where (name.hasSuffix(".ips") || name.hasSuffix(".ips.partial")) && !seenSet.contains(name) {
+                let path = (dir as NSString).appendingPathComponent(name)
+                guard let attrs = try? fm.attributesOfItem(atPath: path),
+                      let sz = attrs[.size] as? NSNumber, sz.intValue < 8_000_000,
+                      let raw = try? String(contentsOfFile: path, encoding: .utf8) else { skipped += 1; continue }
+                let pc = raw.range(of: "pc 0x([0-9a-f]+), lr 0x([0-9a-f]+)", options: .regularExpression)
+                var cls = "n/a"
+                var tail = ""
+                if pc == nil, raw.contains("element modified after free") {
+                    cls = "GZ-MAF (the 43748 fill class)"
+                } else if pc == nil {
+                    cls = "watchdog/other"
+                } else {
+                    // extract pc/lr/x0 by scanning the panic string
+                    tail = String(raw[raw.index(pc!.lowerBound, offsetBy: 0)...min(raw.index(pc!.lowerBound, offsetBy: 400), raw.index(before: raw.endIndex))])
+                    func hex(_ k: String) -> UInt64? {
+                        guard let r = tail.range(of: k + " 0x([0-9a-f]+)", options: .regularExpression) else { return nil }
+                        return UInt64(tail[r].replacingOccurrences(of: k + " 0x", with: ""), radix: 16)
+                    }
+                    if let p = hex("pc"), let l = hex("lr") {
+                        let d = l &- p
+                        let x0 = hex("x0:") ?? 0
+                        if d == 0x115F3C && x0 == 0x59 {
+                            cls = "STALE-SLOT SIG (the 17's repro primitive)"
+                            stale += 1
+                        } else { cls = "OTHER (decode-needed)"; other += 1 }
+                    }
+                }
+                lines.append("\(name): \(cls)")
+                seen.append(name)
+            }
+        }
+        UserDefaults.standard.set(seen, forKey: seenKey)
+        // record into learn: every stale receipt = the repro corpus row
+        if stale > 0 {
+            ctx.arm("kext.autopanic", "stale-sig x\(stale)")
+            ctx.disarm("kext.autopanic", "stale=\(stale) other=\(other)")
+        }
+        return ModuleOutcome(headline: stale > 0 ? tl("自动扫描完成：x") + "\(stale)" + tl(" 个 stale-slot 签名") : tl("自动扫描完成：无新报告或无签名"),
+                             detail: lines.joined(separator: "\n"),
+                             artifacts: [])
+    }
+
     static func kern_decmpfs(_ ctx: RunContext) throws -> ModuleOutcome {
 let url = ctx.workdir.appendingPathComponent("decmpfs_probe.bin")
                 ctx.arm("kern.decmpfs", "roundtrip")

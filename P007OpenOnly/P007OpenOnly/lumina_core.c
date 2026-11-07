@@ -83,11 +83,18 @@ double lumina_bandit_reward(const char *outcome) {
         !strcmp(outcome, "fault-with-far"))
         return 1.0;
     if (!strcmp(outcome, "maf") || !strcmp(outcome, "family-b"))
-        return 0.0;
+        return 0.5;   /* the 2026-11-07 retarget: window-WON = the timing
+                         receipt (not 0) but BELOW a pointer receipt */
+    if (!strcmp(outcome, "kptr-receipt") || !strcmp(outcome, "magic"))
+        return 1.0;   /* THE TOP: a kernel pointer in our buffer */
     if (!strcmp(outcome, "abort") ||
         !strcmp(outcome, "fires") ||
         !strcmp(outcome, "occupancy"))
         return 0.5;
+    if (!strcmp(outcome, "claim-won"))
+        return 0.5;   /* the honesty fix: the (c) detector is saturated
+                         (the 62-64/64 rows) — proxy-class = mid reward,
+                         never above a pointer receipt */
     return 0.25;
 }
 
