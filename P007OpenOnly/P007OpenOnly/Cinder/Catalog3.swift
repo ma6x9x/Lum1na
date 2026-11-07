@@ -144,7 +144,7 @@ ctx.arm("cm.fdleak", "handshake + vend")
                                 let pcv = UInt64(parts[1].dropFirst(2).dropLast(1), radix: 16) ?? 0
                                 let lrv = UInt64(parts[3].dropFirst(0), radix: 16) ?? 0
                                 let d = lrv &- pcv
-                                let x0r = txt.range(of: "x0:\s*0x([0-9a-f]+)", options: .regularExpression).map { txt[$0] } ?? "?"
+                                let x0r = txt.range(of: "x0:\\s*0x([0-9a-f]+)", options: .regularExpression).map { txt[$0] } ?? "?"
                                 cls = (d == 0x115F3C && x0r.contains("0x59")) ? "STALE-SLOT SIG" : "other (\(pcv)-\(lrv), x0=\(x0r))"
                             } else if txt.contains("element modified after free") {
                                 cls = "GZ-MAF (the 43748 fill class)"
