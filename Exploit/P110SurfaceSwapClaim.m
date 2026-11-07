@@ -107,7 +107,7 @@ static void p110_flushCB(void *r, void *e, OSStatus st, VTEncodeInfoFlags f, CMS
 #import <IOKit/IOKitLib.h>       /* dlsym'd calls still; only the UC types  */
 #import <sys/qos.h>
 
-#define P110_BUILD      @"p110-swapclaim-v3.8-wakefix"
+#define P110_BUILD      @"p110-swapclaim-v3.9-wakestatus"
 #define P110_GROOM_KDATA 0x1000        /* the groom kmsg's kdata size       */
 #define P110_ROUNDS     64
 #define P110_PREFILL_MAX  8     /* bandit arm room: prefill 6 (default) vs 8 */
@@ -330,8 +330,12 @@ static void p110_decOutCB(void *rc, void *sh, OSStatus st, VTDecodeInfoFlags f,
                           CVBufferRef pb, CMTime pts, CMTime dur) {
     (void)rc; (void)sh; (void)st; (void)f; (void)pts; (void)dur;
     if (pb) CFRelease(pb); }
+static atomic_int g_p110_wakeCb;      /* v3.9: every callback invocation    */
+static atomic_int g_p110_wakeSt;      /* v3.9: last callback OSStatus       */
 static void p110_flushCB(void *r, void *e, OSStatus st, VTEncodeInfoFlags f, CMSampleBufferRef sb) {
-    (void)r; (void)e; (void)st; (void)f; (void)sb;
+    (void)r; (void)e; (void)f;
+    atomic_fetch_add(&g_p110_wakeCb, 1);
+    atomic_store(&g_p110_wakeSt, (int)st);
     /* v3.1: RETAIN the compressor's output so the DECOMPRESSION render
        (the M2Scaler CSC stage) has real samples to decode. */
     if (sb && g_p110_wakeSbN < 3) {
@@ -698,13 +702,17 @@ static BOOL p110_leak_capture(NSString *tag, BOOL print, P110LeakSnap *snap) {
                    (the false value kept it on a software path that never
                    completed frames — the measured 0/3). Plus the explicit
                    HW-accel string key and the stage9 RCMode=20 pack. */
-                VTSessionSetProperty(ws, (__bridge CFStringRef)@"EncoderUsage",
+                OSStatus wStUsage = VTSessionSetProperty(ws, (__bridge CFStringRef)@"EncoderUsage",
                                      (__bridge CFTypeRef)[NSNumber numberWithInt:1]);
-                VTSessionSetProperty(ws, (__bridge CFStringRef)@"RCMode",
+                /* v3.9: RCMode=20 is the AVE2 stage9 pack value — a plain
+                   VTCompressionSession may REJECT it (the -12900 class) and
+                   then never complete a frame. Log every property status;
+                   drop RCMode when it errors. */
+                OSStatus wStRC = VTSessionSetProperty(ws, (__bridge CFStringRef)@"RCMode",
                                      (__bridge CFTypeRef)[NSNumber numberWithInt:20]);
-                VTSessionSetProperty(ws, (__bridge CFStringRef)@"EnableHardwareAcceleratedVideoEncoder",
+                OSStatus wStHW = VTSessionSetProperty(ws, (__bridge CFStringRef)@"EnableHardwareAcceleratedVideoEncoder",
                                      (__bridge CFTypeRef)@YES);
-                VTSessionSetProperty(ws, kVTCompressionPropertyKey_RealTime,
+                OSStatus wStRT = VTSessionSetProperty(ws, kVTCompressionPropertyKey_RealTime,
                                      kCFBooleanTrue);
                 OSStatus wprep = VTCompressionSessionPrepareToEncodeFrames(ws);
                 OSStatus est = -999;
@@ -722,7 +730,7 @@ static BOOL p110_leak_capture(NSString *tag, BOOL print, P110LeakSnap *snap) {
                         /* v3.8: bounded callback wait — CompleteFrames can
                            return before the async callback; the decode arm
                            needs REAL samples (wakeSbN>0), so wait for it. */
-                        for (int ww = 0; ww < 50 && g_p110_wakeSbN == 0; ww++)
+                        for (int ww = 0; ww < 100 && g_p110_wakeSbN == 0; ww++)
                             usleep(10000);
                         wcb = g_p110_wakeSbN;
                         CVPixelBufferRelease(wpb);
@@ -730,9 +738,12 @@ static BOOL p110_leak_capture(NSString *tag, BOOL print, P110LeakSnap *snap) {
                     }
                 }
                 Lf(@"[leak] WAKE-ARM cycle %d: create=0 prep=%d encode=%d "
-                   @"samples=%d (v3.8: RealTime=on + HW-accel → callbacks? "
-                   @"samples>0 = the engine produced output for the decode arm)",
-                   wc, (int)wprep, (int)est, wcb);
+                   @"callbacks=%d lastSt=%d samples=%d props[usage=%d rc=%d hw=%d rt=%d] "
+                   @"(v3.9: every property status logged; rc!=0 = the RCMode "
+                   @"pack value rejected — the -12900 class)",
+                   wc, (int)wprep, (int)est,
+                   atomic_load(&g_p110_wakeCb), atomic_load(&g_p110_wakeSt), wcb,
+                   (int)wStUsage, (int)wStRC, (int)wStHW, (int)wStRT);
                 VTCompressionSessionInvalidate(ws);
                 CFRelease(ws);
             }
