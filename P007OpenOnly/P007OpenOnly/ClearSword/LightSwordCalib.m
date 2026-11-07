@@ -397,7 +397,6 @@ static CFNumberRef RCNUM(int64_t v) {
                     }
                     rc_log("  AIM %s: content-qwords=%llu zero=%llu KPTR=%llu%s",
                            c == C_PARTIAL ? "PARTIAL" : (c == C_WRONG ? "WRONG" : "FOREIGN"),
-                           c == C_WRONG ? "WRONG" : "FOREIGN",
                            (unsigned long long)cont, (unsigned long long)zro,
                            (unsigned long long)kn, kn ? "  <-- POINTERS" : "");
                     for (int ki = 0; ki < kn; ki++)
