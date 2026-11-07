@@ -4,8 +4,26 @@ import ImageIO
 
 enum Catalog {
 
-    static var all: [ExploitModule] {
+    static var base: [ExploitModule] {
         luminaKRW + luminaLive + luminaParked + coreGraphics + imageIO + imageIO2 + archive + archive2 + coreMedia + crossSandbox + kernel + audio + audio2 + video + fonts + font2 + kext + userspace + tooling + probes
+    }
+
+    /// Every dispatcher id that does not already carry a rich module, so no
+    /// test exists only inside the TAP switch. Deduped by id (byID uses
+    /// uniqueKeysWithValues); the dispatcher stays the runtime.
+    static var tapDirectory: [ExploitModule] {
+        var seen = Set(base.map(\.id))
+        var out: [ExploitModule] = []
+        for item in TapDirectory.items where !seen.contains(item.id) {
+            seen.insert(item.id)
+            out.append(lum(item.id, item.title, "—", item.group,
+                           .probe, .inProcess, 3, item.title))
+        }
+        return out
+    }
+
+    static var all: [ExploitModule] {
+        base + tapDirectory
     }
 
     /// Modules that pin a fix Apple shipped in 27.2 (i.e. carry a CVE number). Computed,
@@ -413,6 +431,7 @@ extension Catalog {
             (tl("应用与系统进程"), userspace),
             (tl("工具链自检"), tooling),
             (tl("可达性探测"), probes),
+            ("All TAPs · dispatcher", tapDirectory),
         ]
     }
 

@@ -8,8 +8,8 @@ struct RootView: View {
 
     var body: some View {
         TabView(selection: $tabs.index) {
-            DashboardView().tabItem {
-                Label(t("tab.overview"), systemImage: "square.grid.2x2.fill")
+            TestsView().tabItem {
+                Label("Tests", systemImage: "magnifyingglass")
             }.tag(0)
 
             LabView().tabItem {
@@ -20,21 +20,13 @@ struct RootView: View {
                 Label(t("tab.chain"), systemImage: "link")
             }.tag(2)
 
-            ModView().tabItem {
-                Label(t("tab.mod"), systemImage: "folder.fill")
+            MoreView().tabItem {
+                Label("More", systemImage: "ellipsis.circle.fill")
             }.tag(3)
 
             ContentView().tabItem {
                 Label(t("tab.console"), systemImage: "text.alignleft")
             }.tag(4)
-
-            MindPane().tabItem {
-                Label(t("tab.mind"), systemImage: "brain.head.profile")
-            }.tag(5)
-
-            SystemView().tabItem {
-                Label(t("tab.system"), systemImage: "cpu")
-            }.tag(6)
         }
         .tint(T.violet)
         .safeAreaInset(edge: .top, spacing: 0) {
@@ -47,8 +39,13 @@ struct RootView: View {
             }
         }
         .overlay(alignment: .bottom) {
-            CopyToastOverlay()
-                .padding(.bottom, 52)
+            VStack(spacing: 6) {
+                if tabs.index != 4 {
+                    ConsolePeek().environmentObject(engine)
+                }
+                CopyToastOverlay()
+            }
+            .padding(.bottom, 52)
         }
         .onAppear {
             Container.ensureAll()

@@ -120,6 +120,10 @@ extension Catalog {
     ]
 
     static let luminaLive: [ExploitModule] = [
+            lum("p150", "P150 ANE UC REACH — IOServiceOpen type 0-2 on the ANE services (safe: no kernel method). Type 1 = direct evaluate client; 23F77 init skips com.apple.ane.iokit-user-access there. An OPEN unlocks the ProgramCreate probe.", "—", "AppleH11ANEInterface", .probe, .entitlementGated, 3,
+                "P150 ANE UC REACH: match AppleH11ANEInterface/H11ANEIn/ANE* and IOServiceOpen type 0-2; report service, registry class and kr per type; presence of the private framework classes. Nothing fires. 23F77 newUserClient: type 1 = direct evaluate client (init does NOT check com.apple.ane.iokit-user-access; only allow-dataChaining), type 0 = program loading client (checks it). OPEN = the ANE kernel paths are app-reachable."),
+            lum("p152", "P152 IOSURFACE GLOBAL GATE — own create/lookup baseline, then a foreign ID window + READ-ONLY lock; no contents copied. Foreign hit + lockRO=0 = the global lookup/ownerless lock door is live for this install.", "—", "IOSurface", .probe, .inProcess, 3,
+                "P152 IOSURFACE GLOBAL GATE: create 64x64 BGRA, lookup own ID, resolve IDs around it via IOSurfaceLookup, read alloc size/useCount and take a read-only lock. Receipts: own ok = IOSurfaceRoot reachable; foreign hits + lockRO=0 = the global-insecure path our ANE/AVE/AVD kernel clients use is live; zero hits = gated."),
             lum("ident", "0. Device identity + prove matrix", "—", "Lum1na TAP", .probe, .inProcess, 2,
                 "0. Device identity + prove matrix"),
             lum("board", "Board JSON + hasKread (p007_board.json)", "—", "Lum1na TAP", .probe, .inProcess, 2,
