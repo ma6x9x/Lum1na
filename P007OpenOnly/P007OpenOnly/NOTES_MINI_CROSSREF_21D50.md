@@ -1276,3 +1276,19 @@ door/stride laws; the p110 claim rows.
   now re-attested by 3 fresh receipts 135503/134910/083959).
 - The **3 wild-delta odd panics = the 12 mini (21D50)** — device-attributed to the mini's
   CS2/libkrw era (path-test-3); decode-owed (the 17.3 banding + the lkrw lane's frames).
+
+## 2026-11-07 — CVE-2026-112554 (the GPT-name OOB read) = a KREAD-CANDIDATE LANE on the 17 (the user's find)
+- The device's OWN Cinder tool (Payloads2.swift) builds the crafted GPT (4 x 128B entries, the
+  overlong name) and documents the law: **27.0 scan bound = 0x48 (72B); 27.2 tightened to 0x24
+  (36B)** => the vector is alive EXACTLY on our 17's build (24A435) and dead on later trains.
+- The reach question (the one census owed): the kernel GPT parser runs at DISK-IMAGE ATTACH;
+  the parsed partition name = an IOMedia registry property = **userland-readable via the
+  IOKit registry** => IF the app can open the DiskImages attach door (the p108 census's
+  AppleDiskImages2/KDI UC), the 72B scan overshoot = **36 bytes of kernel-heap bytes
+  returned to our app as the "Partition Name"** = the disclosure lane with a chosen input.
+- The heap-adjacency design (next build): the kernel allocates the GPT entry array at a
+  chosen size (entryCount x entrySize are attacker bytes) — groom the neighbor kalloc with
+  pointer-bearing objects, attach, read the name property = the KPTR receipt class. The same
+  classifier bands (0xfffffff0/0xfffffe00) apply.
+- HONESTY: leak = not kread by itself; this lane = the disclosure primitive + the aim. The
+  attach entitlement = the open census row (p108 re-run on the newest build = the tap).
