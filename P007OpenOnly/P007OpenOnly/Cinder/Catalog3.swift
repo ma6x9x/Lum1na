@@ -133,8 +133,13 @@ ctx.arm("cm.fdleak", "handshake + vend")
                    with the signature law. */
                 if case let (pentries, _) = session.list("/var/mobile/Library/Logs/CrashReporter", limit: 50) {
                     lines.append("  CrashReporter entries=\(pentries.count)")
-                    let panics = pentries.filter { $0.contains("panic") }.sorted().reversed()
-                    if let newest = panics.first {
+                    /* 2026-11-07 fix: the 'panic' name filter MISSED (last run listed
+                       50 entries but printed no PANIC-RDR row — panic naming varies).
+                       Print 3 names verbatim + fall back to the newest .ips. */
+                    lines.append("  names[:3]: \(pentries.prefix(3))")
+                    let ipsAll = pentries.filter { $0.hasSuffix(".ips") }.sorted().reversed()
+                    let newest = ipsAll.first(where: { $0.contains("panic") }) ?? ipsAll.first
+                    if let newest = newest {
                         let panPair = session.read("/var/mobile/Library/Logs/CrashReporter/\(newest)", limit: 1_200_000)
                         let panData = panPair.data
                         if let panData = panData {
@@ -156,6 +161,8 @@ ctx.arm("cm.fdleak", "handshake + vend")
                                 lines.append("  --- THE AUTO-SCAN PATH WORKS THROUGH THE DAEMON")
                             }
                         }
+                    } else {
+                        lines.append("  PANIC-RDR: no .ips among first 50 entries (the panic file may be deeper)")
                     }
                 }
                 lines.append(session.directOpenControl(FdLeak.readableDomain))
