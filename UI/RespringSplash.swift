@@ -67,7 +67,7 @@ struct Lum1naRespringSplash: View {
                     .tracking(10)
                     .foregroundStyle(Color.white)
 
-                Text("respringing — jailbreak active")
+                Text("respringing")
                     .font(.system(size: 13, weight: .medium, design: .rounded))
                     .foregroundStyle(.white.opacity(0.85))
 
@@ -84,7 +84,7 @@ struct Lum1naRespringSplash: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("LUM1NA respringing, jailbreak active")
+        .accessibilityLabel("LUM1NA respringing")
     }
 }
 
