@@ -273,10 +273,7 @@ enum Runners {
             d["IOSurfaceBytesPerElement"] = 4
             d["IOSurfaceBytesPerRow"] = max(256, size / 16)
             d["IOSurfaceAllocSize"] = size
-            var surf: UnsafeMutableRawPointer? = nil
-            d.withDictionaryRepresentation { cd, _ in
-                if let cd = cd { surf = create(cd) }
-            }
+            let surf = create(d as CFDictionary)
             if surf != nil { refs.append(surf); held += 1 }
         }
         // fill via IOSurfaceGetBaseAddress
