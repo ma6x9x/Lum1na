@@ -123,7 +123,7 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
         case LabSkuA12X_23G71: return @"iPad8,* A12X / 23G71";
         case LabSkuA12X_other: return @"iPad8,* A12X / not 23G71 or 23H30 — FIELD# only";
         case LabSkuA12X_23H30: return @"iPad8,* A12X / 23H30 — iPadOS 26.7.1 FIELD# only, PPL";
-        case LabSkuXR_22H311:  return @"XR A12 / 18.7.x — momentarius-ready";
+        case LabSkuXR_22H311:  return @"XR A12 / 18.7.5 (22H311) — ClearSword patched; momentarius needs kread first";
         case LabSkuA13_22G100:    return @"iPhone12,* A13 / 22x build (18.x) — reference rig; 22H 18.7.x harness";
         case LabSkuA13_19F77:     return @"iPhone12,5 A13 / 19F77 — usbliter8 tethered rig (15.5 stock)";
         case LabSkuA13_other:  return @"iPhone12,* A13 / not 18.x";
@@ -399,7 +399,7 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
             [out appendFormat:@"TRACK: iPad A12X osversion=%@ FIELD# only. 23G71 unslid VAs HOLD. SKIP 254.\n", [self osversion]];
             break;
         case LabSkuXR_22H311:
-            [out appendString:@"TRACK: XR A12 18.7.x — momentarius-ready (ladder row).\n"];
+            [out appendString:@"TRACK: XR A12 18.7.5 (22H311) — ClearSword patched; momentarius needs kread first (ladder row).\n"];
             break;
         case LabSkuA13_22G100:
             [out appendString:@"TRACK: iPhone12 A13 22G100 rig. CS2 KRW proven. Separate from hunt A14/A12X.\n"];

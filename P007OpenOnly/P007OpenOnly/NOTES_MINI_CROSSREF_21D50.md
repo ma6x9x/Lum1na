@@ -1680,3 +1680,18 @@ These describe bugs that exist on our PRE-FIX builds: 23F77 (26.5), 24A435 (27.0
   spin. A broken train now returns an honest failure instead of hanging.
 - gencnt is fixed at blob+0x110 (upstream); the QoS `so_background_thread`
   trick remains the one additive change (for the 22G100 socket locator).
+
+## 2026-11-08 — Full Chain panics at the CS2 stage; CS2 solo is fine
+- Solo CS2 (debug `cs2` / KERNEL) lands KRW on both 11 and mini. Full Chain
+  panics when it reaches the CS2 step. The core is not the problem; the
+  Full-Chain-only paths were.
+- Fixes: AMFI UC 2/7 reverted to 0 on A13_22G100/A14_21D50 (cross-train
+  selectors were a Full-Chain-only kernel interaction; 23F77 is the only
+  proven row). Socket→thread→proc locator is now opt-in
+  (Documents/lum1na_socket_locator); the kobject locator is the default and
+  the egress proc is re-validated by pid before any write. A process-level
+  CS2 guard refuses a second spray even when g_cs2Live is false.
+- Operator law: one ClearSword spray per boot **across both apps**. The
+  per-app boot guard cannot see the other container. If you run the debug
+  `cs2` solo, reboot before the main app Full Chain; or run main KERNEL then
+  Full Chain in the same process (the live lane is reused, no second spray).

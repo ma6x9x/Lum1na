@@ -221,16 +221,16 @@ static LabOffTab gA12X_23H30 = {
     .build_string = "23H30"
 };
 
-/* XR_22H311 — iPhone11,* A12 on iOS 18.7.x (22H*; user device 18.7.2, tag
-   kept from the original 18.7.5 plan). Dopamine 3.0.11 momentarius covers
-   A12 15.0-26.0.1, so this device CAN be jailbroken (PPL exploit ->
-   libkrw). Same honesty shape as the rig row: link base only (0xfffffff
-   007004000 — arm64e fileset base proven on 22G100 + 23F77; on-device
-   confirm = kbase minus static_base page-aligned) + info.c ladder
-   socket_usecount (18.7.x = darwin 24.x -> 0x254). Every VA 0 = unproven:
-   T8010 needs its own Ghidra pass; cs2core gate is 22H rev-specific —
-   22H31 (18.7.1) is pre-fix and viable, 22H124 (18.7.2) is patched.
-   Read/write here comes from libkrw only. */
+/* XR_22H311 — iPhone11,8 XR A12 on iOS 18.7.5, build 22H311. The tag now
+   matches the device exactly (it was originally a 18.7.5 placeholder).
+   22H311 >= 22H124, so CVE-2025-43520 is patched and ClearSword SKIPs.
+   Dopamine 3.0.12's initial-KRW exploits stop at 18.7.1 (ClearSword /
+   DarkSword) and momentarius is a PPL bypass that needs kread first, so
+   18.7.5 has no provider lane here. Same honesty shape as the rig row:
+   link base only (0xfffffff007004000) + info.c socket_usecount (18.7.x =
+   darwin 24.x -> 0x254). Every VA 0 = unproven; T8010 needs its own Ghidra
+   pass. Read/write on a supported 18.7.1 XR would come from libkrw; not
+   on 22H311. */
 static LabOffTab gXR_22H = {
     .tag = "XR_22H311",
     .static_base = 0xFFFFFFF007004000ULL,   /* link base; verify slide on device */
@@ -260,12 +260,11 @@ static LabOffTab gA14_21D50 = {
     .socket_usecount = 0x24c,               /* info.c ladder darwin>=23.1,<23.4 (17.3 = 23.3.0) */
     .socket_proto_off = 0x18,               /* info.c default through 17.3; 0x20 only at 23.4+ */
     .iosurface_md = 0x40,                   /* ladder: pre-23.4 layout (23.4+ is 0x30) */
-    /* AMFI UC external-method selectors are a property of the AMFI kext, not
-       the SoC/train: 2 = copyTrustCacheFromInputArguments, 7 = copyTrustCache
-       AndManifest, proven on 23F77 (A14_23F77 row). Same kext family on 17.3.
-       Test with the elevate+inject path; a refusal is logged, never silent. */
-    .amfi_sel_copy = 2,
-    .amfi_sel_manifest = 7,
+    /* AMFI UC 2/7 is proven on 23F77 only. On 17.3 the selector table may
+       differ; calling the wrong method after elevate is a Full-Chain-only
+       panic risk. Keep 0 (honest skip) until a 21D50 receipt exists. */
+    .amfi_sel_copy = 0,
+    .amfi_sel_manifest = 0,
     .pmap_cs_allow_off = 0,                 /* unproven — pokes skipped */
     .owns_replaceable = 0,
     .build_number = BUILD_21D50,
@@ -308,9 +307,10 @@ static LabOffTab gA13_22G100 = {
     .tag = "A13_22G100",
     .static_base = 0xFFFFFFF007004000ULL,   /* verified link base only */
     .socket_usecount = 0x254,               /* info.c ladder darwin>=23.4 (rig 24.6.0); iOS 26+ would be 0x23c */
-    /* Same AMFI UC selector pair as the 23F77 row (kext-global 2/7). */
-    .amfi_sel_copy = 2,
-    .amfi_sel_manifest = 7,
+    /* Same caution as 21D50: 2/7 is proven on 23F77 only. Keep 0 until a
+       22G100 A13 receipt exists; wrong selectors are a Full-Chain panic. */
+    .amfi_sel_copy = 0,
+    .amfi_sel_manifest = 0,
     .pmap_cs_allow_off = 0,                  /* unproven — poke skipped */
     .owns_replaceable = 0,
     .build_number = BUILD_22G100,

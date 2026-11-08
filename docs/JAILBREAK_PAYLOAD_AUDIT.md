@@ -83,3 +83,19 @@ activation leaves the session bootstrap usable.
 
 Still not supplied: the ElleKit package (`TweakLoader.dylib`). Install it via
 Sileo/Zebra after dpkg works, or drop an `ellekit.deb` into Documents/pkgman.
+
+## Full Chain CS2 panic (2026-11-08)
+
+Solo CS2 lands KRW; Full Chain panicked at the CS2 stage. Fixes:
+
+- AMFI UC 2/7 removed from the A13_22G100/A14_21D50 rows (23F77-only proof).
+  The Full Chain now honestly SKIPs AMFI on those SKUs.
+- Socket→thread→proc locator is opt-in (`Documents/lum1na_socket_locator`);
+  default is the kobject locator, and the located proc is re-checked against
+  getpid() before any write.
+- `Lum1naCS2Core_Establish` has a process-level attempt guard: a second call
+  in the same process cannot spray, even if the first failed.
+
+Cross-app caveat: the boot guard is per container. ONE CS2 spray per boot
+across Lum1na and Lum1na-Debug. If you run the debug `cs2` solo, reboot before
+the main Full Chain, or run main KERNEL→Full Chain in the same process.
