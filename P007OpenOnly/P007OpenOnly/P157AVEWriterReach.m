@@ -96,7 +96,7 @@
     uint32_t o5  = [self knob:@"p157_sel5_out" def:0x150];
     uint32_t sz7 = [self knob:@"p157_sel7_in" def:0x30];
     uint32_t o7  = [self knob:@"p157_sel7_out" def:0x20];
-    uint32_t cntOff = [self knob:@"p157_count_off" def:0x1f8]; /* iOS 23F77 SPS; 27.2 = 0x1f4 */
+    uint32_t cntOff = [self knob:@"p157_count_off" def:0x1f8]; /* iOS 23F77 SPS; 27.0/27.2 = 0x1f4 */
     uint32_t cntVal = [self knob:@"p157_count" def:0];       /* 0 => +4, positive/safe */
 
     [out appendString:[NSString stringWithFormat:
@@ -108,7 +108,7 @@
         sz1,o1, sz4,o4, sz3,o3, sz5,o5, sz7,o7, cntVal, cntOff];
     if (doPrep || doCfg || doStart || doProc)
         [out appendString:@"  [PANIC-POSSIBLE] Prepare/Config/Start/Process enabled — fresh boot, one tap, zeroed request only\n"];
-    [out appendString:@"  [law] signed underwrite is PRESENT on 17.3/18.6/26.5/iPad 26.7; iOS 27.2 writer adds a negative clamp. "
+    [out appendString:@"  [law] signed underwrite is PRESENT on 17.3/18.6/26.5/iPad 26.7; iOS 27.0/27.2 writer adds a negative clamp. "
                        @"This probe does not call the negative-count path.\n"];
 
     CFMutableDictionaryRef m = IOServiceMatching("AppleAVE2Driver");

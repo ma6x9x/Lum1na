@@ -27,14 +27,16 @@ Static confirmation on the iOS/iPadOS binaries (capstone, 2026-11-08):
 | 21D50 (17.3, A14 mini) | present (9 signed `strb` sites) | not matched (older layout) |
 | 22G100 (18.6.2, A13) | present (9) | not matched |
 | 23F77 (26.5, A14) | present (9) | **present** (`0xfffffff0081f3520`) |
+| 24A435 (27.0, T8150) | **writer clamped** (`cmp/csel lt`) | present |
 | 24B119 (27.2, A14) | **writer clamped** (`cmp/csel lt` before `asr`) | **present** (`0xfffffff0083bd224`) |
 | iPad 23H24 (26.7) | present (9) | present |
 | iPad 23H128 (26.7.2) | present (9) | present |
 
-The count-add site is present on both 26.5 (`ldr w8,[x20,#0x1f8]; add
-w2,w8,#4; bl WriteU`) and 27.2 (`[x20,#0x1f4]`). The 27.2 writer clamps the
-negative position, so the underwrite is fixed there; the 27.2 PushBack sink
-is still unfixed.
+The count-add site is present on 26.5 (`ldr w8,[x20,#0x1f8]; add w2,w8,#4;
+bl WriteU`) and on 27.0/27.2 (`[x20,#0x1f4]`). Both 27.x writers clamp the
+negative position, so the underwrite is fixed there; the PushBack sink is
+still unfixed. **The 26.5 A14 build is the best port target: writer and sink
+both present, and it is the main 12 rig.**
 
 This is the first app-reachable write primitive found that is independent of
 the CS2 socket race. It is **not yet a working iOS write**: the macOS request
