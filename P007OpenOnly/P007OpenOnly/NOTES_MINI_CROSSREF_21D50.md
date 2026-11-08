@@ -1656,3 +1656,15 @@ These describe bugs that exist on our PRE-FIX builds: 23F77 (26.5), 24A435 (27.0
   csel poison; cmp x9,x10; b.ls). This is the 112696/84494 OOB-write class.
   The iPhone H16 kext has the same rebuild (278 B-only); exact map still
   pending the 24A435↔24B119 full diff.
+
+## 2026-11-08 — AVE2 iOS dispatch/Start geometry (23F77)
+- UC dispatch table 0xfffffff007bfec88, 0x18-byte entries, 9 entries from
+  selector 3: Config 0x38/0x20, Prepare 0x1a0a0/0x20, Start 0x1a0b0/0x150,
+  Process 0x30/0x20 (six variants). macOS 0x12c08/0x12c18 do not transfer.
+- Start handler 0x836a640 -> 0x836ac4c -> 0x824a808(ctx=[UC+0x160],
+  input+0x18, [input+0x28], [input+0x1a0a8], input+0x22c, input+0x340,
+  input+0x2c). Writer/pipeline = ctx+0x2d0; input+0x1a0a8 is the field
+  pointer. Signed writer 0x835bc60; PushBack 0x81f3504.
+- p157 defaults updated to the iOS sizes and count offset; reach-only.
+- Remaining: list offset vs writer buffer base via FUN_835011c and the
+  Process command path FUN_824e014/FUN_837b838.

@@ -88,15 +88,15 @@
     uint32_t doProc = [self knob:@"p157_process" def:0];
     uint32_t sz1 = [self knob:@"p157_sel1_in" def:0x768];
     uint32_t o1  = [self knob:@"p157_sel1_out" def:0x38];
-    uint32_t sz4 = [self knob:@"p157_sel4_in" def:0x12c08];
+    uint32_t sz4 = [self knob:@"p157_sel4_in" def:0x1a0a0];
     uint32_t o4  = [self knob:@"p157_sel4_out" def:0x20];
     uint32_t sz3 = [self knob:@"p157_sel3_in" def:0x38];
     uint32_t o3  = [self knob:@"p157_sel3_out" def:0x20];
-    uint32_t sz5 = [self knob:@"p157_sel5_in" def:0x12c18];
+    uint32_t sz5 = [self knob:@"p157_sel5_in" def:0x1a0b0];
     uint32_t o5  = [self knob:@"p157_sel5_out" def:0x150];
     uint32_t sz7 = [self knob:@"p157_sel7_in" def:0x30];
     uint32_t o7  = [self knob:@"p157_sel7_out" def:0x20];
-    uint32_t cntOff = [self knob:@"p157_count_off" def:0x1f8]; /* iOS 23F77 SPS; 27.0/27.2 = 0x1f4 */
+    uint32_t cntOff = [self knob:@"p157_count_off" def:0x1a0a8]; /* Start-core field pointer (23F77) */
     uint32_t cntVal = [self knob:@"p157_count" def:0];       /* 0 => +4, positive/safe */
 
     [out appendString:[NSString stringWithFormat:
@@ -108,7 +108,7 @@
         sz1,o1, sz4,o4, sz3,o3, sz5,o5, sz7,o7, cntVal, cntOff];
     if (doPrep || doCfg || doStart || doProc)
         [out appendString:@"  [PANIC-POSSIBLE] Prepare/Config/Start/Process enabled — fresh boot, one tap, zeroed request only\n"];
-    [out appendString:@"  [law] signed underwrite is PRESENT on 17.3/18.6/26.5/iPad 26.7; iOS 27.0/27.2 writer adds a negative clamp. "
+    [out appendString:@"  [law] iOS dispatch: sel3 Config 0x38/0x20, sel4 Prepare 0x1a0a0/0x20, sel5 Start 0x1a0b0/0x150, sel6-11 Process 0x30/0x20. Underwrite present on 17.3/18.6/26.5/iPad 26.7; 27.0/27.2 writer clamps. "
                        @"This probe does not call the negative-count path.\n"];
 
     CFMutableDictionaryRef m = IOServiceMatching("AppleAVE2Driver");
