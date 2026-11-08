@@ -252,3 +252,15 @@ extraction + `kextdiff2`/global pairing on the four relevant kexts:
   `umulh/cmp xzr` multiplication-overflow check. This is the ANE OOB-write
   hardening class; the iPhone H16 kext shows the same rebuild (278 B-only)
   but the exact function map still needs the 24A435↔24B119 full diff.
+
+### Full 24A435 → 24B119 run (completed)
+- Kernel 13432.2.10~2 → 13432.42.3~28, 235 updated kexts.
+- AppleH16ANEInterface 10.19.6 → 10.102.4, **functions 4959 → 5100 (+141)**
+  — the large function-count jump is the bounds-safety rebuild (index and
+  overflow checks), consistent with the iPad H11ANE 8-function set and the
+  `cmp/sxtw/csel/b.ls` pattern.
+- T8150ANEHAL 10.19.6 → 10.102.4.
+- AppleAVE2 913.43.1 → 913.64.1, functions 2995 → 2998 (three new checks).
+- IOSurface 402.8 → 403.1, `__text` 0x3461c → 0x34634 (the ready gate).
+- IOHIDFamily 2360.2.2 → 2360.40.13, functions 2808 → 2809 (index clamp).
+- AppleHIDTransport 10100.41 → 10110.1.
