@@ -83,3 +83,23 @@ found on M2/M3/M4 base. There is **no evidence** the same DropMDSID path
 exists in the iOS AGX firmware for T8150/T8027; porting would first require
 matching the AGX firmware command path on the iOS kext, so this stays
 reference-only for now.
+
+## Ghidra static proof (23F77, 26.5, A14)
+
+`WriteBits` at `0xfffffff00835bc60` decompiles to:
+
+```c
+iVar1 = *(int *)(writer + 0xc);              /* signed bit/byte position */
+if (*(int *)(writer + 0x14) <= iVar1)        /* only index < capacity */
+    return 0xfffffc05;
+*(int *)(writer + 0xc) = iVar1 + 1;
+*(char *)(*(long *)(writer + 0x20) + (long)iVar1) = (char)uVar3;  /* sxtw */
+```
+
+There is no `iVar1 >= 0` check, so a negative position passes and the
+`(long)` cast sign-extends it before the store — exactly the macOS root
+cause, on iOS 26.5.
+
+`_AVE_DLList_PushBack` at `0xfffffff0081f3520` decompiles to the same
+NULL-only checks and `*plVar1 = param_2;` store, confirming the consumer.
+The macOS client geometry (list/writer offsets) is the remaining port gap.
