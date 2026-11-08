@@ -268,6 +268,52 @@ static BOOL ak_extractUstar(NSData *tar, NSString *destDir, NSMutableString *s) 
    strips the tar's "basebin/" prefix, so dest is /var/jb/basebin. A full
    Procursus bootstrap (dpkg, shells) is still a separate payload — this
    installs the injection/respring basebin our pipeline needs. */
+static void ak_installTweaks(NSMutableString *s) {
+    NSFileManager *fm = [NSFileManager defaultManager];
+    /* ak_tweakDylibs also copies bundle tweaks into Documents/tweaks. */
+    (void)ak_tweakDylibs();
+    NSString *docs = NSSearchPathForDirectoriesInDomains(
+        NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+    NSString *src = docs ? [docs stringByAppendingPathComponent:@"tweaks"] : nil;
+    NSArray<NSString *> *names = src ? [fm contentsOfDirectoryAtPath:src error:nil] : nil;
+    if (!names.count) {
+        ak_log(s, @"[*] tweaks: none staged");
+        return;
+    }
+    /* ElleKit TweakLoader scans the classic MobileSubstrate directory and
+       the newer TweakInject directory. Install into both so a real
+       bootstrap's TweakLoader finds them. */
+    NSArray<NSString *> *dirs = @[
+        @"/var/jb/Library/MobileSubstrate/DynamicLibraries",
+        @"/var/jb/usr/lib/TweakInject",
+    ];
+    NSUInteger copied = 0;
+    for (NSString *dir in dirs) {
+        [fm createDirectoryAtPath:dir withIntermediateDirectories:YES attributes:nil error:nil];
+        for (NSString *n in names) {
+            NSString *ext = n.pathExtension.lowercaseString;
+            if (![ext isEqualToString:@"dylib"] && ![ext isEqualToString:@"plist"]) continue;
+            NSString *dst = [dir stringByAppendingPathComponent:n];
+            if ([fm fileExistsAtPath:dst]) continue;
+            if ([fm copyItemAtPath:[src stringByAppendingPathComponent:n]
+                            toPath:dst error:nil]) copied++;
+        }
+    }
+    BOOL loader = [fm fileExistsAtPath:@"/var/jb/usr/lib/TweakLoader.dylib"];
+    ak_log(s, @"[+] tweaks installed (%lu copies) — TweakLoader %@",
+           (unsigned long)copied, loader ? @"present" : @"MISSING (needs the ElleKit/bootstrap package)");
+}
+
+static void ak_reportBootstrap(NSMutableString *s) {
+    NSFileManager *fm = [NSFileManager defaultManager];
+    BOOL dpkg = [fm isExecutableFileAtPath:@"/var/jb/usr/bin/dpkg"];
+    BOOL sbreload = [fm isExecutableFileAtPath:@"/var/jb/usr/bin/sbreload"];
+    BOOL tee = [fm isExecutableFileAtPath:@"/var/jb/usr/bin/ellekit"];
+    ak_log(s, @"[*] bootstrap: dpkg=%@ sbreload=%@ ellekit=%@ "
+               @"(/var/jb/usr — Procursus payload is separate from basebin.tar)",
+           dpkg ? @"yes" : @"NO", sbreload ? @"yes" : @"NO", tee ? @"yes" : @"NO");
+}
+
 static void ak_installJbroot(NSMutableString *s) {
     if (getuid() != 0) {
         ak_log(s, @"[-] jbroot SKIP — uid=%d (elevate did not land; /var write would fail)", getuid());
@@ -276,40 +322,42 @@ static void ak_installJbroot(NSMutableString *s) {
     NSFileManager *fm = [NSFileManager defaultManager];
     NSString *bin = @"/var/jb/basebin";
     NSString *jbctl = [bin stringByAppendingPathComponent:@"jbctl"];
-    if ([fm fileExistsAtPath:jbctl]) {
-        ak_log(s, @"[*] jbroot already installed at /var/jb/basebin (jbctl present)");
-        return;
-    }
-    NSError *err = nil;
-    if (![fm createDirectoryAtPath:bin withIntermediateDirectories:YES
-                        attributes:nil error:&err]) {
-        ak_log(s, @"[-] jbroot mkdir %@ failed: %@", bin, err.localizedDescription);
-        return;
-    }
-    NSString *tarPath = ak_findFile(@"basebin.tar");
-    NSData *tar = tarPath ? [NSData dataWithContentsOfFile:tarPath] : nil;
-    if (!tar.length) {
-        ak_log(s, @"[-] jbroot SKIP — basebin.tar missing");
-        return;
-    }
-    BOOL ok = ak_extractUstar(tar, bin, s);
-    NSString *tc = ak_findFile(@"basebin.tc");
-    if (tc) {
-        [fm removeItemAtPath:[bin stringByAppendingPathComponent:@"basebin.tc"] error:NULL];
-        [fm copyItemAtPath:tc
-                    toPath:[bin stringByAppendingPathComponent:@"basebin.tc"] error:NULL];
-    }
-    NSArray<NSString *> *execs = @[ @"jbctl", @"opainject", @"boomerang", @"hookd",
-                                    @"dopamine", @"idownloadd", @"MachOMerger" ];
-    for (NSString *name in execs) {
-        NSString *p = [bin stringByAppendingPathComponent:name];
-        if ([fm fileExistsAtPath:p]) {
-            [fm setAttributes:@{ NSFilePosixPermissions: @(0755) }
-                 ofItemAtPath:p error:NULL];
+    if (![fm fileExistsAtPath:jbctl]) {
+        NSError *err = nil;
+        if (![fm createDirectoryAtPath:bin withIntermediateDirectories:YES
+                            attributes:nil error:&err]) {
+            ak_log(s, @"[-] jbroot mkdir %@ failed: %@", bin, err.localizedDescription);
+            return;
         }
+        NSString *tarPath = ak_findFile(@"basebin.tar");
+        NSData *tar = tarPath ? [NSData dataWithContentsOfFile:tarPath] : nil;
+        if (!tar.length) {
+            ak_log(s, @"[-] jbroot SKIP — basebin.tar missing");
+            return;
+        }
+        BOOL ok = ak_extractUstar(tar, bin, s);
+        NSString *tc = ak_findFile(@"basebin.tc");
+        if (tc) {
+            [fm removeItemAtPath:[bin stringByAppendingPathComponent:@"basebin.tc"] error:NULL];
+            [fm copyItemAtPath:tc
+                        toPath:[bin stringByAppendingPathComponent:@"basebin.tc"] error:NULL];
+        }
+        NSArray<NSString *> *execs = @[ @"jbctl", @"opainject", @"boomerang", @"hookd",
+                                        @"dopamine", @"idownloadd", @"MachOMerger" ];
+        for (NSString *name in execs) {
+            NSString *p = [bin stringByAppendingPathComponent:name];
+            if ([fm fileExistsAtPath:p]) {
+                [fm setAttributes:@{ NSFilePosixPermissions: @(0755) }
+                     ofItemAtPath:p error:NULL];
+            }
+        }
+        ak_log(s, @"[%@] jbroot install at /var/jb/basebin (files=%d, basebin.tc=%@)",
+               ok ? @"+" : @"-", ok, tc ? @"yes" : @"no");
+    } else {
+        ak_log(s, @"[*] jbroot already installed at /var/jb/basebin (jbctl present)");
     }
-    ak_log(s, @"[%@] jbroot install at /var/jb/basebin (files=%d, basebin.tc=%@)",
-           ok ? @"+" : @"-", ok, tc ? @"yes" : @"no");
+    ak_installTweaks(s);
+    ak_reportBootstrap(s);
 }
 
 static void ak_alias(NSString *from, NSString *to, NSMutableString *s) {

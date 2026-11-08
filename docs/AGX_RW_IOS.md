@@ -56,3 +56,20 @@ vm_map.pmap                   0x40
 The repo is AGPL-3.0. We copied **offset facts and the traversal method**,
 not code, and did not vendor `libsrd.a`. If any AGPL source is ever copied
 into Lum1na, the app distribution must comply with AGPL-3.0.
+
+## pe_v3 and LightSword (26+)
+
+`pe_v3` is the A18/22G100 **ClearSword reoccupation path** (batch socket
+spray, foreign-read limit, `PE_V3_SETTLE_SECONDS`, dealloc pacing, proven
+cycles). It targets the *unpatched* 22G100 OG lane and relies on A18 copy
+semantics + `STATIC_RIPCBINFO` for the slide.
+
+LightSword runs on **patched 26+ trains** where the OG `pwritev → EFAULT`
+primitive is gone and the copy27 lane only yields PARTIAL/WRONG foreign
+pages. pe_v3's **reoccupation strategy** (keep a defunct-immune socket pool,
+re-spray in paced batches after a foreign read, rescan the same IOSurfaces)
+is the reusable idea; its A18 constants, gate, and slide source are not.
+It does not change the fundamental issue: a WRONG page is not an inpcb slab
+page, so reoccupation cannot convert it by itself. It is at best a
+reliability improvement for a genuine PARTIAL hit and should be a
+catalog-solo experiment, not an auto lane.
