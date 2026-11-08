@@ -96,17 +96,14 @@ struct GateView: View {
             VStack(spacing: 10) {
                 LuminaMark(size: 78)
                 Text("Lum1na")
-                    .font(.system(size: 36, weight: .bold, design: .rounded))
-                    .foregroundStyle(
-                        LinearGradient(colors: [T.emberSoft, T.violet, T.cyan],
-                                       startPoint: .leading, endPoint: .trailing)
-                    )
+                    .font(.system(size: 34, weight: .bold))
+                    .foregroundStyle(.white)
                 Text("Debugger · \(LuminaStamp.ui)")
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundColor(.white.opacity(0.45))
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.72))
                 Text(t("ov.headline"))
-                    .font(.system(size: 13, weight: .medium, design: .rounded))
-                    .foregroundColor(.white.opacity(0.4))
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundStyle(.white.opacity(0.62))
                     .multilineTextAlignment(.center)
             }
 
@@ -137,7 +134,7 @@ struct GateView: View {
                 }
                 .padding(.horizontal, 24)
 
-                RunButton(title: t("gate.enter"), systemImage: "arrow.right.circle.fill", tint: T.violet) {
+                RunButton(title: t("gate.enter"), systemImage: "arrow.right.circle.fill", tint: T.accent) {
                     entered = true
                 }
                 .padding(.horizontal, 24)

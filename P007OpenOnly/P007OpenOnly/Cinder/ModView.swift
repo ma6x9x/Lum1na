@@ -33,25 +33,42 @@ struct ModView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 7) {
+                Menu {
+                    Picker("Tool", selection: $pane) {
                         ForEach(Array(panes.enumerated()), id: \.offset) { i, entry in
-                            Button { pane = i } label: {
-                                HStack(spacing: 4) {
-                                    Image(systemName: entry.1).font(.system(size: 9, weight: .semibold))
-                                    Text(entry.0)
-                                }
-                                .font(T.tiny)
-                                .foregroundColor(pane == i ? .white : .white.opacity(0.45))
-                                .padding(.horizontal, 8).padding(.vertical, 4)
-                                .background(Capsule().fill(pane == i ? T.ember.opacity(0.22) : Color.white.opacity(0.04)))
-                                .overlay(Capsule().strokeBorder(pane == i ? T.ember.opacity(0.55) : T.stroke, lineWidth: 0.6))
-                            }
+                            Label(entry.0, systemImage: entry.1).tag(i)
                         }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 9)
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: panes[pane].1)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(T.accent)
+                            .frame(width: 32, height: 32)
+                            .background(T.accent.opacity(0.14), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Tool")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(.secondary)
+                            Text(panes[pane].0)
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+                        }
+                        Spacer(minLength: 8)
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 14)
+                    .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+                    .background(T.panel, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
                 }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .padding(.bottom, 6)
+                .accessibilityLabel("Tool, \(panes[pane].0)")
 
                 switch pane {
                 case 0: FilesPane()

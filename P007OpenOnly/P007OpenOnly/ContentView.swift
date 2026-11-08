@@ -7,6 +7,7 @@ struct ContentView: View {
     @State private var copiedFlash = false
     @State private var running = false
     @State private var showMore = false
+    @State private var probeQuery = ""
     @State private var showHour = false
     @State private var showSettings = false
     @State private var showLogs = false
@@ -14,89 +15,92 @@ struct ContentView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                ScrollView {
-                    Text(text)
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundColor(Color.white.opacity(0.86))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(10)
-                        // Cap layout cost — huge recovered logs froze first paint.
-                        .lineLimit(running ? 8 : 400)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.black.opacity(0.42))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .strokeBorder(T.cyan.opacity(0.18), lineWidth: 1)
-                )
-                .padding(.horizontal, 8)
-                .padding(.top, 6)
-                .allowsHitTesting(!running)
+            ZStack {
+                LuminaBackdrop()
+                VStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(kreadSignal)
+                            .font(.system(size: 12, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(2)
+                            .textSelection(.enabled)
+                        ScrollView {
+                            Text(text)
+                                .font(.system(size: 12, design: .monospaced))
+                                .foregroundStyle(.primary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .textSelection(.enabled)
+                                // Cap layout cost — huge recovered logs froze first paint.
+                                .lineLimit(running ? 8 : 400)
+                        }
+                        Text(LuminaStamp.ui)
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .padding(14)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                    .background(T.panel, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                    .padding(.horizontal, 16)
+                    .allowsHitTesting(!running)
 
-                VStack(spacing: 8) {
                     if running {
                         Button {
                             running = false
                             text = "UI unlocked. Probe may still run in background.\n" + text
                         } label: {
                             HStack(spacing: 10) {
-                                ProgressView().controlSize(.small).tint(T.emberSoft)
+                                ProgressView().controlSize(.small)
                                 Text("Unlock UI")
-                                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                                    .font(.system(size: 16, weight: .semibold))
                                 Spacer()
                                 Text("frees buttons")
                                     .font(T.tiny)
-                                    .foregroundColor(.white.opacity(0.55))
+                                    .foregroundStyle(.secondary)
                             }
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 14)
-                            .padding(.vertical, 11)
+                            .foregroundStyle(.primary)
+                            .padding(.horizontal, 16)
+                            .frame(minHeight: 48)
                         }
-                        .luminaGlass(RoundedRectangle(cornerRadius: 12, style: .continuous),
-                                     interactive: true, tint: T.ember)
+                        .luminaGlass(RoundedRectangle(cornerRadius: 22, style: .continuous),
+                                     interactive: true, tint: T.accent)
+                        .padding(.horizontal, 16)
                     }
-                    HStack(spacing: 8) {
-                        hotButton("KERNEL", id: "krw")
-                        hotButton("PATHS", id: "pathtest")
+
+                    LazyVGrid(columns: [
+                        GridItem(.flexible(), spacing: 10),
+                        GridItem(.flexible(), spacing: 10)
+                    ], spacing: 10) {
+                        huntTile("KERNEL", "cpu", id: "krw", prominent: true)
+                        huntTile("PATHS", "arrow.triangle.branch", id: "pathtest", prominent: false)
+                        huntTile("Ident", "person.text.rectangle", id: "ident", prominent: false)
+                        huntTile("KREAD", "memorychip", id: "kreadtest", prominent: true)
                     }
-                    HStack(spacing: 8) {
-                        hotButton("Ident", id: "ident")
-                        hotButton("KREAD", id: "kreadtest")
-                    }
+                    .padding(.horizontal, 16)
+
                     ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            utilIcon(copiedFlash ? "checkmark" : "doc.on.doc", "Copy") {
+                        HStack(spacing: 2) {
+                            toolButton(copiedFlash ? "checkmark" : "doc.on.doc", "Copy") {
                                 LuminaCopyBus.shared.copy(text, label: "Console copied")
                                 copiedFlash = true
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { copiedFlash = false }
                             }
-                            utilIcon("doc.text.magnifyingglass", "Recover") { showRecoveredLog() }
-                            utilIcon("folder", "Logs") { showLogs = true }
-                            utilButton("Lab") { LuminaTabs.shared.index = 1 }
-                            utilButton("Chain") { LuminaTabs.shared.index = 2 }
-                            utilIcon("gearshape", "Settings") { showSettings = true }
-                            utilButton("All TAPs") { showMore = true }
+                            toolButton("doc.text.magnifyingglass", "Recover") { showRecoveredLog() }
+                            toolButton("folder", "Logs") { showLogs = true }
+                            toolButton("list.bullet", "All TAPs") { showMore = true }
+                            toolButton("gearshape", "Settings") { showSettings = true }
+                            toolButton("ant", "Lab") { LuminaTabs.shared.index = 1 }
+                            toolButton("link", "Chain") { LuminaTabs.shared.index = 2 }
                         }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 4)
                     }
+                    .luminaGlass(RoundedRectangle(cornerRadius: 26, style: .continuous), interactive: false)
+                    .padding(.horizontal, 16)
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+                .padding(.bottom, 8)
             }
-            .luminaCanvas()
             .navigationTitle("Console")
             .navigationBarTitleDisplayMode(.inline)
-            .safeAreaInset(edge: .top, spacing: 0) {
-                Text("\(LuminaStamp.ui)  \(kreadSignal)")
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(T.cyan.opacity(0.85))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 4)
-            }
         }
         // Do NOT scan Documents on first frame — that caused ~1s freeze.
         .sheet(isPresented: $showSettings) {
@@ -334,6 +338,8 @@ struct ContentView: View {
                         moreRow("p017 legacy conf-deputy (STOP)", "p017")
                     }
                 }
+                .listStyle(.insetGrouped)
+                .searchable(text: $probeQuery, prompt: "Name or id")
                 .navigationTitle("All probes")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
@@ -348,54 +354,60 @@ struct ContentView: View {
     }
 
     @ViewBuilder
-    private func hotButton(_ title: String, id: String) -> some View {
+    private func huntTile(_ title: String, _ systemImage: String, id: String, prominent: Bool) -> some View {
         Button {
             UIImpactFeedbackGenerator(style: .light).impactOccurred()
             run(id)
         } label: {
-            Text(title)
-                .font(.system(size: 13, weight: .semibold, design: .rounded))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 11)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-                .foregroundColor(.white)
+            VStack(alignment: .leading, spacing: 10) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 18, weight: .semibold))
+                Text(title)
+                    .font(.system(size: 15, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .foregroundStyle(prominent ? AnyShapeStyle(.white) : AnyShapeStyle(.primary))
+            .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
+            .padding(14)
+            .background {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .fill(prominent ? T.accent : T.panel)
+            }
         }
-        .luminaGlass(RoundedRectangle(cornerRadius: 12, style: .continuous),
-                     interactive: !running, tint: T.ember)
+        .buttonStyle(.plain)
         .disabled(running)
-        .opacity(running ? 0.55 : 1)
+        .opacity(running ? 0.5 : 1)
+        .accessibilityLabel(title)
     }
 
     @ViewBuilder
-    private func utilButton(_ title: String, action: @escaping () -> Void) -> some View {
+    private func toolButton(_ system: String, _ label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Text(title)
-                .font(.system(size: 11, weight: .semibold, design: .rounded))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 7)
-                .foregroundColor(.white)
+            VStack(spacing: 3) {
+                Image(systemName: system)
+                    .font(.system(size: 16, weight: .semibold))
+                Text(label)
+                    .font(.system(size: 11, weight: .medium))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(.primary)
+            .frame(minWidth: 64, minHeight: 48)
         }
-        .luminaGlass(Capsule(), interactive: true, tint: T.cyan)
-    }
-
-    @ViewBuilder
-    private func utilIcon(_ system: String, _ label: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Image(systemName: system)
-                .font(.system(size: 12, weight: .semibold))
-                .padding(.horizontal, 8)
-                .padding(.vertical, 7)
-                .foregroundColor(.white)
-        }
-        .luminaGlass(Capsule(), interactive: true, tint: T.cyan)
+        .buttonStyle(.plain)
         .accessibilityLabel(label)
     }
 
+    @ViewBuilder
     private func moreRow(_ title: String, _ id: String) -> some View {
-        Button(title) {
-            showMore = false
-            run(id)
+        let q = probeQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        if q.isEmpty
+            || title.localizedCaseInsensitiveContains(q)
+            || id.localizedCaseInsensitiveContains(q) {
+            Button(title) {
+                showMore = false
+                run(id)
+            }
         }
     }
 

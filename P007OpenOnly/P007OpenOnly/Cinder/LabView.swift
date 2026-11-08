@@ -23,7 +23,19 @@ extension PrimitiveKind {
         case .infoLeak: return T.violet
         case .typeConfusion: return T.info
         case .intOverflow: return T.emberSoft
-        case .probe: return .white.opacity(0.5)
+        case .probe: return Color.secondary
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .oobWrite: return "square.and.pencil"
+        case .oobRead: return "eye"
+        case .uaf: return "timer"
+        case .infoLeak: return "dot.radiowaves.right"
+        case .typeConfusion: return "questionmark.square"
+        case .intOverflow: return "plus.forwardslash.minus"
+        case .probe: return "scope"
         }
     }
 }
@@ -31,7 +43,7 @@ extension PrimitiveKind {
 extension LabVerdict {
     var tint: Color {
         switch self {
-        case .untested: return .white.opacity(0.3)
+        case .untested: return Color.secondary
         case .running: return T.info
         case .completed: return T.good
         case .refused: return T.warn
@@ -43,95 +55,8 @@ extension LabVerdict {
 // MARK: - Lab
 
 struct LabView: View {
-    @EnvironmentObject private var engine: LabEngine
-    @State private var selected: ExploitModule?
-
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(spacing: 18) {
-                    ForEach(Catalog.groups, id: \.0) { group in
-                        VStack(alignment: .leading, spacing: 8) {
-                            SectionLabel(text: group.0)
-                            ForEach(group.1) { module in
-                                Button {
-                                    selected = module
-                                } label: {
-                                    moduleRow(module)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        }
-                    }
-                }
-                .padding(16)
-            }
-            .luminaCanvas()
-            .navigationTitle(t("lab.title"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Copy all") {
-                        LuminaCopyBus.shared.copy(engine.copyAllResults(), label: "All logs copied")
-                    }
-                    .font(T.tiny)
-                    .tint(T.ember)
-                }
-            }
-            .sheet(item: $selected) { module in
-                ModuleDetailView(module: module)
-                    .environmentObject(engine)
-                    .presentationDetents([.large])
-            }
-        }
-    }
-
-    private func moduleRow(_ module: ExploitModule) -> some View {
-        let verdict = engine.journal.verdict(for: module.id)
-        let isRunning = engine.running.contains(module.id)
-        return VStack(alignment: .leading, spacing: 7) {
-            HStack(spacing: 8) {
-                Text(module.title)
-                    .font(.system(size: 13.5, weight: .semibold, design: .rounded))
-                    .foregroundColor(.white.opacity(0.92))
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                Spacer(minLength: 4)
-                if isRunning {
-                    ProgressView().scaleEffect(0.6)
-                } else {
-                    Pill(text: t(verdict.key), color: verdict.tint)
-                }
-            }
-            HStack(spacing: 6) {
-                Pill(text: module.primitive.label, color: module.primitive.tint)
-                Pill(text: module.reach.label, color: module.reach.tint)
-                Text(module.cve)
-                    .font(T.monoSm)
-                    .foregroundColor(.white.opacity(0.3))
-                    .lineLimit(1)
-            }
-            Text(module.component)
-                .font(T.monoSm)
-                .foregroundColor(.white.opacity(0.28))
-                .lineLimit(1)
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background {
-            RoundedRectangle(cornerRadius: 14, style: .continuous).fill(T.panel)
-        }
-        .overlay(alignment: .leading) {
-            RoundedRectangle(cornerRadius: 2, style: .continuous)
-                .fill(isRunning ? T.info : verdict.tint)
-                .frame(width: 3)
-                .padding(.vertical, 10)
-                .padding(.leading, 4)
-        }
-        .overlay(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(verdict.tint.opacity(isRunning ? 0.55 : 0.22), lineWidth: 1)
-        )
+        CatalogBrowser(title: t("lab.title"), showsCopy: true)
     }
 }
 

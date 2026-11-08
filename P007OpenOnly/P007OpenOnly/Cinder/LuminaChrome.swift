@@ -8,7 +8,7 @@ import Combine
 // phone still has an older IPA. Glass is chrome only — TAP bodies unchanged.
 
 enum LuminaStamp {
-    static let ui = "hunt-krw-15-tests"
+    static let ui = "ios26-catalog-1"
 }
 
 final class LuminaTabs: ObservableObject {
@@ -119,32 +119,31 @@ private struct LuminaGlassMod<S: InsettableShape>: ViewModifier {
                 ZStack {
                     shape.fill(.ultraThinMaterial)
                     if let tint {
-                        shape.fill(tint.opacity(0.16))
+                        shape.fill(tint.opacity(0.18))
                     } else {
-                        shape.fill(T.ember.opacity(0.06))
+                        shape.fill(Color.white.opacity(0.06))
                     }
                     shape.fill(
-                        LinearGradient(colors: [Color.white.opacity(0.22), .clear],
+                        LinearGradient(colors: [Color.white.opacity(0.28), .clear],
                                        startPoint: .top,
-                                       endPoint: UnitPoint(x: 0.5, y: 0.45))
+                                       endPoint: UnitPoint(x: 0.5, y: 0.42))
                     )
                 }
             }
             .overlay(
                 shape.strokeBorder(
                     AngularGradient(stops: [
-                        .init(color: .white.opacity(0.55), location: 0.00),
-                        .init(color: T.ember.opacity(0.40), location: 0.18),
-                        .init(color: T.violet.opacity(0.32), location: 0.38),
-                        .init(color: .white.opacity(0.08), location: 0.52),
-                        .init(color: T.cyan.opacity(0.32), location: 0.70),
-                        .init(color: .white.opacity(0.10), location: 0.80),
-                        .init(color: .white.opacity(0.55), location: 1.00)
+                        .init(color: .white.opacity(0.70), location: 0.00),
+                        .init(color: .white.opacity(0.10), location: 0.22),
+                        .init(color: .clear, location: 0.46),
+                        .init(color: .white.opacity(0.22), location: 0.58),
+                        .init(color: .clear, location: 0.76),
+                        .init(color: .white.opacity(0.65), location: 1.00)
                     ], center: .center, angle: .degrees(-135)),
-                    lineWidth: contrast ? 1.4 : 0.8)
+                    lineWidth: contrast ? 1.5 : 0.8)
                 .blendMode(.plusLighter)
             )
-            .shadow(color: .black.opacity(0.35), radius: 16, y: 8)
+            .shadow(color: .black.opacity(0.28), radius: 16, y: 8)
     }
 }
 
@@ -153,8 +152,9 @@ extension View {
         modifier(LuminaGlassMod(shape: shape, interactive: interactive, tint: tint))
     }
 
+    /// Opaque grouped page. Lists and tool panes sit on this so text stays legible.
     func luminaCanvas() -> some View {
-        background { Color.clear.ignoresSafeArea() }
+        background { Color(.systemGroupedBackground).ignoresSafeArea() }
     }
 }
 
@@ -171,10 +171,9 @@ struct LuminaBackdrop: View {
         TimelineView(.animation(minimumInterval: paused ? 120 : (1.0 / 20.0), paused: paused)) { context in
             let t = paused ? 0 : context.date.timeIntervalSinceReferenceDate
             ZStack {
-                T.void.ignoresSafeArea()
+                Color(red: 0.05, green: 0.07, blue: 0.12).ignoresSafeArea()
                 mesh(t)
                 orbs(t)
-                if !paused { stars(t) }
                 grain
             }
         }
@@ -195,42 +194,30 @@ struct LuminaBackdrop: View {
                     SIMD2<Float>(0, 1), SIMD2<Float>(0.5, 1), SIMD2<Float>(1, 1)
                 ],
                 colors: [
-                    Color(red: 0.05, green: 0.02, blue: 0.10),
-                    T.ember.opacity(0.50),
-                    Color(red: 0.04, green: 0.04, blue: 0.14),
-                    T.cyan.opacity(0.32),
-                    Color(red: 0.10, green: 0.04, blue: 0.18),
-                    T.violet.opacity(0.42),
-                    Color(red: 0.02, green: 0.03, blue: 0.10),
-                    T.ember.opacity(0.22),
-                    Color(red: 0.03, green: 0.02, blue: 0.08)
+                    Color(red: 0.10, green: 0.22, blue: 0.42),
+                    Color(red: 0.18, green: 0.40, blue: 0.62),
+                    Color(red: 0.08, green: 0.16, blue: 0.30),
+                    Color(red: 0.16, green: 0.28, blue: 0.40),
+                    Color(red: 0.22, green: 0.24, blue: 0.32),
+                    Color(red: 0.42, green: 0.32, blue: 0.20),
+                    Color(red: 0.10, green: 0.14, blue: 0.22),
+                    Color(red: 0.55, green: 0.40, blue: 0.22),
+                    Color(red: 0.16, green: 0.18, blue: 0.16)
                 ]
             )
             .ignoresSafeArea()
-            .opacity(0.85)
+            .opacity(0.92)
         } else {
             LinearGradient(
                 colors: [
-                    Color(red: 0.12, green: 0.04, blue: 0.12),
-                    Color(red: 0.03, green: 0.05, blue: 0.14),
-                    Color(red: 0.05, green: 0.02, blue: 0.10)
+                    Color(red: 0.16, green: 0.32, blue: 0.52),
+                    Color(red: 0.10, green: 0.16, blue: 0.28),
+                    Color(red: 0.36, green: 0.26, blue: 0.14)
                 ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
+                startPoint: .top,
+                endPoint: .bottom
             )
             .ignoresSafeArea()
-            .overlay(
-                RadialGradient(colors: [T.ember.opacity(0.30), .clear],
-                               center: .top, startRadius: 20, endRadius: 380)
-            )
-            .overlay(
-                RadialGradient(colors: [T.violet.opacity(0.22), .clear],
-                               center: .center, startRadius: 10, endRadius: 360)
-            )
-            .overlay(
-                RadialGradient(colors: [T.cyan.opacity(0.18), .clear],
-                               center: .bottomTrailing, startRadius: 10, endRadius: 340)
-            )
         }
     }
 
@@ -240,39 +227,23 @@ struct LuminaBackdrop: View {
             let h = geo.size.height
             ZStack {
                 Circle()
-                    .fill(T.ember.opacity(0.24))
-                    .frame(width: 220, height: 220)
+                    .fill(Color(red: 0.35, green: 0.62, blue: 0.90).opacity(0.28))
+                    .frame(width: 240, height: 240)
                     .blur(radius: 70)
                     .offset(x: w * 0.18 + CGFloat(12 * sin(t * 0.21)),
-                            y: -h * 0.18 + CGFloat(10 * cos(t * 0.17)))
+                            y: -h * 0.22 + CGFloat(10 * cos(t * 0.17)))
                 Circle()
-                    .fill(T.violet.opacity(0.20))
-                    .frame(width: 200, height: 200)
-                    .blur(radius: 74)
-                    .offset(x: -w * 0.22 + CGFloat(9 * cos(t * 0.16)),
-                            y: h * 0.12 + CGFloat(11 * sin(t * 0.13)))
-                Circle()
-                    .fill(T.cyan.opacity(0.16))
+                    .fill(Color(red: 0.90, green: 0.62, blue: 0.28).opacity(0.22))
                     .frame(width: 260, height: 260)
                     .blur(radius: 80)
-                    .offset(x: w * 0.42 + CGFloat(10 * cos(t * 0.14)),
-                            y: h * 0.38 + CGFloat(8 * sin(t * 0.19)))
-            }
-        }
-        .ignoresSafeArea()
-    }
-
-    private func stars(_ t: TimeInterval) -> some View {
-        Canvas { ctx, size in
-            for i in 0..<36 {
-                let seed = CGFloat((i * 47) % 997)
-                let x = (seed * 17).truncatingRemainder(dividingBy: max(size.width, 1))
-                let y = (seed * 29).truncatingRemainder(dividingBy: max(size.height, 1))
-                let twinkle = 0.22 + 0.55 * (0.5 + 0.5 * sin(t * 0.65 + Double(i)))
-                let r: CGFloat = i % 7 == 0 ? 1.5 : 0.7
-                let col: Color = i % 4 == 0 ? T.cyan : (i % 4 == 1 ? T.emberSoft : (i % 4 == 2 ? T.violet : .white))
-                ctx.fill(Path(ellipseIn: CGRect(x: x, y: y, width: r * 2, height: r * 2)),
-                         with: .color(col.opacity(twinkle * 0.55)))
+                    .offset(x: -w * 0.10 + CGFloat(9 * cos(t * 0.16)),
+                            y: h * 0.28 + CGFloat(11 * sin(t * 0.13)))
+                Circle()
+                    .fill(Color(red: 0.45, green: 0.55, blue: 0.72).opacity(0.18))
+                    .frame(width: 200, height: 200)
+                    .blur(radius: 74)
+                    .offset(x: w * 0.30 + CGFloat(10 * cos(t * 0.14)),
+                            y: h * 0.05 + CGFloat(8 * sin(t * 0.19)))
             }
         }
         .ignoresSafeArea()
@@ -311,23 +282,17 @@ struct LuminaMark: View {
     var body: some View {
         ZStack {
             Circle()
-                .fill(
-                    RadialGradient(colors: [
-                        T.ember.opacity(0.55),
-                        T.violet.opacity(0.28),
-                        T.cyan.opacity(0.0)
-                    ], center: .center, startRadius: 2, endRadius: size * 0.55)
-                )
+                .fill(T.accent.opacity(0.22))
                 .frame(width: size, height: size)
-                .blur(radius: size * 0.14)
             Circle()
-                .strokeBorder(
-                    AngularGradient(colors: [T.ember, T.violet, T.cyan, T.ember],
-                                    center: .center),
-                    lineWidth: max(1.0, size * 0.018))
-                .frame(width: size * 0.70, height: size * 0.70)
+                .fill(.ultraThinMaterial)
+                .frame(width: size * 0.72, height: size * 0.72)
+            Image(systemName: "circle.hexagongrid.fill")
+                .font(.system(size: size * 0.28, weight: .semibold))
+                .foregroundStyle(T.accent)
+                .accessibilityHidden(true)
         }
-        .accessibilityHidden(true)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel("Lum1na")
     }
 }
@@ -363,11 +328,11 @@ struct CopyToastOverlay: View {
                     .foregroundColor(T.good)
                 Text(message)
                     .font(T.tiny)
-                    .foregroundColor(.white)
+                    .foregroundStyle(.primary)
             }
             .padding(.horizontal, 14)
-            .padding(.vertical, 9)
-            .luminaGlass(Capsule(), interactive: false, tint: T.good)
+            .padding(.vertical, 10)
+            .luminaGlass(Capsule(), interactive: false)
             .padding(.bottom, 8)
             .transition(.move(edge: .bottom).combined(with: .opacity))
             .accessibilityAddTraits(.updatesFrequently)
@@ -487,17 +452,18 @@ struct BoardHUD: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 6) {
-                hudChip(snap.sku, color: T.cyan)
+                hudChip(snap.sku, color: T.accent)
                 hudChip(snap.hasKread ? "kread YES" : "kread NO",
                         color: snap.hasKread ? T.good : T.bad)
                 hudChip(snap.conversion ? "conv YES" : "conv NO",
-                        color: snap.conversion ? T.warn : .white.opacity(0.45))
+                        color: snap.conversion ? T.warn : Color.secondary)
                 hudChip(snap.occupancy ? "occ YES" : "occ NO",
-                        color: snap.occupancy ? T.ember : .white.opacity(0.45))
+                        color: snap.occupancy ? T.ember : Color.secondary)
                 Spacer(minLength: 0)
                 Text(LuminaStamp.ui)
                     .font(T.monoSm)
-                    .foregroundColor(.white.opacity(0.38))
+                    .foregroundStyle(.tertiary)
+                    .lineLimit(1)
             }
             Button {
                 LuminaCopyBus.shared.copy(snap.copyBlock, label: "Next TAP · \(snap.nextID)")
@@ -505,24 +471,27 @@ struct BoardHUD: View {
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "arrow.right.circle.fill")
-                        .font(.system(size: 11, weight: .bold))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(T.accent)
                     Text("NEXT \(snap.nextID)")
-                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(.primary)
                     Text(snap.nextWhy)
                         .font(T.tiny)
-                        .foregroundColor(.white.opacity(0.62))
+                        .foregroundStyle(.secondary)
                         .lineLimit(1)
                     Spacer(minLength: 0)
                 }
-                .foregroundColor(T.emberSoft)
+                .frame(minHeight: 32)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Copy next tap \(snap.nextID)")
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .luminaGlass(RoundedRectangle(cornerRadius: 16, style: .continuous), interactive: true, tint: T.violet)
-        .padding(.horizontal, 10)
-        .padding(.top, 4)
+        .luminaGlass(RoundedRectangle(cornerRadius: 22, style: .continuous), interactive: true)
+        .padding(.horizontal, 12)
+        .padding(.top, 2)
         .onAppear { snap = BoardSnapshot.current() }
         .onChange(of: engine.logLines.count) { _, _ in snap = BoardSnapshot.current() }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in

@@ -412,8 +412,11 @@ let m1: ExploitModule = ExploitModule(
 }
 
 extension Catalog {
+    /// Rich modules keep their own sections. Dispatcher ids that do not already
+    /// have a rich module are split by TapDirectory group (A–K), in first-seen
+    /// order. Empty buckets are omitted. Ids are never listed twice.
     static var groups: [(String, [ExploitModule])] {
-        [
+        let rich: [(String, [ExploitModule])] = [
             ("Lum1na KRW", luminaKRW),
             ("Lum1na live", luminaLive),
             ("Lum1na parked", luminaParked),
@@ -431,8 +434,16 @@ extension Catalog {
             (tl("应用与系统进程"), userspace),
             (tl("工具链自检"), tooling),
             (tl("可达性探测"), probes),
-            ("All TAPs · dispatcher", tapDirectory),
         ]
+        let buckets = Dictionary(grouping: tapDirectory, by: \.component)
+        var seen = Set<String>()
+        var letters: [(String, [ExploitModule])] = []
+        for item in TapDirectory.items where seen.insert(item.group).inserted {
+            if let mods = buckets[item.group], !mods.isEmpty {
+                letters.append((item.group, mods))
+            }
+        }
+        return rich + letters
     }
 
     static var byID: [String: ExploitModule] {

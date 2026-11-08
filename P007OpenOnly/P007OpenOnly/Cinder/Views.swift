@@ -8,27 +8,29 @@ struct RootView: View {
 
     var body: some View {
         TabView(selection: $tabs.index) {
-            TestsView().tabItem {
-                Label("Tests", systemImage: "magnifyingglass")
-            }.tag(0)
+            TestsView()
+                .tabItem { Label("Tests", systemImage: "magnifyingglass") }
+                .tag(0)
 
-            LabView().tabItem {
-                Label(t("tab.lab"), systemImage: "ant.fill")
-            }.tag(1)
+            LabView()
+                .tabItem { Label(t("tab.lab"), systemImage: "ant.fill") }
+                .tag(1)
 
-            ChainView().tabItem {
-                Label(t("tab.chain"), systemImage: "link")
-            }.tag(2)
+            ChainView()
+                .safeAreaInset(edge: .bottom, spacing: 0) { logPeek }
+                .tabItem { Label(t("tab.chain"), systemImage: "link") }
+                .tag(2)
 
-            MoreView().tabItem {
-                Label("More", systemImage: "ellipsis.circle.fill")
-            }.tag(3)
+            MoreView()
+                .safeAreaInset(edge: .bottom, spacing: 0) { logPeek }
+                .tabItem { Label("More", systemImage: "ellipsis.circle") }
+                .tag(3)
 
-            ContentView().tabItem {
-                Label(t("tab.console"), systemImage: "text.alignleft")
-            }.tag(4)
+            ContentView()
+                .tabItem { Label(t("tab.console"), systemImage: "text.alignleft") }
+                .tag(4)
         }
-        .tint(T.violet)
+        .tint(T.accent)
         .safeAreaInset(edge: .top, spacing: 0) {
             BoardHUD(tab: $tabs.index)
         }
@@ -39,17 +41,21 @@ struct RootView: View {
             }
         }
         .overlay(alignment: .bottom) {
-            VStack(spacing: 6) {
-                if tabs.index != 4 {
-                    ConsolePeek().environmentObject(engine)
-                }
-                CopyToastOverlay()
-            }
-            .padding(.bottom, 52)
+            CopyToastOverlay()
+                .padding(.bottom, tabs.index == 4 ? 72 : 108)
         }
         .onAppear {
             Container.ensureAll()
             runAutorunIfRequested()
+        }
+    }
+
+    @ViewBuilder
+    private var logPeek: some View {
+        if tabs.index != 4 {
+            ConsolePeek()
+                .environmentObject(engine)
+                .padding(.bottom, 6)
         }
     }
 
@@ -150,13 +156,10 @@ struct DashboardView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Lum1na")
                     .font(T.title)
-                    .foregroundStyle(
-                        LinearGradient(colors: [T.emberSoft, T.violet, T.cyan],
-                                       startPoint: .leading, endPoint: .trailing)
-                    )
+                    .foregroundStyle(.primary)
                 Text(t("ov.headline"))
                     .font(T.body)
-                    .foregroundColor(.white.opacity(0.72))
+                    .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(String(format: t("ov.sub"), Catalog.all.count, Catalog.locatedFixes))
                     .font(T.tiny)
@@ -266,15 +269,12 @@ struct DashboardView: View {
             Text(value).font(.system(size: 22, weight: .bold, design: .rounded)).foregroundColor(color)
             Text(title).font(T.tiny).foregroundColor(.white.opacity(0.4))
         }
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, minHeight: 72)
         .padding(.vertical, 14)
-        .background {
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(T.panel)
-        }
+        .background(T.panel, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
         .overlay(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(color.opacity(0.35), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 0.5)
         )
     }
 }

@@ -38,6 +38,7 @@ struct P007OpenOnlyApp: App {
                     .environmentObject(l10n)
                     .environment(\.layoutDirection, Lang.resolved.isRTL ? .rightToLeft : .leftToRight)
                     .preferredColorScheme(.dark)
+                    .tint(T.accent)
                     .id(Lang.resolved)
             }
         }
