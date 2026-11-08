@@ -65,6 +65,39 @@
     .kernproc       = KERNPROC, \
 }
 
+/* 22G100 (Darwin 24.6) socket/thread/task ladder, proven by the iOS
+   AGX-RW PoC on iPhone17,* 22G100. The same Darwin 24.6 layout is what the
+   A13 18.6.2 rig runs; keep these 0 on rows where the ladder is not pinned. */
+#define PROC_ROW_D24G(TAG, KERNPROC) { \
+    .tag = TAG, \
+    .proc_list_next = 0x0, \
+    .proc_list_prev = 0x8, \
+    .proc_proc_ro   = 0x18, \
+    .proc_svuid     = 0x38, \
+    .proc_svgid     = 0x3C, \
+    .proc_pid       = 0x60, \
+    .proc_fd        = 0xD0, \
+    .proc_flag      = 0x454, \
+    .pro_ro_csflags = 0x24, \
+    .pro_ro_ucred   = 0x28, \
+    .pro_ro_task_tokens = 0x48, \
+    .ucred_uid      = 0x18, \
+    .ucred_ruid     = 0x1C, \
+    .ucred_svuid    = 0x20, \
+    .ucred_groups   = 0x28, \
+    .ucred_rgid     = 0x68, \
+    .ucred_svgid    = 0x6C, \
+    .ucred_label    = 0x78, \
+    .inpcb_inp_socket = 0x40, \
+    .socket_so_background_thread = 0x2B0, \
+    .thread_t_ro = 0x3F0, \
+    .thread_ro_proc = 0x18, \
+    .proc_ro_task = 0x8, \
+    .task_map = 0x28, \
+    .map_pmap = 0x40, \
+    .kernproc       = KERNPROC, \
+}
+
 static const LabProcOffTab gProcOffTabs[] = {
     /* A14 hunt (26.5, darwin 25.5): Dopamine 24.4+ ladder + P7 leak agree.
        26.5 REMOVED proc_ro.task_tokens (info.c:602) — audit fix must skip. */
@@ -91,8 +124,9 @@ static const LabProcOffTab gProcOffTabs[] = {
     .kernproc       = KERNPROC, \
 }
     PROC_ROW_D25("A14_23F77", 0),
-    /* A13 rig (18.6.2, darwin 24.6): same 24.4+ ladder. */
-    PROC_ROW("A13_22G100", 0),
+    /* A13 rig (18.6.2, darwin 24.6): 24.4+ ladder + the 22G100
+       socket/thread/task traversal from the iOS AGX-RW PoC. */
+    PROC_ROW_D24G("A13_22G100", 0),
     /* A12X iPad twin (23G71): same ladder, untested on T8020. */
     PROC_ROW("A12X_23G71", 0),
     /* XR (iPhone11,*) 18.7.x = darwin 24.x: same 24.4+ ladder as the rig.

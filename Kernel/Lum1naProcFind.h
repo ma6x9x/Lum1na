@@ -14,6 +14,7 @@
 //
 
 #import <Foundation/Foundation.h>
+#import "Lum1naStructOffsets.h"
 #include <stdint.h>
 
 /// @param pid        getpid()
@@ -24,3 +25,11 @@
 ///         returns 0 and the caller HOLDs.
 uint64_t Lum1naFindSelfProc(uint32_t pid, uint32_t pidOff, uint32_t procRoOff,
                             NSString * _Nullable * _Nullable how);
+
+/// ClearSword-lane self-proc: pcb -> inpcb.inp_socket -> socket.so_background_thread
+/// -> thread.t_ro -> thread_ro.proc. Requires the 22G100 traversal offsets
+/// (LabProcOff()->socket_so_background_thread etc.) and a live rw-socket pcb.
+/// Returns 0 if the ladder is not pinned or any read fails validation.
+uint64_t Lum1naFindSelfProcViaSocket(const LabProcOffTab *po, uint32_t pid,
+                                     uint64_t rwSocketPcb,
+                                     NSString * _Nullable * _Nullable how);

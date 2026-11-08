@@ -52,6 +52,19 @@ typedef struct {
     uint32_t ucred_svgid;     // cr_posix + 0x54 = 0x6C
     uint32_t ucred_label;     // 0x78
 
+    // Socket → background thread → thread_ro → proc, and proc_ro → task →
+    // vm_map → pmap. Values proven on 22G100 (Darwin 24.6) by the
+    // AGX-RW-iOS-PoC (iPhone17,* 22G100); 0 = not pinned for this SKU.
+    // This traversal is the symbol-free self-proc route when ClearSword is
+    // the live lane (no mach_port_kobject needed) and unlocks pmap.
+    uint32_t inpcb_inp_socket;             // 0x40
+    uint32_t socket_so_background_thread; // 0x2B0
+    uint32_t thread_t_ro;                 // 0x3F0
+    uint32_t thread_ro_proc;              // 0x18
+    uint32_t proc_ro_task;                // 0x8
+    uint32_t task_map;                    // 0x28
+    uint32_t map_pmap;                    // 0x40
+
     // Unslid kernproc VA (proc 0, allproc-list member). 0 = UNDERIVED.
     // Backward le_prev walk from kernproc reaches every proc without the
     // allproc list-head symbol. Ghidra task queued per SKU.

