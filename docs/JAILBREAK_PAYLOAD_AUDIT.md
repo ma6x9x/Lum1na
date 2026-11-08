@@ -63,3 +63,23 @@ signature strips them. No entitlement changes were made.
   `P007OpenOnly`.
 - The 22G100 traversal fields and `Lum1naFindSelfProcViaSocket` are main-app
   only (the debug app has no ELEVATE stage); `p156`/`p157` are debug-only.
+
+## Bootstrap staging (session, testable now)
+
+`tools/push_bootstrap.sh <UDID> <BUNDLE_ID>` downloads the Procursus
+bootstrap, decompresses it on the Mac, and pushes `bootstrap.tar` into the
+app's Documents. After elevate, `ak_installBootstrap` maps the tar's
+`./var/jb/...` entries into the existing `/var/jb` (real dir or a Dopamine
+preboot symlink), handling regular files, dirs, symlinks and hardlinks. That
+gives `/var/jb/usr/bin/dpkg`, `sbreload`, `launchctl`, and the bootstrap
+libraries for a session.
+
+Opt-in persistence/dyld merge: create `Documents/lum1na_dopamine_activate`.
+The app then copies `/var/jb/basebin/dopamine` to `/var/tmp/dopamine` and runs
+`dopamine activate`, which performs update_var_jb_symlink / basebin gen
+(dyldhook merge via MachOMerger) / trustcache / launchd hook / daemon load.
+It can replace `/var/jb` with the preboot symlink, so it is opt-in; a failed
+activation leaves the session bootstrap usable.
+
+Still not supplied: the ElleKit package (`TweakLoader.dylib`). Install it via
+Sileo/Zebra after dpkg works, or drop an `ellekit.deb` into Documents/pkgman.

@@ -19,6 +19,7 @@
 #import <sys/wait.h>
 #import <errno.h>
 #import <time.h>
+#import <sys/stat.h>
 #include <unistd.h>
 
 #ifndef MH_MAGIC_64
@@ -268,6 +269,210 @@ static BOOL ak_extractUstar(NSData *tar, NSString *destDir, NSMutableString *s) 
    strips the tar's "basebin/" prefix, so dest is /var/jb/basebin. A full
    Procursus bootstrap (dpkg, shells) is still a separate payload — this
    installs the injection/respring basebin our pipeline needs. */
+
+/* Full ustar/pax extractor for the Procursus bootstrap tar.
+   The bootstrap paths are "./var/jb/..."; extracting with destRoot "/"
+   recreates /var/jb. Handles regular files, dirs, symlinks, hardlinks and
+   pax extended headers (path/linkpath/size). Anything outside var/jb is
+   refused; no ".." paths. */
+static void ak_pax_field(const char *rec, size_t len, char *pathOut, size_t pathCap,
+                         char *linkOut, size_t linkCap, uint64_t *sizeOut) {
+    size_t off = 0;
+    while (off < len) {
+        /* "%d key=value\n" */
+        size_t sp = off;
+        while (sp < len && rec[sp] != ' ') sp++;
+        if (sp >= len) break;
+        unsigned long reclen = strtoul(rec + off, NULL, 10);
+        if (reclen == 0 || off + reclen > len) break;
+        const char *kv = rec + sp + 1;
+        size_t kvlen = (off + reclen) - (sp + 1);
+        if (kvlen && kv[kvlen - 1] == '\n') kvlen--;
+        const char *eq = memchr(kv, '=', kvlen);
+        if (eq) {
+            size_t klen = eq - kv;
+            const char *v = eq + 1;
+            size_t vlen = kvlen - klen - 1;
+            if (klen == 4 && !memcmp(kv, "path", 4) && pathOut) {
+                size_t c = vlen < pathCap - 1 ? vlen : pathCap - 1;
+                memcpy(pathOut, v, c); pathOut[c] = 0;
+            } else if (klen == 8 && !memcmp(kv, "linkpath", 8) && linkOut) {
+                size_t c = vlen < linkCap - 1 ? vlen : linkCap - 1;
+                memcpy(linkOut, v, c); linkOut[c] = 0;
+            } else if (klen == 4 && !memcmp(kv, "size", 4) && sizeOut) {
+                *sizeOut = strtoull(v, NULL, 10);
+            }
+        }
+        off += reclen;
+    }
+}
+
+static BOOL ak_extractSystemTar(NSData *tar, NSMutableString *s) {
+    if (tar.length < 512) return NO;
+    const uint8_t *p = tar.bytes;
+    size_t n = tar.length, off = 0;
+    NSFileManager *fm = [NSFileManager defaultManager];
+    uint32_t files = 0, links = 0;
+    char longName[1024] = {0}, longLink[1024] = {0};
+    char paxPath[1024] = {0}, paxLink[1024] = {0};
+    uint64_t paxSize = 0; BOOL paxSizeValid = NO;
+
+    while (off + 512 <= n) {
+        const char *hdr = (const char *)(p + off);
+        int empty = 1;
+        for (int i = 0; i < 512; i++) if (hdr[i]) { empty = 0; break; }
+        if (empty) break;
+        char type = hdr[156];
+        uint64_t size = ak_tarOctal(hdr + 124, 12);
+        uint64_t mode = ak_tarOctal(hdr + 100, 8);
+        off += 512;
+        size_t dataOff = off;
+        size_t padded = (size + 511u) & ~511u;
+        if (off + padded > n && off + size > n) break;
+
+        if (type == 'x' || type == 'g') {
+            if (type == 'x') {
+                ak_pax_field((const char *)(p + dataOff), (size_t)size,
+                             paxPath, sizeof(paxPath), paxLink, sizeof(paxLink),
+                             &paxSize);
+                paxSizeValid = paxPath[0] || paxLink[0];
+            }
+            off += padded;
+            continue;
+        }
+        if (type == 'L' || type == 'K') {
+            size_t copy = size < sizeof(longName) - 1 ? (size_t)size : sizeof(longName) - 1;
+            if (type == 'L') { memcpy(longName, p + dataOff, copy); longName[copy] = 0; }
+            else { memcpy(longLink, p + dataOff, copy); longLink[copy] = 0; }
+            off += padded;
+            continue;
+        }
+
+        char namebuf[1024] = {0}, linkbuf[1024] = {0};
+        if (paxPath[0]) { strncpy(namebuf, paxPath, sizeof(namebuf) - 1); }
+        else if (longName[0]) { strncpy(namebuf, longName, sizeof(namebuf) - 1); }
+        else {
+            char prefix[156] = {0};
+            memcpy(prefix, hdr + 345, 155);
+            if (prefix[0]) snprintf(namebuf, sizeof(namebuf), "%s/%s", prefix, hdr);
+            else { memcpy(namebuf, hdr, 100); namebuf[sizeof(namebuf) - 1] = 0; }
+        }
+        if (paxLink[0]) strncpy(linkbuf, paxLink, sizeof(linkbuf) - 1);
+        else if (longLink[0]) strncpy(linkbuf, longLink, sizeof(linkbuf) - 1);
+        else { memcpy(linkbuf, hdr + 157, 100); linkbuf[sizeof(linkbuf) - 1] = 0; }
+        if (paxSizeValid && paxSize) size = paxSize;
+        paxPath[0] = paxLink[0] = longName[0] = longLink[0] = 0;
+        paxSizeValid = NO; paxSize = 0;
+
+        const char *rel = namebuf;
+        while (*rel == '.' || *rel == '/') rel++;
+        if (!rel[0] || strstr(rel, "..")) { off += padded; continue; }
+        if (strncmp(rel, "var/jb/", 7) != 0 && strcmp(rel, "var/jb") != 0) {
+            off += padded; continue;
+        }
+        NSString *outPath = [@"/" stringByAppendingPathComponent:
+                             [NSString stringWithUTF8String:rel]];
+        if (type == '5' || (rel[strlen(rel) - 1] == '/')) {
+            [fm createDirectoryAtPath:outPath withIntermediateDirectories:YES attributes:nil error:nil];
+            off += padded; continue;
+        }
+        NSString *parent = [outPath stringByDeletingLastPathComponent];
+        [fm createDirectoryAtPath:parent withIntermediateDirectories:YES attributes:nil error:nil];
+
+        if (type == '2') {
+            [fm removeItemAtPath:outPath error:nil];
+            if (linkbuf[0]) {
+                const char *lt = linkbuf;
+                if (symlink(lt, outPath.fileSystemRepresentation) == 0) links++;
+            }
+        } else if (type == '1') {
+            const char *lt = linkbuf;
+            while (*lt == '.' || *lt == '/') lt++;
+            NSString *src = [@"/" stringByAppendingPathComponent:
+                             [NSString stringWithUTF8String:lt]];
+            [fm removeItemAtPath:outPath error:nil];
+            if (link(src.fileSystemRepresentation, outPath.fileSystemRepresentation) == 0) {
+                links++;
+            } else if ([fm copyItemAtPath:src toPath:outPath error:nil]) {
+                files++;
+            }
+        } else if (type == '0' || type == '\0') {
+            NSData *blob = [NSData dataWithBytes:p + dataOff length:(NSUInteger)size];
+            if ([blob writeToFile:outPath atomically:YES]) {
+                files++;
+                if (mode) [fm setAttributes:@{ NSFilePosixPermissions: @(mode & 0777) }
+                             ofItemAtPath:outPath error:nil];
+            } else {
+                [fm removeItemAtPath:outPath error:nil];
+                if ([blob writeToFile:outPath atomically:YES]) files++;
+            }
+        }
+        off += padded;
+    }
+    ak_log(s, @"[*] bootstrap extract: files=%u links=%u", files, links);
+    return files > 0 || links > 0;
+}
+
+static int ak_spawn(NSString *path, NSArray<NSString *> *args, NSMutableString *s);
+
+static void ak_installBootstrap(NSMutableString *s) {
+    NSFileManager *fm = [NSFileManager defaultManager];
+    if ([fm isExecutableFileAtPath:@"/var/jb/usr/bin/dpkg"]) {
+        ak_log(s, @"[*] bootstrap already present (/var/jb/usr/bin/dpkg)");
+        return;
+    }
+    if (getuid() != 0) {
+        ak_log(s, @"[-] bootstrap SKIP — uid=%d", getuid());
+        return;
+    }
+    NSString *tarPath = ak_findFile(@"bootstrap.tar");
+    if (!tarPath) {
+        ak_log(s, @"[*] bootstrap.tar absent — push via tools/push_bootstrap.sh "
+                   @"(Mac: curl+unzstd, then afcclient put Documents/bootstrap.tar)");
+        return;
+    }
+    NSData *tar = [NSData dataWithContentsOfFile:tarPath
+                                         options:NSDataReadingMappedIfSafe error:NULL];
+    if (!tar.length) {
+        ak_log(s, @"[-] bootstrap.tar unreadable");
+        return;
+    }
+    ak_log(s, @"[*] extracting Procursus bootstrap from %@ (%lu bytes)",
+           tarPath.lastPathComponent, (unsigned long)tar.length);
+    BOOL ok = ak_extractSystemTar(tar, s);
+    BOOL dpkg = [fm isExecutableFileAtPath:@"/var/jb/usr/bin/dpkg"];
+    BOOL sbreload = [fm isExecutableFileAtPath:@"/var/jb/usr/bin/sbreload"];
+    BOOL launchctl = [fm isExecutableFileAtPath:@"/var/jb/usr/bin/launchctl"];
+    ak_log(s, @"[%@] bootstrap install dpkg=%@ sbreload=%@ launchctl=%@",
+           ok && dpkg ? @"+" : @"-", dpkg ? @"yes" : @"NO",
+           sbreload ? @"yes" : @"NO", launchctl ? @"yes" : @"NO");
+
+    /* Optional dyld-merge/daemon activation. Dopamine's self-contained
+       `dopamine` binary performs update_var_jb_symlink, basebin gen/merge,
+       trustcache, launchhook and daemon loading. It may replace /var/jb with
+       the preboot symlink, so this is opt-in: Documents/lum1na_dopamine_activate. */
+    NSString *docs = NSSearchPathForDirectoriesInDomains(
+        NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+    NSString *optIn = docs ? [docs stringByAppendingPathComponent:@"lum1na_dopamine_activate"] : nil;
+    NSString *dopamineBin = @"/var/jb/basebin/dopamine";
+    if (optIn && [fm fileExistsAtPath:optIn] && [fm isExecutableFileAtPath:dopamineBin]) {
+        NSString *tmpBin = @"/var/tmp/dopamine";
+        [fm removeItemAtPath:tmpBin error:nil];
+        if ([fm copyItemAtPath:dopamineBin toPath:tmpBin error:nil]) {
+            [fm setAttributes:@{ NSFilePosixPermissions: @(0755) } ofItemAtPath:tmpBin error:NULL];
+            ak_log(s, @"[*] dopamine activate (dyld merge / basebin gen / daemons)");
+            int rc = ak_spawn(tmpBin, @[ @"activate" ], s);
+            ak_log(s, @"[%@] dopamine activate rc=%d", rc == 0 ? @"+" : @"-", rc);
+            if (rc != 0) {
+                ak_log(s, @"[*] activate failed — session bootstrap stays usable; "
+                           @"remove lum1na_dopamine_activate to silence");
+            }
+        }
+    } else if (docs) {
+        ak_log(s, @"[*] dopamine activate not run (opt-in: Documents/lum1na_dopamine_activate)");
+    }
+}
+
 static void ak_installTweaks(NSMutableString *s) {
     NSFileManager *fm = [NSFileManager defaultManager];
     /* ak_tweakDylibs also copies bundle tweaks into Documents/tweaks. */
@@ -845,6 +1050,7 @@ static void ak_tryInstallPkgman(NSMutableString *s) {
         if (ln.length) ak_log(s, @"%@", ln);
     }
     ak_installJbroot(s);
+    ak_installBootstrap(s);
 
     uint32_t selCopy = off->amfi_sel_copy;
     uint32_t selManifest = off->amfi_sel_manifest;
