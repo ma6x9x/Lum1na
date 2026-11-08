@@ -264,3 +264,15 @@ extraction + `kextdiff2`/global pairing on the four relevant kexts:
 - IOSurface 402.8 → 403.1, `__text` 0x3461c → 0x34634 (the ready gate).
 - IOHIDFamily 2360.2.2 → 2360.40.13, functions 2808 → 2809 (index clamp).
 - AppleHIDTransport 10100.41 → 10110.1.
+
+### Full 23F77 → 24B119 run (completed, cross-major)
+- Kernel 25.5.0 (12377.122.4~1) → 27.2.0 (13432.42.3~28), 247 updated
+  kexts, 3 new, 1 removed (hfs).
+- AppleH11ANEInterface 9.511.3 → 10.102.4, **functions 2981 → 5043**.
+  This is cross-major growth plus the bounds-safety rebuild; do not read
+  the +2062 as all security fixes.
+- AppleAVE2 905.36.1 → 913.64.1 (2782 → 2998).
+- IOSurface 393.5.7 → 403.1 (1257 → 1330).
+- IOHIDFamily 2238.120.5 → 2360.40.13 (2790 → 2809).
+- All three full diffs are now complete: iPad 23H24→23H128,
+  24A435→24B119, 23F77→24B119.
