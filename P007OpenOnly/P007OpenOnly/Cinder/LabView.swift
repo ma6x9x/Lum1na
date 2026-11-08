@@ -52,13 +52,7 @@ extension LabVerdict {
     }
 }
 
-// MARK: - Lab
-
-struct LabView: View {
-    var body: some View {
-        CatalogBrowser(title: t("lab.title"), showsCopy: true)
-    }
-}
+// MARK: - Module detail
 
 struct ModuleDetailView: View {
     let module: ExploitModule

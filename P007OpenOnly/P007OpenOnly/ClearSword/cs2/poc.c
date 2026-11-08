@@ -106,10 +106,13 @@ kern_return_t cs2_pe_v1(void) {
        was a 24A435 pass-2 wedge workaround; on the 18.x/17.3 trains it makes
        a single unlucky sweep fatal for the tap. Retry a few times (the pass
        end already releases sockets/mappings) but stay inside the tap budget. */
-    uint64_t max_passes = cs2_ctx.copy_confusion_lane ? 1 : 4;
+    /* Dopamine's loop is while(true) until success. OG lane keeps that shape;
+       the 300 s deadline turns a broken train into an honest failure instead
+       of an infinite tap. copy27 remains one pass. */
+    uint64_t max_passes = cs2_ctx.copy_confusion_lane ? 1 : UINT64_MAX;
     for (size_t pass = 0; pass < max_passes; pass++) {
-        if (pass && cs2_expired()) {
-            LOG("budget expired before pass %lu — stop after %lu completes", pass + 1, pass);
+        if (cs2_expired()) {
+            LOG("budget expired before pass %lu — honest failure", pass + 1);
             break;
         }
         {

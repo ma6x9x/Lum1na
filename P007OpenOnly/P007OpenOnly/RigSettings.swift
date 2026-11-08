@@ -47,7 +47,6 @@ struct DeviceConsoleSheet: View {
 struct RigSettingsView: View {
     var onHour: (() -> Void)?
     var onLogs: (() -> Void)?
-    var onAllTaps: (() -> Void)?
 
     @Environment(\.dismiss) private var dismiss
     @State private var showConsole = false
@@ -106,8 +105,8 @@ struct RigSettingsView: View {
                     Button("Copy NEXT TAP") {
                         LuminaCopyBus.shared.copy(snap.copyBlock, label: "Next TAP · \(snap.nextID)")
                     }
-                    Button("Jump to Lab catalog") {
-                        LuminaTabs.shared.index = 1
+                    Button("Jump to Tests") {
+                        LuminaTabs.shared.index = 0
                         dismiss()
                     }
                     Button("Jump to Chain") {
@@ -127,13 +126,11 @@ struct RigSettingsView: View {
                     Button("Hour gallery") {
                         if let onHour { onHour() } else { showHourSheet = true }
                     }
-                    Button("Lab catalog (all TAP cards)") {
-                        if let onAllTaps { onAllTaps() } else {
-                            LuminaTabs.shared.index = 1
-                            dismiss()
-                        }
+                    Button("Open Tests") {
+                        LuminaTabs.shared.index = 0
+                        dismiss()
                     }
-                    Text("Copy full lives on each TAP card in Lab, on Console Copy, and on the HUD NEXT chip. Files tab previews a 12 KB tail so huge P044/P073 logs cannot jetsam.")
+                    Text("Copy full lives on each test, on Console Copy, and on the HUD NEXT chip. Files tab previews a 12 KB tail so huge P044/P073 logs cannot jetsam.")
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }

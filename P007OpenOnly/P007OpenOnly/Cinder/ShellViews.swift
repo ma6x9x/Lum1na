@@ -1,10 +1,9 @@
 //
 //  ShellViews.swift — Tests index, More hub, Console peek.
 //
-//  The catalog is the single place every test lives: rich modules plus
-//  the dispatcher directory, split into TapDirectory letter groups.
-//  Tests and Lab share CatalogBrowser. Search keeps sections. The
-//  section menu jumps. The tab bar is the short path to Console.
+//  Tests is the only catalog. Search, filter, and the section menu live
+//  in the page, under the HUD. The navigation bar sits behind that HUD,
+//  so it is not used here.
 //
 
 import SwiftUI
@@ -15,7 +14,6 @@ import UIKit
 struct ModuleListRow: View {
     let title: String
     let detail: String
-    let systemImage: String
     let verdictText: String
     let verdictTint: Color
     let running: Bool
@@ -23,12 +21,6 @@ struct ModuleListRow: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: systemImage)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(verdictTint)
-                .frame(width: 32, height: 32)
-                .background(verdictTint.opacity(0.16), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.system(size: 15, weight: .semibold, design: .monospaced))
@@ -78,14 +70,13 @@ struct TestsView: View {
 
 // MARK: - Shared catalog browser
 //
-// One list for Tests and Lab. Sections stay put while searching, so a hit
-// keeps its group. The menu scrolls to the first row of a section.
+// Sections stay put while searching. The section menu scrolls to the
+// first row of a group. Controls are in the page, not the hidden bar.
 
 struct CatalogBrowser: View {
     @EnvironmentObject private var engine: LabEngine
     let title: String
     var showsFilter: Bool = false
-    var showsCopy: Bool = false
 
     @State private var query = ""
     @State private var filter: TestFilter = .all
@@ -109,59 +100,106 @@ struct CatalogBrowser: View {
     var body: some View {
         let sections = visibleSections
         let shown = sections.reduce(0) { $0 + $1.1.count }
-        NavigationStack {
-            Group {
-                if sections.isEmpty {
-                    emptyState
-                } else {
-                    catalogList(sections)
-                }
-            }
-            .navigationTitle(title)
-            .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $query, prompt: "Id, name, CVE, or group")
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    VStack(spacing: 1) {
-                        Text(title)
-                            .font(.system(size: 17, weight: .semibold))
-                        Text("\(shown) of \(Catalog.all.count)")
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(.secondary)
+        ScrollViewReader { proxy in
+            VStack(spacing: 0) {
+                header(shown: shown, sections: sections, proxy: proxy)
+                searchField
+                Group {
+                    if sections.isEmpty {
+                        emptyState
+                    } else {
+                        catalogList(sections)
                     }
-                    .accessibilityElement(children: .combine)
-                    .accessibilityLabel("\(title), \(shown) of \(Catalog.all.count) tests")
                 }
-                if showsFilter {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Menu {
-                            Picker("Show", selection: $filter) {
-                                ForEach(TestFilter.allCases) { item in
-                                    Text(item.title).tag(item)
-                                }
-                            }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .background(Color(.systemGroupedBackground))
+        }
+        .sheet(item: $selected) { module in
+            ModuleDetailView(module: module)
+                .environmentObject(engine)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
+    }
+
+    private func header(shown: Int,
+                        sections: [(String, [ExploitModule])],
+                        proxy: ScrollViewProxy) -> some View {
+        HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.system(size: 22, weight: .bold))
+                Text("\(shown) of \(Catalog.all.count)")
+                    .font(.system(size: 12, design: .monospaced))
+                    .foregroundStyle(.secondary)
+            }
+            .accessibilityElement(children: .combine)
+            Spacer(minLength: 8)
+            if showsFilter {
+                Menu {
+                    Picker("Show", selection: $filter) {
+                        ForEach(TestFilter.allCases) { item in
+                            Text(item.title).tag(item)
+                        }
+                    }
+                } label: {
+                    Label(filter == .all ? "Filter" : filter.title,
+                          systemImage: "line.3.horizontal.decrease")
+                        .font(.system(size: 14, weight: .semibold))
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 44)
+                }
+                .catalogMenuChrome()
+                .accessibilityLabel("Filter tests")
+            }
+            if !sections.isEmpty {
+                Menu {
+                    ForEach(sections, id: \.0) { group in
+                        Button {
+                            proxy.scrollTo(sectionAnchor(group.0), anchor: .top)
                         } label: {
-                            Label(filter == .all ? "Filter" : filter.title,
-                                  systemImage: "line.3.horizontal.decrease")
-                        }
-                        .accessibilityLabel("Filter tests")
-                    }
-                }
-                if showsCopy {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("Copy all") {
-                            LuminaCopyBus.shared.copy(engine.copyAllResults(), label: "All logs copied")
+                            Text("\(group.0)  \(group.1.count)")
                         }
                     }
+                } label: {
+                    Label("Sections", systemImage: "list.bullet")
+                        .font(.system(size: 14, weight: .semibold))
+                        .padding(.horizontal, 12)
+                        .frame(minHeight: 44)
                 }
-            }
-            .sheet(item: $selected) { module in
-                ModuleDetailView(module: module)
-                    .environmentObject(engine)
-                    .presentationDetents([.large])
-                    .presentationDragIndicator(.visible)
+                .catalogMenuChrome()
+                .accessibilityLabel("Jump to section")
             }
         }
+        .padding(.horizontal, 16)
+        .padding(.top, 6)
+        .padding(.bottom, 8)
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundStyle(.secondary)
+            TextField("Id, name, CVE, or group", text: $query)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+            if !query.isEmpty {
+                Button {
+                    query = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
+            }
+        }
+        .padding(.horizontal, 12)
+        .frame(minHeight: 44)
+        .background(T.panel, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .padding(.horizontal, 16)
+        .padding(.bottom, 8)
     }
 
     private var emptyState: some View {
@@ -178,40 +216,28 @@ struct CatalogBrowser: View {
     }
 
     private func catalogList(_ sections: [(String, [ExploitModule])]) -> some View {
-        ScrollViewReader { proxy in
-            List {
-                ForEach(sections, id: \.0) { group in
-                    Section("\(group.0) · \(group.1.count)") {
-                        ForEach(Array(group.1.enumerated()), id: \.element.id) { index, module in
-                            Button {
-                                selected = module
-                            } label: {
-                                catalogRow(module)
-                            }
-                            .buttonStyle(.plain)
-                            .id(index == 0 ? sectionAnchor(group.0) : rowAnchor(module.id))
+        List {
+            ForEach(sections, id: \.0) { group in
+                Section {
+                    ForEach(Array(group.1.enumerated()), id: \.element.id) { index, module in
+                        Button {
+                            selected = module
+                        } label: {
+                            catalogRow(module)
                         }
+                        .buttonStyle(.plain)
+                        .id(index == 0 ? sectionAnchor(group.0) : rowAnchor(module.id))
                     }
-                }
-            }
-            .listStyle(.insetGrouped)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        ForEach(sections, id: \.0) { group in
-                            Button {
-                                proxy.scrollTo(sectionAnchor(group.0), anchor: .top)
-                            } label: {
-                                Text("\(group.0)  \(group.1.count)")
-                            }
-                        }
-                    } label: {
-                        Label("Sections", systemImage: "list.bullet")
-                    }
-                    .accessibilityLabel("Jump to section")
+                } header: {
+                    Text("\(group.0) · \(group.1.count)")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .textCase(nil)
                 }
             }
         }
+        .listStyle(.insetGrouped)
+        .scrollDismissesKeyboard(.interactively)
     }
 
     /// Filter first, then keep any section that matches the query or still
@@ -252,7 +278,6 @@ struct CatalogBrowser: View {
         return ModuleListRow(
             title: module.id,
             detail: module.title,
-            systemImage: module.primitive.symbol,
             verdictText: t(verdict.key),
             verdictTint: verdict.tint,
             running: engine.running.contains(module.id),
@@ -261,6 +286,23 @@ struct CatalogBrowser: View {
 
     private func sectionAnchor(_ name: String) -> String { "catalog-section:\(name)" }
     private func rowAnchor(_ id: String) -> String { "catalog-row:\(id)" }
+}
+
+extension View {
+    /// Real menu chrome. Xcode 26 compiles the glass pill; Xcode 16.4 keeps
+    /// a bordered menu that still opens. The label stays a 44-pt target.
+    @ViewBuilder
+    func catalogMenuChrome() -> some View {
+        #if compiler(>=6.2)
+        if #available(iOS 26.0, *) {
+            self.buttonStyle(.glass)
+        } else {
+            self.buttonStyle(.bordered)
+        }
+        #else
+        self.buttonStyle(.bordered)
+        #endif
+    }
 }
 
 // MARK: - More (everything that used to be its own tab)
@@ -279,12 +321,20 @@ struct MoreView: View {
                     NavigationLink("System") { SystemView() }
                 }
                 Section("Notes") {
-                    Text("Tests and Lab share one catalog. The list menu jumps to a section, and search matches id, name, CVE, or group. Console stays on the tab bar.")
+                    Text("Tests is the only catalog. Its search box and Sections menu stay on that page. Console is the log and the four hunt buttons.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
             }
             .listStyle(.insetGrouped)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                Text("More")
+                    .font(.system(size: 22, weight: .bold))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 4)
+                    .padding(.bottom, 6)
+            }
             .navigationTitle("More")
             .navigationBarTitleDisplayMode(.inline)
         }

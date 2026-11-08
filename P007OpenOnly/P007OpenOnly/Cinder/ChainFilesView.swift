@@ -125,6 +125,10 @@ struct ChainView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 14) {
+                    Text(t("chain.title"))
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundStyle(.primary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     ForEach(ChainPlan.stages) { stage in
                         stageCard(stage)
                     }

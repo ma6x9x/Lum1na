@@ -1668,3 +1668,15 @@ These describe bugs that exist on our PRE-FIX builds: 23F77 (26.5), 24A435 (27.0
 - p157 defaults updated to the iOS sizes and count offset; reach-only.
 - Remaining: list offset vs writer buffer base via FUN_835011c and the
   Process command path FUN_824e014/FUN_837b838.
+
+## 2026-11-08 — ClearSword OG lane restored to Dopamine verbatim + deadline
+- Dopamine-era devices (21D50/22G100) now take the upstream OG path in
+  `cs2_oob_read`: iov_len = offset+size, HIT only on pwritev EFAULT (w == -1),
+  pread, first-qword marker comparison. The lab prefill/scan/copy27 logic is
+  gated behind `copy_confusion_lane` (27.x only).
+- `cs2_pe_v1` pass loop is `while(true)` until success again (copy27 stays one
+  pass). The only addition is the 300 s `cs2_expired()` deadline, checked in
+  the pass loop, the pwritev try loop, `cs2_oob_read_retry`, and the write
+  spin. A broken train now returns an honest failure instead of hanging.
+- gencnt is fixed at blob+0x110 (upstream); the QoS `so_background_thread`
+  trick remains the one additive change (for the 22G100 socket locator).

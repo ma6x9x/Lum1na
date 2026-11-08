@@ -9,12 +9,8 @@ struct RootView: View {
     var body: some View {
         TabView(selection: $tabs.index) {
             TestsView()
-                .tabItem { Label("Tests", systemImage: "magnifyingglass") }
+                .tabItem { Label("Tests", systemImage: "list.bullet") }
                 .tag(0)
-
-            LabView()
-                .tabItem { Label(t("tab.lab"), systemImage: "ant.fill") }
-                .tag(1)
 
             ChainView()
                 .safeAreaInset(edge: .bottom, spacing: 0) { logPeek }
@@ -37,7 +33,8 @@ struct RootView: View {
         .onAppear {
             if let env = ProcessInfo.processInfo.environment["CINDER27_TAB"],
                let n = Int(env) {
-                tabs.index = n
+                // 1 was the removed POCs tab. The catalog is Tests.
+                tabs.index = n == 1 ? 0 : n
             }
         }
         .overlay(alignment: .bottom) {

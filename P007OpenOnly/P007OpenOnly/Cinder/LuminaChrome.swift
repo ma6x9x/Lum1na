@@ -8,7 +8,7 @@ import Combine
 // phone still has an older IPA. Glass is chrome only — TAP bodies unchanged.
 
 enum LuminaStamp {
-    static let ui = "ios26-catalog-1"
+    static let ui = "ios26-one-list-1"
 }
 
 final class LuminaTabs: ObservableObject {
@@ -514,7 +514,7 @@ struct BoardHUD: View {
     private func reveal(_ id: String) {
         let console = Set(["ident", "krw", "pathtest", "kreadtest", "p044", "p139",
                            "p010qleak", "p063", "p149", "p114", "board", "cs2", "p100"])
-        LuminaTabs.shared.index = console.contains(id) ? 4 : 1
+        LuminaTabs.shared.index = console.contains(id) ? 4 : 0
     }
 }
 

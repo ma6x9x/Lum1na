@@ -615,8 +615,12 @@ jobs:
   # "runtime profile always wins". IPA artifact name stays
   # Lum1na-Debug-unsigned-ipa. Bundle id stays ma6x9x.P007OpenOnly.
   # Entitlements are the free-account set (game-center + get-task-allow).
+  # macos-26 so the compiler is Xcode 26 and the iOS 26 glass
+  # branch (#if compiler(>=6.2)) is actually built. The shell Lum1na job
+  # stays on macos-15 / Xcode 16.4: Xcode 26 copies nested README.md into
+  # Lum1na.app/README.md. Deployment target stays 17.0.
   build-debug:
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 45
     name: "🔨 Build Lum1na-Debug IPA"
 
@@ -624,25 +628,28 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Select Xcode 16.4
+      - name: Select Xcode 26.6
         run: |
           set -euo pipefail
-          if [ -d /Applications/Xcode_16.4.app ]; then
-            XCODE=/Applications/Xcode_16.4.app
-          elif [ -d /Applications/Xcode_16.3.app ]; then
-            XCODE=/Applications/Xcode_16.3.app
+          # Pin a version. Do not sort Xcode_2*.app — that glob is what
+          # pulled Xcode 26 into the shell job and collided README.md.
+          if [ -d /Applications/Xcode_26.6.app ]; then
+            XCODE=/Applications/Xcode_26.6.app
+          elif [ -d /Applications/Xcode_26.5.app ]; then
+            XCODE=/Applications/Xcode_26.5.app
+          elif [ -d /Applications/Xcode_26.4.1.app ]; then
+            XCODE=/Applications/Xcode_26.4.1.app
+          elif [ -d /Applications/Xcode_26.3.app ]; then
+            XCODE=/Applications/Xcode_26.3.app
           else
-            XCODE=$(ls -d /Applications/Xcode_16*.app 2>/dev/null | sort -V | tail -1 || true)
-          fi
-          if [ -z "${XCODE:-}" ] || [ ! -d "$XCODE" ]; then
-            echo "ERROR: Xcode 16.x not found"
+            echo "ERROR: Xcode 26.x not found"
             ls /Applications | grep -i xcode || true
             exit 1
           fi
           echo "Using $XCODE"
           sudo xcode-select -s "$XCODE/Contents/Developer"
           # Do not pipe xcodebuild -version into head: NSFileHandle write
-          # aborts on SIGPIPE and the step dies even on Xcode 16.4.
+          # aborts on SIGPIPE and the step dies.
           xcodebuild -version
 
       # T8150 (17 Pro Max / 24A435) P073 v13/v13b artifacts: the lab app's
@@ -667,7 +674,7 @@ jobs:
               ls -la "$MLC" | head -3
               continue
             fi
-            echo "${MODEL} absent — compiling with coremlc (Xcode 16.4) via ${GEN}"
+            echo "${MODEL} absent — compiling with coremlc (selected Xcode) via ${GEN}"
             python3 -m venv /tmp/mvenv257
             /tmp/mvenv257/bin/python -m pip install --quiet --upgrade pip
             /tmp/mvenv257/bin/pip install --quiet coremltools numpy

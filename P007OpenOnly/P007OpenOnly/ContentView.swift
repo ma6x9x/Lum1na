@@ -3,11 +3,9 @@ import UIKit
 import Darwin
 
 struct ContentView: View {
-    @State private var text = "Lum1na \(LuminaStamp.ui). Ident first. One TAP per force-quit. Catalog lives in Lab. Unlock UI stays tappable during a TAP."
+    @State private var text = "Lum1na \(LuminaStamp.ui). Ident first. One TAP per force-quit. The catalog is the Tests tab. Unlock UI stays tappable during a TAP."
     @State private var copiedFlash = false
     @State private var running = false
-    @State private var showMore = false
-    @State private var probeQuery = ""
     @State private var showHour = false
     @State private var showSettings = false
     @State private var showLogs = false
@@ -77,37 +75,30 @@ struct ContentView: View {
                     }
                     .padding(.horizontal, 16)
 
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 2) {
-                            toolButton(copiedFlash ? "checkmark" : "doc.on.doc", "Copy") {
-                                LuminaCopyBus.shared.copy(text, label: "Console copied")
-                                copiedFlash = true
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { copiedFlash = false }
-                            }
-                            toolButton("doc.text.magnifyingglass", "Recover") { showRecoveredLog() }
-                            toolButton("folder", "Logs") { showLogs = true }
-                            toolButton("list.bullet", "All TAPs") { showMore = true }
-                            toolButton("gearshape", "Settings") { showSettings = true }
-                            toolButton("ant", "Lab") { LuminaTabs.shared.index = 1 }
-                            toolButton("link", "Chain") { LuminaTabs.shared.index = 2 }
+                    HStack(spacing: 0) {
+                        toolButton(copiedFlash ? "checkmark" : "doc.on.doc", "Copy") {
+                            LuminaCopyBus.shared.copy(text, label: "Console copied")
+                            copiedFlash = true
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { copiedFlash = false }
                         }
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 4)
+                        toolButton("doc.text.magnifyingglass", "Recover") { showRecoveredLog() }
+                        toolButton("folder", "Logs") { showLogs = true }
+                        toolButton("gearshape", "Settings") { showSettings = true }
                     }
-                    .luminaGlass(RoundedRectangle(cornerRadius: 26, style: .continuous), interactive: false)
+                    .luminaGlass(Capsule(), interactive: false)
                     .padding(.horizontal, 16)
                 }
                 .padding(.bottom, 8)
             }
             .navigationTitle("Console")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.hidden, for: .navigationBar)
         }
         // Do NOT scan Documents on first frame — that caused ~1s freeze.
         .sheet(isPresented: $showSettings) {
             RigSettingsView(
                 onHour: { showSettings = false; showHour = true },
-                onLogs: { showSettings = false; showLogs = true },
-                onAllTaps: { showSettings = false; showMore = true }
+                onLogs: { showSettings = false; showLogs = true }
             )
         }
         .sheet(isPresented: $showHour) {
@@ -122,234 +113,6 @@ struct ContentView: View {
                 kreadSignal = P007Board.shared().kreadSignal
                 showLogs = false
             }
-        }
-        .sheet(isPresented: $showMore) {
-            NavigationStack {
-                List {
-                    // 2026-10-28 hand-reorder (note 283) — every implemented tap
-                    // has a visible row; buckets: platform → learner → active
-                    // KRW → escape → groom → census → ABI/legacy/parked/stop.
-                    Section("A · Platform") {
-                        moreRow("0. Device identity + prove matrix", "ident")
-                        moreRow("Board JSON + hasKread (p007_board.json)", "board")
-                    }
-                    Section("B · Learner / intel") {
-                        moreRow("P118. BOOT-LEARNER — one tap = one training event (per-boot offsets.json via p090's resolver + the entitlement map + the LabBandit ledger's bootId attribution; READ-ONLY; the auto-port pipeline's input pair)", "p118")
-                        moreRow("P117. Entitlement ECHO — what the KERNEL sees of the rig's plist (SecTaskCopyValueForEntitlement, type+value per key; NIL = stripped by free-profile AMFI); gates every kernel-side entitlement experiment", "p117")
-                        moreRow("INTEL. merged offset DB + ladder cross-check (read-only)", "intel")
-                        moreRow("P090. momentarius census v1 (offsets DB vs live kernel + kbase sanity + allproc scan, READ-ONLY, rig)", "p090")
-                        moreRow("P100. AutoLearn (READ-ONLY learner — unknown devices, chip tag + door census + LEARN PACKET)", "p100")
-                        moreRow("HT149041. 26.7 chain map (print only)", "ht149041")
-                    }
-                    Section("C · ACTIVE KRW — 43748 / M2Scaler / 64788 / T020") {
-                        moreRow("P119. T020 STALE-UPL port (new-build reopen of the wire×replace lane): stage0 calibrate → stage1 re-ordered race (detach-idle → wirer commit → replace) → stage2 staging oracle (paints 0x41/0x11/0x43 vs FOREIGN) → stage3 reclaim-spray 0xE0 read-through. PANIC-POSSIBLE — one tap per force-quit; hasKread stays NO", "p119")
-                        moreRow("P120. 64788 new-resource DOOR (23F77 sel-map byte-verified on-disk: sel8 var-struct newRes / sel9 delete / sel36 fn4 / naked +0x90 getter) — resType-0 calibrate, then the oversized create-fail-after-insert ladder + post-fail leftover-id sweep. PANIC-POSSIBLE", "p120")
-                        moreRow("P121. iogpu_close × merge REOPEN (new build vs the P040-ABI): create(sel6)/destroy(sel7) calibrate on THIS device, then the close-vs-merge race (destroy ping-pong × Metal blit commits, 10s). PANIC-POSSIBLE", "p121")
-                        moreRow("P125. kern.ipc REQUEST-TABLE race (CVE-2026-112507 port, Cinder27): 4-thread mach-namespace alloc/notify/teardown interleave, bounded 5s/6000; 27.2 ships the fix = pre-fix live on 26.5/27.0; refused-notifications = the stale-index candidate signal. PANIC-POSSIBLE", "p125")
-                        moreRow("P126. decmpfs KERNEL HEAP DISCLOSURE (CVE-2026-113910 port): crafted com.apple.decmpfs chunked-zlib xattr under-produces vs its chunk table; read-back scan for kernel pointers (>= 0xFFFFFFE000000000). READ-ONLY; hits = a kernel-content READ from a free app (the read prong receipt class)", "p126")
-                        moreRow("P127. FENCE-LIST PRESSURE + KRW SELF-TEST: IOSurface-backed Metal blit churn on OUR sids + periodic surface recycle (drain walker + the twice-aborted fence-append range checks 0x984fcc8 in the hot path), then the honest kread32(kbase)==0xfeedfacf self-test via the lane pickers. PANIC-POSSIBLE; one tap per force-quit", "p127")
-                        moreRow("P128. CO-DRIVER RACE (fence × queue): p127 proved fence churn ALONE is clean (3×~21k commits); the 2/2 aborts had allocator churn concurrent — thread A = IOSurface Metal blit churn + surface recycle, thread B = full-rate IOGPU QueueCreate/destroy ping-pong, 12s bounded race. PANIC-POSSIBLE; one tap per force-quit", "p128")
-                        moreRow("P129. LAST CO-DRIVER CELL (fence × FILL): thread A = p127 fence churn racing thread B = the REAL P044 fill battery (mlmodel compile + ember rounds, serialized). The 2/2 fence-append aborts carried fill-staging sids in x5 — this pair is what was actually live. PANIC-POSSIBLE; one tap per force-quit", "p129")
-                        moreRow("P130. THE FUSION (fence × p073 LANDING ENGINE): p127/p128/p129 falsified every reproducible pair; only p073 produces record LANDINGS (positioned 0x820 prefill, 254-in post-marshal, translation bar on 23H30). Thread A = fence churn racing thread B = [P073 tap] — the historical 0x984fcc8 condition reproduced. PANIC-POSSIBLE; one tap per force-quit", "p130")
-                        moreRow("P131. QUICKLOOK DETOUR (calif chain stage 2): the 86950 trigger PDF through the quicklookd handoff (QLThumbnailGenerator) — the daemon receipts land in crash logs, not in-app. Stage control = benign PDF QL + in-process ImageIO replica. PANIC-POSSIBLE; one tap per force-quit", "p131")
-                        moreRow("P132. THE CHAIN FRAME (anchor→fence→write→landing→gate): the receipts interlock, so the frame runs them in ONE session — aio anchor, fence churn live for the whole session (the 20:20 delayed-abort condition), p112 chosen-write receipt UNDER that churn, p073 landing flag-gated (p132_land.txt), then the honest kread32 gate + 45s late watcher. PANIC-POSSIBLE; one tap per force-quit", "p132")
-                        moreRow("P133. THE READ FRAME (p010 WHERE → p114 WHAT → echo-classified candidates → gate): the queue-object KVA names where; the sel-8 serializer pull is the content pull — rec 0 = our echo calibration row, later records = kernel-refilled = the relative-read receipt. Echo law separates provenance. READ-ONLY; one tap per force-quit", "p133")
-                        moreRow("P134 ROUTE A. ENGINE-ARMED K2K FILL DISCLOSURE: sel-6's ARMED branch (UC+0x154) writes kernel results INTO the caller's 0xfa8 struct (count +0, record ptrs +0x608..+0x614). VT encode battery BETWEEN two row-6 sends on the SAME conn; KVA-CAND scan on every response. PANIC-POSSIBLE; one tap", "p134")
-                        moreRow("P135 ROUTE B. TAMING THE NQ NULL-CTX WINDOW (our ×5 bug): groom the freed-ctx zone with 0x42-class pattern, then the p027 trap ×2 — far 0x10 again = window NULL (law); far in 0x42-class = THE NULL TAMED = kernel read at a chosen slot. PANIC-POSSIBLE BY DESIGN; one tap", "p135")
-                        moreRow("P136 ROUTE C. FENCE CHURN × STALE-GVA RECLAIM KICK: the b1b2 engine (map → unmap+spray → latched kick → verify reclaim) with the p127 fence thread LIVE all session — the aimable-write state; phase4 non-own reclaim = the candidate. PANIC-POSSIBLE; one tap", "p136")
-                        moreRow("P137 ROUTE C-LATCH. THE REAL LATCHED KICK: held-blit UAF by the b1b2 laws — encode 0xBB fill → HOLD commit → drop the buffer (pages live by the noop-deallocator law) → 0xCC spray → COMMIT the held command → verdict by where 0xBB lands (our old pages = stale GVA survived; spray = reclaim won = AIMABLE-WRITE STATE). PANIC-POSSIBLE; one tap", "p137")
-                        moreRow("P138 ROUTE D. IOMD dmaref RETAIN-WRAP RUNNER (corpus-complete, zero entitlement walls): IOSurfaceCreateMachPort arm (P069-proven hop) → op-channel census (the w1=op<<24|subsel dispatcher law) → the op-2 ORACLE ([md+0x98] kernel-counter readback) → the op-3 retain ladder to the u16 2^16 WRAP → the op-6 receipt. PANIC-POSSIBLE (the underflow panic = the named receipt); one tap", "p138")
-                        moreRow("P139 BOOT INTEL COLLATOR (the Learner layer, one tap): the aio KVA family (+0xC0 law) + the console-sec leak + the p010 cursor+band + the ipc rows + the IOMD op-2 oracle — one dossier (p139_boot_intel.txt) with the slide-TRIANGULATION checks. Feeds every lane's boot-1 aim; never a receipt. READ-ONLY; one tap", "p139")
-                        moreRow("P141 USB/STOCKHOLM REACHABILITY ORACLE (SKU-free): the USB device-mode family (IOUSBDeviceInterface match+open+census — the mini law: match OK in-app, open=2e2 owner-held) + the Stockholm/hammerfest control UC (the nfc.disableentitlements PEBL switch = the kext's OWN gate-void). One open per lane, census then close; any kr=0 = the fleet comparison row. READ-ONLY", "p141")
-                        moreRow("P142 AVE2 TEMPORAL-KNOB (CVE-2026-112705, PUBLIC VECTOR, credited MMdAS/Calif): VT compression session with NumberOfTemporalLayers=16463 (16462 survives) then ONE encode — the AVE2 kernel OOB write at +0xDA78 with the count-scaled fault word = the lab's fill-store geometry with a LIVE knob. PANIC-POSSIBLE BY DESIGN = the count receipt; one value per tap (Documents/p142_layers.txt)", "p142")
-                        moreRow("P143 ROCKET SUBMIT DOOR (the 17, 24A435; the state-band DERIVED: record array {ptr,+8 u32,+0x10 valid} @0x18 at PP+0x48, owner UC+0x120, the 0xcda1 fleet PAC law — static chain CLOSED): the IOGPU UC open + the sel-0x24 submit-row census with the real-resource law. PANIC-POSSIBLE; one tap", "p143")
-                        moreRow("P144 AVE2 IO_Config MASK INTAKE (the agent-named knob, 24A435): row 2 = IO_Config (structIn 0x38; the u64 at +0x30 = the RAW mask, unvalidated store) after IO_Open; the mask consumer = the encode-loop map step to the boundless write-through mapper. State-machine rows; PANIC-POSSIBLE; one tap", "p144")
-                        moreRow("P145 COMPOSITION (the composition row): 64 held IOSurface-backed Metal buffers painted 0x41 + a 16-surface 0x53 marker group, then the p142 stage9 AVE2 fill session (EncoderUsage=1, RCMode-20, RealTime=FALSE, HEVC 1280x720) composed INSIDE the live spray on a second thread, then the overshoot discriminator marker-vs-bytes on every held page. PANIC-POSSIBLE; one tap per force-quit", "p145")
-                        moreRow("P146 KNOB SETTER v3 (the afc-bypass law; line-per-knob): p146_set.txt line1 → p142_layers.txt (default 16463), line2 → p147_cycles.txt (default 24), line3 → p148_gop.txt (default 2), line4 → p142_pre.txt (default 8) — each with its readback VERIFY row + the composition flags state. A file utility between taps (no IOKit/Metal/state)", "p146")
-                        moreRow("P147 LIFECYCLE (the STALE-SLOT UAF teardown battery): 64 held 0x41 IOSurface-backed Metal buffers + a 16-surface 0x53 marker group, then N FAST VTCompressionSession create→prepare→encode→complete→invalidate cycles (HEVC 1280x720, the stage9 property pack VERBATIM) on a worker thread with the spray LIVE — the codec-instance teardown chase at rate; then the discriminator marker-vs-bytes on every held page. Knob = the CYCLE COUNT (Documents/p147_cycles.txt, default 24, cap 200); the temporal-layers property is RETIRED on this lane. PANIC-POSSIBLE; one tap per force-quit", "p147")
-                        moreRow("P148 AVE2 BLOB INTAKE (the params-blob decode, VERBATIM +0x55c = sGOP.iNumOfTemporalLayer, cfg+0x55c == structIn+0x55c NO remap): direct-UC open census -> row0 IO_Open -> row2 IO_Config zero-shape -> row3 IO_Prepare ladder {0,2,4,8} + p148_gop.txt knob IF in [0,8] — a ZEROED 0x12c08 blob whose ONLY set field = +0x55c; the kr verdicts name WHICH hard wall fires first (D5 0xe00002bc class) on the sparse shape. Values >8 = OUT-LAW (refused in-app; the 16463 panic class guarded). PANIC-POSSIBLE; one tap per force-quit", "p148")
-                        moreRow("P149 T8150 KRW CONVERSION (the 17 door): kernel pipe spray (96 held + 48 catch, 16KB unique markers) → VT Prepare N=8 → encode >=1 frame (heap this at ctx+0x147b0) → Set NumberOfTemporalLayers=16463 (re-init live pool) → encode → invalidate (dtor queue_init this+0x58 then kfree count<<5) → scan pipes for marker mismatch / kernel VA / queue-init triplet → kread32(kbase)==0xfeedfacf gate. PIPE-HIT is a write receipt, never hasKread. PANIC-POSSIBLE; one tap per force-quit; reboot after", "p149")
-                        moreRow("P147 LADDER x60 (the no-push ladder arm; the row preset 60 OVERRIDES the knob file — consume-once — the teardown chase's first climb; PANIC-POSSIBLE)", "p147x60")
-                        moreRow("P147 LADDER x120 (the row preset 120; the second climb)", "p147x120")
-                        moreRow("P147 LADDER x200 (the row preset 200 = the CAP; the top climb)", "p147x200")
-                        moreRow("P110 LEAK-ON PAIRING (the targeted-sampling row: the row preset FORCES the leakgate-on arm for this one tap — the sel-8 KVA-disclosure capture per round + the claim-window DIFF = the corruption observable; kernel-range KVs in OUR output buffer = disclosure class, NEVER kread)", "p110xleak")
-                        moreRow("P140 MINI GROUND-TRUTH VERIFIER (21-D50 cross-ref rig): mach_port_kobject = the SKU-free port→kaddr locator, then — lane live — DIRECT kread of the p138 oracle slots ([+0x98] gate, [+0x34] dmaref, [+0x80] the 21-D50 MD twin slot): the 2c2 op-channel census answered by kernel READ, not by port-guessing. Receipt = kread32(kbase); hunt board NEVER flipped. READ-ONLY", "p140")
-                        moreRow("P114. M2ScalerCSC sel-8 leak tap — SOLO leak law validation (p110 v2 pairing gate; {u64} 8B in, serializer records stride 0x7c, rec+0x18 raw KV; N=8 captures + KV table + honest KVA-disclosure class; READ-ONLY; no race)", "p114")
-                        moreRow("P115. M2Scaler framework-path PEEK (the tpeek law): bounded CSC battery (IOSurface control + one VT 720p encode), diff the task's SEND ports after each op, fingerprint new ports for the M2Scaler sel-8 no-queue signature (2bf). A framework-opened UC owns a REAL queue — no QueueCreate grammar needed. READ-ONLY", "p115")
-                        moreRow("P116. sandbox_extension NOFOLLOW TOCTOU (CVE-class file-read escape; deterministic, live on 23F77..24B119; port of speedyfriend433/sandbox_extension-TOCTOU-bug): control in-container read + 7 bounded out-of-container targets (/etc + prefs); tokens never logged; READ-ONLY", "p116")
-                        moreRow("P110. IOSurface swap-claim probe (270 design; sibling-client reclaim after owner death, prefill(6)+2 same-CPU pop, 64 rounds; three-outcome honest verdicts; T8101 23F77 + T8150 24A435; STANDALONE — Family-B is a target outcome)", "p110")
-                        moreRow("P088. 43748 forged OUTPUT-record write hop. Never flips hasKread. STANDALONE 254-in A is MAF-class; KERNEL smash is P044 N=192.", "p088")
-                        moreRow("P099. 43748 ANE prewire GROOMED 254-in. STANDALONE MAF occupancy into FREE kalloc.3072. Not the hunt-12 KRW chain. Use KERNEL / P044 N=192.", "p099")
-                        moreRow("CS2. VERBATIM Dopamine core (A13 22G100 KRW — one tap)", "cs2")
-                        moreRow("LSWORD ARM. calib-licensed cs2 on patched trains (toggle arm file)", "lswarm")
-                        moreRow("CS KRW. mapped theory (runKRW, 23F77 offsets)", "cskrw")
-                        moreRow("CS calib. phys_oob race only (not KRW)", "cscali")
-                        moreRow("P122 SwordForge. combined 64788 KRW test (freer→reclaim→read)", "swordforge")
-                        moreRow("P123 ShapeCensus. kalloc.3072 victims with KRW vision (mini/libkrw)", "shapecensus")
-                        moreRow("KERNEL. hunt-krw-14: Mind talks Ollama 192.168.1.236:11434 or Grok api.x.ai. P139 then P044 N=192 / 17 P114+P149 / CS2 copy27 PARTIAL. SKIP 254. Occupancy / PIPE-HIT is not hasKread.", "krw")
-                        moreRow("PATHS. Per-path scorecard + READ-ONLY tests. Hunt: P139+kread. 17: P139+P114+kread (P149 stays KERNEL/catalog). Occupancy stays P044/KERNEL solo. P110/P143 isolated.", "pathtest")
-                        moreRow("KREAD. commitSlide kread32(kbase)==MH_MAGIC_64", "kreadtest")
-                        moreRow("P070 five-door chain census + persist HOLD", "p070")
-                        moreRow("P113. DescForge CONTROL (KRW krw hand-forged desc -> recv oracle; A13 rig)", "p113")
-                        moreRow("P094. kernproc derive + ucred ladder (READ-ONLY, sysctl anchor + allproc walk; v3 fold runs P095's ladder in the same tap — one boot, unlocks elevate)", "p094")
-                        moreRow("P095. ucred ladder standalone (READ-ONLY; also runs inside P094 since v3 — use for a ladder re-check without re-deriving)", "p095")
-                    }
-                    Section("D · Escape lanes") {
-                        moreRow("AVE47VT. CVE-2026-64747 via VT (raw UC open is 2e2 — VT is the app path): control 720p encode + wrap-dims Create/Prepare + tiny 64x64 encodes; LIVE on 12/23F77 (fixed 26.6); panic = kernel attestation — DO NOT re-tap", "ave47vt")
-                        moreRow("AVE47VTW. 64747 TRUE 32-bit CalcBufSize wrap (align32(w)*(h>>5) >= 2^32) Create+Prepare ONLY, no encode — SAFE ceiling inventory before ave47vt", "ave47vtw")
-                        moreRow("AVE47MAP. 64747 raw-UC MAP (raw open = 2e2 on-device; kept for re-check)", "ave47map")
-                        moreRow("AVE47CTL. 64747 raw-UC CONTROL (control battery only)", "ave47ctl")
-                        moreRow("P112. cgshading — CG Type-5 shading OOB oracle (112611 port; in-process oracle PDF built at-tap + CGPDFDocument render; chosen-double value-control sweep 1.0/2.0/4.0/8.0; honest 3-outcome; far = chosen-bits + structural offset; one sweep per tap)", "p112")
-                        moreRow("P076. 86950 glyph trigger (CVE-2026-86950, userspace OOB, NOT KRW)", "p076")
-                        moreRow("P076c. control-only (no trigger — display-crash discriminator)", "p076c")
-                        moreRow("P022GC v34. Game Center path oracle (not KRW)", "p022GC")
-                        moreRow("P097. console-sec gRegistryRoot leak (CVE-2026-65371, READ-ONLY — lock/unlock once while it waits)", "p097")
-                        moreRow("P065 Facet A 64788 oracle (0xe00002be, not kread)", "p065")
-                        moreRow("P067 AppleAVD reach (65407, no bitstream fire)", "p067")
-                    }
-                    Section("E · Groom / race family") {
-                        moreRow("P044. 43748 v61 addchain-191 B1 (on-device ANECCompile of the handwritten 191-in MIL, count=192 exactly in-bounds; OUTPUT-SID lane + census stillness + out-entry scan; override file p044_model.txt = model NAME, p044_req_in.txt = N inputs — one file = one deliberate fire; notes 149/127/130)", "p044")
-                        moreRow("P084. pmap-tte PUAF port (65,537-map refcount wrap, 64 dangling PTEs, A14 untested)", "p084")
-                        moreRow("P085. 84607 Close-vs-async racer (UNPARKED — kernel gap, videocodecd)", "p085")
-                        moreRow("P087. 84607 reclaim observer (race -> refill -> attributed drain)", "p087")
-                        moreRow("P083. ANE staging hunt + injection + y attribution", "p083")
-                        moreRow("P082. copyout dump of fetched sids (x_i=sid, OUR output; IOMD leak vs value echo)", "p082")
-                        moreRow("P081. ANE foreign-sid probe (bias isolation + cross-process fetch gate)", "p081")
-                        moreRow("P080. 43748 y-craft 127-in LIVE sids (input loop passes; read+write doors)", "p080")
-                        moreRow("P079. 43748 y-craft pad (3in/126ops ANE-scheduled + engagement gate)", "p079")
-                        moreRow("P078. 43748 y-craft 3-in (all-valid records reach output; write door)", "p078")
-                        moreRow("P077. 43748 y-craft (crafted y = output record sid; write door)", "p077")
-                        moreRow("P075. 43748 KRW v2 SAFE (pre-load sid_C groom; read+write doors)", "p075")
-                        moreRow("P074. 43748 consume (count-gate pass, no overflow, not hasKread)", "p074")
-                        moreRow("CONV. P073 43748 second-table. STANDALONE 254-in MAF occupancy. conversion != hasKread. Hunt smash is P044 N=192.", "conv")
-                        moreRow("P073. 43748 second-table 254-in. STANDALONE MAF if neighbor FREE. Not KERNEL.", "p073")
-                        moreRow("P086. 43684 dmaCommand fingerprint sweep (3 UCs, no fires)", "p086")
-                        moreRow("P101. 43684 dmaCommand FIRE (bounded reuse IOMD+0x68; one setup + one reuse; isolate from T7)", "p101")
-                        moreRow("P102. Titan write TEST (MapMemory IORVBAR look-for + CacheMode canary; SKIPs MMIO without window; no titan.m ROP)", "p102")
-                        moreRow("P010 qleak. QueueCreate copyout. LabOff word1=+0x558 A14 / +0x550 A12X (layout disclose, not KRW)", "p010qleak")
-                    }
-                    Section("F · Census / map") {
-                        moreRow("P109 v4. ANE sel sweep w/ Stage-B oracle — 23F77 + T8150/27.x (H16 names + types 0..4, sels 0..213; the direct-UC reachability answer for 43748-out-of-framework + 112696/84494)", "p109")
-                        moreRow("P103. M2Scaler user_* census (opens-only; sel 8/11 semantics + boundary denials; NO transforms)", "p103")
-                        moreRow("P098. M2ScalerCSC iosaDiag census (sel 8, honest input shape, READ-ONLY)", "p098")
-                        moreRow("P106. JPEG teardown ORACLE (sel5 +0x30=0 two-call; JpegRequest view ktflag 0x64; 2 requests NO fuzz)", "p106")
-                        moreRow("P107. AVE2 wrap-dims create/prepare-ONLY (v1's encode is p035-law FORBIDDEN; kext +0xdc cite = static; p035 already swept this ceiling)", "p107")
-                        moreRow("P105. IOSurface gates census (framework-level; global-warn/lookup/protection-bits/pool oracle; NO iopl — 64749 closed)", "p105")
-                        moreRow("P104. AppleSEPKeyStore census (163-sel; sels 7/17/31 handle-0 gate expect 0xfffffffa; benign shapes; watch aks klog lines)", "p104")
-                        moreRow("P108. DiskImages kernel-backed census (AppleDiskImages2 / IOHDIXHDDriveInKernel / KDIDiskImageNubUserClient opens + sels 0..24; 84552 attach doors; notes 255)", "p108")
-                        moreRow("71. P032 ANE OPEN only", "p032")
-                        moreRow("72. P033 CoreML 1-in/1-out", "p033")
-                        moreRow("73. P034 kmsg 0x820 occupancy", "p034")
-                        moreRow("W− 83. P038 W-hunt OPEN only", "p038")
-                        moreRow("D  84. P040 ns dest create/destroy", "p040")
-                        moreRow("P041. 43724 dest MAP only (no #536)", "p041")
-                        moreRow("P042. IOGPU type1 sel kptr scan (not #536)", "p042")
-                        moreRow("P043. write-class dests + ANE reach", "p043")
-                        moreRow("P045. APFS VNOP coverage census v16 (not kread)", "p045")
-                        moreRow("P046. leftover MAP v2 (43722/24, G71 caps, no fire)", "p046")
-                        moreRow("P062 NEON exception-state self-test (not KRW, not hasKread)", "p062")
-                        moreRow("P057 AKS 65343 sel16 feeder (not 163-sel, not hasKread)", "p057")
-                        moreRow("P050 buflet UAF v3 (not 65349)", "p050")
-                        moreRow("P051 gamed census v6 (in-cache only, no WVEK/TrollRestore)", "p051")
-                        moreRow("P052 nstream extend — CLOSED (EFBIG)", "p052")
-                        moreRow("P053 NECP connect×close v2", "p053")
-                        moreRow("P054 APFS reap list", "p054")
-                        moreRow("P055 IOSurface UPL (43684 MAP)", "p055")
-                        moreRow("P063 aio84530 kn_sdata HEAP leak (not kslide, not hasKread)", "aio84530")
-                        moreRow("P066 EncType/AVE MAP (one VT session, no Close-vs-async)", "p066")
-                        moreRow("P068 chroot/seteuid MAP (43689, errno only)", "p068")
-                        moreRow("P069 dmaCommand MAP (43684, one map)", "p069")
-                        moreRow("P019 64749 iopl MAP (size mismatch, not 65349)", "p019")
-                        moreRow("P071 65408 ANE overflow MAP (DeviceOpen only, not 43748)", "p071")
-                        moreRow("P072 file-parser census (dlopen + 1x1 PNG, not ACE)", "p072")
-                    }
-                    Section("G · P009 / 64788 ABI") {
-                        moreRow("F  82. P009 PathB detach+replace", "p009pathb")
-                        moreRow("F½ 4. P009 detach only (no OOL)", "p009detach")
-                        moreRow("80. P009 ranges 0x82", "p009ranges")
-                        moreRow("81. P009 types inventory", "p009types")
-                    }
-                    Section("H · p017v2 / Prove") {
-                        moreRow("H  64. p017v2 holder/install", "p017v2")
-                    }
-                    Section("I · Legacy probes (XR-era / superseded)") {
-                        moreRow("P013. A14 AVE dim ladder", "p013ave")
-                        moreRow("P001. A13 VT ladder (A13 rig)", "p001a13vt")
-                        moreRow("P001 dim. dim probe", "p001dim")
-                        moreRow("P001 proc. process probe", "p001proc")
-                        moreRow("P001 cap. cap boundary", "p001cap")
-                        moreRow("P001 ladder. full ladder", "p001ladder")
-                        moreRow("P001 conn. VT conn hunt", "p001conn")
-                        moreRow("P001 xref. cross-ref", "p001xref")
-                        moreRow("P001 ports. new-port sweep", "p001ports")
-                        moreRow("P001 T3. lying-backing SENTINEL (4096 over 1MB + sentinel pages): encode 1 frame, decode it back, scan for the constants. Zero = encoder clamps (law closed). Hits = OOB READ disclosure with walk shape. PANIC-POSSIBLE; one tap", "p001t3")
-                        moreRow("VT SMOKE. AVE open smoke", "vt_smoke")
-                        moreRow("SPAWNATTRS. spawn attribute map (not KRW)", "spawnattrs")
-                        moreRow("JPEG DEST. dest+timeout oracle (framework-side)", "jpeg_dest")
-                        moreRow("JPEG FW. framework decode smoke", "jpeg_fw")
-                        moreRow("P016. sout dest unlock", "p016")
-                        moreRow("P018. sout mach port", "p018")
-                        moreRow("P020. magazine-aware reclaim", "p020")
-                        moreRow("P020v2. magazine drain", "p020v2")
-                        moreRow("P021. AGX stage mask", "p021")
-                        moreRow("P022. cpu0 drain delay", "p022")
-                        moreRow("P023. VT extreme", "p023")
-                        moreRow("P025. NECP string spray", "p025")
-                        moreRow("P026. Metal NQ cite", "p026")
-                        moreRow("P027. Metal callback", "p027")
-                        moreRow("P028. reentry A", "p028")
-                        moreRow("P029. hammer", "p029")
-                        moreRow("P030. two queue", "p030")
-                        moreRow("P031. reclaim hit", "p031")
-                        moreRow("IOPL. 64749-class leak (CLOSED — re-check only)", "iopl")
-                        moreRow("AIO. aio UAF", "aio")
-                        moreRow("T018. COW trunc race", "t018")
-                        moreRow("T018 shadow. shadow race", "t018shadow")
-                        moreRow("T018 ver. version race", "t018ver")
-                        moreRow("P010 qspray. queue spray", "p010qspray")
-                        moreRow("P010 remain. remaining-fire", "p010remain")
-                        moreRow("P010 leak. queue leak", "p010leak")
-                        moreRow("B1P1. map + latch", "b1p1")
-                        moreRow("B1P2. unmap + reclaim", "b1p2")
-                        moreRow("B1P3. latched kick", "b1p3")
-                        moreRow("B1P4. verify reclaim", "b1p4")
-                        moreRow("Luminakrw. mapped theory (runKRW)", "luminakrw")
-                    }
-                    Section("J · Parked — do not grind") {
-                        moreRow("79. P039 AVE (sandbox wall)", "p039")
-                        moreRow("35. P035 AVE wrap", "p035")
-                        moreRow("18. P024 NECP (socket lock)", "p024")
-                        moreRow("31. P005 JIT disclose", "p005")
-                    }
-                    Section("K · Intercepted — tap returns STOP") {
-                        moreRow("40. IOGPU close (XR sel) — REOPENED as p121", "iogpu_close")
-                        moreRow("54. T014 serial (XR)", "t014a")
-                        moreRow("61. P014 close (XR)", "p014close")
-                        moreRow("1. P010obj last-ref SURVIVED", "p010obj")
-                        moreRow("53. T019 Lookup-nil SURVIVED", "t019")
-                        moreRow("p009iopl leftover (STOP)", "p009iopl")
-                        moreRow("p011v3 leftover wire race (STOP — reopened as p119)", "p011v3")
-                        moreRow("p011v10 leftover wire race (STOP)", "p011v10")
-                        moreRow("p012ctx leftover (STOP)", "p012ctx")
-                        moreRow("p010krwv2 leftover UAF (STOP)", "p010krwv2")
-                        moreRow("p010twoconn leftover UAF (STOP)", "p010twoconn")
-                        moreRow("p014ane leftover (STOP)", "p014ane")
-                        moreRow("p015 leftover (STOP)", "p015")
-                        moreRow("p017 legacy conf-deputy (STOP)", "p017")
-                    }
-                }
-                .listStyle(.insetGrouped)
-                .searchable(text: $probeQuery, prompt: "Name or id")
-                .navigationTitle("All probes")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Done") { showMore = false }
-                    }
-                }
-            }
-            .presentationDetents([.large])
-            .presentationDragIndicator(.visible)
         }
     }
 
@@ -392,23 +155,10 @@ struct ContentView: View {
                     .lineLimit(1)
             }
             .foregroundStyle(.primary)
-            .frame(minWidth: 64, minHeight: 48)
+            .frame(maxWidth: .infinity, minHeight: 48)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)
-    }
-
-    @ViewBuilder
-    private func moreRow(_ title: String, _ id: String) -> some View {
-        let q = probeQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-        if q.isEmpty
-            || title.localizedCaseInsensitiveContains(q)
-            || id.localizedCaseInsensitiveContains(q) {
-            Button(title) {
-                showMore = false
-                run(id)
-            }
-        }
     }
 
     // After panic+reboot: prefer the log for the *last TAP* (p011_tap_log),
