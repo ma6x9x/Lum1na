@@ -163,10 +163,10 @@
     uint32_t outCnt = [self knobUInt:@"p153_out_count" def:0];
     uint32_t offIn = [self knobUInt:@"p153_off_in" def:0x1c];
     uint32_t offOut = [self knobUInt:@"p153_off_out" def:0x51c];
-    uint32_t createSz = [self knobUInt:@"p153_create_size" def:(is27 ? 0xd88 : 0x35e18)];
-    uint32_t createMagic = [self knobUInt:@"p153_create_magic" def:0xac738];
     BOOL is26 = ![[LabDeviceProfile osversion] hasPrefix:@"24"];
     BOOL is27 = [[LabDeviceProfile osversion] hasPrefix:@"24"];
+    uint32_t createSz = [self knobUInt:@"p153_create_size" def:(is27 ? 0xd88 : 0x35e18)];
+    uint32_t createMagic = [self knobUInt:@"p153_create_magic" def:0xac738];
     NSString *defaultSvc = is26 ? @"H11ANEIn" : @"H1xANELoadBalancer";
     NSString *svc = [self knobString:@"p153_svc" def:defaultSvc];
     /* 24A435 table @0xfffffe00080554f8 (11 sels, capstone): sel2 SendRequest
