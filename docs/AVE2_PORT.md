@@ -54,3 +54,41 @@ The macOS client list offset (`client+0x280`) and writer buffer base
 `FUN_824e014` / `FUN_837b838` (Process command path) for the list pointer
 that reaches `0x81f3504`. Once mapped, the request field at `0x1a0a8` can be
 set to the negative count and the forged list can target a chosen VA.
+
+## SPS count chain (Ghidra, continued)
+
+```
+0x82eda2c (SPS/layer generator)
+  param_1+0x10 = layer count (1 or 2)
+  param_1+0x18 = SPS-id source
+  param_1+0x20 + layer*8 = SPS object pointer
+  param_1+0x48 = per-layer array
+  -> 0x837f2d0(sps_obj, param_1+0x18, param_1+0x48, layer, ...)
+     allocates the syntax writer, seeds *(sps+8), *(sps+0x1c0)
+     -> 0x837f6fc(sps_obj, layer_array, writer)   HEVC SPS writer
+```
+
+The vulnerable call is inside `0x837f6fc`:
+
+```c
+thunk_0x835bc60(writer,
+                layer_array[i + 0x169c],
+                *(int *)(sps_obj + 0x1f8) + 4);   /* signed count */
+```
+
+`0x835bc60` checks only `capacity <= position`; a negative SPS+0x1f8 value
+passes and sign-extends into the byte store. So the chain is:
+
+```
+Start input (0x1a0b0)
+  -> ctx = [UC+0x160]
+  -> ctx+0x20/0x28 SPS object(s)
+  -> SPS+0x1f8 count
+  -> WriteBits underwrite
+```
+
+Remaining: the input offset that populates **SPS+0x1f8**. The macOS request
+used +0x487c -> SPS+0x1f4; iOS has the count one field later at +0x1f8, so
+the input field is likely one 4-byte slot later in the parsed SPS payload.
+The next pass is the SPS parser (`0x82ee3fc` / `0x82eda2c` caller) to map
+that input slot.
