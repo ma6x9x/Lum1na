@@ -17,7 +17,7 @@
 #import <IOKit/IOKitLib.h>
 #import <mach/mach.h>
 
-#define P162_BUILD @"p162-iohid-reach-v1"
+#define P162_BUILD @"p162-iohid-reach-v2"
 
 @implementation P162IOHIDReach
 
@@ -27,6 +27,18 @@
         return [NSString stringWithUTF8String:name];
     }
     return @"?";
+}
+
++ (NSString *)property:(NSString *)key of:(io_object_t)obj {
+    CFTypeRef v = IORegistryEntryCreateCFProperty(
+        obj, (__bridge CFStringRef)key, kCFAllocatorDefault, 0);
+    if (!v) return nil;
+    NSString *s = nil;
+    if (CFGetTypeID(v) == CFStringGetTypeID()) {
+        s = [NSString stringWithString:(__bridge NSString *)v];
+    }
+    CFRelease(v);
+    return s;
 }
 
 + (NSString *)tap {
@@ -50,6 +62,8 @@
     ];
 
     int totalServices = 0, totalOpens = 0;
+    NSMutableDictionary<NSString *, NSString *> *ucByClass =
+        [NSMutableDictionary dictionary];
     for (NSString *cls in classes) {
         CFMutableDictionaryRef match = IOServiceMatching(cls.UTF8String);
         if (!match) {
@@ -67,6 +81,14 @@
         while ((svc = IOIteratorNext(it)) != 0) {
             n++;
             NSString *real = [self classOf:svc];
+            if (!ucByClass[real]) {
+                NSString *uc = [self property:@"IOUserClientClass" of:svc];
+                NSString *io = [self property:@"IOClass" of:svc];
+                NSString *bid = [self property:@"CFBundleIdentifier" of:svc];
+                ucByClass[real] = uc ?: @"(null)";
+                [o appendFormat:@"  [%@] %@ IOUserClientClass=%@ IOClass=%@ bundle=%@\n",
+                    cls, real, uc ?: @"(null)", io ?: @"(null)", bid ?: @"(null)"];
+            }
             NSMutableString *line = [NSMutableString stringWithFormat:
                 @"  [%@] inst=%d class=%@", cls, n, real];
             for (uint32_t type = 0; type <= 4; type++) {

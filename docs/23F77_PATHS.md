@@ -52,6 +52,23 @@ IOHIDFamily 23F77 vs 24B119, not a magic hunt.
 `AppleMultitouchDevice`, fast-path client) and tries `IOServiceOpen` types 0–4,
 read-only. Any open client is the entry point the 112515 lane needs.
 
+First receipt (2026-11-09, 12/23F77 and 17/24A435):
+
+- `AppleARMPMUPowerSensor` and `IOHIDEventDriver` open at **type 2**
+  (`kr=0`) on both devices; types 0/1/3/4 return `0xe00002c2` (BadArgument).
+- `AppleMultitouchDevice` refuses every type (`0xe00002c2`); on 24A435 the
+  `AppleMultitouchDeviceUserClient` instance exists but returns
+  `0xe00002c7` (Unsupported) for every type.
+- `IOHIDDevice` instances (SPUHID/BTM) return `0xe00002e2` (NotPermitted)
+  except one instance on 23F77, which returns `0xe00002c7`.
+- `IOHIDInterface` is `0xe00002c7`; `IOHIDResource` is `0xe00002c2`.
+
+p162 v2 reads `IOUserClientClass`/`IOClass`/`CFBundleIdentifier` for each
+service class, so the next run names the type-2 user client. That class's
+external-method table is the next Ghidra target: if it exposes a
+property/event path into the `" hid"`-magic table object, 112515 is live
+from an app.
+
 ## Existing paths
 
 - P027/AppleJPEG, P063/aio84530, P139/P010/P063 disclose, P113, P044 — already

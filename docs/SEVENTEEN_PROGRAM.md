@@ -75,6 +75,13 @@ unchanged: hasKread flips ONLY on kread32(kbase)==0xfeedfacf in P007Board).
    16462 (survival), never silently to 16463. The log line to read is
    `[2e] materialize drain st=… frames=…`; frames>0 is the first real
    evidence that ctx+0x147b0 holds a heap object.
+   **First v4 receipt (2026-11-09 00:44, 17/24A435):** `profile st=0`,
+   `Prepare st=0`, first encode `st=0`, then
+   `materialize drain st=0 frames=0` — the overshoot was skipped and there
+   was **no panic**. So the this=1 / FAR=0x59 panic is gated, but the pool
+   still did not materialize: the hardware HEVC session is not delivering a
+   sample buffer. v4.1 adds callback `calls/dropped/lastStatus/lastInfo` and
+   an IOSurface-presence line to tell a dropped frame from a failed encode.
 3. **p149** is the conversion TAP: kernel pipe spray + p142 v7 sequence
    + scan for PIPE-HIT / QUEUE-INIT self-pointers + kread32 gate.
    KERNEL T1 on T8150 fires P114 then P149. Catalog p149 is the solo
