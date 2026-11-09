@@ -39,6 +39,19 @@ The fixed 2360.40.13 index clamp (`cmp; b.ge; csel`) is absent. The 23F77
 table-index function and event reach are not yet mapped; IOHID event
 generation is app-reachable via the private IOHID APIs (p0xx probe needed).
 
+Bench27 (iOS 27.0.1) located the fixed shape: 27.2 adds `cmp w8, w9; b.ge`
+before `smull x8, w8, #0x14` on an array at `+0x38`, count at `+0x40`, magic
+`" hid"`. Reachability stayed closed there because
+`AppleMultitouchDeviceUserClient` refused every open type. A 23F77 scan for
+either immediate encoding of the magic found nothing, so 26.5 builds the
+comparison differently — the next step is a mnemonic-profile diff of
+IOHIDFamily 23F77 vs 24B119, not a magic hunt.
+
+**p162** now enumerates the HID service family on-device (`IOHIDDevice`,
+`IOHIDEventService`, `IOHIDEventDriver`, `IOHIDInterface`, `IOHIDResource`,
+`AppleMultitouchDevice`, fast-path client) and tries `IOServiceOpen` types 0–4,
+read-only. Any open client is the entry point the 112515 lane needs.
+
 ## Existing paths
 
 - P027/AppleJPEG, P063/aio84530, P139/P010/P063 disclose, P113, P044 — already

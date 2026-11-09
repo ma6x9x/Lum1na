@@ -261,7 +261,9 @@ static int64_t p160_class7_try(NSString *target, NSString **pathOut, NSString **
             int64_t result = -1;
             if (symlink(target.fileSystemRepresentation,
                         partPath.fileSystemRepresentation) == 0) {
-                for (NSNumber *flagNum in @[@(UINT64_C(0x8000000000)), @(P160_FLAGS)]) {
+                for (NSNumber *flagNum in @[@(UINT64_C(0x8000000000)),
+                                            @(UINT64_C(0x800000000)),
+                                            @(P160_FLAGS)]) {
                     g_p160_flags = flagNum.unsignedLongLongValue;
                     NSString *path = nil, *err = nil;
                     int64_t h = p160_query(7, gid.UTF8String, YES, part,
