@@ -68,6 +68,10 @@ them from its session spec. Current VT session does not.
 - Reachability: the direct UC Prepare is the natural path but
   `IOServiceOpen` is `0xe00002e2` for type 1. VT composes the SPS from
   session properties; a negative VT-provided value is unproven.
+- Direct-open receipt (p148, 12/23F77): types 0/1/2 all return
+  `0xe00002e2`; `IOServiceMatching("AppleAVE2")` finds no service. The
+  P157 sweep now covers types 0-5; if none open, the direct UC path is
+  closed on that build and VT is the only AVE2 route.
 
 ### Zones
 
