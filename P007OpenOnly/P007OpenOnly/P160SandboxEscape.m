@@ -217,8 +217,10 @@ static int64_t p160_class2_try(NSString *target, NSString **pathOut, NSString **
     if (result < 0) {
         [fm removeItemAtPath:link error:nil];
         if (symlink(target.fileSystemRepresentation, link.fileSystemRepresentation) == 0) {
-            NSArray *domains = @[leaf, [@"Caches/" stringByAppendingString:leaf],
-                                 [@"Library/Caches/" stringByAppendingString:leaf]];
+            NSString *leafLink = [leaf stringByAppendingString:@"_link"];
+            NSArray *domains = @[leafLink,
+                                 [@"Caches/" stringByAppendingString:leafLink],
+                                 [@"Library/Caches/" stringByAppendingString:leafLink]];
             for (NSString *dom in domains) {
                 NSString *path = nil, *err = nil;
                 int64_t h = p160_query(2, bid.UTF8String, NO, 3, dom, @"class2-subpath", &path, &err);
