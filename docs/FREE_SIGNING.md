@@ -44,6 +44,29 @@ If the free profile carries `group.com.Lum1naDebug`, p160's class-7 escape
 can run on the stock 12/17/XR/iPad without a paid account. If it does not,
 the escape stays paid-profile/ldid-only on stock, as before.
 
+## Reading the p160 log
+
+The 2026-11-09 15:56 run on the 12 (23F77) shows:
+
+```
+[ent] no com.apple.security.application-groups
+[profile] app-group array: 0 id(s)
+[kernelcache] handle=-5 ... open=0 w=0 err=posix=1
+[class2] miss ...
+```
+
+That is the signature, not the probe: the running app has **no app-group
+entitlement**, and the embedded profile has **zero groups**. Class 7 cannot
+run, class 13 is patched on 26.x, and class 2 returns ENOENT. The parent
+fallback is opt-in and Bench27 measured `rename Library -> EPERM`; it is not
+a substitute for the group.
+
+**An app cannot add this entitlement to itself at runtime.** App Groups are
+code-signing metadata read by the kernel at launch. A debugger or injector
+(StikDebug, SideStore, a dylib) can add code at runtime but cannot add an
+entitlement to the running signature. Only re-signing the IPA with a profile
+that contains the group changes the answer.
+
 ## Do not
 
 - Do not put SideStore/AltStore groups in our entitlements.
