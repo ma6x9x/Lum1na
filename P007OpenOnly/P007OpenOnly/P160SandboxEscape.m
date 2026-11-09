@@ -190,6 +190,72 @@ static void p160_recover_library(NSMutableString *o) {
     }
 }
 
+/* Class-7 app-group path. Needs a real provisioned app group: the app must be
+   signed with com.apple.security.application-groups containing the ID and the
+   profile must carry it. Free Sideloadly profiles cannot; a paid profile or a
+   jailbroken ldid sign can. Candidate IDs come from Documents/p160_group.txt
+   (one per line) plus a guess of group.<bundle-id>. */
+static NSArray<NSString *> *p160_group_candidates(void) {
+    NSMutableArray *ids = [NSMutableArray array];
+    NSString *docs = NSSearchPathForDirectoriesInDomains(
+        NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+    if (docs) {
+        NSString *knob = [docs stringByAppendingPathComponent:@"p160_group.txt"];
+        NSString *text = [NSString stringWithContentsOfFile:knob
+                                                   encoding:NSUTF8StringEncoding
+                                                      error:NULL];
+        NSCharacterSet *ws = [NSCharacterSet whitespaceAndNewlineCharacterSet];
+        for (NSString *line in [text componentsSeparatedByString:@"\n"]) {
+            NSString *g = [line stringByTrimmingCharactersInSet:ws];
+            if (g.length && ![g hasPrefix:@"#"] && ![ids containsObject:g]) [ids addObject:g];
+        }
+    }
+    NSString *bid = [[NSBundle mainBundle] bundleIdentifier];
+    if (bid.length) {
+        NSString *guess = [@"group." stringByAppendingString:bid];
+        if (![ids containsObject:guess]) [ids addObject:guess];
+    }
+    return ids;
+}
+
+static int64_t p160_class7_try(NSString *target, NSString **pathOut, NSString **errOut) {
+    if (!p160_load() || !g.set_ids) { if (errOut) *errOut = @"MCM unavailable"; return -1; }
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSString *last = @"no provisioned app group (put one ID per line in Documents/p160_group.txt)";
+    for (NSString *gid in p160_group_candidates()) {
+        NSURL *u = [fm containerURLForSecurityApplicationGroupIdentifier:gid];
+        if (!u) continue;
+        NSString *caches = [[u.path stringByAppendingPathComponent:@"Library"]
+                            stringByAppendingPathComponent:@"Caches"];
+        [fm createDirectoryAtPath:caches withIntermediateDirectories:YES attributes:nil error:nil];
+        NSString *leaf = [NSString stringWithFormat:@".p160_g%d", getpid()];
+        NSString *link = [caches stringByAppendingPathComponent:leaf];
+        [fm removeItemAtPath:link error:nil];
+        int64_t result = -1;
+        if (symlink(target.fileSystemRepresentation, link.fileSystemRepresentation) == 0) {
+            for (NSString *dom in @[leaf,
+                                    [@"Caches/" stringByAppendingString:leaf],
+                                    [@"Library/Caches/" stringByAppendingString:leaf]]) {
+                NSString *path = nil, *err = nil;
+                int64_t h = p160_query(7, gid.UTF8String, YES, 3, dom, @"class7", &path, &err);
+                if (h >= 0) {
+                    if (p160_can_open(target, YES)) {
+                        result = h; if (pathOut) *pathOut = path; break;
+                    }
+                    if (g.release) g.release(h);
+                }
+                if (err.length) last = err;
+            }
+        } else {
+            last = [NSString stringWithFormat:@"symlink in group %@ failed", gid];
+        }
+        [fm removeItemAtPath:link error:nil];
+        if (result >= 0) { if (errOut) *errOut = nil; return result; }
+    }
+    if (errOut) *errOut = last;
+    return -1;
+}
+
 static int64_t p160_class2_parent(NSString *target, NSString **pathOut, NSString **errOut) {
     NSString *docs = NSSearchPathForDirectoriesInDomains(
         NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
@@ -335,6 +401,12 @@ static int64_t p160_class2_try(NSString *target, NSString **pathOut, NSString **
         if (h < 0 && [t[@"dir"] boolValue]) {
             NSString *c2path = nil, *c2err = nil;
             int64_t h2 = p160_class2_try(path, &c2path, &c2err);
+            if (h2 < 0) {
+                NSString *gpath = nil, *gerr = nil;
+                int64_t hg = p160_class7_try(path, &gpath, &gerr);
+                if (hg >= 0) { h2 = hg; c2path = gpath; }
+                else if (gerr.length) c2err = gerr;
+            }
             if (h2 < 0) {
                 NSString *ppath = nil, *perr = nil;
                 int64_t hp = p160_class2_parent(path, &ppath, &perr);
