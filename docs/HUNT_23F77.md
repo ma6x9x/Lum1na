@@ -145,5 +145,36 @@ untested) remains the only AVE2 route on 23F77.
    +0x110 equality checks. App reach is weaker (HID/peripheral event
    path); still an internal read, not a copyout.
 
-Pending: IOSurface p154 and M2Scaler PoC-shape agents (the AVE2 VT/writer
-analysis is complete: 26.5 is clamped; direct UC types 3-5 untested).
+### p154 in detail (23F77)
+
+- UC is `IOSurfaceRootUserClient`, 0x148 B, type-isolated kalloc_type
+  (`site.IOSurfaceRootUserClient`, flags 0x61); +0xd8 lock, +0xe8 root,
+  +0xf0 armed byte, +0xf8 task, +0x108/+0x110/+0x118 surface array/count/
+  token. Root is 0x4b8 B; notification node is `IOSurfaceNotifyRequest`
+  0x60 B (links +0/8, port word +0x10, ids +0x18/+0x20, refcon +0x50,
+  UC +0x58).
+- Teardown `0x986e1fc`: if +0xf0, clear +0xf0; remove_map
+  `0x986bb98`; clear surface owners; purge listeners `0x98699f4`
+  (root+0x148 lock, unlink nodes with [node+0x58]==UC, release +0x10,
+  free node); then super::free `0x986e280`.
+- **Race:** a concurrent sel-0x11 insert (`0x986978c`) that takes
+  root+0x148 after the purge's unlock and before super::free links a node
+  with +0x58 = the dying UC. The UC is freed; the node survives (a second
+  teardown cannot run because +0xf0 was cleared). A later surface
+  use-count→0 notify `0x9858bc0 → 0x9869984 → 0x98722dc` locks the stale
+  UC+0xd8 and reads the stale +0x108/+0x110/+0x118.
+- 27.2 fix: detach sets `+0xf1` under the list lock
+  (`0x9be5494`), add gate returns `0xe00002d8` if set (`0x9be5210`).
+  23F77 has no +0xf1 byte.
+- App reach: selector 0x11 (add) / 0x12 (remove), 0x18-byte struct,
+  normal TABLE1, entitlement token 0. Trigger with
+  `IOSurfaceDecrementUseCount`/last unlock.
+- **Primitive:** stale-pointer UAF of the UC, not a refcount underflow.
+  The node holds no retain; use is a read of the freed lock/array/token.
+  The UC zone is type-isolated, so generic kalloc sprays cannot land;
+  the only same-zone object is another IOSurfaceRootUserClient. Net:
+  DoS/type-confusion, **not a self-contained KRW ladder**. The window is
+  narrow (one lock interval at the tail of free) and requires
+  IOServiceClose to overlap an in-flight method; validate on-device.
+
+Pending: M2Scaler PoC-shape agent (AVE2 VT/writer complete; p154 mapped).
