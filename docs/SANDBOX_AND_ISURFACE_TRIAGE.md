@@ -106,3 +106,17 @@ Three new repos reviewed statically; none is a kernel R/W primitive.
 - Therefore class-7 is a **paid-account or jailbroken-device** path, not a
   free-sideload path. The class-2 parent fallback is the only no-entitlement
   variant, and it is now testable.
+
+### Bench27 confirmation (2026-11-09)
+
+`SKVLENT/iOS27-Research-Exploits` reproduced the class-7 escape on 27.0.1:
+28 shared system groups reachable, R/W in foreign app containers, MobileGestalt
+cache editable. Only class 7 issued a token; class 2/12/13 did not, and
+`rename Library` returned EPERM for the no-group fallback. Their flags value
+for 27.0.1 is `0x8000000000` (the 26.x value `0x800000000` was refused).
+
+p160 now uses their exact shape: replace the group's `Library/Caches` (part 3)
+or `Library/Preferences` (part 2) with the target symlink, query class 7 with
+an empty domain, try both flag values, and restore the directory afterwards.
+The App Group requirement is unchanged and is still the blocker on stock
+devices. Details: `docs/BENCH27_INTEGRATION.md`.

