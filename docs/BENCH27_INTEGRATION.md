@@ -50,12 +50,23 @@ The MobileGestalt cache is at
 mandatory for us too: back up into Documents before any write, restore after,
 and never touch `CacheUUID`.
 
-### 2. IOHIDFamily 112515 — still open, build-specific
+### 2. IOHIDFamily 112515 — CLOSED (not app-reachable, not a write)
 
 Their 27.2 fix adds `cmp w8, w9; b.ge` before a `smull x8, w8, #0x14`
 indexed read (`index` from `[obj+8]+0x30`, array at `[obj+0x38]`, count at
 `[obj+0x40]`, magic `" hid"`). Reachability was **not** demonstrated: the
 multitouch user client refuses every open type.
+
+**2026-11-09 final map (24A435→24B119):** the type-2 class is
+`IOHIDEventServiceUserClient` (personality `0xfffffe000b5b7e78`); its
+selectors never reach the path. The `" hid"` object is
+`site.HIDPreparsedData` (`0xfffffe00083218c8`), table base `+0x38`, count
+`+0x40`, stride `0x14`, index parsed from the HID report descriptor. Both
+getters are **read-only** (`ldr w8,[x11]`), and the leaked dword is
+consumed in-kernel; there is no userland copyout. The 27.2 check is a
+signed upper bound only. **112515 is an internal OOB read, not a KRW
+step.** The app-reachable type-2 client is still worth keeping p162 for
+(event-service vtable methods), but not for this CVE.
 
 Our scan of the 23F77 kernelcache for either immediate encoding of the `" hid"`
 magic (`movz/movk`) found nothing, so 26.5's IOHIDFamily 2360.2.2 builds the

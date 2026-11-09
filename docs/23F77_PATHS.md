@@ -64,10 +64,35 @@ First receipt (2026-11-09, 12/23F77 and 17/24A435):
 - `IOHIDInterface` is `0xe00002c7`; `IOHIDResource` is `0xe00002c2`.
 
 p162 v2 reads `IOUserClientClass`/`IOClass`/`CFBundleIdentifier` for each
-service class, so the next run names the type-2 user client. That class's
-external-method table is the next Ghidra target: if it exposes a
-property/event path into the `" hid"`-magic table object, 112515 is live
-from an app.
+service class, so the next run names the type-2 user client.
+
+**CLOSED (2026-11-09, IOHID agent 24A435→24B119):** the type-2 class for
+`IOHIDEventDriver`/`AppleARMPMUPowerSensor` is
+**`IOHIDEventServiceUserClient`** (registry personality at
+`0xfffffe000b5b7e78`; class vtable `0xfffffe000831dc70`). Its selectors do
+not reach the `HIDPreparsedData` table path. The `" hid"` magic is the
+immediate `0x68696420` at `0xa0bc4a0`; the object is
+`site.HIDPreparsedData` (`0xfffffe00083218c8`), table base `+0x38`, count
+`+0x40`, stride `0x14`, index from the **descriptor** at `[obj+8]+0x30`.
+
+- 27.0 vulnerable getter `0xa0bc4b0`/`0xa0bc6d0` does
+  `ldr w8,[x11]` — a 4-byte **OOB read**, no store. 27.2 `0xa10b4dc` adds
+  `ldr w9,[x20,#0x40]; cmp w8,w9; b.ge` (signed upper bound only).
+  The batch twin `0xa0c17a8`/`0xa0c1894` is also read-only.
+- The leaked dword is consumed **in-kernel** (it becomes the `x1` of a
+  container lookup); neither getter copies it to userland.
+- The index is parsed from a HID report descriptor at service init
+  (`0xa10e74c` / `0xa10e908` / `0xa10f040`), i.e. device-side input, not a
+  user-client value. The type-2 UC has no app-facing selector table for
+  this path; the `[x16+0x118]` calls are container/property lookups, not
+  table accessors.
+
+**Verdict: 112515 is an internal OOB read only — not an app-reachable
+leak, not a write, and not a KRW step.** The type-2 open is still useful
+for anything that uses event-service vtable methods, but not for 112515.
+If a user client is ever implicated in descriptor handling it would be
+`IOHIDLibUserClient` (IOHIDDevice personality `0xb5b8220`), not the
+event-service UC.
 
 ## Existing paths
 
