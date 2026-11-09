@@ -132,13 +132,20 @@ untested) remains the only AVE2 route on 23F77.
    (`0x9be5210`, returns 0xe00002d8), mark (`0x9be5494`) and teardown
    (`0x9bea414`). App reach: IOSurfaceRoot/shared-event listeners, no
    entitlement. Race class -> stale/UAF listener.
-2. **M2Scaler submit/queue guards.** 23F77 `0x8a2e57c` (453 insn);
-   27.2 `0x8dc40ac` adds an entry active-bitmap gate on service+0x1414
-   (`0x8dc40b0-0x8dc40b8`, returns 5), window/clamp checks
-   (`0x8dc4600-0x8dc4678`), and queue-depth/backpressure/stale-flush
-   strings. 23F77 has no `+0x1414` field and none of those checks. App
-   reach: the Scaler UC opens with no entitlement; types {6,7,8,11} and
-   selectors 6/7/8/11 are reachable.
+2. **M2Scaler — premise false; not a 23F77 memory-corruption lane.** The
+   23F77 `0x8a2e57c` is a **histogram self-test** ("HistogramBinMode"),
+   not the 24B119 `0x8dc40ac` per-stream scaler window/tile prepare; the
+   static-diff pairing was a same-size mispair. The real 24B119 histogram
+   twin is the function containing `0x8cf5334`. The 27.2 `+0x1414` active
+   bitmap, HAL state fields, and queue-depth/backpressure/stale-flush
+   logic have **no 23F77 counterpart** (exhaustive scan: no
+   `[xN,#0x1414]`, no new strings). The older 23F77 enqueue `FUN_8acf088`
+   is a different HW-FIFO bitmap with a `0x1e` slot cap, driven by the
+   internal request path, not a client index. Reachable Scaler paths:
+   sel6 histogram (`0xFA8` struct, count 2..1000, sid0/sid1, `+0xFA4`
+   bit0; 0x620 kernel stack buffer; an engine-length overflow would be a
+   canary panic with kernel-set length/source) and sel11 `0x288` kernel
+   copyout (disclosure). No queue/arena primitive.
 3. **IOHID 112515 bit-range check.** 23F77 matcher `0x9671ebc` (caller
    `0x969ac4c`) lacks the 27.2 checks at `0x99c9a74-0x99c9b4c` against
    the element bit-size/offset fields (+0x138/+0x110) and the +0x108/
