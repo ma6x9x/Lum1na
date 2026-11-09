@@ -65,6 +65,16 @@ unchanged: hasKread flips ONLY on kread32(kbase)==0xfeedfacf in P007Board).
    (IPS 13:45-13:55). Ghidra: ctor/dtor FUN_fffffe0008840f78 /
    FUN_fffffe0008840fec queue_init at this+0x58; dtor then
    kfree(this+0x50, count<<5) with count at this+0x48.
+   **p149 v4 correction (2026-11-09):** the materialize premise was never
+   verified — `EncodeFrame` can return 0 and still drop the frame with
+   RealTime=false. v4 adds a hardware-encoder spec, an IOSurface-backed
+   source, `VTCompressionSessionCompleteFrames` after the N=8 encode, and a
+   delivered-sample-buffer counter. If `frames=0`, the overshoot is skipped
+   and the session is leaked on purpose: running Set/invalidate there is the
+   known this=1 FAR=0x59 panic. A bad `p142_layers.txt` now falls back to
+   16462 (survival), never silently to 16463. The log line to read is
+   `[2e] materialize drain st=… frames=…`; frames>0 is the first real
+   evidence that ctx+0x147b0 holds a heap object.
 3. **p149** is the conversion TAP: kernel pipe spray + p142 v7 sequence
    + scan for PIPE-HIT / QUEUE-INIT self-pointers + kread32 gate.
    KERNEL T1 on T8150 fires P114 then P149. Catalog p149 is the solo

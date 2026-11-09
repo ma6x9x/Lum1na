@@ -103,6 +103,9 @@
         }
     } else if (sku == LabSkuT8150_24A435 || sku == LabSkuT8150_other) {
         L(@"[*] 17 pair: P114 sel-8 serializer (READ-ONLY) then P149 conversion. 43748 clamp-CLOSED.");
+        L(@"[*] P149 v4: hardware HEVC + IOSurface source, CompleteFrames after the");
+        L(@"  N=8 encode, and a delivered-frame gate. frames=0 = materialize skip");
+        L(@"  (the this=1 FAR=0x59 invalidate is NOT run). frames>0 = overshoot fires.");
         NSString *p114 = nil;
         @try { p114 = [P114SurfaceLeak tap]; }
         @catch (NSException *e) { L([NSString stringWithFormat:@"[-] p114 %@", e.name]); }
