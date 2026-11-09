@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Free Personal Team / stock test signing only.
+         The private entitlement set lives in P007OpenOnly.entitlements and is
+         for the ldid/Dopamine rigs. A free profile will never include it. -->
+    <key>com.apple.security.application-groups</key>
+    <array>
+        <string>group.com.Lum1naDebug</string>
+    </array>
+    <key>get-task-allow</key>
+    <true/>
+</dict>
+</plist>
