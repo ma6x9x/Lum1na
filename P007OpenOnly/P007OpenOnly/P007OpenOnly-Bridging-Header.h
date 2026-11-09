@@ -154,3 +154,5 @@
 #import "P153ANESelectorProbe.h"
 #import "P156ProcLocate.h"
 #import "P157AVEWriterReach.h"
+#import "P160SandboxEscape.h"
+#import "P159IOSurfaceAdjacency.h"
