@@ -162,3 +162,73 @@ strips that private exception entitlement, so stock iOS refuses the open.
 **The AVE2 lane is therefore not reachable on the stock 12.** It can only
 be exercised on the ldid/Dopamine rigs (11 22G100, mini 21D50), where the
 writer exists but the PushBack sink was not matched.
+
+## 27.0 T8150 (24A435/24A437): writer is UNCLAMPED, input mapped
+
+24A435 and 24A437 AppleAVE2 are byte-identical (0 changed functions in the
+mnemonic diff), so the 24A437 Ghidra project is valid for the 17.
+
+Symbols on 24A435 (from `ipsw kernel sym` + the 27.0 signature set):
+
+| Address | Symbol |
+|---|---|
+| `0x88e4c2c` | `HEVC_SPS::Write_seq_parameter_set_rbsp(HEVC_RPS*, AVE_SyntaxWriter*)` |
+| `0x88b9670` | wrapper: `(writer, value, count)` → `0x88b94f8` |
+| `0x88b94f8` | real WriteBits |
+| `0x8839554` | `AVE_PSGen::Init(...)` |
+| `0x88e45f4` | `HEVC_SPS` ctor: `memcpy(sps, src, 0x1c74)` |
+| `0x88e4618` | `HEVC_SPS::Init` (writes +0x1fc/+0x218, never +0x1f4) |
+| `0x879054c` | `AVE_Client_Verify` |
+| `0x88d46d4` | `AppleAVE2UserClient::Prepare` |
+
+**The writer has no lower-bound check.** 24A435 `0x88b94f8`:
+
+```c
+bitpos = *(int *)(writer + 8);              /* signed */
+index  = (bitpos - 8) >> 3;                 /* arithmetic shift */
+if (*(int *)(writer + 0x10) <= index)       /* upper bound only */
+    return 0xfffffc05;
+*(char *)(*(long *)(writer + 0x18) + index) = byte;   /* sxtw */
+```
+
+A negative bit position gives a negative byte index, passes the capacity
+check, and lands before the buffer at `writer+0x18`.
+
+**Correction (2026-11-09):** 27.2 does **not** clamp either. The 24B119
+real WriteBits `0x88f39a4` has the same shape; its `cmp/csel` is
+`(bitpos<0 ? bitpos+7 : bitpos) >> 3` rounding, not a lower bound. The
+27.2 SPS caller `0x891f68c` does `ldr w8,[x20,#0x1f4]; add w2,w8,#4;
+bl 0x88f3b1c` with no check. The old "27.x clamps" note was a misread.
+
+### Input mapping (27.0)
+
+```
+IO_Prepare: AVE_Client_Prepare(ctx, in+0x18, in+0x228, in+0x338, in+0x28)
+  settings = in+0x338
+AVE_Client_Verify (encType 2):
+  client+0x6228 <- settings+0x4348   (0x38e8)
+  client+0x9b10 <- settings+0x7c30   (0x4300)
+  client+0x3758 <- settings+0x1878   (0x2ad0)
+  client+0xde10 <- settings+0xbf30   (0xbc8)
+  client+0xe9d8 <- settings+0xcaf8   (0x5dd8)
+AVE_PSGen::Init:
+  HEVC_SPS layer 0 = ctor(heap, client+0x6228)       memcpy 0x1c74
+  HEVC_SPS layer 1 = ctor(heap, client+0x6228+0x1c74)
+```
+
+`HEVC_SPS::Init`/`Generate` never rewrite +0x1f4, so:
+
+**Prepare input +0x4874  →  HEVC_SPS+0x1f4** (layer 0)
+layer 1 at **+0x64e8** (`+0x1c74` later).
+
+This matches the macOS PoC's `request+0x487c → SPS+0x1f4` within 8 bytes.
+
+### Remaining reachability question
+
+The direct UC Prepare is denied (`IOServiceOpen` 0xe00002e2). Through
+VideoToolbox, VT builds `settings` from session properties. The open
+question is **which VT property maps to `settings+0x4348+0x1f4`**, and
+whether it accepts a negative value. If it does, the underwrite is live on
+the 17 through the VT path. Candidate properties: MaxFrameDelayCount /
+AllowFrameReordering / NumberOfTemporalLayers / ExpectedFrameRate; the
+field is in the SPS RBSP path, not the temporal-layer fill.
