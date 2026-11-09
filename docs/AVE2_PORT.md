@@ -232,3 +232,59 @@ whether it accepts a negative value. If it does, the underwrite is live on
 the 17 through the VT path. Candidate properties: MaxFrameDelayCount /
 AllowFrameReordering / NumberOfTemporalLayers / ExpectedFrameRate; the
 field is in the SPS RBSP path, not the temporal-layer fill.
+
+## P149 gates and the real 16463 write (2026-11-09, 24A437)
+
+The v4 `frames=0` is **not** an encoder-materialization failure. Both
+P149 callers return 0 (success) silently when a gate fails:
+
+- `ctx+0x274 == 1` — set by `FUN_87955f4` after `IOOpen`; not a VT
+  property.
+- `ctx+0x1f60 != 0` — `FUN_879054c` copies `ctx+0x1b40 <- blob, 0x5c0`,
+  so this is `blob+0x420` = Prepare input **+0x758** / Start input
+  **+0x760**. If 0, P149 is skipped.
+- `pipeline+0x18 == 2` — `pipeline = *(ctx+0x2d0)`; mode 2 iff
+  `(*(u8*)(ctx+0x1f39) >> 2) & 1`, where `ctx+0x1f39 = blob+0x3f9` =
+  Prepare input **+0x731** / Start input **+0x739**. Modes 1/3 are also
+  built; mode != 2 skips P149.
+
+The direct UC can set those blob bytes (selector 3 Prepare). VT must
+serialize them from its session spec; our current VT session does not.
+**No amount of encoder-spec tuning fixes this if VT writes mode 1 or
+blob+0x420 = 0.**
+
+The old NTL=16463 panic is **not** a failed allocation. The only
+`str w24,[x10,x9,lsl#2]` is `0x883979c` in `FUN_8839554` (HEVC
+PSGen/DPB init), with base `ctx+0x4678` and index from `ctx+0x3760`
+(= Prepare input +0x1bb8). Arithmetic:
+
+```
+ctx+0x4678 + 16462*4 = ctx+0x147b0   (SOT pool slot low)
+ctx+0x4678 + 16463*4 = ctx+0x147b4   (slot high)
+```
+
+So NTL=16463 writes a small DPB value (w24, observed 1) into the
+`ctx+0x147b0` SOT-pool pointer. The slot becomes 1; teardown
+(`AVE2_CODEC_TEARDOWN 0x87913b4`) later dereferences it and panics
+(`FAR=0x59`). This is an **in-object relative write**, not heap-neighbor
+corruption. The count is user-influenced through the GOP/temporal-layer
+config; if a chosen index can target a useful ctx field, this is a real
+primitive. The fill range/start and the target field map are the next
+Ghidra question.
+
+Zones (from the __DATA_CONST descriptors):
+
+| Descriptor | Zone | Size |
+|---|---|---|
+| `DAT_f92028/68` | `site.AVE_SurfacePool` | 0x98 |
+| `DAT_f97638/d8` | `site.S_AVE_SurfacePool_Entry` | 0x20 per entry |
+| `DAT_f94928/a8` | same Entry, count==1 | 0x20 |
+| ctx | `site._S_AVE_Client` | 0x147c8 |
+| pipeline | `site.AVE_Pipeline` | 0x50 |
+| MD | `site.AVE_MD_SVE` / `site.AVE_MD_LAGOP` | 0x1c1d0 / 0x19590 |
+| writer | `site.AVE_SyntaxWriter` | 0x828 |
+
+The P149 pipe spray is **wrong**: the backing is a typed zone
+(`S_AVE_SurfacePool_Entry`), not kalloc_data. The count at
+`MD+0x198b0` is 10 (a computed DPB count), not NTL; the backing is
+`10<<5 = 0x140`. Grooming would have to hit the same typed zone.
