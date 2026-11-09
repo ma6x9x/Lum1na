@@ -84,4 +84,43 @@ not reproduced on 23F77 (only the +8 bit-accumulator path; VT negative is
 unproven pending the 26.5 ave.videoencoder analysis), and the direct UC
 open is 0xe00002e2.
 
-Pending: 23F77 AVE2 VT/writer and 23F77→24B119 static-diff agents.
+## Static diff 23F77 -> 24B119 (A14, 26.5 -> 27.2)
+
+Kext versions: AVE2 905.36.1->913.64.1; AppleH11ANEInterface 9.511.3->
+10.102.4; IOSurface 393.5.7->403.1; M2Scaler 265.0.0->265.0.0 (code
+changed); IOHIDFamily 2.0.0->2.0.0 (code changed).
+
+**AVE2 writer: nothing was clamped.** 23F77 SPS call `0x837fc3c ldr
+w8,[x20,#0x1f8]; add w2,w8,#4; bl 0x835bdb8 -> 0x835bc60`. 27.2 A14 call
+`0x857ac2c [x20,#0x1f4]; ... -> 0x854ef44`. The 23F77 writer has a
+separate zeroed byte cursor at +0xc (signed cap check), so a negative SPS
+count only moves the +8 bit accumulator; the 27.x writer computes
+`(bitpos-8)>>3` and underflows. **Do not claim the P149 underwrite as a
+26.5 bug;** it is a 27.x writer shape. The field moved +0x1f8 -> +0x1f4
+but is unvalidated on both.
+
+**Top 3 27.2 fixes still live on 26.5 (ranked by app reach):**
+
+1. **IOSurface ready-byte listener race (p154).** 23F77 add
+   `0x986ba54`, remove `0x986bb98`, teardown `0x986e1fc`; **no +0xf1 byte
+   exists anywhere in the 23F77 kext.** Teardown clears +0xf0, removes
+   the listener from `+0x440` (count `+0x408`), then notifies, with no
+   mark preventing a concurrent re-add. 27.2 adds the +0xf1 gate
+   (`0x9be5210`, returns 0xe00002d8), mark (`0x9be5494`) and teardown
+   (`0x9bea414`). App reach: IOSurfaceRoot/shared-event listeners, no
+   entitlement. Race class -> stale/UAF listener.
+2. **M2Scaler submit/queue guards.** 23F77 `0x8a2e57c` (453 insn);
+   27.2 `0x8dc40ac` adds an entry active-bitmap gate on service+0x1414
+   (`0x8dc40b0-0x8dc40b8`, returns 5), window/clamp checks
+   (`0x8dc4600-0x8dc4678`), and queue-depth/backpressure/stale-flush
+   strings. 23F77 has no `+0x1414` field and none of those checks. App
+   reach: the Scaler UC opens with no entitlement; types {6,7,8,11} and
+   selectors 6/7/8/11 are reachable.
+3. **IOHID 112515 bit-range check.** 23F77 matcher `0x9671ebc` (caller
+   `0x969ac4c`) lacks the 27.2 checks at `0x99c9a74-0x99c9b4c` against
+   the element bit-size/offset fields (+0x138/+0x110) and the +0x108/
+   +0x110 equality checks. App reach is weaker (HID/peripheral event
+   path); still an internal read, not a copyout.
+
+Pending: 23F77 AVE2 VT/writer (26.5 ave.videoencoder clamps) and the
+IOSurface/Scaler PoC-shape agents.
