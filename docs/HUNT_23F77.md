@@ -176,5 +176,24 @@ untested) remains the only AVE2 route on 23F77.
   DoS/type-confusion, **not a self-contained KRW ladder**. The window is
   narrow (one lock interval at the tail of free) and requires
   IOServiceClose to overlap an in-flight method; validate on-device.
+- **Follow-up (+0xd8 lifetime):** UC+0xd8 is a dedicated `lck_mtx_t`
+  allocated at `0x986dcd4` from the lck_mtx zone and freed in the UC
+  dealloc path (`0x986de80` → `0x986e024` free → `0x986e030` zero). The
+  escaped node therefore produces a **second-order mutex-state UAF**
+  (owner/waiters/interlock/ext; `lck_mtx_lock 0x9e1e8b0/0x9e1e8d8`), not
+  just an array read. But the lck_mtx zone is kernel-initialized, so no
+  arbitrary bytes; the effect is lock-state corruption/deadlock/panic
+  (or ext deref) when the slot is recycled by another lock. If the UC
+  slot is reclaimed by a new UC, +0xd8 is that UC's valid lock and the
+  mutex UAF does not occur.
+- **Escaped node:** the +0x10 port ref leaks at purge; a later UC at the
+  same address triggers a duplicate-registration DoS/oracle
+  (`0xe00002c9`); the node is freed once when a UC at that address is
+  destroyed; no write path, no double-free. It is a permanent notify
+  hook into the recycled slot.
+- **No same-zone reclaim:** the UC's type string occurs only at site 32
+  (`0x7f360b0`, 0x148, flags 0x61); no other record shares it, so only
+  another IOSurfaceRootUserClient can reclaim it. Bound remains
+  UAF/type-confusion + second-order lck_mtx UAF, DoS-grade.
 
 Pending: M2Scaler PoC-shape agent (AVE2 VT/writer complete; p154 mapped).
