@@ -82,9 +82,12 @@ Kernel-pipe/kalloc_data sprays cannot groom these typed zones.
   (init 0x8caf080, skips the entitlement check); all other types ->
   H11ANEInUserClient (init 0x8caede8, tests
   `com.apple.ane.iokit-user-access`). Stock app: **only 1/4 open**.
+  The 0xe00002c7 is realized by `mov w0,#0x2c7; movk w0,#0xe000; ret`
+  stubs (e.g. 0x8cae834), not device state.
 - ProgramCreate (sel2), GetProgramOutput (sel8), and the argsOutput
-  failure leak are therefore unreachable; `0xe00002c7` is the entitlement
-  stub, not device state.
+  failure leak are therefore unreachable; no other service/type reaches
+  H11ANEInUserClient (`ANEClientHints` needs
+  `com.apple.private.ane.allow-set-client-hints`, 0xe00002c1).
 - Reachable DirectPath: sel2 ProgramSendRequest (0xc50/0x40), sel3
   OutputSetEnqueue, sel4 InputsReady, sel5 MemoryMapRequest (0x828), sel6
   Unmap, sel7 SessionHint, sel8 Chaining, sel9/10 mutable weights.
@@ -120,9 +123,12 @@ are `ldr` only; the leaked dword is consumed in-kernel; no copyout.
 
 ## Next (17)
 
-1. **p157 type sweep 0-5** (now coded, SKU-aware selectors). If any
-   AVE2 type opens, the direct UC path unlocks the Prepare blob gates and
-   the signed writer. If none open, the VT blob mapping is the only route.
+1. **p157 type sweep 0-5** (now coded, SKU-aware selectors). 24A435:
+   0 Open / 2 Config / 3 Prepare (0x12c08) / 4 Start (0x12c18), count
+   +0x12c10; 23F77: 1/3/4/5 with 0x1a0a0/0x1a0b0 and count +0x1a0a8.
+   Each selector is knob-overridable. If any AVE2 type opens, the direct
+   UC path unlocks the Prepare blob gates and the signed writer. If none
+   open, the VT blob mapping is the only route.
 2. If a type opens, build a blob-filling probe: Prepare in+0x758 ≥1,
    in+0x731 bit2 set, in+0x848 = chosen N, in+0x4874 negative.
 3. SPTM/MIE mapping pending (post-KRW path).
