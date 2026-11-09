@@ -121,6 +121,62 @@ are `ldr` only; the leaked dword is consumed in-kernel; no copyout.
 | AppleM2ScalerCSCDriver | 77 | top 0x9108d04, 0x91073c0; guard candidate 0x91413b8 |
 | IOSurface | 2 | 0xa3460f0, 0xa34b2dc (p154 ready-byte candidates) |
 
+## SPTM / MIE on T8150 (24A435/24A437)
+
+Core kernel is byte-identical between 24A435 and 24A437 (md5 match), so the
+Ghidra addresses apply to both.
+
+### SPTM
+
+- The kernel→EL2 gate is a custom trap, **`.inst 0xd4e00000`** (undefined
+  in ARM ARM; Ghidra prints "bad instruction"), one per call, **174 sites**
+  / 51 wrappers, selector in `x16`. Enter `FUN_ab48018` saves x0-x7/x16,
+  bumps `tpidr_el1+0x1c0`, spins on `s3_6_c15_c8_0`; exit `FUN_ab48084`.
+  SPTM-present flag `DAT_7ef9380`; gate sites e.g. `0xb41b44c` (sel0),
+  `0xb41b488` (sel1), `0xb41b4c4` (sel2).
+- Shadow state in `__DATA_CONST` (RO after boot): `7ef92d0` enabled,
+  `7ef92d8/e0` range list, `7ef9310` per-page metadata, `7ef9318`
+  entry-type table, `7ef9338` range table. Range/pointer lookups tag-check
+  and force tag **0xc8a2**.
+- Mediates page tables/PTE state (`pmap_tt_deallocate 0xad34020`,
+  `sptm_get_table_mapping_count 0xb41b080`), page retype/lifecycle
+  (`sptm_check_inflight`, sel50), **DART/SMMU** (`sptm_gen3dart_*`),
+  and the trustcache/SART ranges (`kern_trustcache` resolves via
+  `0xb41ab4c`, tag 0xc8a2).
+- **A kernel data write cannot edit page tables, DART tables, text
+  permissions, or the trustcache.** No writable SPTM config register,
+  call-gate pointer, or permissive selector was found. Do not claim an
+  SPTM bypass.
+
+### MIE / MTE
+
+- MTE enabled at boot in `arm_init 0xb4346f0` (`s3_4_c15_c9_6` bit setup,
+  `cntkctl_el1 |= 3`).
+- Tag-check faults are fatal: ESR EC 0x25 → panic
+  `"Kernel tag check fault (expected tagged address...)"` at `0xad54d28`.
+- `kalloc_type` zidx validation on free at `0xb42dfe0`; double-free
+  detection at `0xb42e498`.
+- **CPU writes are tag-checked**: OOB within the same allocation/tag works;
+  crossing into a differently tagged neighbour panics. DMA bypasses CPU
+  MTE, but its reach is the IOVA→PA mappings the driver installed, and
+  those DART tables are SPTM-mediated.
+
+### Post-KRW requirements
+
+| Step | From a kernel data write under SPTM/MIE |
+|---|---|
+| (a) Patch kernel text | **No** — RX, SPTM owns PTEs, DART cannot map text PA |
+| (b) Trustcache / AMFI | **No, not directly** — SPTM range table + SART; runtime caches are tagged kalloc_type |
+| (c) `pmap_cs` / CS flags | **Name absent**; config is const/RO; `code_signing_configuration`, `disable_code_signing_feature` exports only |
+| (d) kernproc / ucred | **Yes in principle** — heap data, but writes must use correctly tagged kernel pointers |
+| (e) launchd / opainject | **Split** — task/cred edits are data-only; mapping unsigned/exec pages still hits pmap_cs + trustcache |
+
+Ranked next: map the AVE2/ANE DART IOVA window; use DMA to corrupt
+user-shared, kernel-consumed structures so kernel code later uses its own
+tagged pointers; data-only ucred/task edits; target task `cs_blob`/AMFI
+decision state for unsigned code; treat page tables, text, trustcache and
+DART tables as SPTM-gated until a real gate bypass exists.
+
 ## Next (17)
 
 1. **p157 type sweep 0-5** (now coded, SKU-aware selectors). 24A435:
@@ -131,4 +187,6 @@ are `ldr` only; the leaked dword is consumed in-kernel; no copyout.
    open, the VT blob mapping is the only route.
 2. If a type opens, build a blob-filling probe: Prepare in+0x758 ≥1,
    in+0x731 bit2 set, in+0x848 = chosen N, in+0x4874 negative.
-3. SPTM/MIE mapping pending (post-KRW path).
+3. For SPTM/MIE: map the DART IOVA window and a user-shared,
+   kernel-consumed structure; no SPTM bypass is available.
+
