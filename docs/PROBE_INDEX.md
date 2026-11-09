@@ -1,0 +1,40 @@
+# Probe number index (P150–P169)
+
+Numbers are **reserved by design**, not allocated sequentially. A number is
+added to the app only when its trigger/selector/shape is mapped and its
+safety class is known; a reserved number may stay unbuilt for months. Do not
+add a placeholder tap that does nothing.
+
+| # | Lane | State |
+|---|---|---|
+| P150 | ANE user-client reach (H11ANEIn / H16) | implemented, invoked by other probes |
+| P151 | ANE DeviceOpen census | implemented, invoked by other probes |
+| P152 | IOSurface foreign lookup gate | implemented, invoked by other probes |
+| P153 | ANE selector/class probe | implemented, invoked by other probes |
+| **P154** | **IOSurface notification-listener ready-byte race (CVE-2026-112477)** | **reserved — mapped 2026-11-09, not built.** 23F77 add `0x986ba54`, remove `0x986bb98`, teardown `0x986e1fc`; 27.2 `+0xf1` gate `0x9be5210` / mark `0x9be5494`. Needs a PANIC-POSSIBLE race runner (sel 0x11 + `IOServiceClose`). Primitive is DoS/type-confusion + second-order lck_mtx UAF on 23F77. |
+| **P155** | **iPad A12X read/corrupt candidate** | **reserved, not built** — needs the 23H30/26.7.1 A12X offset table and a mapped primitive; p017 is FORBIDDEN on the iPad. |
+| P156 | symbol-free self-proc locator | implemented |
+| P157 | AVE2 writer reach + type sweep | implemented (v2, SKU-aware selectors) |
+| **P158** | **AVE2 Prepare blob fill (gates/SPS/fill)** | **reserved, not built** — the direct AVE2 UC is `0xe00002e2` on stock; build only if the p157 type sweep 0–5 opens a type. |
+| P159 | IOSurface user-VA adjacency | implemented; user-VA only, not KRW |
+| P160 | worse_query/class-7 sandbox escape + pathleak | implemented; absorbed the pathleak helper |
+| **P161** | — | **unassigned** |
+| P162 | IOHID user-client reach (CVE-2026-112515 lane) | implemented; CVE closed as internal OOB read |
+| **P163** | — | **unassigned**; the M2Scaler 26.5 lane was checked and found inert (histogram self-test, not the 27.2 queue code) |
+
+## Why gaps exist
+
+- **P154** was named in `docs/IPSW_DIFFS.md` when the 27.2 IOSurface diff
+  first showed the ready-byte guard. The vulnerable insert function and its
+  selector were not mapped until the 2026-11-09 23F77 diff (add/remove/
+  teardown + selectors 0x11/0x12), so a blind race probe was not written.
+  It is now buildable.
+- **P155** is the iPad's read/corrupt lane; it cannot be written until the
+  23H30/26.7.1 A12X cache is mapped and the `A12X_23G71` table is replaced.
+- **P158** was the AVE2 blob-fill idea. The gates/SPS/fill fields are mapped,
+  but the direct UC never opens on stock devices; the VT path clamps the
+  dangerous fields. Build only on a type-open receipt.
+- **P161/P163** were never allocated. P162 was chosen for IOHID after P160,
+  leaving P161 free. The Scaler idea was evaluated under P163 and closed.
+- P150–P153 exist in `LuminaTAP.swift` but are invoked by other probes rather
+  than as TapDirectory rows; the visible tap list only shows wired rows.
