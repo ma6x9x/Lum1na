@@ -255,8 +255,8 @@ blob+0x420 = 0.**
 
 The old NTL=16463 panic is **not** a failed allocation. The only
 `str w24,[x10,x9,lsl#2]` is `0x883979c` in `FUN_8839554` (HEVC
-PSGen/DPB init), with base `ctx+0x4678` and index from `ctx+0x3760`
-(= Prepare input +0x1bb8). Arithmetic:
+PSGen/DPB init), with base `ctx+0x4678` and index from `ctx+0x3760`.
+Arithmetic:
 
 ```
 ctx+0x4678 + 16462*4 = ctx+0x147b0   (SOT pool slot low)
@@ -266,11 +266,44 @@ ctx+0x4678 + 16463*4 = ctx+0x147b4   (slot high)
 So NTL=16463 writes a small DPB value (w24, observed 1) into the
 `ctx+0x147b0` SOT-pool pointer. The slot becomes 1; teardown
 (`AVE2_CODEC_TEARDOWN 0x87913b4`) later dereferences it and panics
-(`FAR=0x59`). This is an **in-object relative write**, not heap-neighbor
-corruption. The count is user-influenced through the GOP/temporal-layer
-config; if a chosen index can target a useful ctx field, this is a real
-primitive. The fill range/start and the target field map are the next
-Ghidra question.
+(`FAR=0x59`). This is an **in-object linear write**, not heap-neighbor
+corruption.
+
+### Exact fill bounds and why it is not a pointer forge
+
+Follow-up Ghidra (24A437, device-identical 24A435):
+
+- **Loop A** (0x8839788–0x88397ac): base `ctx+0x4678`, count
+  `ctx+0x3760`, start index 0, step 1, end when `count+1` stores are done.
+  The value `w24` is the DPB/reorder size, `min(AVE2_GOP_CLAMP16(...),
+  max(CalcMaxDpbSize(...),1)-1)`, **0..16**, never negative and not
+  freely chosen.
+- **Loop B** (0x88397b0–0x88397fc): two HEVC_SPS layers; layer 0 base
+  `ctx+0x6424`, count `ctx+0x6230`; layer 1 base `ctx+0x8098`, count
+  `ctx+0x7ea4` (Prepare input+0x62fc). Same count+1 / small value.
+- Count lever: `FUN_88b9a08` sets `ctx+0x6230 = ctx+0x3760 =
+  u32(ctx+0x2050) - 1` in the fast path; `ctx+0x2050 = Prepare
+  input+0x848` (Start input+0x850). So **"Set 16463" = input+0x848 =
+  16463 → count 16462 → the last store lands exactly on ctx+0x147b0**.
+  Input 16464 writes both halves. This is not NTL directly; NTL is one
+  way VT fills the GOP config.
+- The whole range from the base to the target is overwritten with the
+  same 0..16 value. In-object, the only kernel pointers above the bases
+  are the three SOT pool slots at 0x147b0/b8/c0; the rest is the user-blob
+  copy or derived scalars. A small value in a pool slot is a fault path,
+  not control.
+- **Layer 1 can leave the object.** With loop A count < 3595 (so it does
+  not overwrite 0x7ea4) and input+0x62fc > 12748, layer 1 writes past the
+  end of `_S_AVE_Client` (size 0x147c8) into neighbouring
+  `_S_AVE_Client` objects with the 0..16 value. This is cross-session
+  small-int corruption or a controlled fault; it is not an arbitrary
+  pointer write.
+- Known later-read scalars in range (0x63e8/0x6414/0x641c/0x6c90/0x6c94)
+  can be zeroed/shrunk, but no field was found where a small value yields
+  a bigger read/write. **This fill is not a direct KRW primitive.**
+- Reachability of FUN_8839554's HEVC branch: subtype `ctx+0x270==2` and
+  `(param_6 != 0 || ctx+0x1f64 == 0x14)`. `ctx+0x1f64 = blob+0x424 =
+  RCMode`; our session's RCMode=20 forces it.
 
 Zones (from the __DATA_CONST descriptors):
 
