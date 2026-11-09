@@ -67,6 +67,12 @@ code-signing metadata read by the kernel at launch. A debugger or injector
 entitlement to the running signature. Only re-signing the IPA with a profile
 that contains the group changes the answer.
 
+The debug app now has a **Files → Signing** pane that imports `.p12` /
+`.mobileprovision`, validates the pair and shows this process's real app groups
+through `SecTaskCopyValueForEntitlement` (the same call p160 makes). It is a
+selector and validator for the re-signing workflow — see
+[`docs/CREDENTIALS.md`](CREDENTIALS.md). It cannot grant the group either.
+
 ## Do not
 
 - Do not put SideStore/AltStore groups in our entitlements.

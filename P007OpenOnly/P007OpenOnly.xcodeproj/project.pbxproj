@@ -83,6 +83,7 @@
 /* End PBXBuildRule section */
 
 /* Begin PBXFileReference section */
+		5140B5DF5A63F43D9DA257ED /* libpthread.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libpthread.tbd; path = usr/lib/libpthread.tbd; sourceTree = SDKROOT; };
 		E687D35A302ADD6E00E24ACE /* P007OpenOnly.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = P007OpenOnly.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		E687D39F302AE85C00E24ACE /* VideoToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = VideoToolbox.framework; path = System/Library/Frameworks/VideoToolbox.framework; sourceTree = SDKROOT; };
 		E687D3A4302AE88B00E24ACE /* CoreMedia.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreMedia.framework; path = System/Library/Frameworks/CoreMedia.framework; sourceTree = SDKROOT; };
@@ -97,8 +98,7 @@
 		E6A8FFB13047EF4E00416069 /* CoreAudioTypes.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudioTypes.framework; path = System/Library/Frameworks/CoreAudioTypes.framework; sourceTree = SDKROOT; };
 		E6A8FFB33047EF7F00416069 /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
 		E6A8FFEE304A4F2600416069 /* IOKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = IOKit.framework; path = System/Library/Frameworks/IOKit.framework; sourceTree = SDKROOT; };
-		5140B5DF5A63F43D9DA257ED /* libpthread.tbd */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.text-based-dylib-definition; name = libpthread.tbd; path = usr/lib/libpthread.tbd; sourceTree = SDKROOT; };
-		E98628FED0E73C4173710D38 /* libz.tbd */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.text-based-dylib-definition; name = libz.tbd; path = usr/lib/libz.tbd; sourceTree = SDKROOT; };
+		E98628FED0E73C4173710D38 /* libz.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = libz.tbd; path = usr/lib/libz.tbd; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -429,14 +429,18 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = GLVKP6RZ39;
+				DEVELOPMENT_TEAM = V467U8LP46;
 				ENABLE_PREVIEWS = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"LAB_DEBUG_APP=1",
+					"$(inherited)",
+				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = P007OpenOnly/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Lum1na-Debugger";
+				INFOPLIST_KEY_GCSupportsGameMode = YES;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.games";
 				INFOPLIST_KEY_LSSupportsGameMode = YES;
-				INFOPLIST_KEY_GCSupportsGameMode = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UIFileSharingEnabled = YES;
@@ -447,6 +451,8 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				MARKETING_VERSION = 1.0;
+				NEW_SETTING = "";
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-framework",
@@ -462,12 +468,6 @@
 					"-framework",
 					UniformTypeIdentifiers,
 					"-lsqlite3",
-				);
-				MARKETING_VERSION = 1.0;
-				NEW_SETTING = "";
-				GCC_PREPROCESSOR_DEFINITIONS = (
-					"LAB_DEBUG_APP=1",
-					"$(inherited)",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = ma6x9x.P007OpenOnly;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -493,14 +493,18 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = GLVKP6RZ39;
+				DEVELOPMENT_TEAM = V467U8LP46;
 				ENABLE_PREVIEWS = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"LAB_DEBUG_APP=1",
+					"$(inherited)",
+				);
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = P007OpenOnly/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "Lum1na-Debugger";
+				INFOPLIST_KEY_GCSupportsGameMode = YES;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.games";
 				INFOPLIST_KEY_LSSupportsGameMode = YES;
-				INFOPLIST_KEY_GCSupportsGameMode = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UIFileSharingEnabled = YES;
@@ -511,6 +515,8 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				MARKETING_VERSION = 1.0;
+				NEW_SETTING = "";
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-framework",
@@ -526,12 +532,6 @@
 					"-framework",
 					UniformTypeIdentifiers,
 					"-lsqlite3",
-				);
-				MARKETING_VERSION = 1.0;
-				NEW_SETTING = "";
-				GCC_PREPROCESSOR_DEFINITIONS = (
-					"LAB_DEBUG_APP=1",
-					"$(inherited)",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = ma6x9x.P007OpenOnly;
 				PRODUCT_NAME = "$(TARGET_NAME)";

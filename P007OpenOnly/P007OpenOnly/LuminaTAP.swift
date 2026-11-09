@@ -436,6 +436,13 @@ enum LuminaTAP {
                     named: "p104_sepks_census_log.txt",
                     missing: "p104 finished but log missing")
             }
+        case "p161", "testuc":
+            result = P161SEPKeyStoreTestUC.tap()
+            if result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                result = ContentView.readFreshLog(
+                    named: "p161_sepks_testuc_log.txt",
+                    missing: "p161 finished but log missing")
+            }
         case "p105", "iosgates":
             result = P105IosurfaceGates.tap()
             if result.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {

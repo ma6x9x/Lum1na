@@ -190,6 +190,7 @@ enum Table {
         "pane.fonts": row("Fonts", "字体"),
         "pane.telemetry": row("Telemetry", "遥测"),
         "pane.profiles": row("Profiles", "描述文件"),
+        "pane.signing": row("Signing", "签名"),
         "pane.cross": row("X-sandbox", "越界读"),
         "pane.symlink": row("Symlink", "符号链接"),
         "files.backup": row("backup written", "已写备份"),

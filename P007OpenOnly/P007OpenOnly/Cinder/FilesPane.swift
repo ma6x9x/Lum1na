@@ -49,6 +49,13 @@ final class Bookmarks: ObservableObject {
                 "/",
             ]
         }
+        // The Signing pane imports into this directory; keep it reachable from
+        // the file finder even on installs that already saved a bookmark list.
+        let credentials = Container.documents.appendingPathComponent("Credentials").path
+        if !items.contains(credentials) {
+            items.append(credentials)
+            persist()
+        }
     }
 
     func add(_ path: String) {
@@ -88,6 +95,7 @@ struct FilesPane: View {
     @State private var selecting = false
     @State private var selection = Set<String>()
     @State private var sortMode = 0
+    @State private var showImporter = false
 
     private var visible: [FileItem] {
         var list = browser.items
@@ -145,9 +153,13 @@ struct FilesPane: View {
         }
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
+                Button { showImporter = true } label: {
+                    Image(systemName: "square.and.arrow.down")
+                }.tint(T.ember)
                 Menu {
                     Button { jumpShown = true } label: { Label(t("files.jump"), systemImage: "arrow.right.to.line") }
                     Button { newFolderShown = true } label: { Label(t("files.newFolder"), systemImage: "folder.badge.plus") }
+                    Button { showImporter = true } label: { Label("Import files…", systemImage: "square.and.arrow.down") }
                     Divider()
                     Button { bookmarks.add(browser.path); status = tl("✓ 已加入书签") } label: {
                         Label(t("files.bookmarks"), systemImage: "bookmark")
@@ -215,6 +227,44 @@ struct FilesPane: View {
             Button(t("files.cancel"), role: .cancel) { confirmDelete = nil }
         } message: {
             Text(confirmDelete?.path ?? "")
+        }
+        .fileImporter(isPresented: $showImporter,
+                      allowedContentTypes: [.data],
+                      allowsMultipleSelection: true) { result in
+            importFiles(result)
+        }
+    }
+
+    /// Files-app / iCloud import into the directory currently shown. This is
+    /// how credentials, IPAs, debs and mlmodelc bundles get into the container
+    /// without a Mac.
+    private func importFiles(_ result: Result<[URL], Error>) {
+        switch result {
+        case .failure(let error):
+            status = "Import failed: \(error.localizedDescription)"
+        case .success(let urls):
+            var copied = 0
+            var failed: [String] = []
+            for src in urls {
+                let scoped = src.startAccessingSecurityScopedResource()
+                defer { if scoped { src.stopAccessingSecurityScopedResource() } }
+                let dst = (browser.path as NSString).appendingPathComponent(src.lastPathComponent)
+                do {
+                    if FileManager.default.fileExists(atPath: dst) {
+                        try FileManager.default.removeItem(atPath: dst)
+                    }
+                    try FileManager.default.copyItem(atPath: src.path, toPath: dst)
+                    copied += 1
+                } catch {
+                    failed.append("\(src.lastPathComponent): \(error.localizedDescription)")
+                }
+            }
+            browser.reload()
+            if failed.isEmpty {
+                status = "✓ Imported \(copied) file(s) into \(browser.path)"
+            } else {
+                status = "✓ \(copied) imported · \(failed.count) failed — \(failed.first ?? "")"
+            }
         }
     }
 

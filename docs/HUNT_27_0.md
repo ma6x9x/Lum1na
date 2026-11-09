@@ -245,4 +245,53 @@ real gate bypass exists. The DMA tag-bypass route is closed.
 4. SPTM/MIE: no bypass; DMA is surface-only. New lanes must be new bugs
    (Scaler/IOSurface 27.2 diffs) or a real SPTM gate bypass.
 
+## M2Scaler sel8 static map (24A435, 2026-11-09)
+
+The 17's best remaining **read** lead is the M2Scaler sel8 copyout, not the
+fenced 43748 prewire. Static decode (capstone over
+`kernelcache.research.iPhone18,2`; flat delta `fileoff = low32(va) - 0x7004000`):
+
+- Dispatch table `0xfffffe00080efcd8`, stride `0x30`, 12 rows. Row 8 =
+  `0xfffffe00080efe58`, handler `0xfffffe000909b3e0` (flags `0x3`, in-size
+  descriptor `0xfffffe0007004008` = 8 bytes).
+- Handler `0x909b3e0`:
+  - rejects `*(u32*)(this+0x15c) != 0`, null input, or `inputSize != 8`;
+  - `x0 = *(u64*)input` (the caller's 8-byte value);
+  - global `*(u32*)(0xfffffe000b8f5460 + 0x48)` is a record/queue count;
+    `stride = (count > 0x100 ? 0x200 : 0x40) + count`;
+  - allocation size = `count_or_512 * 0x7c + 0x20`;
+  - `bl 0xfffffe00091862f8` with `(input_u64, size, 1, *(this+0x130))`;
+  - then `x0 = *(this+0x100)`, `x1 = buffer`, `bl 0xfffffe00090e3414`
+    (the serializer that fills the 0x7c-stride records), release via
+    `vtable+0x28`, return status.
+- Matches the device contract: first record's `rec+0x18` is **our** input
+  u64; the later records are kernel-refilled. The record copy
+  (`0x90e36e4`) sends every pointer field through `0x9186b48`, whose target
+  `0xac91568` is the `VM_KERNEL_ADDRPERM` canonicalizer/permuter (kernel
+  range table `0x7ef7f58`, `addr + vm_kernel_addrperm`). **The disclosure is
+  permuted kernel addresses, not raw pointers.** It is a slide/pointer-
+  obfuscation leak, not an arbitrary kread: the low offset survives, but
+  the permutation constant must be solved before the value is dereferenceable.
+  Do not bill p114's sel8 output as a kread.
+- The 27.2 sel8 check pattern (`085c41b9 28060035`) is absent from 24B119,
+  so the handler changed after 27.0. Treat the lane as 24A435/27.0-only
+  until a 24B119/24C diff proves otherwise.
+- Next static step (needs a T8150/24A435 Ghidra program; the current bridge
+  is A14/23F77): decompile `0x91862f8` (allocator/descriptor),
+  `0x90e3414` / `0x90e3468` (serializer/action), and the globals at
+  `0xb8f5460` / `0xb8f4510`; enumerate the 0x7c record fields and classify
+  each as scalar, permuted pointer, or our-input echo. Then p114 can use
+  the records as a slide oracle rather than pretending they are a read.
+- 43748 status on the 17: the 257/300-in models are already generated
+  (`tools/make_257in_addchain.py`, `make_300in_addchain.py`) and wired in
+  P073, but the prewire caller still fences in+out to 255 records. The
+  >254 model is necessary but not sufficient; do not remaining-fire it.
+- **27.3b1 (24C5037i) diff plan:** when the IPSW lands, extract
+  `kernelcache.research.iPhone18,2` and diff (a) the M2Scaler sel8
+  handler/permuter, (b) the ANE prewire caller fence, (c) AVE2, and
+  (d) SPTM/MIE. Treat it as a **patched reference**, not a target: the 17
+  stays on 27.0 and the 12 on 26.5. A lane that is live on 27.0 and changed
+  in 27.3b1 is a priority; one present in both is deliberate behavior.
+
+
 

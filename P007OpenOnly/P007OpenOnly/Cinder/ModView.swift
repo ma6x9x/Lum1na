@@ -27,6 +27,7 @@ struct ModView: View {
             (t("pane.backup"), "archivebox.fill"),
             (t("pane.telemetry"), "gauge.medium"),
             (t("pane.profiles"), "checkmark.seal.fill"),
+            (t("pane.signing"), "signature"),
         ]
     }
 
@@ -89,6 +90,7 @@ struct ModView: View {
                 case 15: IPAPane()
                 case 16: BackupPane()
                 case 17: TelemetryPane()
+                case 18: CredentialPane()
                 default: ProfilePane()
                 }
             }

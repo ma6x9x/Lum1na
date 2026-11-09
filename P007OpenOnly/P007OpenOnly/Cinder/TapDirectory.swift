@@ -123,6 +123,7 @@ enum TapDirectory {
         .init(id: "p107", title: "P107. AVE2 wrap-dims create/prepare-ONLY (v1's encode is p035-law FORBIDDEN; kext +0xdc cite = static; p035 already swept this ceiling)", group: "F · Census / map"),
         .init(id: "p105", title: "P105. IOSurface gates census (framework-level; global-warn/lookup/protection-bits/pool oracle; NO iopl — 64749 closed)", group: "F · Census / map"),
         .init(id: "p104", title: "P104. AppleSEPKeyStore census (163-sel; sels 7/17/31 handle-0 gate expect 0xfffffffa; benign shapes; watch aks klog lines)", group: "F · Census / map"),
+        .init(id: "p161", title: "P161. AppleSEPKeyStore test-UC type sweep. IOServiceOpen types 0-32 on AppleKeyStore/AppleKeyStoreTest/AppleSEPKeyStore; logs IOUserClientClass + provider registry children and flags any Test class. NO selectors, NO writes. PANIC-POSSIBLE — one tap per force-quit.", group: "F · Census / map"),
         .init(id: "p108", title: "P108. DiskImages kernel-backed census (AppleDiskImages2 / IOHDIXHDDriveInKernel / KDIDiskImageNubUserClient opens + sels 0..24; 84552 attach doors; notes 255)", group: "F · Census / map"),
         .init(id: "p032", title: "71. P032 ANE OPEN only", group: "F · Census / map"),
         .init(id: "p033", title: "72. P033 CoreML 1-in/1-out", group: "F · Census / map"),

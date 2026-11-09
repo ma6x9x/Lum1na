@@ -18,7 +18,7 @@ add a placeholder tap that does nothing.
 | **P158** | **AVE2 Prepare blob fill (gates/SPS/fill)** | **reserved, not built** — the direct AVE2 UC is `0xe00002e2` on stock; build only if the p157 type sweep 0–5 opens a type. |
 | P159 | IOSurface user-VA adjacency | implemented; user-VA only, not KRW |
 | P160 | worse_query/class-7 sandbox escape + pathleak | implemented; absorbed the pathleak helper |
-| **P161** | — | **unassigned** |
+| **P161** | **AppleSEPKeyStore test-UC type sweep** | **implemented (v1)** — `P161SEPKeyStoreTestUC`, log `p161_sepks_testuc_log.txt`. Opens `AppleKeyStore`/`AppleKeyStoreTest`/`AppleSEPKeyStore` with types 0–32; reads `IOUserClientClass`/`IOClass`/bundle and provider registry children; flags any `Test` class. No selectors, no writes. PANIC-POSSIBLE — one tap per force-quit. |
 | P162 | IOHID user-client reach (CVE-2026-112515 lane) | implemented; CVE closed as internal OOB read |
 | **P163** | — | **unassigned**; the M2Scaler 26.5 lane was checked and found inert (histogram self-test, not the 27.2 queue code) |
 
@@ -34,7 +34,10 @@ add a placeholder tap that does nothing.
 - **P158** was the AVE2 blob-fill idea. The gates/SPS/fill fields are mapped,
   but the direct UC never opens on stock devices; the VT path clamps the
   dangerous fields. Build only on a type-open receipt.
-- **P161/P163** were never allocated. P162 was chosen for IOHID after P160,
-  leaving P161 free. The Scaler idea was evaluated under P163 and closed.
+- **P161/P163** were never allocated. P162 was chosen for IOHID after P160.
+  P161 is now proposed for the AppleSEPKeyStore test-UC type sweep (the class
+  is registered in the production ctor but no type is known to instantiate
+  it). The Scaler idea under P163 stays closed for 23F77 (histogram
+  self-test, not the 27.2 queue code); the 27.0 sel8 read is p114.
 - P150–P153 exist in `LuminaTAP.swift` but are invoked by other probes rather
   than as TapDirectory rows; the visible tap list only shows wired rows.

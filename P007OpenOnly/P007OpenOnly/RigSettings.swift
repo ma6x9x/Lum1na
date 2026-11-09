@@ -8,9 +8,35 @@ import UniformTypeIdentifiers
 
 struct DeviceConsoleSheet: View {
     @StateObject private var console = DeviceConsole()
+    @State private var interfaces: [(name: String, address: String)] = []
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                DisclosureGroup("Network path (LocalDevVPN / loopback)") {
+                    VStack(alignment: .leading, spacing: 3) {
+                        if interfaces.isEmpty {
+                            Text("No IPv4 interfaces reported.")
+                                .font(.system(size: 10, design: .monospaced))
+                                .foregroundColor(.secondary)
+                        }
+                        ForEach(Array(interfaces.enumerated()), id: \.offset) { _, row in
+                            Text("\(row.name)  \(row.address)")
+                                .font(.system(size: 10, design: .monospaced))
+                        }
+                        Text("Tried in order: 127.0.0.1 → 10.7.0.1 → 10.7.1.1 → utun/LAN. A utun entry means LocalDevVPN is up; without one only loopback is live.")
+                            .font(.system(size: 9, design: .monospaced))
+                            .foregroundColor(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.top, 2)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 4)
+                }
+                .font(.system(size: 11, design: .monospaced))
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+
                 Text("status: \(console.status)")
                     .font(.caption.monospaced())
                     .foregroundColor(.secondary)
@@ -38,7 +64,10 @@ struct DeviceConsoleSheet: View {
                 }
             }
             .navigationTitle("Live Device Console")
-            .onAppear { console.start() }
+            .onAppear {
+                interfaces = DeviceConsole.interfaceAddresses()
+                console.start()
+            }
             .onDisappear { console.stop() }
         }
     }

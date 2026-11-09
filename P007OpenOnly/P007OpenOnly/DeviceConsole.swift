@@ -266,4 +266,28 @@ final class DeviceConsole: ObservableObject {
         }
         return utun ?? wlan ?? fallback
     }
+
+    /// Every IPv4 interface name/address, for the console's path card. A
+    /// `utunN` entry with an address is the LocalDevVPN tunnel the run loop
+    /// tries after loopback; its absence is why 10.7.0.1 never answers.
+    static func interfaceAddresses() -> [(name: String, address: String)] {
+        var ifaddr: UnsafeMutablePointer<ifaddrs>?
+        guard getifaddrs(&ifaddr) == 0 else { return [] }
+        defer { freeifaddrs(ifaddr) }
+        var out: [(name: String, address: String)] = []
+        var p = ifaddr
+        while let c = p {
+            let name = String(cString: c.pointee.ifa_name)
+            if c.pointee.ifa_addr?.pointee.sa_family == UInt8(AF_INET) {
+                var a = c.pointee.ifa_addr!
+                var host = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+                if getnameinfo(a, socklen_t(a.pointee.sa_len),
+                               &host, socklen_t(host.count), nil, 0, NI_NUMERICHOST) == 0 {
+                    out.append((name, String(cString: host)))
+                }
+            }
+            p = c.pointee.ifa_next
+        }
+        return out
+    }
 }

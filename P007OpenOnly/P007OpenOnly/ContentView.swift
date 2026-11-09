@@ -240,6 +240,7 @@ struct ContentView: View {
             "p109": "p109_ane_selsweep_log.txt",
             "p113": "p113_descforge_log.txt",
             "p104": "p104_sepks_census_log.txt",
+            "p161": "p161_sepks_testuc_log.txt",
             "p105": "p105_iosurface_gates_log.txt",
             "p106": "p106_jpeg_teardown_oracle_log.txt",
             "p107": "p107_ave_wrap_dims_log.txt",
