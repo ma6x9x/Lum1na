@@ -69,3 +69,40 @@ Three new repos reviewed statically; none is a kernel R/W primitive.
 - Verdict: class-13 is not issuing a sandbox extension on either device.
   `p160` now also tries the class-2 staged/subpath-symlink variants (no
   app-group required); re-tap is needed.
+
+### p160 class-2 results + parent fallback (2026-11-08 23:21)
+
+- **12 / 23F77**: class-2 staged and subpath both `posix=2 (ENOENT)`. The
+  subpath query had a domain bug (`leaf` instead of `leaf_link`), fixed in
+  `0fb526a`.
+- **17 / 24A435**: class-2 `posix=0`, no result and no token.
+- No token = no sandbox extension. `obj=…` on the 12 app-data rows is the raw
+  traversal path, not a resolved container path.
+- Added the **class-2 parent fallback** (KAMUI): opt-in via
+  `Documents/lum1na_class2_parent`. It moves `Library` aside, symlinks
+  `Library/Caches` to the target, queries class 2 part 3 with an empty domain,
+  then restores. A guard file (`lum1na_class2_parent_guard`) is written first;
+  if the app is killed mid-move, the next launch restores `Library.p160bak`, so
+  repeated taps cannot loop.
+- Moving `Library` can kill the app on some builds: one tap, fresh boot, and
+  check the log before the next tap.
+
+### Entitlement reality (why Sideloadly cannot just grant these)
+
+- `container_query` **class 7** (app group) needs a **provisioned app group**
+  in the code signature. `com.apple.security.application-groups` in this app
+  is currently an **integer** (`1`, from the p117 experiment), not an array,
+  so class 7 is unavailable even before provisioning.
+- Sideloadly/AltStore sign with a **development certificate + provisioning
+  profile**. AMFI honors only the entitlements listed in that profile; a free
+  profile cannot provision an app group (paid-account capability). Private
+  entitlements (`platform-application`, `no-sandbox`, `task_for_pid-allow`)
+  are stripped or rejected.
+- `ldid`/AppSync/TrollStore can embed arbitrary entitlements, but on stock iOS
+  AMFI rejects private/platform ones — they work only on a jailbroken device
+  with AMFI relaxed/trustcache, or with a platform-signed binary. This is why
+  the app's `platform-application`/`no-sandbox` set only takes effect on the
+  Dopamine-jailed 11/mini under ldid.
+- Therefore class-7 is a **paid-account or jailbroken-device** path, not a
+  free-sideload path. The class-2 parent fallback is the only no-entitlement
+  variant, and it is now testable.

