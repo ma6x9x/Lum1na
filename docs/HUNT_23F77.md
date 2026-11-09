@@ -99,6 +99,29 @@ count only moves the +8 bit accumulator; the 27.x writer computes
 26.5 bug;** it is a 27.x writer shape. The field moved +0x1f8 -> +0x1f4
 but is unvalidated on both.
 
+**23F77 fill loops (AVE_PSGen::Init 0x82ec254):** PS block base
+`client+0x6144`, count `+0x5c34`; SPS L0 base `client+0x8df4`, count
+`+0x8c00`; L1 base `client+0xac70`, count `+0xaa7c`. Blob offsets
+(settings = Prepare in+0x338): PS `in+0x3bec/+0x36dc`; SPS L0
+`in+0x689c/+0x66a8`; L1 `in+0x8718/+0x8524`. The value is encoder-derived
+and bounded. The loop is `base[i*4] = value` for i<count, so a count above
+the struct/client capacity is a heap OOB small-value write (a huge count
+is a long loop/panic), not a writer underwrite.
+
+**26.5 VT plugin is clamped.** The 26.5 encoder is
+`/System/Library/Video/Plug-Ins/AppleVideoEncoder.bundle/AppleVideoEncoder`
+(not the 27.0 VideoCodecs/ave.videoencoder). HEVC_SPS L0 = instance+0x5eac;
+SPS+0x1f8 = instance+0x60a4, SPS+0xc = instance+0x5eb8.
+- `log2_max_minus4`: `cmp w8,#0xc; b.hs` rejects unsigned >=12 (and
+  negatives); stores value+1 (1..12) at 0x60a4.
+- `LookAheadFrames`: negative rejected, 0..20 accepted (clamped to 20).
+- `NumberOfTemporalLayers`: no setter upper bound, but the encoder core
+  caps effective layers to 3/4 and writes SPS+0xc only for value >=2,
+  value-1 <=3 (`0x106a98-0x106ab8`). Negative impossible.
+So the VT path cannot deliver a negative SPS count or a chosen fill
+index. The direct-UC type sweep (types 0-5; p148 0/1/2 = 2e2, 3-5
+untested) remains the only AVE2 route on 23F77.
+
 **Top 3 27.2 fixes still live on 26.5 (ranked by app reach):**
 
 1. **IOSurface ready-byte listener race (p154).** 23F77 add
@@ -122,5 +145,5 @@ but is unvalidated on both.
    +0x110 equality checks. App reach is weaker (HID/peripheral event
    path); still an internal read, not a copyout.
 
-Pending: 23F77 AVE2 VT/writer (26.5 ave.videoencoder clamps) and the
-IOSurface/Scaler PoC-shape agents.
+Pending: IOSurface p154 and M2Scaler PoC-shape agents (the AVE2 VT/writer
+analysis is complete: 26.5 is clamped; direct UC types 3-5 untested).
