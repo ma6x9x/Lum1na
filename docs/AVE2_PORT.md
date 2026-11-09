@@ -92,3 +92,73 @@ used +0x487c -> SPS+0x1f4; iOS has the count one field later at +0x1f8, so
 the input field is likely one 4-byte slot later in the parsed SPS payload.
 The next pass is the SPS parser (`0x82ee3fc` / `0x82eda2c` caller) to map
 that input slot.
+
+## SOLVED: input offset -> HEVC_SPS+0x1f8 (2026-11-09)
+
+The 23F77 kernelcache was symbolicated with the blacktop/symbolicator
+signatures (`ipsw kernel sym ... --signatures ...`) — 73.3% match. Names:
+
+| Address | Symbol |
+|---|---|
+| `0x836a640` | `AppleAVE2UserClient::IO_Start` |
+| `0x836ac4c` | `AppleAVE2UserClient::Start` |
+| `0x837f6fc` | `HEVC_SPS::seq_parameter_set_rbsp(HEVC_RPS*, AVE_SyntaxWriter*)` |
+| `0x837f2d0` | `HEVC_SPS::Generate(HEVC_VPS*, HEVC_RPS*, int, int, _S_AVE_PSContext*)` |
+| `0x82eda2c` | `AVE_PSGen::GenerateSPS(_S_AVE_PSContext*)` |
+| `0x82ec254` | `AVE_PSGen::Init(unsigned long long, void*, _E_AVE_EncType, int, int)` |
+| `0x8338a70` | `AVE_MD_SVE::InitComponents()` |
+| `0x8249ddc` | `AVE_Client_Prepare(...)` |
+| `0x8244850` | `AVE_Client_Verify(_S_AVE_Client*, bool, SessionSettings_UserKernel_Data*)` |
+| `0x837f124` | `HEVC_SPS` constructor (`memcpy(dst, src, 0x1e7c)`) |
+| `0x835bc60` | `AVE_SyntaxWriter` WriteBits (nearest symbol `AVE_IOP_GetCurrTime_Aio`) |
+
+### The chain
+
+```
+IO_Prepare  -> AVE_Client_Prepare(ctx, in+0x18, in+0x228, in+0x338, in+0x28)
+  AVE_Client_Verify(client, 1, in+0x338):
+      HEVC (client+0x3cac == 2):
+        client+0x5c28 <- in+0x338+0x3398   (0x2fcc)
+        client+0x8bf4 <- in+0x338+0x6364   (0x3cf8)
+        client+0xc8ec <- in+0x338+0xa05c   (0x4b40)
+        client+0x11430 <- in+0x338+0xeba0  (0x53f0)
+        client+0x16820 <- in+0x338+0x13f90 (0x5dd8)
+  AVE_PSGen::Init:
+      HEVC_SPS layer 0 = ctor(heap, client+0x8bf4)
+      HEVC_SPS layer 1 = ctor(heap, client+0x8bf4+0x1e7c)
+      ctor = memcpy(sps, src, 0x1e7c), then zeroes sps+0x1c74..0x1e78
+```
+
+`HEVC_SPS::Generate` / `Init` never write +0x1f8, so it stays the value
+copied by the constructor. Therefore:
+
+**Prepare input +0x6894  ->  HEVC_SPS+0x1f8**
+
+(`0x338 + 0x6364 + 0x1f8 = 0x6894`.) Layer 1 is `+0x1e7c` later in the
+client copy: Prepare input +0x6894+0x1e7c = **+0x8710**.
+
+### Writer reachability (important)
+
+- `AVE_SyntaxWriter` is heap-allocated per `HEVC_SPS::Generate` and its
+  position +0xc is zeroed by the constructor `0x835bb0c`, so a negative
+  SPS+0x1f8 does not seed a negative byte position directly. On 23F77 a
+  negative count makes WriteBits take the signed-compare branch and move the
+  **bit accumulator +8** negative; it returns without a store. The macOS
+  underwrite story is not yet reproduced by this call on 23F77.
+- The iOS Prepare input is large enough to reach the field, so the remaining
+  work is the writer-position path (which helper turns a negative count into
+  a negative +0xc), not the input mapping.
+
+### IOServiceOpen gate (blocking)
+
+`p157` on the 12 (23F77, free-signed) gets
+`AppleAVE2Driver type=1 kr=0xe00002e2 (kIOReturnNotPermitted) conn=0`.
+`AppleAVE2Driver::newUserClient` (0x8378ac0) creates the UC and calls
+`AppleAVE2UserClient::Init` (0x836f528), which calls the base
+`initWithTask` vtable slot (+0x550); the permission check lives there.
+The app's entitlements file lists `AppleAVE2UserClient` under
+`com.apple.security.exception.iokit-user-client-class`, but free signing
+strips that private exception entitlement, so stock iOS refuses the open.
+**The AVE2 lane is therefore not reachable on the stock 12.** It can only
+be exercised on the ldid/Dopamine rigs (11 22G100, mini 21D50), where the
+writer exists but the PushBack sink was not matched.
