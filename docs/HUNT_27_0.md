@@ -195,11 +195,38 @@ Ghidra addresses apply to both.
 | (d) kernproc / ucred | **Yes in principle** — heap data, but writes must use correctly tagged kernel pointers |
 | (e) launchd / opainject | **Split** — task/cred edits are data-only; mapping unsigned/exec pages still hits pmap_cs + trustcache |
 
-Ranked next: map the AVE2/ANE DART IOVA window; use DMA to corrupt
-user-shared, kernel-consumed structures so kernel code later uses its own
-tagged pointers; data-only ucred/task edits; target task `cs_blob`/AMFI
-decision state for unsigned code; treat page tables, text, trustcache and
-DART tables as SPTM-gated until a real gate bypass exists.
+### DART / DMA verdict (2026-11-09)
+
+Both AVE2 and ANE DMA reach **only IOSurface backing**, not kernel
+objects:
+
+- `IOUAT::map FUN_b3c5688` builds the segment array from
+  `IOMemoryDescriptor::getPhysicalSegment` (vtable +0x90); the PA always
+  comes from the IOMD, never from a client field. `pmap_iommu_map_internal
+  FUN_ad43c18` → SPTM callgates → AppleT8110DART `FUN_ad6c0b8`.
+- `FUN_ad6c0b8` filters only PA < dart+0xaa8 and IOVA < per-SID limit
+  (16K pages << 14); page-table refcount on an unmanaged page hard-panics
+  (`FUN_ad4451c`, "unmanaged page", `0x7063622`). No user/kernel PA split
+  exists in the mapper because every PA is an IOMD segment.
+- AVE2 surfaces: global IOSurface lookup (`FUN_a344130` / policy
+  `FUN_a343de8`); the client supplies sids/symbols/sizes, never a PA.
+- ANE: `ANE_ProgramCheckAndPrewireBuffers` resolves sids via
+  `FUN_8d31f9c`/`FUN_8d32494`; the plane check `FUN_8c1cae8` compares
+  plane count/size against the surface (`surface+0x98`, plane array
+  `+0x180` stride 0x38, size +0x28) and rejects mismatches/undersize.
+  DMA length is confined to the surface's own plane.
+- Tag-bypass candidates: the prewire record table (kalloc, CPU-only), the
+  IOSurface object (kalloc, not backing), the IOSurface backing (already
+  user-writable), the AVE2 command IOMD (user-writable), shared events
+  (kernel-mediated). **None gives a DMA-to-kernel-object path.**
+- A hypothetical kernel-PA mapping needs an IOMD whose page list contains
+  a kernel PA — no user-reachable constructor — plus SPTM accepting a
+  non-managed page, which the refcount path panics on.
+
+Ranked next: data-only ucred/task edits through correctly tagged
+pointers; target task `cs_blob`/AMFI decision state for unsigned code;
+treat page tables, text, trustcache and DART tables as SPTM-gated until a
+real gate bypass exists. The DMA tag-bypass route is closed.
 
 ## Next (17)
 
@@ -209,8 +236,13 @@ DART tables as SPTM-gated until a real gate bypass exists.
    Each selector is knob-overridable. If any AVE2 type opens, the direct
    UC path unlocks the Prepare blob gates and the signed writer. If none
    open, the VT blob mapping is the only route.
-2. If a type opens, build a blob-filling probe: Prepare in+0x758 ≥1,
+2. **p149 v4.2 LookAheadFrames test** (VT path): `LookAheadFrames=1`
+   should satisfy the P149 gates and materialize the pool; read
+   `[2a] lookahead st` and `[2e] frames`. This does **not** unlock the
+   16463 fill or the negative writer (both direct-UC-only).
+3. If a type opens, build a blob-filling probe: Prepare in+0x758 ≥1,
    in+0x731 bit2 set, in+0x848 = chosen N, in+0x4874 negative.
-3. For SPTM/MIE: map the DART IOVA window and a user-shared,
-   kernel-consumed structure; no SPTM bypass is available.
+4. SPTM/MIE: no bypass; DMA is surface-only. New lanes must be new bugs
+   (Scaler/IOSurface 27.2 diffs) or a real SPTM gate bypass.
+
 
