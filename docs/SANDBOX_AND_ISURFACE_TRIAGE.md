@@ -120,3 +120,38 @@ or `Library/Preferences` (part 2) with the target symlink, query class 7 with
 an empty domain, try both flag values, and restore the directory afterwards.
 The App Group requirement is unchanged and is still the blocker on stock
 devices. Details: `docs/BENCH27_INTEGRATION.md`.
+
+### Erosion (jailbreakdotparty) — the same escape, plus post-escape tooling
+
+Erosion is a Swift customization toolbox built on worse_query. It supports
+iOS 26.0–26.7.2, 27.0–27.2 and 27.3b1. Its logic confirms and sharpens ours:
+
+- **Entitlement:** `com.apple.security.application-groups` is an **array**
+  (`group.com.jbdotparty.Erosion.WQ`). It reads the group at runtime with
+  `SecTaskCreateFromSelf`/`SecTaskCopyValueForEntitlement` rather than
+  hardcoding it. No free-signed/no-group variant exists.
+- **Flags:** class 7, part 3; on iOS 26.x when the target is under
+  `/var/mobile/Containers/Shared/AppGroup`, it uses **`0x800000000`**
+  first, otherwise **`0x8000000000`**. (p160 now orders the flags this way.)
+- **Verification:** after consuming the token it checks actual
+  `isReadableFile`/`isWritableFile`; a token is not proof. (p160 now logs
+  both `open` and `w`.)
+- **Path enumeration:** `bad_query.c`/`pathleak.m` brute-force inodes with
+  `fsgetpath` to list direct children of a prefix (container UUIDs), then
+  read `MCMMetadataIdentifier` from the container metadata. p160 has an
+  opt-in read-only copy: `Documents/lum1na_pathleak` (max inode knob
+  `p160_pathleak_max`, default 400000).
+- **Atomic writes:** `WriteHelpers` uses temp-file/`replaceItemAt`, or
+  `O_NOFOLLOW` + `ftruncate` + `fsync` + read-back verify + rollback. The
+  same discipline belongs in any MG-cache write.
+- **Post-escape tweaks:** MobileGestalt field editing, keypad/PosterBoard
+  customization and a file/Plist browser. These are userland features, not
+  chain primitives.
+
+**Licensing:** `worse_query.m` and `pathleak.m` in Erosion carry GPLv3
+headers; the Erosion repo itself has no LICENSE. Do **not** copy the code
+into Lum1na. p160 is our independent implementation of the published
+mechanism; the Erosion additions above were reimplemented and credited.
+
+The escape is userland only: it crosses container boundaries, not kernel
+memory. It does not change the KRW picture on the 12 or 17.
