@@ -232,6 +232,42 @@ static void p160_recover_library(NSMutableString *o) {
 typedef void *(*p160_sectask_create_fn)(CFAllocatorRef);
 typedef CFTypeRef (*p160_sectask_copy_fn)(void *, CFStringRef, CFErrorRef *);
 static NSArray<NSString *> *g_p160_ent_groups;
+static NSArray<NSString *> *g_p160_profile_groups;
+
+/* terminal_worse also reads the app's embedded provisioning profile: SecTask
+   can be empty even when the profile carries an app-group array. Parse the
+   plist inside the CMS blob and take Entitlements/app-groups. */
+static NSArray<NSString *> *p160_groups_from_profile(void) {
+    NSMutableArray *out = [NSMutableArray array];
+    NSString *path = [[NSBundle mainBundle] pathForResource:@"embedded"
+                                                     ofType:@"mobileprovision"];
+    if (!path.length) return out;
+    NSData *data = [NSData dataWithContentsOfFile:path];
+    if (!data.length) return out;
+    NSData *startTag = [@"<?xml" dataUsingEncoding:NSUTF8StringEncoding];
+    NSData *endTag = [@"</plist>" dataUsingEncoding:NSUTF8StringEncoding];
+    NSRange start = [data rangeOfData:startTag options:0
+                                range:NSMakeRange(0, data.length)];
+    if (start.location == NSNotFound) return out;
+    NSRange end = [data rangeOfData:endTag options:0
+                              range:NSMakeRange(start.location,
+                                                data.length - start.location)];
+    if (end.location == NSNotFound) return out;
+    NSRange full = NSMakeRange(start.location, NSMaxRange(end) - start.location);
+    id plist = [NSPropertyListSerialization propertyListWithData:
+        [data subdataWithRange:full] options:NSPropertyListImmutable
+        format:NULL error:NULL];
+    if (![plist isKindOfClass:[NSDictionary class]]) return out;
+    id ent = ((NSDictionary *)plist)[@"Entitlements"];
+    if (![ent isKindOfClass:[NSDictionary class]]) return out;
+    id groups = ((NSDictionary *)ent)[@"com.apple.security.application-groups"];
+    if (![groups isKindOfClass:[NSArray class]]) return out;
+    for (id g in (NSArray *)groups) {
+        if ([g isKindOfClass:[NSString class]] && [(NSString *)g length] &&
+            ![out containsObject:g]) [out addObject:g];
+    }
+    return out;
+}
 
 static NSArray<NSString *> *p160_entitlement_groups(NSMutableString *o) {
     NSMutableArray *out = [NSMutableArray array];
@@ -286,6 +322,9 @@ static NSArray<NSString *> *p160_entitlement_groups(NSMutableString *o) {
 static NSArray<NSString *> *p160_group_candidates(void) {
     NSMutableArray *ids = [NSMutableArray array];
     for (NSString *g in g_p160_ent_groups ?: @[]) {
+        if (g.length && ![ids containsObject:g]) [ids addObject:g];
+    }
+    for (NSString *g in g_p160_profile_groups ?: @[]) {
         if (g.length && ![ids containsObject:g]) [ids addObject:g];
     }
     NSString *docs = NSSearchPathForDirectoriesInDomains(
@@ -546,6 +585,11 @@ static void p160_pathleak(NSString *prefix, uint64_t maxInode, NSMutableString *
     p160_recover_library(o);
     [o appendFormat:@"  [mcm] %@\n", p160_load() ? @"loaded" : @"MISSING (libsystem_containermanager not available)"];
     g_p160_ent_groups = p160_entitlement_groups(o);
+    g_p160_profile_groups = p160_groups_from_profile();
+    [o appendFormat:@"  [profile] app-group array: %lu id(s)%@\n",
+        (unsigned long)g_p160_profile_groups.count,
+        g_p160_profile_groups.count ? [@" — " stringByAppendingString:
+            [g_p160_profile_groups componentsJoinedByString:@","]] : @""];
 
     NSString *docs = NSSearchPathForDirectoriesInDomains(
         NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
