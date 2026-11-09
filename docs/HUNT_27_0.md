@@ -23,6 +23,17 @@ Both P149 callers return 0 (success) silently when a gate fails:
 fields. The direct UC Prepare (selector 3) can set them; VT must serialize
 them from its session spec. Current VT session does not.
 
+**VT fix (2026-11-09, ave.videoencoder analysis):** the blobs are built in
+`/System/Library/VideoCodecs/ave.videoencoder`, not VideoToolbox. The AVE
+plugin's **SuggestedLookAheadFrameCount** setter (VT key CFString content
+`"LookAheadFrames"`) writes Gate1 (`settings+0x420`) and Gate2
+(`settings+0x3f9` bit2) **together**; values **1..20** pass, default 0
+fails. P149 now sets `"LookAheadFrames"` = 1 before Prepare. Other
+properties (NumberOfTemporalLayers -> session+0x12438, EncoderUsage,
+MaxKeyFrameInterval, BaseLayerFrameRate, ExpectedFrameRate,
+SourceFrameCount) do **not** touch these fields; MaxFrameDelayCount has a
+getter only.
+
 ### The NTL=16463 write is a bounded DPB fill
 
 - Store: `0xfffffe000883979c` `str w24,[x10,x9,lsl#2]` in `FUN_8839554`
@@ -31,9 +42,16 @@ them from its session spec. Current VT session does not.
   `w24 = min(GOP_CLAMP16, max(CalcMaxDpbSize,1)-1)` → **0..16**, never
   negative.
 - Count lever: `FUN_88b9a08` sets `ctx+0x3760 = u32(ctx+0x2050)-1`;
-  `ctx+0x2050 = Prepare input+0x848` (Start +0x850). So "Set 16463" =
-  input+0x848 = 16463 → 16462 stores, last at
-  `ctx+0x4678+16462*4 = ctx+0x147b0` (SOT pool slot low half).
+  `ctx+0x2050 = Prepare input+0x848` (Start +0x850). The direct UC can
+  write 16463 there; the arithmetic would put the last store at
+  `ctx+0x147b0`. **VT cannot:** the AVE plugin's field C
+  (`settings+0x510` = input+0x848) is default/forced **1** (AllowFrame
+  Reordering=false forces 1, Validate sets 1); no VT property writes an
+  arbitrary value, and 16463/16462 are absent as client data. Number of
+  TemporalLayers maps to session+0x12438, not this field. So the p142
+  NTL=16463 panic is **not** reachable through this fill on the VT path;
+  it must be another site/path (needs reconciliation). The fill remains
+  direct-UC-only.
 - Loop B (HEVC_SPS delta-POC): layer 0 base `ctx+0x6424`, count
   `ctx+0x6230`; layer 1 base `ctx+0x8098`, count `ctx+0x7ea4` (Prepare
   input+0x62fc).
@@ -66,8 +84,10 @@ them from its session spec. Current VT session does not.
   The field is `log2_max_pic_order_cnt_lsb_minus4`; a negative value
   (e.g. -12 -> bit count -8) triggers the underwrite.
 - Reachability: the direct UC Prepare is the natural path but
-  `IOServiceOpen` is `0xe00002e2` for type 1. VT composes the SPS from
-  session properties; a negative VT-provided value is unproven.
+  `IOServiceOpen` is `0xe00002e2` for type 1. VT does not help: the AVE
+  plugin's private `log2_max_minus4` setter accepts only unsigned <12 and
+  stores **value+1 (1..12)**; negatives/≥12 are rejected. The negative
+  SPS field is therefore **not reachable through VT**. Direct UC only.
 - Direct-open receipt (p148, 12/23F77): types 0/1/2 all return
   `0xe00002e2`; `IOServiceMatching("AppleAVE2")` finds no service. The
   P157 sweep now covers types 0-5; if none open, the direct UC path is

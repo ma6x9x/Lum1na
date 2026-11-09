@@ -233,6 +233,27 @@ the 17 through the VT path. Candidate properties: MaxFrameDelayCount /
 AllowFrameReordering / NumberOfTemporalLayers / ExpectedFrameRate; the
 field is in the SPS RBSP path, not the temporal-layer fill.
 
+**Solved (2026-11-09, ave.videoencoder analysis):** the blobs are built in
+`/System/Library/VideoCodecs/ave.videoencoder`, not VideoToolbox; the
+mapping is `kernel settings X == session + 0x2b0 + X`.
+
+- **No VT path to the signed underwrite.** The private key
+  `log2_max_minus4` (CFString content) is the only writer of
+  `settings+0x453c`; it accepts only unsigned <12 and stores **value+1
+  (1..12)**. Negative/≥12 are rejected. The field is not reachable from
+  VT with a negative value.
+- **The fill field is forced to 1.** `settings+0x510` (Prepare in+0x848)
+  is default 1; AllowFrameReordering=false forces 1; Validate sets 1.
+  NumberOfTemporalLayers maps to session+0x12438, not this field.
+  16463/16462 are absent as client data. The DPB fill is not VT-reachable
+  with an arbitrary count.
+- **The P149 gates are VT-writable.** `SuggestedLookAheadFrameCount`
+  (VT key content `"LookAheadFrames"`) writes `settings+0x420` (Gate1)
+  and `settings+0x3f9` bit2 (Gate2) together; values 1..20 pass, default
+  0 fails. P149 now sets it to 1.
+- **Direct UC only** for the negative count and the fill count; the stock
+  open gate remains the blocker.
+
 ## P149 gates and the real 16463 write (2026-11-09, 24A437)
 
 The v4 `frames=0` is **not** an encoder-materialization failure. Both

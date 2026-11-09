@@ -47,7 +47,7 @@
 #import <unistd.h>
 #import <errno.h>
 
-#define P149_BUILD     @"p149-t8150krw-v4.1"
+#define P149_BUILD     @"p149-t8150krw-v4.2"
 #define P149_KEY       @"NumberOfTemporalLayers"
 #define P149_PRE       8
 #define P149_OVER      16463
@@ -243,6 +243,14 @@ static long p149_layers_knob(NSString *docs) {
     OSStatus sProf = VTSessionSetProperty(session,
         kVTCompressionPropertyKey_ProfileLevel,
         kVTProfileLevel_HEVC_Main_AutoLevel);
+    /* The AVE plugin (ave.videoencoder) builds the kernel Prepare/Start
+       blobs. Its LookAheadFrames setter writes settings+0x420 (must be
+       >=1) and settings+0x3f9 bit2 (pipeline mode 2) together; default 0
+       fails the P149 gate. The VT key's CFString content is
+       "LookAheadFrames" (SuggestedLookAheadFrameCount). */
+    OSStatus sLA = VTSessionSetProperty(session,
+        (__bridge CFStringRef)@"LookAheadFrames",
+        (__bridge CFTypeRef)@1);
     VTSessionSetProperty(session, kVTCompressionPropertyKey_RealTime,
                          kCFBooleanFalse);
     CFStringRef key = (__bridge CFStringRef)P149_KEY;
@@ -252,8 +260,8 @@ static long p149_layers_knob(NSString *docs) {
                                         kCFNumberSInt32Type, &pre32);
     st = VTSessionSetProperty(session, key, preVal);
     CFRelease(preVal);
-    Lf(@"[2a] usage st=%d rc st=%d profile st=%d SetProperty(NTL pre=%ld) st=%d",
-       (int)sUsage, (int)sRC, (int)sProf, pre, (int)st);
+    Lf(@"[2a] usage st=%d rc st=%d profile st=%d lookahead st=%d SetProperty(NTL pre=%ld) st=%d",
+       (int)sUsage, (int)sRC, (int)sProf, (int)sLA, pre, (int)st);
     if (sRC == -12900) {
         L(@"[law] rc st=-12900 = VT RCMode=20 property miss on this build.");
         L(@"  ntl st=0 = 27.0 still accepts the count (Nov 1 panics used this).");
