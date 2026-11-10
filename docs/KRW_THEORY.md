@@ -244,6 +244,7 @@ KRW on their own.
 |---|---|---|---|---|---|---|
 | **12** 23F77 | **A: DPC via p073 record smash** (primary); C: AVE2/B6/86950 (stage-2 only); **B: p084 CLOSED** | M2Scaler sel11 `0x288` copyout; P098 IOSurface KVA; P063 aio; P097 | port-object copy (A, needs a kernel descriptor smash); 43748/v63 bounded (C) | `kernproc`/`allproc`/`ucred` | A userland forge normalized; kernel smash untested; B closed (D2 0/0) | p073 desc smash / kw path; 86950/84607; B6/P086 |
 | **17** 24A435 | **A: DPC (needs kernel smash)**; C: AVE2 p157 | M2Scaler sel8 **permuted** pointers; p110 unverified | port-object copy (A); AVE2 heap OOB (C) | data-only `task`/`ucred`; same-tag | userland forge normalized; p130 translation bar; C untested | p073 desc smash; p157 type sweep |
+| **12/17 (pre-KRW)** | **D: P116 TOCTOU → daemon deputy** | out-of-container read (P116), group map | out-of-container write to a **mobile-writable daemon cache** (P116 rw) | `aned` / `videocodecd` / `_analyticsd` | unproven; needs a daemon-read cache | P116 v2 path/dir/rw; enumerate `/var/mobile/Library/Caches` |
 | **iPad** 23H30 | B closed (p084 dead); post-write lab only | P010/P063 | none confirmed | — | low | do not tap p017; only after a chain exists |
 | **11** 22G100 | CS2 baseline | — | — | — | existing | not novel |
 | **12 mini** 21D50 | libkrw baseline | — | — | — | KRW-PASS | not novel |
@@ -295,4 +296,78 @@ KRW on their own.
   userland type word never reaches the OOL copy engine. The next DPC step is
   a kernel write to the kernel-resident descriptor (p073 record smash or a
   kw provider).
+
+## 10. Theory D — TOCTOU daemon deputy (Chollima-style)
+
+**The idea:** stop trying to reach the kernel wall from the sandboxed app.
+Use P116's deterministic sandbox-extension TOCTOU to **read and write
+out-of-container files**, then borrow a **privileged daemon's position** to
+reach the AVE2/ANE/CoreML lane that the app itself cannot open (AVE2 direct
+UC is `0xe00002e2`; the ANE client validate fences P044/P073). This is the
+Chollima shape: userland sandbox → daemon → kernel-adjacent entitlement.
+
+**Primitive (P116 v2):**
+
+- `Documents/p116_path.txt` — one out-of-container read.
+- `Documents/p116_dir.txt` — directory listing (128 entries).
+- `Documents/p116_rw_path.txt` — read-write probe, restricted to `/var/mobile`
+  (default `/var/mobile/Library/Caches/p116_rw_probe.txt`).
+- Deterministic, no race; tokens never logged; default read-only. The bug
+  bypasses the **sandbox path check**, not Unix uid/gid. The app remains
+  `mobile:mobile` (501); the VFS still enforces permissions.
+
+**Who the app is (from `/etc/group`):** `mobile` primary 501; the groups that
+name `mobile` are `_analyticsusers` (250), `systemusers` (299) and
+`_accessory_mobile_share` (286). `wheel`/`admin`, `_securityd` (64),
+`_trustd` (282), `_coreml` (280) and `_driverkit` (270) do **not** include
+`mobile`. Check the actual supplementary groups with `getgroups()`; the group
+DB is a target map, not a privilege grant. `/etc/group` itself is world-readable,
+so reading it only proves the sandbox bypass.
+
+**Daemon-deputy targets (what better position buys):**
+
+| Daemon / class | Why it matters | Mobile-writable surface to look for |
+|---|---|---|
+| `aned` / `_coreml` | ANE entitlement; can open the direct ANE client that the app cannot. A model/cache it loads could reach the prewire with a different client validate. | `/var/mobile/Library/Caches/` ANE/CoreML model caches; model files in app/group containers |
+| `videocodecd` / `mediaserverd` | AVE2/VideoToolbox entitlement; the app's direct AVE2 UC is `2e2`. The signed writer is the 27.x lane (p149/p157). | media caches, thumbnails, playlists, `/var/mobile/Media/` |
+| `_analyticsd` | `_analyticsusers` includes mobile; parses crash/analytics data. A parser bug in the daemon is a userland privilege gain. | `/var/mobile/Library/Logs/`, analytics caches, `CrashReporter` |
+| `cfprefsd` | Preferences plumbing; ownership/domain checks make it lower value. | `/var/mobile/Library/Preferences/` (cfprefsd may overwrite) |
+| `_securityd` / `_trustd` | High value, but their data is not mobile-writable. Do not target. | — |
+
+**The chain to try:**
+
+1. **Enumerate** with `p116_dir.txt` over `/var/mobile/Library/Caches`,
+   `/var/mobile/Library/Logs`, `/var/mobile/Media`, and the app/group
+   containers. Read candidates with `p116_path.txt`; look for a file a daemon
+   reads **directly** (not cfprefsd) and parses (cache/plist/model/media).
+2. **Write a copy first.** Use `p116_rw_path.txt` on a **new** file under
+   `/var/mobile/Library/Caches/`; never overwrite a daemon's live cache on the
+   first run. If the write succeeds, the rw TOCTOU class is live.
+3. **Deputy confirmation:** put the poison on the path the daemon reads, trigger
+   the daemon's read (relaunch/foreground/notification, not a kill loop), and
+   look for a behavior change in logs/telemetry. This is the userland
+   privilege/deputy proof.
+4. **Kernel-adjacent use:** if the deputy is an ANE/media daemon, use the
+   existing AVE2 signed-writer (`p149`/`p157`) or ANE prewire (`P044`/`P073`)
+   lane **through the daemon's entitlement position**. The app's own wall is
+   bypassed because the daemon, not the app, opens the UC.
+5. **Verify** only with `kread32(kbase) == 0xfeedfacf`.
+
+**What must be proven / may fail:**
+
+- a daemon must read a **mobile-writable** file **directly** and parse it;
+  many caches are root/`_daemon`-owned, SQLite/WAL, signed, or rewritten by
+  the daemon on launch;
+- the daemon may validate a signature/checksum or ignore the file;
+- the write may be denied by the sandbox extension class or the VFS;
+- poisoning a live daemon cache can brick services or boot-loop. Use copies,
+  non-critical daemons, one tap per boot; never `/etc`, `/System`, launchd,
+  keychain, `_securityd` or `_trustd`.
+
+**Why it is worth trying:** P116 is deterministic, live on 24B119, and needs
+no app group. It is the only current primitive that gives out-of-container
+**write** without a kernel bug. If a single privileged daemon reads one
+mobile-writable cache, the app's AVE2/ANE wall becomes irrelevant — the
+daemon carries the entitlement. That is exactly the Chollima "better
+position" move, and it is a **separate bug hunt**, not a KRW claim by itself.
 

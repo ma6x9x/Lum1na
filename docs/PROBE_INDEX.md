@@ -53,5 +53,12 @@ add a placeholder tap that does nothing.
   `kernelRange=YES`. Next: scan the received message body, and find either
   a user-controlled +4 u32 (kernel high half) or a 4/8-byte type-only write
   at `desc+8` that preserves `desc+0..7`. Design: `docs/KRW_THEORY.md` §2.1.
+- **P116 v2 (TOCTOU) is the pre-KRW daemon-deputy enabler.** Path read,
+  directory listing, and a read-write probe restricted to `/var/mobile`
+  (default `/var/mobile/Library/Caches/p116_rw_probe.txt`);
+  `Documents/p116_path.txt`, `p116_dir.txt`, `p116_rw_path.txt`. Tokens are
+  never logged. It is a deterministic **userland** sandbox escape, not uid0
+  and not kread32. Theory D (P116 rw -> privileged daemon cache -> AVE2/ANE
+  entitlement) is in `docs/KRW_THEORY.md` §10.
 - P150–P153 exist in `LuminaTAP.swift` but are invoked by other probes rather
   than as TapDirectory rows; the visible tap list only shows wired rows.

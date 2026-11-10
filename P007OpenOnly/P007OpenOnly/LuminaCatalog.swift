@@ -164,7 +164,7 @@ extension Catalog {
                 "P146 KNOB SETTER v3 (the afc-bypass law; line-per-knob): p146_set.txt line1 → p142_layers.txt (default 16463), line2 → p147_cycles.txt (default 24), line3 → p148_gop.txt (default 2), line4 → p142_pre.txt (default 8) — each with its readback VERIFY row + the composition flags s…"),
             lum("p115", "P115. M2Scaler framework-path PEEK (the tpeek law): bounded CSC battery (IOSurface control + one", "—", "M2ScalerCSC", .probe, .kernel, 2,
                 "P115. M2Scaler framework-path PEEK (the tpeek law): bounded CSC battery (IOSurface control + one VT 720p encode), diff the task's SEND ports after each op, fingerprint new ports for the M2Scaler sel-8 no-queue signature (2bf). A framework-opened UC owns a REAL queue — no Queue…"),
-            lum("p116", "P116. sandbox_extension NOFOLLOW TOCTOU (CVE-class file-read escape; deterministic, live on 23F7", "—", "Sandbox", .probe, .kernel, 2,
+            lum("p116", "P116 v2. sandbox_extension NOFOLLOW TOCTOU (file read/write escape; path/dir/rw knobs; tokens never logged; default read-only)", "—", "Sandbox", .probe, .kernel, 2,
                 "P116. sandbox_extension NOFOLLOW TOCTOU (CVE-class file-read escape; deterministic, live on 23F77..24B119; port of speedyfriend433/sandbox_extension-TOCTOU-bug): control in-container read + 7 bounded out-of-container targets (/etc + prefs); tokens never logged; READ-ONLY"),
             lum("p094", "P094. kernproc derive + ucred ladder (READ-ONLY, sysctl anchor + allproc walk; v3 fold runs P095", "—", "Lum1na TAP", .probe, .kernel, 2,
                 "P094. kernproc derive + ucred ladder (READ-ONLY, sysctl anchor + allproc walk; v3 fold runs P095's ladder in the same tap — one boot, unlocks elevate)"),
