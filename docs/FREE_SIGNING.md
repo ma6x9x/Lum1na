@@ -88,14 +88,15 @@ gates `hasKread`. Use the read to enumerate daemon caches for Theory D
 (`docs/KRW_THEORY.md` §10); first write to a **copy**, never a live daemon
 cache.
 
-**v2b correction (17/24A435, iLoader):** the group was live in both
-`[ent]` and `[profile]`, and a class-7 token was minted for the group's
-`Library/Caches` (`@obj=/private/var/mobile/Containers/Shared/AppGroup/…/Library/Caches`).
-The v2 probe opened the **target path** directly and got `EPERM`; the escape
-must open the **part symlink** (`group/Library/Caches`), because that is the
-path the token is for. v2b does that for read/list/write. The Preferences part
-can fail with `symlink … failed`; the Caches part is the one to use. Set
-`p160_dir.txt` to `/var/mobile/Library/Caches` (mobile-owned), not
+**v2c correction (17/24A435, iLoader):** the group was live in both
+`[ent]` and `[profile]`, and class-7 tokens were minted for the group's
+`Library/Caches`. v2b created the part symlink **before** the query; the MCM
+resolved/recreated the real `Caches` directory at query time, so the later
+`open` hit a directory (`EISDIR`) or `EPERM`. v2c uses the P116 order:
+query the group's **real** part dir → hold the **unconsumed** token → swap
+the part path to a symlink → **consume** → open the part path. The
+Preferences part can fail with `symlink … failed`; the Caches part is the one
+to use. Set `p160_dir.txt` to `/var/mobile/Library/Caches` (mobile-owned), not
 `InternalDaemon` (root-only), for the first listing.
 
 ## Do not

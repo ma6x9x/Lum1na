@@ -320,12 +320,13 @@ Chollima shape: userland sandbox → daemon → kernel-adjacent entitlement.
 class-7 door is the same class of file access with a **kernel-minted token**
 instead of the issue/consume TOCTOU. iLoader/paid/ESign can put a real group
 in both the entitlement and the profile; p160 logs `[ent]`/`[profile]` with the
-group, and its v2b knobs (`p160_path.txt`, `p160_dir.txt`,
+group, and its v2c knobs (`p160_path.txt`, `p160_dir.txt`,
 `p160_write_target.txt`; write opt-in under `/var/mobile`) read/list/write
-outside the container. **Open the part symlink** (`group/Library/Caches`) after
-the token, not the target path directly — the target-direct open is `EPERM`;
-v2b does this. The group is the **key**, not kernel access: `kread32` still
-gates hasKread.
+outside the container. **Order matters:** query the group's **real** part dir,
+take the **unconsumed** token, swap the part path to a symlink, then
+**consume**, then open the part path. A symlink created before the query is
+replaced by the real dir (`EISDIR`/`EPERM`, the live 17 v2b result). The group
+is the **key**, not kernel access: `kread32` still gates hasKread.
 
 **Who the app is (from `/etc/group`):** `mobile` primary 501; the groups that
 name `mobile` are `_analyticsusers` (250), `systemusers` (299) and
