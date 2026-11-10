@@ -111,7 +111,7 @@ enum TapDirectory {
         .init(id: "p075", title: "P075. 43748 KRW v2 SAFE (pre-load sid_C groom; read+write doors)", group: "E · Groom / race family"),
         .init(id: "p074", title: "P074. 43748 consume (count-gate pass, no overflow, not hasKread)", group: "E · Groom / race family"),
         .init(id: "conv", title: "CONV. P073 43748 second-table. STANDALONE 254-in MAF occupancy. conversion != hasKread. Hunt smash is P044 N=192.", group: "E · Groom / race family"),
-        .init(id: "p073", title: "P073. 43748 second-table 254-in. STANDALONE MAF if neighbor FREE. Not KERNEL.", group: "E · Groom / race family"),
+        .init(id: "p073", title: "P073 v15. 43748 second-table 254-in + desc-smash body/copy scan (srcKernel/bodyKptr/copyKptr). STANDALONE MAF if neighbor FREE. Not KERNEL.", group: "E · Groom / race family"),
         .init(id: "p086", title: "P086. 43684 dmaCommand fingerprint sweep (3 UCs, no fires)", group: "E · Groom / race family"),
         .init(id: "p101", title: "P101. 43684 dmaCommand FIRE (bounded reuse IOMD+0x68; one setup + one reuse; isolate from T7)", group: "E · Groom / race family"),
         .init(id: "p102", title: "P102. Titan write TEST (MapMemory IORVBAR look-for + CacheMode canary; SKIPs MMIO without window; no titan.m ROP)", group: "E · Groom / race family"),

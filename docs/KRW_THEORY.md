@@ -159,6 +159,16 @@ message body** — scan the received body, not `vmread(addr)`.
   `desc+8` that preserves `desc+0..7`; the port pointer then becomes the OOL
   address.
 
+**Static audit (23F77/24A435):** the prewire writer is a **16-byte record**
+write: `+0 = sids[i]` (user), `+4 = record index`, `+8 = fixed tail`
+(`0x1000000001` in / `0x200000001` out). The only user-controlled u32 is
+`+0`; `+4` is the loop index and the tail is fixed. There is no 4/8-byte
+type-only write at `+8`. So **E-desc-2 and E-desc-3 are static negatives in
+the current writer**; the only live experiment is **E-desc-1** (the v15
+body/copy scan). If it reports `srcKernel=0`, the desc-smash is a type-forge
+bar, not a kread. A kread needs a different kernel write primitive or a
+descriptor whose first eight bytes survive.
+
 **Verdict for now:** the p073 desc-smash on the 12 is a **type-forge bar**,
 not a kread, until E-desc-2 or E-desc-3 lands. The p073 v9 `kernelRange`
 line is not sufficient evidence. This is the honest design to add to the

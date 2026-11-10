@@ -113,7 +113,7 @@ extension Catalog {
                 "P075. 43748 KRW v2 SAFE (pre-load sid_C groom; read+write doors)"),
             lum("conv", "CONV. P073 43748 second-table conversion bar (not hasKread)", "—", "AppleH11ANEInterface", .oobWrite, .kernel, 1,
                 "CONV. P073 43748 second-table conversion bar (not hasKread)"),
-            lum("p073", "P073. 43748 second-table conversion (v46 parity + detectors)", "—", "AppleH11ANEInterface", .oobWrite, .kernel, 1,
+            lum("p073", "P073 v15. 43748 second-table + desc-smash body/copy scan", "—", "AppleH11ANEInterface", .oobWrite, .kernel, 1,
                 "P073. 43748 second-table conversion (v46 parity + detectors)"),
             lum("luminakrw", "Luminakrw. mapped theory (runKRW)", "—", "Lum1na TAP", .oobWrite, .kernel, 1,
                 "Luminakrw. mapped theory (runKRW)"),
