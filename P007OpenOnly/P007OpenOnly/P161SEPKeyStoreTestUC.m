@@ -24,7 +24,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P161_BUILD @"p161-sepks-testuc-v1"
+#define P161_BUILD @"p161-sepks-testuc-v2"
 #define P161_TYPES 32
 
 static NSMutableString *g_log = nil;
@@ -62,24 +62,34 @@ static void L(NSString *s) {
     return s;
 }
 
-/// User clients are registry children of the provider. Listing them after
-/// each open is how a type-selected test class becomes visible without
-/// calling any selector.
-+ (NSArray<NSString *> *)childClasses:(io_service_t)svc {
-    NSMutableArray<NSString *> *out = [NSMutableArray array];
+/// User clients are registry children of the provider. The v1 probe capped
+/// the child list at 16 and stopped after 24 opens, so it never tested types
+/// 24..32 and never saw a new child beyond the first 16. v2 diffs the child
+/// registry-entry IDs across each open and logs only the new entries.
++ (NSArray<NSDictionary *> *)childInfos:(io_service_t)svc {
+    NSMutableArray<NSDictionary *> *out = [NSMutableArray array];
     io_iterator_t it = 0;
     if (IORegistryEntryGetChildIterator(svc, kIOServicePlane, &it) != KERN_SUCCESS) {
         return out;
     }
     io_object_t child = 0;
     while ((child = IOIteratorNext(it)) != 0) {
+        uint64_t rid = 0;
+        IORegistryEntryGetRegistryEntryID(child, &rid);
         NSString *cls = [self classOf:child];
-        if (cls.length) [out addObject:cls];
+        [out addObject:@{ @"id": @(rid), @"class": cls ?: @"?" }];
         IOObjectRelease(child);
-        if (out.count >= 16) break;
     }
     IOObjectRelease(it);
     return out;
+}
+
++ (NSSet<NSNumber *> *)childIDs:(io_service_t)svc {
+    NSMutableSet<NSNumber *> *ids = [NSMutableSet set];
+    for (NSDictionary *info in [self childInfos:svc]) {
+        [ids addObject:info[@"id"]];
+    }
+    return ids;
 }
 
 + (BOOL)looksTest:(NSString *)s {
@@ -101,8 +111,9 @@ static void L(NSString *s) {
         LabLocalMilitaryNow(), P161_BUILD]);
     L(@"AppleSEPKeyStore test-UC type sweep. Static: AppleKeyStoreTestUserClient "
       @"is registered in the production ctor (0x8d8838c -> 0x8d883e0).");
-    L(@"Opens types 0..32; reads service IOUserClientClass/IOClass/bundle and the "
-      @"provider's registry children after each open. NO selectors. NO writes.");
+    L(@"Opens types 0..32; diffs the provider's child registry-entry IDs before/after "
+      @"each open, so a new (possibly type-selected) UC is visible even past the v1 "
+      @"16-child/24-open caps. NO selectors. NO writes.");
     L(@"PANIC-POSSIBLE: an unknown user-client type can assert. One tap per force-quit.");
     L([LabDeviceProfile identBlock]);
 
@@ -114,8 +125,7 @@ static void L(NSString *s) {
         @"com.apple.driver.AppleSEPKeyStore",
     ];
 
-    int servicesFound = 0, opens = 0, testHits = 0, instances = 0;
-    NSMutableSet<NSString *> *openTypes = [NSMutableSet set];
+    int servicesFound = 0, opens = 0, testHits = 0, newChildren = 0;
 
     for (NSString *name in services) {
         CFMutableDictionaryRef match = IOServiceMatching(name.UTF8String);
@@ -141,48 +151,52 @@ static void L(NSString *s) {
             testHits++;
         }
 
-        NSArray<NSString *> *before = [self childClasses:svc];
-        L([NSString stringWithFormat:@"  children(before)=%@", [self join:before]]);
-        for (NSString *c in before) {
-            if ([self looksTest:c]) {
-                L([NSString stringWithFormat:@"  TEST-UC? child(before): %@", c]);
-                testHits++;
-            }
-        }
+        NSSet<NSNumber *> *before = [self childIDs:svc];
+        L([NSString stringWithFormat:@"  children(before)=%lu", (unsigned long)before.count]);
 
         for (uint32_t type = 0; type <= P161_TYPES; type++) {
             io_connect_t conn = 0;
             kern_return_t kr = IOServiceOpen(svc, mach_task_self(), type, &conn);
             BOOL opened = (kr == KERN_SUCCESS && conn != 0);
-            [openTypes addObject:[NSString stringWithFormat:@"%@:%u=0x%x", name, type, kr]];
             if (!opened) {
                 L([NSString stringWithFormat:@"  %@ type=%u kr=0x%x", name, type, kr]);
                 continue;
             }
 
             opens++;
-            instances++;
-            NSArray<NSString *> *after = [self childClasses:svc];
-            L([NSString stringWithFormat:@"  %@ type=%u conn=0x%x (OPEN) children(after)=%@",
-                name, type, conn, [self join:after]]);
-            for (NSString *c in after) {
-                if ([self looksTest:c]) {
-                    L([NSString stringWithFormat:@"    TEST-UC? child(after): %@", c]);
+            io_name_t connName;
+            kern_return_t ckr = IOObjectGetClass(conn, connName);
+            NSString *connClass = (ckr == KERN_SUCCESS)
+                ? [NSString stringWithUTF8String:connName] : nil;
+
+            /* Diff the child registry-entry IDs: the new UC is the one this
+               open created, even when it sits past the first 16 children. */
+            NSMutableArray<NSString *> *fresh = [NSMutableArray array];
+            for (NSDictionary *info in [self childInfos:svc]) {
+                if ([before containsObject:info[@"id"]]) continue;
+                newChildren++;
+                NSString *childClass = info[@"class"];
+                [fresh addObject:childClass ?: @"?"];
+                if ([self looksTest:childClass]) {
+                    L([NSString stringWithFormat:@"    TEST-UC? NEW child id=%llu class=%@",
+                        [info[@"id"] unsignedLongLongValue], childClass]);
                     testHits++;
                 }
             }
-            IOServiceClose(conn);
-            if (instances >= 24) {
-                L(@"  [cap] stopped after 24 successful opens");
-                break;
+            L([NSString stringWithFormat:@"  %@ type=%u conn=0x%x (OPEN) connClass=%@ new=%@",
+                name, type, conn, connClass ?: @"?", [self join:fresh]]);
+            if ([self looksTest:connClass]) {
+                L([NSString stringWithFormat:@"    TEST-UC? connClass=%@", connClass]);
+                testHits++;
             }
+            IOServiceClose(conn);
         }
 
         IOObjectRelease(svc);
     }
 
-    L([NSString stringWithFormat:@"=== VERDICT services_found=%d opens=%d test_hits=%d ===",
-        servicesFound, opens, testHits]);
+    L([NSString stringWithFormat:@"=== VERDICT services_found=%d opens=%d new_children=%d test_hits=%d ===",
+        servicesFound, opens, newChildren, testHits]);
     if (testHits > 0) {
         L(@"TEST-UC VISIBLE. Next: a selector probe against the type/child above; "
           @"do not call the 163-sel sweep on it until the class is confirmed.");

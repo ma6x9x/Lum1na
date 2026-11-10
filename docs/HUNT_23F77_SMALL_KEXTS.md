@@ -91,11 +91,23 @@ bounded.
 - **Built as P161** (`Exploit/P161SEPKeyStoreTestUC.m` + the P007 copy,
   log `p161_sepks_testuc_log.txt`): opens `AppleKeyStore`,
   `AppleKeyStoreTest`, `AppleSEPKeyStore`, `AppleSEPKeyStoreTest` and the
-  bundle-id spelling with types 0–32, reads `IOUserClientClass`/`IOClass`/
-  bundle and the provider's registry children, and flags any `Test` class.
-  No selectors, no writes. PANIC-POSSIBLE — one tap per force-quit. If a
-  type instantiates the test class, a selector probe can follow; until
-  then the test UC remains a static-only surface.
+  bundle-id spelling with types 0–32; logs the service and child classes.
+  No selectors, no writes. PANIC-POSSIBLE — one tap per force-quit.
+- **v1 device result (17 Pro Max, 24A435/27.0, 2026-11-09 19:42):**
+  only `AppleKeyStore` matched (`AppleKeyStoreTest`, `AppleSEPKeyStore`,
+  `AppleSEPKeyStoreTest`, bundle-id spelling all absent). Types **0–23**
+  all returned `KERN_SUCCESS`; every child was `AppleKeyStoreUserClient`;
+  `IOUserClientClass` on the service was `(null)`. `test_hits=0`.
+  **v1 had two blind spots:** it stopped after 24 successful opens (type
+  23) so types 24–32 were never tested, and it capped the child list at 16
+  so a new UC past the first 16 children was invisible.
+- **v2** removes both caps: full type range 0–32, and a child
+  registry-entry-ID diff before/after each open (logs `connClass` and only
+  the new children). Re-run once; if every type still yields
+  `AppleKeyStoreUserClient`, the type field is not a test-UC selector on
+  this build and the `AppleKeyStoreTest` personality is not published —
+  the test UC stays a static-only surface, and p104's 163-sel census on
+  `AppleKeyStoreUserClient` remains the only AKS door.
 
 ## Verdict
 

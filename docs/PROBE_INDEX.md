@@ -18,7 +18,7 @@ add a placeholder tap that does nothing.
 | **P158** | **AVE2 Prepare blob fill (gates/SPS/fill)** | **reserved, not built** — the direct AVE2 UC is `0xe00002e2` on stock; build only if the p157 type sweep 0–5 opens a type. |
 | P159 | IOSurface user-VA adjacency | implemented; user-VA only, not KRW |
 | P160 | worse_query/class-7 sandbox escape + pathleak | implemented; absorbed the pathleak helper |
-| **P161** | **AppleSEPKeyStore test-UC type sweep** | **implemented (v1)** — `P161SEPKeyStoreTestUC`, log `p161_sepks_testuc_log.txt`. Opens `AppleKeyStore`/`AppleKeyStoreTest`/`AppleSEPKeyStore` with types 0–32; reads `IOUserClientClass`/`IOClass`/bundle and provider registry children; flags any `Test` class. No selectors, no writes. PANIC-POSSIBLE — one tap per force-quit. |
+| **P161** | **AppleSEPKeyStore test-UC type sweep** | **implemented v2** — `P161SEPKeyStoreTestUC`, log `p161_sepks_testuc_log.txt`. v1 on the 17/24A435 opened types **0–23 all OK**, every child `AppleKeyStoreUserClient`, no Test class; v1 stopped at the 24-open cap and hid children past the first 16. v2 tests **0–32** and diffs child registry-entry IDs before/after each open, logging `connClass` and only the new children. No selectors, no writes. PANIC-POSSIBLE — one tap per force-quit. |
 | P162 | IOHID user-client reach (CVE-2026-112515 lane) | implemented; CVE closed as internal OOB read |
 | **P163** | — | **unassigned**; the M2Scaler 26.5 lane was checked and found inert (histogram self-test, not the 27.2 queue code) |
 
