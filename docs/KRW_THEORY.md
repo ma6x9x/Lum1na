@@ -196,9 +196,10 @@ KRW on their own.
 - **P084 v7** (`P084PmapTtePUA`, log `p084_pmap_tte_puaf_log.txt`): the
   existing recipe plus the **D2** experiment behind
   `Documents/p084_surface_reclaim.txt` — a 2,048-surface 16 KB IOSurface
-  spray and a repeated-PTE signature scan. A hit means the freed pmap page
-  table is user-mapped through a surface (the missing link for a PTE edit);
-  it is still not hasKread. Read-only; one tap per fresh boot.
+  spray and a repeated-PTE (full block) / single-PTE-at-index-0 (last-block
+  L3) signature scan. A hit means the freed pmap page table is user-mapped
+  through a surface (the missing link for a PTE edit); it is still not
+  hasKread. Read-only; one tap per fresh boot.
 - **P163 v1** (`P163DescOOLOracle`, log `p163_desc_ool_log.txt`): the DPC
   **translation oracle**. Control, low-user pad, and kernel-low pad cases;
   one forged port descriptor per case. No kw, no kernel writes, no selectors.

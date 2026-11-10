@@ -98,7 +98,7 @@ enum TapDirectory {
         .init(id: "p067", title: "P067 AppleAVD reach (65407, no bitstream fire)", group: "D · Escape lanes"),
         // E · Groom / race family
         .init(id: "p044", title: "P044. 43748 v61 addchain-191 B1 (on-device ANECCompile of the handwritten 191-in MIL, count=192 exactly in-bounds; OUTPUT-SID lane + census stillness + out-entry scan; override file p044_model.txt = model NAME, p044_req_in.txt = N inputs — one file = one deliberate fire; notes 149/127/130)", group: "E · Groom / race family"),
-        .init(id: "p084", title: "P084 v7. pmap-tte PUAF port (65,537-map refcount wrap, 64 dangling PTEs, A14 untested). New knob: Documents/p084_surface_reclaim.txt adds a 2048-surface IOSurface spray and scans for the repeated-PTE signature of a user-mapped page table. Read-only. PANIC-POSSIBLE — one tap per fresh boot.", group: "E · Groom / race family"),
+        .init(id: "p084", title: "P084 v7. pmap-tte PUAF port (65,537-map refcount wrap, 64 dangling PTEs, A14 untested). New knob: Documents/p084_surface_reclaim.txt adds a 2048-surface IOSurface spray and scans for the repeated-PTE (full block) or single-PTE-at-index-0 (last-block L3) signature of a user-mapped page table. Read-only. PANIC-POSSIBLE — one tap per fresh boot.", group: "E · Groom / race family"),
         .init(id: "p085", title: "P085. 84607 Close-vs-async racer (UNPARKED — kernel gap, videocodecd)", group: "E · Groom / race family"),
         .init(id: "p087", title: "P087. 84607 reclaim observer (race -> refill -> attributed drain)", group: "E · Groom / race family"),
         .init(id: "p083", title: "P083. ANE staging hunt + injection + y attribution", group: "E · Groom / race family"),
