@@ -73,6 +73,21 @@ through `SecTaskCopyValueForEntitlement` (the same call p160 makes). It is a
 selector and validator for the re-signing workflow — see
 [`docs/CREDENTIALS.md`](CREDENTIALS.md). It cannot grant the group either.
 
+## When the group is real (iLoader / paid / ESign)
+
+If the signed app reports the group in **both** `[ent]` and `[profile]`, p160
+v2's class-7 door can run. It now has opt-in knobs:
+
+- `Documents/p160_path.txt` — one class-7 read (a mobile-readable path),
+- `Documents/p160_dir.txt` — class-7 directory listing (128 entries),
+- `Documents/p160_write_target.txt` — opt-in class-7 write, restricted to
+  `/var/mobile`; default is read-only.
+
+The group buys a **sandbox escape**, not kernel access: `kread32(kbase)` still
+gates `hasKread`. Use the read to enumerate daemon caches for Theory D
+(`docs/KRW_THEORY.md` §10); first write to a **copy**, never a live daemon
+cache.
+
 ## Do not
 
 - Do not put SideStore/AltStore groups in our entitlements.
