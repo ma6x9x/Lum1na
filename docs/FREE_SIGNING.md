@@ -88,6 +88,16 @@ gates `hasKread`. Use the read to enumerate daemon caches for Theory D
 (`docs/KRW_THEORY.md` §10); first write to a **copy**, never a live daemon
 cache.
 
+**v2b correction (17/24A435, iLoader):** the group was live in both
+`[ent]` and `[profile]`, and a class-7 token was minted for the group's
+`Library/Caches` (`@obj=/private/var/mobile/Containers/Shared/AppGroup/…/Library/Caches`).
+The v2 probe opened the **target path** directly and got `EPERM`; the escape
+must open the **part symlink** (`group/Library/Caches`), because that is the
+path the token is for. v2b does that for read/list/write. The Preferences part
+can fail with `symlink … failed`; the Caches part is the one to use. Set
+`p160_dir.txt` to `/var/mobile/Library/Caches` (mobile-owned), not
+`InternalDaemon` (root-only), for the first listing.
+
 ## Do not
 
 - Do not put SideStore/AltStore groups in our entitlements.
