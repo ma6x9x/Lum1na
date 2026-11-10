@@ -20,7 +20,7 @@ add a placeholder tap that does nothing.
 | P160 | worse_query/class-7 sandbox escape + pathleak | implemented; absorbed the pathleak helper |
 | **P161** | **AppleSEPKeyStore test-UC type sweep** | **implemented v2** — `P161SEPKeyStoreTestUC`, log `p161_sepks_testuc_log.txt`. v1 on the 17/24A435 opened types **0–23 all OK**, every child `AppleKeyStoreUserClient`, no Test class; v1 stopped at the 24-open cap and hid children past the first 16. v2 tests **0–32** and diffs child registry-entry IDs before/after each open, logging `connClass` and only the new children. No selectors, no writes. PANIC-POSSIBLE — one tap per force-quit. |
 | P162 | IOHID user-client reach (CVE-2026-112515 lane) | implemented; CVE closed as internal OOB read |
-| **P163** | **Descriptor-Port Confusion (DPC) translation oracle** | **implemented v1** — `P163DescOOLOracle`, log `p163_desc_ool_log.txt`. Forges one port descriptor's type word to OOL and sends/receives it (control, low-user, kernel-low pad); no kw provider, no kernel writes, no selectors. Proves whether the copy engine honors the forged type; a real read still needs the kernel-resident port pointer (p073 record smash / kw). PANIC-POSSIBLE — one tap per force-quit. |
+| **P163** | **Descriptor-Port Confusion (DPC) translation oracle** | **implemented v1; userland forge NEGATIVE** — `P163DescOOLOracle`, log `p163_desc_ool_log.txt`. 17/24A435 (2026-11-09): control sends/recvs 16 port descs (type=0); every forge case sends/recvs 0 but the received descriptor is normalized to `name=0, type=0, disp=0` — the userland type word is validated/normalized and never reaches the OOL copy engine. The DPC still needs a kernel write to the kernel-resident descriptor (p073 record smash or a kw provider). PANIC-POSSIBLE — one tap per force-quit. |
 
 ## Why gaps exist
 
@@ -36,8 +36,14 @@ add a placeholder tap that does nothing.
   dangerous fields. Build only on a type-open receipt.
 - **P161/P163** were never allocated. P161 is now the AppleSEPKeyStore
   test-UC type sweep (closed after v2: 33/33 types flat). P163 is the DPC
-  translation oracle (forge one port descriptor type word to OOL). The
-  Scaler idea under P163 stays closed for 23F77 (histogram self-test, not
-  the 27.2 queue code); the 27.0 sel8 read is p114.
+  translation oracle (userland forge normalized to a null port; needs a
+  kernel-resident type smash). The Scaler idea under P163 stays closed for
+  23F77 (histogram self-test, not the 27.2 queue code); the 27.0 sel8 read
+  is p114.
+- **P084 v7 is closed on the fleet.** 12/23F77 (2026-11-09): the D2
+  2,048-surface IOSurface spray found `signature_surfaces=0` and
+  `weak_surfaces=0`; C3 0/0 and the 60s watch 0. The free/reclaim did not
+  occur on A14. T8150 is structurally dead (SPTM `cpt_mapcnt` has no silent
+  u16 wrap). Do not spend more boots on the pmap-tte lane.
 - P150–P153 exist in `LuminaTAP.swift` but are invoked by other probes rather
   than as TapDirectory rows; the visible tap list only shows wired rows.

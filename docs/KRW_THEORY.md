@@ -89,6 +89,15 @@ is the address the copy engine would use.
 **Risk:** PANIC-POSSIBLE (descriptor/kmsg corruption). One tap per
 force-quit; no blind selector sweeps; no remaining-fire.
 
+**Result (P163 v1, 17/24A435, 2026-11-09):** the control (all port
+descriptors) sends/recvs cleanly with type=0. Every forge case also returns
+`send/recv kr=0`, but the received descriptor is **normalized to
+`name=0, type=0, disp=0`**. The userland type word is validated/normalized;
+it never reaches the OOL copy engine. The translation bar is **not crossed**
+from userland. A kernel write to the kernel-resident descriptor is required
+(the p073 record smash or a kw provider); a userland forge alone cannot
+produce the OOL-address confusion.
+
 ## 3. Theory B — PTE Reclaim (p084)
 
 **One line:** the 65,537-map `pt_desc` wrap leaves a dangling PTE; if the
@@ -129,6 +138,13 @@ not depend on any SPTM bypass; it targets the MMU, not SPTM-managed metadata.
 **Risk:** high; PANIC-POSSIBLE; one tap per fresh boot; p017 remains
 FORBIDDEN on the iPad. Do not remaining-fire.
 
+**Result (P084 v7, 12/23F77, 2026-11-09):** the D2 2,048-surface IOSurface
+spray found `signature_surfaces=0` and `weak_surfaces=0`; C3 was 0/0 and
+the 60s watch 0. The free/reclaim did not occur on A14 with this recipe.
+The 17's premise is structurally dead (`cpt_mapcnt` has no silent u16
+wrap), and the 12 matches the A12X negative. **P084 is closed**; do not
+spend more boots on the pmap-tte lane.
+
 ## 4. Theory C — bounded write lanes (stage-2 only)
 
 These are useful only **after** an address/read lane exists; they are not
@@ -150,20 +166,20 @@ KRW on their own.
 
 | Device | Best theory | Leak / address | Write | Target | Confidence | Next |
 |---|---|---|---|---|---|---|
-| **12** 23F77 | **B: p084 PTE reclaim** (primary); **A: DPC** (secondary) | M2Scaler sel11 `0x288` copyout; P098 IOSurface KVA; P063 aio; P097 | PTE edit (B); port-object copy (A) | `kernproc`/`allproc`/`ucred` | B unproven on A14; A oracle not built | P084 v2 (reclaim + PTE oracle); P163 DPC read oracle |
-| **17** 24A435 | **A: DPC** (primary); C: AVE2 p157 | M2Scaler sel8 **permuted** pointers; p110 unverified | port-object copy (A); AVE2 heap OOB (C) | data-only `task`/`ucred`; same-tag | A translation bar only; C untested | P163 DPC read/write oracle; p157 type sweep |
-| **iPad** 23H30 | B in principle, but no initial write; p017 forbidden | P010/P063 | none confirmed | post-write testbed | low | do not tap p017; only after a chain exists |
+| **12** 23F77 | **A: DPC via p073 record smash** (primary); C: AVE2/B6/86950 (stage-2 only); **B: p084 CLOSED** | M2Scaler sel11 `0x288` copyout; P098 IOSurface KVA; P063 aio; P097 | port-object copy (A, needs a kernel descriptor smash); 43748/v63 bounded (C) | `kernproc`/`allproc`/`ucred` | A userland forge normalized; kernel smash untested; B closed (D2 0/0) | p073 desc smash / kw path; 86950/84607; B6/P086 |
+| **17** 24A435 | **A: DPC (needs kernel smash)**; C: AVE2 p157 | M2Scaler sel8 **permuted** pointers; p110 unverified | port-object copy (A); AVE2 heap OOB (C) | data-only `task`/`ucred`; same-tag | userland forge normalized; p130 translation bar; C untested | p073 desc smash; p157 type sweep |
+| **iPad** 23H30 | B closed (p084 dead); post-write lab only | P010/P063 | none confirmed | — | low | do not tap p017; only after a chain exists |
 | **11** 22G100 | CS2 baseline | — | — | — | existing | not novel |
 | **12 mini** 21D50 | libkrw baseline | — | — | — | KRW-PASS | not novel |
 
 ## 6. Experiment order
 
-1. **12 — P084 v2**: run the p084 recipe once, then page-table spray and the
-   PTE marker oracle. One tap per fresh boot. If the oracle is positive, go
-   straight to the physical scan and `kread32(kbase)`.
-2. **12/17 — DPC read oracle (P163)**: a receive-side OOL descriptor whose
-   address is a port object; look for `ipc_port` data in the user buffer. No
-   writes, no arbitrary target. If positive, the write oracle follows.
+1. **12 — P084 v7**: closed. D2 2,048 surfaces found 0 strong / 0 weak; C3 and
+   the 60s watch found nothing. The free/reclaim did not occur on A14. No
+   further pmap-tte boots.
+2. **12/17 — DPC**: P163 v1 userland forge is **normalized** to a null port.
+   The next step is a **kernel write to the kernel-resident descriptor**
+   (p073 record smash or a kw provider), not another userland type word.
 3. **17 — p157 type sweep**: if a direct AVE2 UC type opens, build the
    Prepare negative-SPS blob; it is a stage-2 heap write, not KRW alone.
 4. **12 — B6/P086** and **p154** only as fallbacks; they need a separate
@@ -193,18 +209,14 @@ KRW on their own.
 
 ## 9. Built (2026-11-09)
 
-- **P084 v7** (`P084PmapTtePUA`, log `p084_pmap_tte_puaf_log.txt`): the
-  existing recipe plus the **D2** experiment behind
-  `Documents/p084_surface_reclaim.txt` — a 2,048-surface 16 KB IOSurface
-  spray and a repeated-PTE (full block) / single-PTE-at-index-0 (last-block
-  L3) signature scan. A hit means the freed pmap page table is user-mapped
-  through a surface (the missing link for a PTE edit); it is still not
-  hasKread. Read-only; one tap per fresh boot.
+- **P084 v7** (`P084PmapTtePUA`, log `p084_pmap_tte_puaf_log.txt`): **closed**.
+  The D2 2,048-surface IOSurface spray found `signature_surfaces=0` and
+  `weak_surfaces=0` on the 12; C3/Phase E also 0. The free/reclaim did not
+  occur on A14, and T8150 is structurally dead. No further pmap-tte boots.
 - **P163 v1** (`P163DescOOLOracle`, log `p163_desc_ool_log.txt`): the DPC
-  **translation oracle**. Control, low-user pad, and kernel-low pad cases;
-  one forged port descriptor per case. No kw, no kernel writes, no selectors.
-  A send success plus a body error/received type=1 crosses the translation
-  bar; a send error means the validator rejected the type. The real read
-  still needs the kernel-resident port pointer (p073 record smash or a kw
-  provider).
+  userland oracle. Control works (16 port descs, type=0); every forge case
+  sends/recvs 0 but is **normalized to `name=0, type=0, disp=0`**. The
+  userland type word never reaches the OOL copy engine. The next DPC step is
+  a kernel write to the kernel-resident descriptor (p073 record smash or a
+  kw provider).
 
