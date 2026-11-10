@@ -242,8 +242,9 @@ static long p116_write_test(const char *outPath, const char *s, const char *l) {
                 [docs stringByAppendingPathComponent:@"p116_rw_path.txt"]
                 encoding:NSUTF8StringEncoding error:nil]
                 stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
-            if (!rw.length) rw = @"/var/mobile/Library/Caches/p116_rw_probe.txt";
-            if (!([rw hasPrefix:@"/var/mobile/"] || [rw hasPrefix:@"/private/var/mobile/"])) {
+            if (!rw.length) {
+                L(@"[v2] rw skipped (create Documents/p116_rw_path.txt to enable; default read-only)");
+            } else if (!([rw hasPrefix:@"/var/mobile/"] || [rw hasPrefix:@"/private/var/mobile/"])) {
                 Lf(@"[v2] rw refused: %@ (target must be under /var/mobile)", rw);
             } else {
                 long w = p116_write_test(rw.UTF8String, s, l);
