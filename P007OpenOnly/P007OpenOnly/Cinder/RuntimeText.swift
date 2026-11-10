@@ -2,10 +2,9 @@ import Foundation
 
 /// Runtime-output translation.
 ///
-/// Chinese literals in engine and UI code are the source of truth and stay where they are.
-/// This table maps each one to its English rendering. In Chinese the input passes through
-/// untouched; in English an unmapped string also passes through, so an ASCII name such as
-/// "Documents" needs no entry.
+/// Chinese literals in engine and UI code stay as the lookup keys. The app is English
+/// only, so every call returns the English value. An unmapped ASCII name such as
+/// "Documents" passes through.
 ///
 /// Keys are the exact literal text, including any leading/trailing spaces that were part
 /// of the original string.

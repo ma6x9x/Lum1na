@@ -118,17 +118,9 @@ struct FilesPane: View {
             searchBar
 
             if let status = status {
-                HStack(spacing: 6) {
-                    Image(systemName: status.hasPrefix("✓") ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                        .font(.system(size: 10))
-                    Text(status).font(T.monoSm).lineLimit(2)
-                    Spacer()
-                    Button { self.status = nil } label: {
-                        Image(systemName: "xmark").font(.system(size: 9, weight: .bold))
-                    }
-                }
-                .foregroundColor(status.hasPrefix("✓") ? T.good : T.warn)
-                .padding(.horizontal, 16).padding(.bottom, 6)
+                ToolResult(text: status)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 6)
             }
 
             if let error = browser.error {

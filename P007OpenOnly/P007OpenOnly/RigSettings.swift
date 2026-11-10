@@ -134,18 +134,6 @@ struct RigSettingsView: View {
                     Button("Copy NEXT TAP") {
                         LuminaCopyBus.shared.copy(snap.copyBlock, label: "Next TAP · \(snap.nextID)")
                     }
-                    Button("Jump to Tests") {
-                        LuminaTabs.shared.index = 0
-                        dismiss()
-                    }
-                    Button("Jump to Chain") {
-                        LuminaTabs.shared.index = 2
-                        dismiss()
-                    }
-                    Button("Jump to Console") {
-                        LuminaTabs.shared.index = 4
-                        dismiss()
-                    }
                 }
 
                 Section("Logs") {
@@ -155,11 +143,7 @@ struct RigSettingsView: View {
                     Button("Hour gallery") {
                         if let onHour { onHour() } else { showHourSheet = true }
                     }
-                    Button("Open Tests") {
-                        LuminaTabs.shared.index = 0
-                        dismiss()
-                    }
-                    Text("Copy full lives on each test, on Console Copy, and on the HUD NEXT chip. Files tab previews a 12 KB tail so huge P044/P073 logs cannot jetsam.")
+                    Text("Console shows a short line. Full and Copy hold the rest. Files previews a 12 KB tail so huge logs cannot jetsam.")
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }
@@ -219,7 +203,7 @@ struct RigSettingsView: View {
                 LogListSheet { body in
                     LuminaCopyBus.shared.copy(body, label: "Log copied")
                     showLogsSheet = false
-                    LuminaTabs.shared.index = 4
+                    LuminaTabs.shared.index = 3
                     dismiss()
                 }
             }
@@ -227,7 +211,7 @@ struct RigSettingsView: View {
                 HourLogGallery { body in
                     LuminaCopyBus.shared.copy(body, label: "Hour log copied")
                     showHourSheet = false
-                    LuminaTabs.shared.index = 4
+                    LuminaTabs.shared.index = 3
                     dismiss()
                 }
             }

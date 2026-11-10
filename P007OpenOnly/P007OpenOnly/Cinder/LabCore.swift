@@ -96,7 +96,7 @@ enum CinderLogStore {
     }
 
     static func copyAll() -> String {
-        FileLoader.tail(at: labLog.path, maxBytes: 512_000) ?? "(no Cinder runs yet — Lab → run a module, then Copy)"
+        FileLoader.tail(at: labLog.path, maxBytes: 512_000) ?? "(no test runs yet)"
     }
 
     static func append(_ s: String, to url: URL) {
@@ -222,7 +222,7 @@ final class LabEngine: ObservableObject {
     func run(_ module: ExploitModule) {
         guard !running.contains(module.id) else { return }
         running.insert(module.id)
-        log("▸ " + module.title + "  [" + module.cve + "]")
+        log("▸ \(module.id)")
         LuminaLearn.begin(module.id)
         LuminaLearn.prepare(module.id)
 
@@ -240,11 +240,12 @@ final class LabEngine: ObservableObject {
                 DispatchQueue.main.async {
                     self.outcomes[module.id] = out
                     self.running.remove(module.id)
-                    self.log("✓ \(module.title) — \(out.headline) (\(out.elapsedMs) ms)")
-                    self.log("  log Documents/cinder/\(logURL.lastPathComponent)")
-                    for line in footer.components(separatedBy: .newlines) where line.hasPrefix("id=") || line.hasPrefix("sibling:") || line.hasPrefix("hasKread") {
-                        self.log("  " + line)
+                    let head = String(out.headline.prefix(160))
+                    self.log("✓ \(module.id) — \(head) (\(out.elapsedMs) ms)")
+                    for line in footer.components(separatedBy: .newlines) where line.hasPrefix("hasKread") {
+                        self.log("  " + String(line.prefix(160)))
                     }
+                    _ = logURL
                 }
             } catch {
                 let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
@@ -258,7 +259,7 @@ final class LabEngine: ObservableObject {
                 DispatchQueue.main.async {
                     self.outcomes[module.id] = out
                     self.running.remove(module.id)
-                    self.log("✗ \(module.title) — \(message)")
+                    self.log("✗ \(module.id) — \(String(message.prefix(160)))")
                 }
             }
         }

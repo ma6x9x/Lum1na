@@ -12,47 +12,37 @@ struct RootView: View {
                 .tabItem { Label("Tests", systemImage: "list.bullet") }
                 .tag(0)
 
+            ModView()
+                .tabItem { Label("Tools", systemImage: "wrench.and.screwdriver") }
+                .tag(1)
+
             ChainView()
-                .safeAreaInset(edge: .bottom, spacing: 0) { logPeek }
                 .tabItem { Label(t("tab.chain"), systemImage: "link") }
                 .tag(2)
 
-            MoreView()
-                .safeAreaInset(edge: .bottom, spacing: 0) { logPeek }
-                .tabItem { Label("More", systemImage: "ellipsis.circle") }
-                .tag(3)
-
             ContentView()
                 .tabItem { Label(t("tab.console"), systemImage: "text.alignleft") }
-                .tag(4)
+                .tag(3)
         }
         .tint(T.accent)
-        .safeAreaInset(edge: .top, spacing: 0) {
-            BoardHUD(tab: $tabs.index)
-        }
         .onAppear {
             if let env = ProcessInfo.processInfo.environment["CINDER27_TAB"],
                let n = Int(env) {
-                // 1 was the removed POCs tab. The catalog is Tests.
-                tabs.index = n == 1 ? 0 : n
+                // Older IPAs used 3 for More and 4 for Console.
+                switch n {
+                case 4: tabs.index = 3
+                case 3: tabs.index = 1
+                default: tabs.index = n
+                }
             }
         }
         .overlay(alignment: .bottom) {
             CopyToastOverlay()
-                .padding(.bottom, tabs.index == 4 ? 72 : 108)
+                .padding(.bottom, 88)
         }
         .onAppear {
             Container.ensureAll()
             runAutorunIfRequested()
-        }
-    }
-
-    @ViewBuilder
-    private var logPeek: some View {
-        if tabs.index != 4 {
-            ConsolePeek()
-                .environmentObject(engine)
-                .padding(.bottom, 6)
         }
     }
 

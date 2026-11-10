@@ -1,6 +1,32 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+/// A tool's result, in the page, with the full text selectable and one Copy.
+struct ToolResult: View {
+    let text: String
+    var label: String = "Result copied"
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(text)
+                .font(.system(size: 13, design: .monospaced))
+                .foregroundStyle(.primary)
+                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Button {
+                LuminaCopyBus.shared.copy(text, label: label)
+            } label: {
+                Label("Copy", systemImage: "doc.on.doc")
+                    .font(.system(size: 13, weight: .semibold))
+            }
+            .buttonStyle(.bordered)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(T.panel, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+}
+
 // MARK: - Toolkit hub
 
 struct ModView: View {
@@ -28,6 +54,8 @@ struct ModView: View {
             (t("pane.telemetry"), "gauge.medium"),
             (t("pane.profiles"), "checkmark.seal.fill"),
             (t("pane.signing"), "signature"),
+            ("Mind", "brain"),
+            ("System", "iphone"),
         ]
     }
 
@@ -91,11 +119,14 @@ struct ModView: View {
                 case 16: BackupPane()
                 case 17: TelemetryPane()
                 case 18: CredentialPane()
-                default: ProfilePane()
+                case 19: ProfilePane()
+                case 20: MindPane()
+                case 21: SystemView()
+                default: FilesPane()
                 }
             }
             .luminaCanvas()
-            .navigationTitle(t("mod.title"))
+            .navigationTitle("Tools")
             .navigationBarTitleDisplayMode(.inline)
         }
     }
@@ -142,8 +173,7 @@ struct CrossSandboxPane: View {
                                       tint: T.ember, disabled: busy) { stealAll() }
                         }
                         if !status.isEmpty {
-                            Text(status).font(T.monoSm).foregroundColor(.white.opacity(0.6))
-                                .fixedSize(horizontal: false, vertical: true)
+                            ToolResult(text: status)
                         }
                     }
                 }
@@ -175,11 +205,7 @@ struct CrossSandboxPane: View {
                 }
 
                 if !oracleResult.isEmpty {
-                    Card {
-                        Text(oracleResult).font(T.monoSm).foregroundColor(.white.opacity(0.7))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+                    ToolResult(text: oracleResult)
                 }
 
                 Card {
@@ -360,24 +386,11 @@ struct SymlinkPane: View {
                 }
 
                 if !result.isEmpty {
-                    Card {
-                        Text(result).font(T.monoSm).foregroundColor(.white.opacity(0.7))
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
+                    ToolResult(text: result)
                 }
 
                 if !output.isEmpty {
-                    Card {
-                        VStack(alignment: .leading, spacing: 4) {
-                            SectionLabel(text: tl("内容"))
-                            Text(output)
-                                .font(.system(size: 10, design: .monospaced))
-                                .foregroundColor(.white.opacity(0.72))
-                                .textSelection(.enabled)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    }
+                    ToolResult(text: output, label: "File copied")
                 }
 
                 if !history.isEmpty {
@@ -544,8 +557,7 @@ struct ArchivePane: View {
                         RunButton(title: tl("解包"), systemImage: "arrow.down.doc", tint: T.info,
                                   disabled: target == nil) { extract() }
                         if !status.isEmpty {
-                            Text(status).font(T.monoSm).foregroundColor(.white.opacity(0.6))
-                                .fixedSize(horizontal: false, vertical: true)
+                            ToolResult(text: status)
                         }
                     }
                 }

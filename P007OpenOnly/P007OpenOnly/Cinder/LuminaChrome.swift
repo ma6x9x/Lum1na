@@ -8,7 +8,7 @@ import Combine
 // phone still has an older IPA. Glass is chrome only — TAP bodies unchanged.
 
 enum LuminaStamp {
-    static let ui = "ios26-one-list-1"
+    static let ui = "ios26-en-1"
 }
 
 final class LuminaTabs: ObservableObject {
@@ -445,7 +445,6 @@ struct BoardSnapshot {
 }
 
 struct BoardHUD: View {
-    @Binding var tab: Int
     @EnvironmentObject private var engine: LabEngine
     @State private var snap = BoardSnapshot.current()
 
@@ -467,7 +466,6 @@ struct BoardHUD: View {
             }
             Button {
                 LuminaCopyBus.shared.copy(snap.copyBlock, label: "Next TAP · \(snap.nextID)")
-                reveal(snap.nextID)
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "arrow.right.circle.fill")
@@ -489,9 +487,8 @@ struct BoardHUD: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
-        .luminaGlass(RoundedRectangle(cornerRadius: 22, style: .continuous), interactive: true)
-        .padding(.horizontal, 12)
-        .padding(.top, 2)
+        .background(T.panel, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .padding(.horizontal, 16)
         .onAppear { snap = BoardSnapshot.current() }
         .onChange(of: engine.logLines.count) { _, _ in snap = BoardSnapshot.current() }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
@@ -509,12 +506,6 @@ struct BoardHUD: View {
             .overlay(Capsule().strokeBorder(color.opacity(0.40), lineWidth: 0.6))
             .lineLimit(1)
             .minimumScaleFactor(0.7)
-    }
-
-    private func reveal(_ id: String) {
-        let console = Set(["ident", "krw", "pathtest", "kreadtest", "p044", "p139",
-                           "p010qleak", "p063", "p149", "p114", "board", "cs2", "p100"])
-        LuminaTabs.shared.index = console.contains(id) ? 4 : 0
     }
 }
 

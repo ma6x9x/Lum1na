@@ -7,11 +7,9 @@ import SwiftUI
 // invocation with no Xcode project, so resources would have to be copied by hand and
 // kept in sync. One table is one source of truth.
 //
-// Language detection: Locale.preferredLanguages[0] → language code → match against the
-// supported set → fall back to English. Region is ignored (pt-BR and pt-PT both map to
-// nothing here; en-GB maps to English).
-//
-// Arabic forces RTL at the root view.
+// English only. Device language and the saved cinder27.lang override are ignored,
+// including a phone set to zh-Hans. The Chinese column stays in the table as source
+// text and is never shown.
 
 enum Lang: String, CaseIterable, Identifiable {
     case en, zh
@@ -46,38 +44,17 @@ final class L10n: ObservableObject {
         lang = Self.detect()
     }
 
-    static func detect() -> Lang {
-        if let forced = ProcessInfo.processInfo.environment["CINDER27_LANG"],
-           let l = Lang(rawValue: forced) {
-            return l
-        }
-        // Two languages only: Chinese (any variant, including zh-Hans / zh-Hant / zh-HK)
-        // maps to zh, everything else maps to English.
-        for identifier in Locale.preferredLanguages {
-            let code = identifier.split(separator: "-").first.map(String.init)?.lowercased() ?? ""
-            if code == "zh" { return .zh }
-            if code == "en" { return .en }
-        }
-        return .en
-    }
+    static func detect() -> Lang { .en }
 
-    func set(_ language: Lang) {
-        override = language
-        lang = language
-        UserDefaults.standard.set(language.rawValue, forKey: "cinder27.lang")
+    func set(_: Lang) {
+        override = .en
+        lang = .en
+        UserDefaults.standard.set(Lang.en.rawValue, forKey: "cinder27.lang")
         objectWillChange.send()
     }
 
-    /// Manual override persisted from the language picker, else the detected language.
-    func resolved() -> Lang {
-        if let o = override { return o }
-        if let saved = UserDefaults.standard.string(forKey: "cinder27.lang"),
-           let l = Lang(rawValue: saved) {
-            override = l
-            return l
-        }
-        return lang
-    }
+    /// Always English. A saved zh override from an older build is not read.
+    func resolved() -> Lang { .en }
 }
 
 /// Translate a key. Unknown keys return the key itself so a missing string is visible in

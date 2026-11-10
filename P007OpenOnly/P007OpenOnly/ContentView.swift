@@ -3,7 +3,9 @@ import UIKit
 import Darwin
 
 struct ContentView: View {
-    @State private var text = "Lum1na \(LuminaStamp.ui). Ident first. One TAP per force-quit. The catalog is the Tests tab. Unlock UI stays tappable during a TAP."
+    @State private var text = "Ready. One TAP per force-quit."
+    @State private var fullText = ""
+    @State private var showFull = false
     @State private var copiedFlash = false
     @State private var running = false
     @State private var showHour = false
@@ -16,6 +18,7 @@ struct ContentView: View {
             ZStack {
                 LuminaBackdrop()
                 VStack(spacing: 12) {
+                    BoardHUD()
                     VStack(alignment: .leading, spacing: 8) {
                         Text(kreadSignal)
                             .font(.system(size: 12, design: .monospaced))
@@ -23,7 +26,7 @@ struct ContentView: View {
                             .lineLimit(2)
                             .textSelection(.enabled)
                         ScrollView {
-                            Text(text)
+                            Text(shownLog)
                                 .font(.system(size: 12, design: .monospaced))
                                 .foregroundStyle(.primary)
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -77,9 +80,12 @@ struct ContentView: View {
 
                     HStack(spacing: 0) {
                         toolButton(copiedFlash ? "checkmark" : "doc.on.doc", "Copy") {
-                            LuminaCopyBus.shared.copy(text, label: "Console copied")
+                            LuminaCopyBus.shared.copy(fullText.isEmpty ? text : fullText, label: "Console copied")
                             copiedFlash = true
                             DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { copiedFlash = false }
+                        }
+                        toolButton(showFull ? "text.alignleft" : "doc.text", showFull ? "Short" : "Full") {
+                            showFull.toggle()
                         }
                         toolButton("doc.text.magnifyingglass", "Recover") { showRecoveredLog() }
                         toolButton("folder", "Logs") { showLogs = true }
@@ -92,7 +98,6 @@ struct ContentView: View {
             }
             .navigationTitle("Console")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar(.hidden, for: .navigationBar)
         }
         // Do NOT scan Documents on first frame — that caused ~1s freeze.
         .sheet(isPresented: $showSettings) {
@@ -103,13 +108,14 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showHour) {
             HourLogGallery { body in
-                text = body
+                present(title: "hour", body: body)
                 showHour = false
             }
         }
         .sheet(isPresented: $showLogs) {
             LogListSheet { body in
-                text = body.count > 48_000 ? String(body.suffix(48_000)) : body
+                let clipped = body.count > 48_000 ? String(body.suffix(48_000)) : body
+                present(title: "log", body: clipped)
                 kreadSignal = P007Board.shared().kreadSignal
                 showLogs = false
             }
@@ -360,10 +366,7 @@ struct ContentView: View {
         }
         for name in recoverNames {
             if let body = loadLog(named: name) {
-                text = "=== RECOVERED (last TAP \(lastTapId ?? "?") → \(name)) ===\n"
-                    + P007Board.shared().kreadSignal + "\n"
-                    + body
-                    + "\n=== end ===\n"
+                present(title: "recovered \(lastTapId ?? name)", body: P007Board.shared().kreadSignal + "\n" + body)
                 kreadSignal = P007Board.shared().kreadSignal
                 return
             }
@@ -395,11 +398,7 @@ struct ContentView: View {
               let raw = FileLoader.tail(at: win.url.path, maxBytes: 256_000),
               !raw.isEmpty else {
             if let tid = lastTapId {
-                text = "=== RECOVERED ===\n"
-                    + "Last TAP was \(tid), but its log file is missing/empty "
-                    + "(common after panic before F_FULLFSYNC).\n"
-                    + "Check ips PC; re-run that probe after install.\n"
-                    + "=== end ===\n"
+                present(title: "recovered \(tid)", body: "Last TAP was \(tid), but its log file is missing or empty. Check the ips PC, then run that probe again.")
             }
             return
         }
@@ -410,10 +409,7 @@ struct ContentView: View {
             note = "(NOTE: last TAP was \(tid) → mapped \(preferredName!); "
                 + "file missing, showing newest durable \(win.url.lastPathComponent).)\n"
         }
-        text = "=== RECOVERED (newest mtime: \(win.url.lastPathComponent)) ===\n"
-            + note
-            + body
-            + "\n=== end ===\n"
+        present(title: "recovered \(win.url.lastPathComponent)", body: note + body)
     }
 
     /// Last *run* only. Do NOT split on `=== verdict` — that ate the full log.
@@ -464,10 +460,41 @@ struct ContentView: View {
         LuminaTAP.blocked(id)
     }
 
+    private var shownLog: String {
+        let body = (showFull && !fullText.isEmpty) ? fullText : text
+        if body.count > 12_000 {
+            return String(body.prefix(12_000)) + "\n… Copy for the rest"
+        }
+        return body
+    }
+
+    private func present(title: String, body: String) {
+        fullText = body
+        showFull = false
+        text = Self.concise(title: title, body: body)
+    }
+
+    /// One id, one verdict line, one gate line. The full body stays behind Full and Copy.
+    static func concise(title: String, body: String) -> String {
+        let lines = body.split(whereSeparator: \.isNewline)
+            .map { String($0).trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty && !$0.hasPrefix("===") && !$0.hasPrefix("[PLAN]") }
+        var keep = [title]
+        if let first = lines.first {
+            keep.append(String(first.prefix(180)))
+        }
+        if let gate = lines.first(where: { $0.contains("hasKread") || $0.contains("kread32") }) {
+            let clip = String(gate.prefix(180))
+            if clip != keep.last { keep.append(clip) }
+        }
+        keep.append("\(lines.count) lines")
+        return keep.joined(separator: "\n")
+    }
+
     func run(_ id: String) {
         if let stop = blockedProbeMessage(id) {
             logTap(id)
-            text = LuminaLearn.observeParked(id: id, log: stop)
+            present(title: id, body: LuminaLearn.observeParked(id: id, log: stop))
             return
         }
 
@@ -475,13 +502,11 @@ struct ContentView: View {
         // running=true across that — UI stays usable; poll log with magnifying glass.
         if id == "p022GC" {
             logTap(id)
-            text = "p022GC v34 — Game Center path oracle. Client write proven earlier.\n"
-                + "Want load_raw>=0 or load_over!=client len. NOT KRW.\n"
-                + "Log: p022_gc_escape_log.txt  (UI stays unlocked; GameKit can block)\n"
+            present(title: "p022GC", body: "Game Center path oracle. UI stays unlocked. Log: p022_gc_escape_log.txt")
             let th = Thread {
                 let body = LuminaTAP.execute("p022GC")
                 DispatchQueue.main.async {
-                    text = body
+                    present(title: "p022GC", body: body)
                 }
             }
             th.name = "p022GC-probe"
@@ -496,14 +521,9 @@ struct ContentView: View {
         // the ranked cross-domain plan BEFORE the tap runs).
         var planBuf = [CChar](repeating: 0, count: 4096)
         _ = LabBanditPlan(&planBuf, 4096)
-        let planText = String(cString: planBuf)
-        if !planText.isEmpty {
-            text = "[PLAN]\n" + planText
-                + "lattice: sandbox → leak → race → write → krw → sptm HOLD\n"
-                + "Running \(id)…\nUnlock UI stays tappable. Classify ips after reboot.\n"
-        } else {
-            text = "Running \(id)…\nUnlock UI stays tappable. Classify ips after reboot.\n"
-        }
+        fullText = ""
+        showFull = false
+        text = "Running \(id)…"
         logTap(id)
 
         // 8BADF00D postmortem (P007OpenOnly-2026-10-24-181415/184530 ips):
@@ -526,12 +546,7 @@ struct ContentView: View {
                     pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0)
                     UIApplication.shared.isIdleTimerDisabled = false
                 }
-                // Truncate monster returns so SwiftUI doesn't layout megabytes.
-                if result.count > 48_000 {
-                    text = String(result.prefix(48_000)) + "\n…(truncated; full log in Documents)\n"
-                } else {
-                    text = result
-                }
+                present(title: id, body: result)
                 Self.snapshotHourLog(result)
                 kreadSignal = P007Board.shared().kreadSignal
                 running = false

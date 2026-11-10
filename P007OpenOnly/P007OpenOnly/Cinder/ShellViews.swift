@@ -353,7 +353,7 @@ struct ConsolePeek: View {
 
     var body: some View {
         Button {
-            LuminaTabs.shared.index = 4
+            LuminaTabs.shared.index = 3
         } label: {
             HStack(spacing: 8) {
                 Image(systemName: "terminal.fill")
