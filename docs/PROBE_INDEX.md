@@ -45,5 +45,13 @@ add a placeholder tap that does nothing.
   `weak_surfaces=0`; C3 0/0 and the 60s watch 0. The free/reclaim did not
   occur on A14. T8150 is structurally dead (SPTM `cpt_mapcnt` has no silent
   u16 wrap). Do not spend more boots on the pmap-tte lane.
+- **P073 desc-smash on the 12 is a type-forge bar, not a kread.** The fill
+  record sets the desc `{type=1, disp=0}`, but the OOL address is
+  `sid | (flags<<32)` and the 43748 `flags` is the record index (6..15), so
+  it is a user VA; the port pointer is overwritten. p073 v9's
+  `vmread(addr)` is a userland read and a mapped user page can fake
+  `kernelRange=YES`. Next: scan the received message body, and find either
+  a user-controlled +4 u32 (kernel high half) or a 4/8-byte type-only write
+  at `desc+8` that preserves `desc+0..7`. Design: `docs/KRW_THEORY.md` §2.1.
 - P150–P153 exist in `LuminaTAP.swift` but are invoked by other probes rather
   than as TapDirectory rows; the visible tap list only shows wired rows.

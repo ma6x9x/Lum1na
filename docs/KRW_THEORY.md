@@ -98,6 +98,72 @@ from userland. A kernel write to the kernel-resident descriptor is required
 (the p073 record smash or a kw provider); a userland forge alone cannot
 produce the OOL-address confusion.
 
+### 2.1 P073 desc-smash on the 12 (design)
+
+This is the 12's version of the DPC: use the ANE prewire record stream to
+overwrite a **port descriptor** in the same kmsg body, changing its type word
+from 0 (port) to 1 (OOL) **after** the userland validator has run. No userland
+type forge (P163) and no kw provider.
+
+**Layout (p073 v7g, measured):** 16 port descriptors extend the desc block to
+`body+0xC4`; the OOB record stream lands at `body+0x64..0xC4` and overwrites
+descs 6..15. A 43748 fill record is `{sid u32, flags u32, tail 0x1000000001}`
+at 16-byte stride, 1:1 with the 16-byte kernel descriptor. The record's
+`tail` at +8 writes `{type u16 = 0x0001, disp u16 = 0x0000}` — a clean
+port desc is `{type=0, disp=0x11}`, so the smashed desc becomes OOL. The
+record's `sid` at +0 and `flags` at +4 overwrite the descriptor's first
+eight bytes.
+
+**The blocker:** for an OOL desc the first eight bytes are the **address**.
+The smashed address is `sid | (flags << 32)`. In the 43748 fill the `flags`
+is the **record index**, and at the desc block that index is **6..15**. So
+the OOL address is a **user VA** (`0x6..0xF_<sid>`), not the kernel port
+pointer. The record also overwrites the port pointer, so the original
+kernel address is gone. On the 12 the record count is capped below 0x100;
+the index can never be the kernel high half (0xfffffe00 / 0xfffffff0).
+
+**Why p073 v9's current check is not proof:** `p073_ool_probe` computes
+`addr = name | pad<<32` and calls `p073_vmread(addr)` **from userland**.
+A userland `vm_read` cannot read a kernel VA; it can read the user VA above.
+If that user VA is mapped and contains kernel-looking qwords, the
+`kernelRange=YES` line is a **false positive** (our own page), not a kread.
+The real copy, if the kernel processed an OOL desc, is in the **received
+message body** — scan the received body, not `vmread(addr)`.
+
+**Two paths to a real kernel-address OOL read:**
+
+1. **Control the record `flags`.** Find a prewire record write whose +4 u32
+   is user-controlled (the `symbols`/`sid`/out-record paths) rather than the
+   rec_idx. Then set `flags = 0xfffffe00` (or `0xfffffff0`) and `sid` to the
+   low 32 bits of a target kernel VA. The OOL address becomes a kernel
+   address; the receive-side body contains kernel data. This is the clean
+   DPC read and the 12 has no SPTM/MTE to stop the copy.
+2. **Partial type write.** A write of only the `tail` at `desc+8` (or any
+   4-byte write to the type word) preserves the descriptor's first eight
+   bytes — the **kernel port pointer**. The OOL address is then the port
+   object; the OOL copy leaks the `ipc_port` and adjacent data. The current
+   fill record is 16 bytes, so it overwrites the pointer; a 4-byte/8-byte
+   write path is required.
+
+**Experiments (12/23F77, one tap per boot):**
+
+- **E-desc-1 (body scan):** after a forged OOL desc is received, scan the
+  **received message body** for kernel-range qwords and for port-object
+  patterns; do not use `vmread(addr)` as the read. This distinguishes a real
+  kernel copy from a user-address copy.
+- **E-desc-2 (flags control):** audit the prewire record writes for a +4 u32
+  that is user-controlled. If found, set it to `0xfffffe00`, `sid` to the
+  low32 of a known kernel VA (e.g., a port pointer from a P098/M2Scaler
+  leak), and check the body.
+- **E-desc-3 (partial type write):** find a 4-byte or 8-byte write at
+  `desc+8` that preserves `desc+0..7`; the port pointer then becomes the OOL
+  address.
+
+**Verdict for now:** the p073 desc-smash on the 12 is a **type-forge bar**,
+not a kread, until E-desc-2 or E-desc-3 lands. The p073 v9 `kernelRange`
+line is not sufficient evidence. This is the honest design to add to the
+map; do not claim a read from it.
+
 ## 3. Theory B — PTE Reclaim (p084)
 
 **One line:** the 65,537-map `pt_desc` wrap leaves a dangling PTE; if the

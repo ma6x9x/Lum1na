@@ -204,3 +204,21 @@ untested) remains the only AVE2 route on 23F77.
   UAF/type-confusion + second-order lck_mtx UAF, DoS-grade.
 
 Pending: M2Scaler PoC-shape agent (AVE2 VT/writer complete; p154 mapped).
+
+## P073 desc-smash on 23F77 (design, not a kread yet)
+
+- p073 v7g: 16 port descs extend the kmsg desc block to `body+0xC4`; the
+  OOB record stream lands `body+0x64..0xC4` and overwrites descs 6..15.
+- Fill record `{sid u32, flags u32, tail 0x1000000001}` → desc
+  `{name=sid, pad=flags, type u16=0x0001 (OOL), disp u16=0}`. Clean port
+  desc is `{type=0, disp=0x11}`.
+- OOL address = `sid | (flags<<32)`. The 43748 `flags` is the **record
+  index** (6..15 at the desc block), so the address is a **user VA**, not
+  the kernel port pointer; the record also overwrites the port pointer.
+- `p073_ool_probe`'s `vmread(addr)` is a userland read; a `kernelRange=YES`
+  in a mapped user page is a false positive. Scan the **received message
+  body** for the real OOL copy.
+- To make it a kread: (a) find a +4 u32 that is user-controlled and set it
+  to a kernel high half (0xfffffe00 / 0xfffffff0), or (b) find a 4/8-byte
+  type-only write at `desc+8` that preserves the port pointer at `desc+0..7`.
+  Full design: `docs/KRW_THEORY.md` §2.1.
