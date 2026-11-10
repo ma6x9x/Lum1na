@@ -146,7 +146,8 @@ enum CredentialParser {
         guard SecIdentityCopyCertificate(identity, &certRef) == errSecSuccess,
               let cert = certRef else { return nil }
         let cn = (SecCertificateCopySubjectSummary(cert) as String?) ?? ""
-        var team = certificateValue(cert, kSecOIDOrganizationalUnitName) ?? ""
+        let fields = certificateFields(cert)
+        var team = fields.teamID
         if team.isEmpty,
            let open = cn.range(of: "(", options: .backwards),
            cn.hasSuffix(")") {
@@ -154,32 +155,153 @@ enum CredentialParser {
         }
         let der = SecCertificateCopyData(cert) as Data
         let fp = SHA256.hash(data: der).map { String(format: "%02X", $0) }.joined()
-        return (cn, team, certificateDate(cert, kSecOIDX509V1ValidityNotAfter), fp)
+        return (cn, team, fields.notAfter, fp)
     }
 
-    private static func certificateValue(_ cert: SecCertificate, _ oid: CFString) -> String? {
-        guard let values = SecCertificateCopyValues(cert, [oid] as CFArray, nil) as? [String: Any] else {
-            return nil
-        }
-        for raw in values.values {
-            guard let entry = raw as? [String: Any] else { continue }
-            if let s = entry[kSecPropertyKeyValue as String] as? String, !s.isEmpty { return s }
-        }
-        return nil
+    // MARK: DER fallback
+    //
+    // SecCertificateCopyValues and the kSecOID*/kSecPropertyKeyValue constants
+    // are macOS-only, so parse the certificate DER ourselves. This is the
+    // minimal slice needed by the pane: the subject OU (the team ID on Apple
+    // Development certificates) and notAfter.
+
+    private struct DERNode {
+        let tag: UInt8
+        let value: ArraySlice<UInt8>
+        let children: [DERNode]
     }
 
-    private static func certificateDate(_ cert: SecCertificate, _ oid: CFString) -> Date? {
-        guard let values = SecCertificateCopyValues(cert, [oid] as CFArray, nil) as? [String: Any] else {
-            return nil
+    private static func parseDER(_ bytes: [UInt8], _ start: Int, _ end: Int) -> [DERNode] {
+        var nodes: [DERNode] = []
+        var i = start
+        while i < end {
+            guard let node = parseDERNode(bytes, &i, end) else { break }
+            nodes.append(node)
         }
-        for raw in values.values {
-            guard let entry = raw as? [String: Any] else { continue }
-            if let d = entry[kSecPropertyKeyValue as String] as? Date { return d }
-            if let n = entry[kSecPropertyKeyValue as String] as? NSNumber {
-                return Date(timeIntervalSinceReferenceDate: n.doubleValue)
+        return nodes
+    }
+
+    private static func parseDERNode(_ bytes: [UInt8], _ i: inout Int, _ end: Int) -> DERNode? {
+        guard i < end else { return nil }
+        let tag = bytes[i]
+        i += 1
+        if tag & 0x1F == 0x1F { // high-tag-number form
+            while i < end {
+                let b = bytes[i]
+                i += 1
+                if b & 0x80 == 0 { break }
             }
         }
-        return nil
+        guard i < end else { return nil }
+        var length = Int(bytes[i])
+        i += 1
+        if length & 0x80 != 0 {
+            let count = length & 0x7F
+            guard count > 0, count <= 4, i + count <= end else { return nil }
+            length = 0
+            for _ in 0..<count {
+                length = (length << 8) | Int(bytes[i])
+                i += 1
+            }
+        }
+        guard length >= 0, i + length <= end else { return nil }
+        let valueStart = i
+        let valueEnd = i + length
+        let constructed = (tag & 0x20) != 0
+        let children = constructed ? parseDER(bytes, valueStart, valueEnd) : []
+        i = valueEnd
+        return DERNode(tag: tag, value: bytes[valueStart..<valueEnd], children: children)
+    }
+
+    private static func certificateFields(_ cert: SecCertificate) -> (teamID: String, notAfter: Date?) {
+        let der = SecCertificateCopyData(cert) as Data
+        let bytes = [UInt8](der)
+        let root = parseDER(bytes, 0, bytes.count)
+        guard let certificate = root.first, certificate.tag == 0x30,
+              let tbs = certificate.children.first, tbs.tag == 0x30 else {
+            return ("", nil)
+        }
+        var index = 0
+        if tbs.children.first?.tag == 0xA0 { index = 1 } // [0] EXPLICIT Version
+        var notAfter: Date?
+        if tbs.children.count > index + 3 {
+            let validity = tbs.children[index + 3]
+            if validity.tag == 0x30, validity.children.count >= 2 {
+                notAfter = asn1Time(validity.children[1])
+            }
+        }
+        var team = ""
+        if tbs.children.count > index + 4 {
+            team = subjectOU(tbs.children[index + 4])
+        }
+        return (team, notAfter)
+    }
+
+    private static func subjectOU(_ subject: DERNode) -> String {
+        for rdn in subject.children {           // SET OF AttributeTypeAndValue
+            guard rdn.tag == 0x31 else { continue }
+            for attribute in rdn.children {     // SEQUENCE { OID, value }
+                guard attribute.tag == 0x30, attribute.children.count >= 2 else { continue }
+                let oid = attribute.children[0]
+                // 2.5.4.11 = organizationalUnitName
+                guard oid.tag == 0x06, Array(oid.value) == [0x55, 0x04, 0x0B] else { continue }
+                return decodeASN1String(attribute.children[1])
+            }
+        }
+        return ""
+    }
+
+    private static func decodeASN1String(_ node: DERNode) -> String {
+        switch node.tag {
+        case 0x1E: // BMPString, UTF-16BE
+            var units: [UInt16] = []
+            let bytes = Array(node.value)
+            var i = 0
+            while i + 1 < bytes.count {
+                units.append((UInt16(bytes[i]) << 8) | UInt16(bytes[i + 1]))
+                i += 2
+            }
+            return String(decoding: units, as: UTF16.self)
+        default:
+            return String(data: Data(node.value), encoding: .utf8)
+                ?? String(data: Data(node.value), encoding: .ascii)
+                ?? String(decoding: Array(node.value), as: UTF8.self)
+        }
+    }
+
+    private static func asn1Time(_ node: DERNode) -> Date? {
+        guard let text = String(data: Data(node.value), encoding: .ascii) else { return nil }
+        let digits = Array(text.filter { $0.isNumber })
+        guard let year = utcYear(node, digits) else { return nil }
+        var components = DateComponents()
+        components.timeZone = TimeZone(secondsFromGMT: 0)
+        components.year = year.year
+        let monthIndex = year.monthIndex
+        guard digits.count >= monthIndex + 10,
+              let month = Int(String(digits[monthIndex..<monthIndex + 2])),
+              let day = Int(String(digits[monthIndex + 2..<monthIndex + 4])),
+              let hour = Int(String(digits[monthIndex + 4..<monthIndex + 6])),
+              let minute = Int(String(digits[monthIndex + 6..<monthIndex + 8])),
+              let second = Int(String(digits[monthIndex + 8..<monthIndex + 10])) else {
+            return nil
+        }
+        components.month = month
+        components.day = day
+        components.hour = hour
+        components.minute = minute
+        components.second = second
+        return Calendar(identifier: .gregorian).date(from: components)
+    }
+
+    /// UTCTime is YYMMDDHHMMSS (2-digit year), GeneralizedTime is
+    /// YYYYMMDDHHMMSS. Returns the full year and the index where MM starts.
+    private static func utcYear(_ node: DERNode, _ digits: [Character]) -> (year: Int, monthIndex: Int)? {
+        if node.tag == 0x17 || digits.count == 12 {
+            guard digits.count >= 12, let yy = Int(String(digits[0..<2])) else { return nil }
+            return (yy < 50 ? 2000 + yy : 1900 + yy, 2)
+        }
+        guard digits.count >= 14, let yyyy = Int(String(digits[0..<4])) else { return nil }
+        return (yyyy, 4)
     }
 }
 
