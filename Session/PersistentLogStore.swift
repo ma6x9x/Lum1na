@@ -36,6 +36,7 @@ public final class PersistentLogStore {
         "p114": "p114_surfaceleak_log.txt",
         "p115": "p115_m2peek_log.txt",
         "p116": "p116_sandboxext_toctou_log.txt",
+        "p164": "p164_mcm_census_log.txt",
         "p117": "p117_entecho_log.txt",
         "p118": "p118_bootlearn_log.txt",
         "p119": "p119_staleupl_log.txt",

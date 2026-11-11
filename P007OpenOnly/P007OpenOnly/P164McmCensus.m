@@ -185,6 +185,60 @@ static void p164_probe(NSMutableString *o, NSString *name, uint64_t cls,
     }
 }
 
+/* v2: live deputy census — the daemon-backed ANE/ML pid pool for the Stage-B
+   pid-borrow lane (P109). sysctl KERN_PROC_ALL first (records errno), libproc
+   fallback; per-pid proc_pidpath; deputy = name heuristic only, the kernel's
+   kr oracle decides entitlement truth. Read-only. */
+static void p164_deputy_census(NSMutableString *o) {
+    static const char *depNames[] = {
+        "aned", "nesessionmanager", "mlruntimed", "mlhostd", "modelmanagerd",
+        "modelcatalogd", "siriinferenced", "siriknowledged", "corespeechd",
+        "photoanalysisd", "mediaanalysisd", "generativeexperiencesd",
+        "intelligenceplatformd", "intelligenceflowd", "visualintelligenced",
+        "videocodecd", "mobilegestalt", "sirittsd", "speechmodeltrainingd",
+        "assistantd", "sensingpredictd", "intelligencetasksd", "centaurid",
+    };
+    Lf(@"[deputy] live pid census (sysctl -> libproc fallback; %d candidate names)", (int)(sizeof depNames / sizeof depNames[0]));
+    typedef int32_t (*listpids_t)(uint32_t, uint32_t, void *, int32_t);
+    typedef int32_t (*pidpath_t)(int32_t, void *, uint32_t);
+    void *h = dlopen(NULL, RTLD_LAZY);
+    if (!h) { L(@"[-] dlopen(NULL) failed"); return; }
+    listpids_t listpids = (listpids_t)dlsym(h, "proc_listpids");
+    pidpath_t pidpath = (pidpath_t)dlsym(h, "proc_pidpath");
+    if (!listpids || !pidpath) { L(@"[-] libproc symbols unavailable"); return; }
+    int32_t got = listpids(1 /*PROC_ALL_PIDS*/, 0, NULL, 0);
+    if (got <= 0) {
+        Lf(@"[-] proc_listpids denied errno=%d (sandbox) — p109 pids via pasteboard", errno);
+        return;
+    }
+    char *buf = calloc(1, (size_t)got + 16);
+    if (!buf) return;
+    got = listpids(1, 0, buf, (int32_t)((size_t)got + 16));
+    int32_t cnt = got > 0 ? (int32_t)(got / 4) : 0;
+    int shown = 0, total = 0;
+    for (int32_t i = 0; i < cnt; i++) {
+        int32_t pid;
+        memcpy(&pid, buf + i * 4, 4);
+        if (pid <= 0) continue;
+        total++;
+        char path[4096] = {0};
+        if (pidpath(pid, path, sizeof path) <= 0) continue;
+        NSString *np = [NSString stringWithUTF8String:path];
+        if (!np) continue;
+        NSString *nm = np.lastPathComponent.lowercaseString;
+        for (size_t d = 0; d < sizeof depNames / sizeof depNames[0]; d++) {
+            if ([nm containsString:[NSString stringWithUTF8String:depNames[d]]]) {
+                Lf(@"  dep%-7d %@", pid, np);
+                if (++shown >= 24) goto done;
+                break;
+            }
+        }
+    }
+done:
+    free(buf);
+    Lf(@"[deputy] %d pids scanned, %d live deputies listed (kr oracle decides entitlements)", total, shown);
+}
+
 @implementation P164McmCensus
 
 + (NSString *)tap {
@@ -215,6 +269,9 @@ static void p164_probe(NSMutableString *o, NSString *name, uint64_t cls,
            [NSString stringWithUTF8String:names[i].n]);
         (void)p164_enum_class(classes[i], 200, o);
     }
+
+    [o appendString:@"--- live deputy census (Stage-B pid-borrow feed) ---\n"];
+    p164_deputy_census(o);
 
     [o appendString:@"--- documented probe leases (listing only) ---\n"];
     p164_probe(o, @"[MHA-C13] Install Coordination", 13,
