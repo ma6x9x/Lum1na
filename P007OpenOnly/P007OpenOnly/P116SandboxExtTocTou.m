@@ -314,7 +314,7 @@ static long long p116_dump(const char *outPath, const char *s, const char *l, NS
                                     [rw hasPrefix:@"/private/var/mobile/"]);
                 BOOL mgSafe = ([rw hasPrefix:@"/var/containers/Shared/SystemGroup/systemgroup.com.apple.mobilegestaltcache/Library/Caches/"] ||
                                [rw hasPrefix:mgDir]) &&
-                               ![rw.lastPathComponent isEqualTo:@"com.apple.MobileGestalt.plist"];
+                               ![rw.lastPathComponent isEqualToString:@"com.apple.MobileGestalt.plist"];
                 if (!underMobile && !mgSafe) {
                     Lf(@"[v2] rw refused: %@ (target must be under /var/mobile or the MG cache copy law)", rw);
                 } else {
