@@ -1,6 +1,6 @@
 //
 //  P125KernIpcRace.m — mach-namespace REQUEST-TABLE stale-index race
-//  (CVE-2026-112507, Cinder27 kern.ipc, vendored jbjflab). p125. P007 rig.
+//  (CVE-2026-112507, Lum27 kern.ipc, vendored jbjflab). p125. P007 rig.
 //
 //  Mechanism (their C twin ported verbatim, bounded): each ring allocates
 //  RECEIVE rights, arms TWO notification kinds per port
@@ -18,7 +18,7 @@
 //  VERDICT classes (honest): refused notifications / the err-code census =
 //  the race shape; refused > 0 with budget NOT exhausted = the stale-index
 //  candidate signal; a panic = the UAF attestation (decode the ips).
-//  BOUNDED: 5s, budget 6000 ops, depth 48 — the Cinder27 numbers.
+//  BOUNDED: 5s, budget 6000 ops, depth 48 — the Lum27 numbers.
 //
 
 #import "P125KernIpcRace.h"
@@ -226,7 +226,7 @@ static void P125_rec(const char *outcome) {
 
     Lf(@"=== p125 session %@ BUILD %@ ===", LabLocalMilitaryNow(), P125_BUILD);
     Lf(@"%@", [LabDeviceProfile identBlock]);
-    L(@"[law] CVE-2026-112507 (Cinder27 kern.ipc, vendored jbjflab): xnu's");
+    L(@"[law] CVE-2026-112507 (Lum27 kern.ipc, vendored jbjflab): xnu's");
     L(@"  per-space port request-table index consumers raced by the");
     L(@"  alloc/notify/teardown interleave; 27.2 ships the ipr/table NULL");
     L(@"  checks = PRE-FIX LIVE on 23F77(26.5) + 24A435(27.0). 27.2 = the");
@@ -253,7 +253,7 @@ static void P125_rec(const char *outcome) {
            mach_error_string(gp_stat.err_codes[i]) ?: "?", gp_stat.err_counts[i]);
 
     L(@"");
-    L(@"=== VERDICT (honest — the Cinder27 recorded-oracle semantics) ===");
+    L(@"=== VERDICT (honest — the Lum27 recorded-oracle semantics) ===");
     L(@"- their own twin's printed verdict = 'survived the interleaving, no");
     L(@"  request-table fault surfaced' AND 'this platform does not allow");
     L(@"  notification registration on own ports — the path cannot be armed'.");

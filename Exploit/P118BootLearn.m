@@ -166,6 +166,33 @@ static NSString *p118_echoType(CFStringRef key) {
     Lf(@"[*] DERIVE written: %@", jp);
     L(j);   /* the whole slice prints for paste-back */
 
+    /* LightSword calib persistence: PARTIAL windows vs WRONG spray-page tags.
+       WRONG is phys_oob copy confusion of SOCK_DGRAM markers (c0dec0de), not
+       kread. FOREIGN/kptr and pcb_start_offset still live in CS2. */
+    {
+        NSString *hot = [NSString stringWithContentsOfFile:
+            [docs stringByAppendingPathComponent:@"lightsword_hot.txt"]
+            encoding:NSUTF8StringEncoding error:nil] ?: @"";
+        NSString *wrong = [NSString stringWithContentsOfFile:
+            [docs stringByAppendingPathComponent:@"lightsword_wrong.txt"]
+            encoding:NSUTF8StringEncoding error:nil] ?: @"";
+        NSUInteger nh = 0, nw = 0;
+        for (NSString *line in [hot componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]])
+            if (line.length >= 2 && [line hasPrefix:@"0x"]) nh++;
+        for (NSString *line in [wrong componentsSeparatedByCharactersInSet:[NSCharacterSet newlineCharacterSet]])
+            if (line.length >= 2 && [line hasPrefix:@"0x"]) nw++;
+        Lf(@"[*] LightSword ingest hot=%lu wrong=%lu (Documents/lightsword_{hot,wrong}.txt)",
+           (unsigned long)nh, (unsigned long)nw);
+        NSString *ls = [docs stringByAppendingPathComponent:@"boot_learning/lightsword.json"];
+        NSString *body = [NSString stringWithFormat:
+            @"{\n  \"bootId\": \"%@\",\n  \"hot_count\": %lu,\n  \"wrong_count\": %lu,\n  \"note\": \"WRONG=c0dec0de spray-page confusion. hasKread only kread32(kbase)==0xfeedfacf. hop-1 KEEP CLOSED.\"\n}\n",
+            bootId, (unsigned long)nh, (unsigned long)nw];
+        [body writeToFile:ls atomically:YES encoding:NSUTF8StringEncoding error:nil];
+        L(@"[*] LightSword slice written: boot_learning/lightsword.json");
+        if (nw)
+            L(@"[*] WRONG offsets are calib map offs, not CS2 search-mapping offs. CS2 still scans for pcb_start_offset.");
+    }
+
     L(@"=== VERDICT (honest) ===");
     L(@"- This file pair (offsets.json + the bandit ledger's bootId rows) = the");
     L(@"  training event the pipeline reads; repeat taps on the same boot = the");

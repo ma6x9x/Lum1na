@@ -645,3 +645,15 @@ int LabBanditPlan(char *lineOut, int lineCap) {
     os_unfair_lock_unlock(&g_labbLock);
     return used > 0;
 }
+
+int LabBanditRegister1(const char *domain, const char *arm,
+                       const char *seededFrom,
+                       const char *bootChangeOpen,
+                       const char *sameBootOpen,
+                       char *attrLineOut, int attrLineCap) {
+    const char *a = arm ? arm : "main";
+    const char *const arms[1] = { a };
+    return LabBanditRegister(domain, arms, 1, NULL, 0, seededFrom,
+                             bootChangeOpen, sameBootOpen,
+                             attrLineOut, attrLineCap);
+}
