@@ -193,7 +193,8 @@ enum ProcList {
             return []
         }
         var out: [ProcInfo] = []
-        for i in 0..<(got / 4) {
+        let n = Int(got) / 4
+        for i in 0..<n {
             let pid = buf[i]
             if pid <= 0 { continue }
             var pathBuf = [CChar](repeating: 0, count: 4096)
@@ -548,24 +549,27 @@ enum MachOInspector {
     /// device's private data and are NOT reported.
     static func entitlementKeys(_ data: Data) -> [String] {
         guard data.count > 8 else { return [] }
-        let magicLE: [UInt8] = [0x71, 0x71, 0xDE, 0xFA]   // 0xfade7171 little-endian
-        let n = data.count
-        return data.withUnsafeBytes { (raw: UnsafeRawBuffer) -> [String] in
-            guard let base = raw.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return [] }
+        let magicLE: (UInt8, UInt8, UInt8, UInt8) = (0x71, 0x71, 0xDE, 0xFA)   // 0xfade7171 LE
+        var keys: [String] = []
+        data.withUnsafeBytes { raw in
+            guard let base = raw.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
+            let n = data.count
             for i in 0..<(n - 8) {
-                if base[i] == magicLE[0] && base[i+1] == magicLE[1] &&
-                   base[i+2] == magicLE[2] && base[i+3] == magicLE[3] {
+                if base[i] == magicLE.0 && base[i+1] == magicLE.1 &&
+                   base[i+2] == magicLE.2 && base[i+3] == magicLE.3 {
                     let len = UInt32(base[i+4]) | (UInt32(base[i+5]) << 8) |
                               (UInt32(base[i+6]) << 16) | (UInt32(base[i+7]) << 24)
                     guard len > 8, Int(len) <= n - i else { continue }
                     let xml = data.subdata(in: (i + 8)..<(i + Int(len)))
-                    guard let plist = try? PropertyListSerialization.propertyList(
-                        from: xml, format: nil) as? [String: Any] else { continue }
-                    return plist.keys.sorted()
+                    if let plist = try? PropertyListSerialization.propertyList(
+                        from: xml, format: nil) as? [String: Any] {
+                        keys = plist.keys.sorted()
+                    }
+                    return
                 }
             }
-            return []
         }
+        return keys
     }
 
     private struct Header {
