@@ -276,3 +276,37 @@ extraction + `kextdiff2`/global pairing on the four relevant kexts:
 - IOHIDFamily 2238.120.5 → 2360.40.13 (2790 → 2809).
 - All three full diffs are now complete: iPad 23H24→23H128,
   24A435→24B119, 23F77→24B119.
+
+## Exact 23H30 (26.7.1, LIVE iPad) → 23H128 (26.7.2) kernel diff (2026-11-10)
+Source: `ipsw diff --starts --strs` on the extracted ipad8b kernelcaches
+(23H30 cache on disk at `ios-xnu-hunt/kernels/26.7.1_23H30_iPad8,7/`),
+output diff = `~/Downloads/diff_ipad_26.7.1_starts/`. 47 kexts updated.
+AMFI / SEPKeyStore / AppleImage4 = timestamp + version-string rebuilds ONLY
+(Aug 18 → Oct 8), no functional change — do not chase those.
+
+- **com.apple.kernel**: `__TEXT_EXEC.__text` +0x1ec0, `__kalloc_type`
+  +0x40, functions 20322 → **20323 (one new)**, CStrings +13.
+  Added strings are network-stack HARDENING SKUs: `SK[%u]` filter-ring
+  validation (`dropped packet injected on ring %u whose wrap flag does not
+  match`, `filter packet is not mbuf-wrapped`, `FilterDropBadDirection`
+  = **Skywalk/nx_netif packet-injection class**), mbuf len check respan,
+  `refusing cross-protocol ifa change on route with llinfo`,
+  **`_inm/_in6m_dtlecnt != 0` assertions = multicast-membership teardown
+  count hardening**, and `necp_set_socket_resolver_signature_from_parameters`
+  (new kernel function). The socket-lane (socket.usecount +0x23c FIELD#) on
+  the live iPad sits on the PRE-hardening side of this fix → candidate for
+  the A12X write lane: read the assert function's caller before any P155 fire.
+- **AppleH11ANEInterface 9.512.0 → 9.512.2**: +0x638 text, kalloc_var
+  +0x140, 7 functions grew (620→1312, 412→744 doubles). ONE added string:
+  `ANEUserClient::%s failed to allocate kernel-private
+  ANEProgramCreateArgsOutput (%zu bytes)` — **the ProgramCreate
+  argsOutput leak/double-fetch lane (P149/p157 lead) got its kernel-side
+  fix in 26.7.2**; on LIVE 23H30 it is unpatched. Highest-value iPad lane.
+- **AppleAVE2 905.41.1 → 905.43.1**: +0x30c0 text, functions 2782 → 2785,
+  ~60 new range-check strings (AVC/HEVC PPS count, RPS count, log2_max,
+  B-frame "out of range") = parse-time hardening of the 84607/112466
+  class. A12X VT path now predates these checks.
+- **IOSurface 393.5.8 → 393.5.10**: two functions grew slightly
+  (256→272, 224→232) — smallest delta class, 112477-adjacent.
+- IOHIDFamily 2238.162.1 → .700.1: 4 functions +24 each;
+  IOGPUFamily 130.16.4 → .5: section-level only, no function delta listed.
