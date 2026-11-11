@@ -23,7 +23,7 @@
 #import <Foundation/Foundation.h>
 #import <dlfcn.h>
 #import <xpc/xpc.h>
-#import <Security/SecTask.h>
+#import <dlfcn.h>
 #import <dirent.h>
 #import <fcntl.h>
 #if __has_include("pathleak.h")
@@ -262,19 +262,27 @@ done:
 }
 
 static NSArray<NSString *> *p164_app_groups(void) {
+    /* SecTask via dlsym — SecTask.h is absent from the iOS SDK (P160 law) */
     NSMutableArray<NSString *> *out = [NSMutableArray array];
-    SecTaskRef task = SecTaskCreateFromSelf(kCFAllocatorDefault);
-    if (task) {
-        CFTypeRef v = SecTaskCopyValueForEntitlement(
-            task, CFSTR("com.apple.security.application-groups"), NULL);
-        if (v) {
-            if ([(__bridge NSArray *)v isKindOfClass:[NSArray class]]) {
-                for (NSString *s in (__bridge NSArray *)v) [out addObject:s];
-            }
-            CFRelease(v);
+    typedef const struct OpaqueSecTaskRef *SecTaskRef_t;
+    typedef CFTypeRef (*create_fn)(CFAllocatorRef);
+    typedef CFTypeRef (*copy_fn)(SecTaskRef_t, CFStringRef, CFErrorRef *);
+    void *h = dlopen("/System/Library/Frameworks/Security.framework/Security", RTLD_LAZY);
+    void *h2 = dlopen(NULL, RTLD_LAZY);
+    create_fn create = (create_fn)dlsym(h2 && dlsym(h2, "SecTaskCreateFromSelf") ? h2 : h,
+                                        "SecTaskCreateFromSelf");
+    copy_fn copy = (copy_fn)dlsym(h2 && dlsym(h2, "SecTaskCopyValueForEntitlement") ? h2 : h,
+                                  "SecTaskCopyValueForEntitlement");
+    if (!create || !copy) return out;
+    SecTaskRef_t task = create(kCFAllocatorDefault);
+    CFTypeRef v = copy((SecTaskRef_t)task, CFSTR("com.apple.security.application-groups"), NULL);
+    if (v) {
+        if ([(__bridge NSArray *)v isKindOfClass:[NSArray class]]) {
+            for (NSString *s in (__bridge NSArray *)v) [out addObject:s];
         }
-        CFRelease(task);
+        CFRelease(v);
     }
+    if (task) CFRelease(task);
     return out;
 }
 

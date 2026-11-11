@@ -24,3 +24,22 @@ by Lum1na.
   Elevate/Bootstrap order: uid0 -> unsandbox -> CS_PLATFORM -> pmap_cs -> AMFI
   trustcache -> opainject -> dpkg) follows the Dopamine design. Verbatim
   Dopamine file vendoring slot reserved; MIT terms apply when files land.
+
+## Build note (Vendor/, Lum1na target)
+Everything under `Vendor/` is compiled/bundled by the Lum1na target. Keep
+file basenames unique inside the tree — the synchronized root copies
+non-source files into the app bundle and Xcode fails on duplicate output
+names (the two CMakeLists.txt and two README.md were removed for this).
+
+## Vendor/darksword provenance notes
+- Entry point: `int kexploit_opa334(void)`; on success `g_kernel_base`/
+  `g_kernel_slide` are live and krw/m (`kreadbuf/kwritebuf/kread64/...`)
+  works on the phys lane; `kutils`: proc_self/proc_find(_by_name).
+- The socket lane matches ClearSword/CS2 (inpcb/icmp6filt/ipi_zone/
+  so_usecount); offsets.m derives per-train values by hex-pattern search
+  for iOS 17.x–26.x, includes the 26.x kbase magic `0xCC0000002`, receipt
+  on iPhone14,6 iOS 26.0.
+- Lum1na integration (our code): `Exploit/DarkswordBridge.{h,m}` externs +
+  `Kernel/Lum1naDarkswordLane.{h,m}` lane (cascade slot 4). Slide is
+  recomputed against OUR LabStaticBase — the vendored g_kernel_slide
+  subtracts only the A14 link base.
