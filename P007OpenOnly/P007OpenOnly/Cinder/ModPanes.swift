@@ -377,33 +377,76 @@ struct DaemonPane: View {
     @State private var query = ""
 
     private var filtered: [LaunchCensus.Daemon] {
-        guard !query.isEmpty else { return daemons }
-        return daemons.filter { $0.label.localizedCaseInsensitiveContains(query) }
+        let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !q.isEmpty else { return daemons }
+        return daemons.filter {
+            $0.label.localizedCaseInsensitiveContains(q)
+                || $0.path.localizedCaseInsensitiveContains(q)
+                || $0.program.localizedCaseInsensitiveContains(q)
+        }
     }
 
     var body: some View {
         VStack(spacing: 0) {
             HStack {
                 Image(systemName: "magnifyingglass").font(.system(size: 12)).foregroundColor(.white.opacity(0.3))
-                TextField("label", text: $query).font(T.body)
+                TextField("label or path", text: $query).font(T.body)
                     .textInputAutocapitalization(.never).autocorrectionDisabled()
-                Text("\(daemons.count)").font(T.monoSm).foregroundColor(.white.opacity(0.3))
+                Text("\(filtered.count)").font(T.monoSm).foregroundColor(.white.opacity(0.3))
             }
             .padding(10)
             .background(RoundedRectangle(cornerRadius: 10).fill(T.panel))
             .padding(.horizontal, 16)
 
+            Button(action: copyAllPaths) {
+                HStack(spacing: 8) {
+                    Image(systemName: "doc.on.doc")
+                    Text("Copy all paths")
+                    Spacer()
+                    Text("\(daemons.count)")
+                        .font(T.monoSm)
+                        .foregroundColor(.white.opacity(0.35))
+                }
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.primary)
+                .padding(10)
+                .background(RoundedRectangle(cornerRadius: 10).fill(T.panel))
+            }
+            .buttonStyle(.plain)
+            .disabled(daemons.isEmpty)
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+
             List {
                 ForEach(filtered) { d in
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack(spacing: 6) {
-                            Text(d.label).font(T.mono).foregroundColor(.white.opacity(0.85)).lineLimit(1)
-                            if d.runAtLoad { Pill(text: "RunAtLoad", color: T.good) }
-                            if d.keepAlive { Pill(text: "KeepAlive", color: T.info) }
+                    HStack(alignment: .center, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(spacing: 6) {
+                                Text(d.label).font(T.mono).foregroundColor(.white.opacity(0.85)).lineLimit(1)
+                                if d.runAtLoad { Pill(text: "RunAtLoad", color: T.good) }
+                                if d.keepAlive { Pill(text: "KeepAlive", color: T.info) }
+                            }
+                            Text(d.path)
+                                .font(T.monoSm).foregroundColor(.white.opacity(0.45))
+                                .lineLimit(1).truncationMode(.middle)
+                            if !d.program.isEmpty {
+                                Text(d.program)
+                                    .font(T.monoSm).foregroundColor(.white.opacity(0.28))
+                                    .lineLimit(1).truncationMode(.middle)
+                            }
                         }
-                        Text(d.program.isEmpty ? d.path : d.program)
-                            .font(T.monoSm).foregroundColor(.white.opacity(0.3))
-                            .lineLimit(1).truncationMode(.middle)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                        Button {
+                            LuminaCopyBus.shared.copy(d.path, label: "Path copied")
+                        } label: {
+                            Image(systemName: "doc.on.doc")
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(.primary)
+                                .frame(width: 32, height: 32)
+                        }
+                        .buttonStyle(.borderless)
+                        .accessibilityLabel("Copy path")
                     }
                     .listRowBackground(T.panel)
                 }
@@ -412,6 +455,12 @@ struct DaemonPane: View {
             .scrollContentBackground(.hidden)
         }
         .onAppear { daemons = LaunchCensus.daemons() }
+    }
+
+    private func copyAllPaths() {
+        let paths = daemons.map(\.path).filter { !$0.isEmpty }
+        guard !paths.isEmpty else { return }
+        LuminaCopyBus.shared.copy(paths.joined(separator: "\n"), label: "\(paths.count) paths copied")
     }
 }
 
