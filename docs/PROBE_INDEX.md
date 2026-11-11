@@ -17,7 +17,7 @@ add a placeholder tap that does nothing.
 | P157 | AVE2 writer reach + type sweep | implemented (v2, SKU-aware selectors) |
 | **P158** | **AVE2 Prepare blob fill (gates/SPS/fill)** | **reserved, not built** — the direct AVE2 UC is `0xe00002e2` on stock; build only if the p157 type sweep 0–5 opens a type. |
 | P159 | IOSurface user-VA adjacency | implemented; user-VA only, not KRW |
-| P160 | worse_query/class-7 sandbox escape + pathleak | **implemented v2c** — class-13/2/7 traversal + app-group class-7 knobs: `Documents/p160_path.txt` (single read), `p160_dir.txt` (list), `p160_write_target.txt` (write, opt-in, `/var/mobile` only). v2c uses the correct order: query the group's **real** part dir → take the unconsumed token → swap the part path to a symlink → consume → open the part path. v2b's symlink-before-query was replaced by the MCM with the real dir (17 log: EPERM/EISDIR). iLoader group live on 17: `[ent]`/`[profile]` 1. Default read-only; userland file access, not kread32. |
+| P160 | worse_query/class-7 sandbox escape + pathleak | **implemented v2d** — class-13/2/7 traversal + app-group class-7 knobs: `Documents/p160_path.txt` (single read), `p160_dir.txt` (list), `p160_write_target.txt` (write, opt-in, `/var/mobile`), `p160_dump_path.txt` (v2d: full-file class-7 dump to `Documents/p160_live_<basename>`, 1 MB chunks). v2c order: query the group's **real** part dir → take the unconsumed token → swap the part path to a symlink → consume → open the part path. **iPad 26.7.1/23H30 receipt (2026-11-10): class-7 READ works** — `.GlobalPreferences.plist` 64 B (`bplist00`) via part `.../Library/Caches`; dir list 0 entries and write EPERM (read-only primitive). `p160_dump_path.txt` pushed to the iPad. Default read-only; userland file access, not kread32. |
 | **P161** | **AppleSEPKeyStore test-UC type sweep** | **implemented v2** — `P161SEPKeyStoreTestUC`, log `p161_sepks_testuc_log.txt`. v1 on the 17/24A435 opened types **0–23 all OK**, every child `AppleKeyStoreUserClient`, no Test class; v1 stopped at the 24-open cap and hid children past the first 16. v2 tests **0–32** and diffs child registry-entry IDs before/after each open, logging `connClass` and only the new children. No selectors, no writes. PANIC-POSSIBLE — one tap per force-quit. |
 | P162 | IOHID user-client reach (CVE-2026-112515 lane) | implemented; CVE closed as internal OOB read |
 | **P163** | **Descriptor-Port Confusion (DPC) translation oracle** | **implemented v1; userland forge NEGATIVE** — `P163DescOOLOracle`, log `p163_desc_ool_log.txt`. 17/24A435 (2026-11-09): control sends/recvs 16 port descs (type=0); every forge case sends/recvs 0 but the received descriptor is normalized to `name=0, type=0, disp=0` — the userland type word is validated/normalized and never reaches the OOL copy engine. The DPC still needs a kernel write to the kernel-resident descriptor (p073 record smash or a kw provider). PANIC-POSSIBLE — one tap per force-quit. |
@@ -53,12 +53,22 @@ add a placeholder tap that does nothing.
   `kernelRange=YES`. Next: scan the received message body, and find either
   a user-controlled +4 u32 (kernel high half) or a 4/8-byte type-only write
   at `desc+8` that preserves `desc+0..7`. Design: `docs/KRW_THEORY.md` §2.1.
-- **P116 v2 (TOCTOU) is the pre-KRW daemon-deputy enabler.** Path read,
+- **P116 v2/v3 (TOCTOU) is the pre-KRW daemon-deputy enabler.** Path read,
   directory listing, and a read-write probe restricted to `/var/mobile`
   (default `/var/mobile/Library/Caches/p116_rw_probe.txt`);
-  `Documents/p116_path.txt`, `p116_dir.txt`, `p116_rw_path.txt`. Tokens are
-  never logged. It is a deterministic **userland** sandbox escape, not uid0
-  and not kread32. Theory D (P116 rw -> privileged daemon cache -> AVE2/ANE
-  entitlement) is in `docs/KRW_THEORY.md` §10.
+  `Documents/p116_path.txt`, `p116_dir.txt`, `p116_rw_path.txt`. v3 adds
+  `p116_dump_path.txt` — a **full-file** out-of-container dump into
+  `Documents/p116_live_<basename>` (1 MB chunks, 256 MB cap; the v2 receipt
+  read itself is capped at 64 KB). Tokens are never logged. It is a
+  deterministic **userland** sandbox escape, not uid0 and not kread32.
+  **iPad 26.7.1/23H30 receipts (2026-11-10): 6/7 out-of-container reads —
+  `/etc/hosts` 213 B, `/etc/passwd` 3595 B, `/etc/services` 66048 B,
+  `.GlobalPreferences.plist` 18348 B, PublicEffectiveUserSettings 27559 B,
+  `/var/preferences/com.apple.networkd.plist` 3978 B (twice, same-size —
+  stable); dyld shared cache refused (honest); dir list 0; rw write=-1
+  (read-only).** NOTE vs P160: p116's NOFOLLOW read carries the FULL file
+  (66 KB cap) while the p160 class-7 read returned 64 B — p116 is the
+  stronger read primitive on this SKU. Theory D (P116 rw -> privileged
+  daemon cache -> AVE2/ANE entitlement) is in `docs/KRW_THEORY.md` §10.
 - P150–P153 exist in `LuminaTAP.swift` but are invoked by other probes rather
   than as TapDirectory rows; the visible tap list only shows wired rows.
