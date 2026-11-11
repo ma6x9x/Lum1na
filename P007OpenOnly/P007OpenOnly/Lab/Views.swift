@@ -26,7 +26,7 @@ struct RootView: View {
         }
         .tint(T.accent)
         .onAppear {
-            if let env = ProcessInfo.processInfo.environment["CINDER27_TAB"],
+            if let env = ProcessInfo.processInfo.environment["LUM1NA_TAB"],
                let n = Int(env) {
                 // Older IPAs used 3 for More and 4 for Console.
                 switch n {
@@ -50,12 +50,12 @@ struct RootView: View {
     /// user presses Execute.
     ///
     /// The only exception is an opt-in harness for automated testing, and it needs *two*
-    /// independent conditions: the environment variable `CINDER27_AUTORUN` naming a module,
+    /// independent conditions: the environment variable `LUM1NA_AUTORUN` naming a module,
     /// and a file called `enable-autorun` sitting in the container. A shipped build has
     /// neither, so a normal launch cannot execute anything.
     private func runAutorunIfRequested() {
         let env = ProcessInfo.processInfo.environment
-        guard let id = env["CINDER27_AUTORUN"], !id.isEmpty else { return }
+        guard let id = env["LUM1NA_AUTORUN"], !id.isEmpty else { return }
 
         let marker = Container.appSupport.appendingPathComponent("enable-autorun")
         guard FileManager.default.fileExists(atPath: marker.path) else { return }
@@ -64,7 +64,7 @@ struct RootView: View {
         print("[AUTORUN] \(id)")
         DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
             engine.run(module)
-            if env["CINDER27_AUTORUN_EXIT"] == "1" {
+            if env["LUM1NA_AUTORUN_EXIT"] == "1" {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 6.0) {
                     print("[AUTORUN] exit")
                     exit(0)

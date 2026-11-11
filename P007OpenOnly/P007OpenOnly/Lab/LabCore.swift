@@ -73,7 +73,7 @@ enum LabLogStore {
     static func persist(id: String, title: String, cve: String,
                         outcome: ModuleOutcome, history: [JournalEntry]) -> URL {
         var lines: [String] = []
-        lines.append("=== CINDER \(id) ===")
+        lines.append("=== LAB \(id) ===")
         lines.append("title=\(title)")
         lines.append("cve=\(cve)")
         lines.append("when=\(ISO8601DateFormatter().string(from: Date()))")

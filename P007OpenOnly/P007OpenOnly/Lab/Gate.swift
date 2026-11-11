@@ -39,7 +39,7 @@ enum VersionGate {
             supported = false                      // 27.2+ / 28+ — patched
         }
         // An explicit override exists for research builds where the version string lies.
-        if ProcessInfo.processInfo.environment["CINDER27_FORCE_GATE"] == "1" {
+        if ProcessInfo.processInfo.environment["LUM1NA_FORCE_GATE"] == "1" {
             return .supported(major: v.majorVersion, minor: v.minorVersion, patch: v.patchVersion, build: build)
         }
         return supported
@@ -79,9 +79,9 @@ struct GateView: View {
         .animation(.easeInOut(duration: 0.25), value: entered)
         .onAppear(perform: check)
         .onChange(of: phaseText) { _, _ in
-            // Headless harness: CINDER27_AUTOENTER=1 walks through the gate so tab
+            // Headless harness: LUM1NA_AUTOENTER=1 walks through the gate so tab
             // screenshots and autoruns do not need a tap.
-            if ProcessInfo.processInfo.environment["CINDER27_AUTOENTER"] == "1",
+            if ProcessInfo.processInfo.environment["LUM1NA_AUTOENTER"] == "1",
                !entered, phaseText != "checking" {
                 entered = true
             }

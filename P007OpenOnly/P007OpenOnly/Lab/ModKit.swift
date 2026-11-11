@@ -41,6 +41,10 @@ final class FileBrowser: ObservableObject {
 
     private let fm = FileManager.default
 
+    /// Files > this count render a capped listing instead of a full walk
+    /// (multi-thousand-entry dirs spun the walk until the tab died).
+    static let entryCap = 2000
+
     init(path: String) {
         self.path = Container.normalize(path)
         reload()
@@ -55,7 +59,12 @@ final class FileBrowser: ObservableObject {
         }
         writable = Container.probe(URL(fileURLWithPath: path, isDirectory: true)).canWrite
         do {
-            let names = try fm.contentsOfDirectory(atPath: path)
+            var names = try fm.contentsOfDirectory(atPath: path)
+            var capped = false
+            if names.count > Self.entryCap {
+                names = Array(names.prefix(Self.entryCap).sorted())
+                capped = true
+            }
             var list: [FileItem] = []
             for name in names {
                 let full = (path as NSString).appendingPathComponent(name)
@@ -74,6 +83,7 @@ final class FileBrowser: ObservableObject {
                 return $0.name.localizedStandardCompare($1.name) == .orderedAscending
             }
             error = nil
+            if capped { error = tl("listing capped at ") + "\(Self.entryCap)" }
         } catch {
             items = []
             let code = errno
@@ -118,6 +128,20 @@ final class FileBrowser: ObservableObject {
             let code = errno
             return "\(Container.describe(code))  ·  \(target)"
         }
+    }
+
+    /// v2: create an empty file and hand the path back for immediate editing.
+    func createFile(_ name: String) -> (path: String?, error: String?) {
+        let clamped = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !clamped.isEmpty, !clamped.contains("/") else {
+            return (nil, "invalid name")
+        }
+        let target = (path as NSString).appendingPathComponent(clamped)
+        if !fm.createFile(atPath: target, contents: Data()) {
+            return (nil, "\(Container.describe(errno))  ·  \(target)")
+        }
+        reload()
+        return (target, nil)
     }
 
     @discardableResult
@@ -317,7 +341,9 @@ enum PackageTool {
     /// Whole-file Data(contentsOf:) of a multi-MB IPA jetsams the Files tab — cap at 1.5 MB.
     static func list(_ path: String) -> [PackageEntry] {
         let total = FileLoader.fileSize(at: path)
-        if total > 1_500_000 {
+        // 750 KB: the in-process libarchive parse of a fuzzed zip is exactly the
+        // crash class the lab seeds prove; keep anything bigger in the Archive pane.
+        if total > 750_000 {
             return [PackageEntry(name: "(package \(total) B — too large to list in-app)", size: Int64(total))]
         }
         guard let handle = FileHandle(forReadingAtPath: path) else { return [] }

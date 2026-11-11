@@ -391,7 +391,7 @@ enum GPTPayload {
             entry[0] = 0xA2; entry[1] = 0xA0; entry[2] = 0xD0; entry[3] = 0xEB
             entry[56] = UInt8(i + 1)                   // unique partition GUID byte
             // name field at +56..+128 is 36 UTF-16 code units; declare a long run
-            let name = Array("CINDER27-OVERLONG-PARTITION-NAME".utf16)
+            let name = Array("LUM1NA-OVERLONG-PARTITION-NAME".utf16)
             for (k, unit) in name.enumerated() where 56 + k * 2 + 1 < 128 {
                 entry[56 + k * 2] = UInt8(unit & 0xff)
                 entry[56 + k * 2 + 1] = UInt8((unit >> 8) & 0xff)

@@ -264,7 +264,7 @@ struct FilePreviewView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    if mode == 1 && browser.writable && (text?.count ?? 0) < 24_000 {
+                    if mode == 1 && browser.writable && (text?.count ?? 0) < 48_000 {
                         Button(editing ? t("files.cancel") : t("files.save")) {
                             if editing { save() } else { editing = true; draft = text ?? "" }
                         }.tint(T.ember)
@@ -380,14 +380,17 @@ struct FilePreviewView: View {
                 if PackageTool.isZip(path) { pkg = PackageTool.list(path) }
             default:
                 if FileLoader.kind(of: path) == .image {
-                    image = UIImage(contentsOfFile: path)
-                    if let raw = image, raw.size.width > 800 || raw.size.height > 800 {
-                        let scale = min(800 / raw.size.width, 800 / raw.size.height)
-                        let sz = CGSize(width: raw.size.width * scale, height: raw.size.height * scale)
-                        UIGraphicsBeginImageContextWithOptions(sz, false, 1)
-                        raw.draw(in: CGRect(origin: .zero, size: sz))
-                        image = UIGraphicsGetImageFromCurrentImageContext()
-                        UIGraphicsEndImageContext()
+                    // v2: thumbnail via ImageIO — a full UIImage decode of a
+                    // 12MP screenshot used to jetsam the preview.
+                    if let src = CGImageSourceCreateWithURL(URL(fileURLWithPath: path) as CFURL, nil) {
+                        let opts: [CFString: Any] = [
+                            kCGImageSourceCreateThumbnailFromImageAlways: true,
+                            kCGImageSourceThumbnailMaxPixelSize: 640,
+                            kCGImageSourceCreateThumbnailWithTransform: true,
+                        ]
+                        if let cg = CGImageSourceCreateThumbnailAtIndex(src, 0, opts as CFDictionary) {
+                            image = UIImage(cgImage: cg)
+                        }
                     }
                 }
             }

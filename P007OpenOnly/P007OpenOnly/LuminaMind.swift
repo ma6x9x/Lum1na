@@ -468,7 +468,7 @@ enum LuminaMindTools {
                 lines.append("  \(m.id)  \(m.title)  [\(m.cve)]")
             }
         }
-        lines.append("CINDER MODULES")
+        lines.append("LAB MODULES")
         for m in Catalog.all where !lum.contains(where: { $0.id == m.id }) {
             if q.isEmpty || m.id.lowercased().contains(q) || m.title.lowercased().contains(q) {
                 lines.append("  \(m.id)  \(m.title)  [\(m.cve)]")

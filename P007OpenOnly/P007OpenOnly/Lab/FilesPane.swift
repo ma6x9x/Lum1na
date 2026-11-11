@@ -85,6 +85,8 @@ struct FilesPane: View {
     @State private var jumpPath = ""
     @State private var newFolderShown = false
     @State private var newFolderName = ""
+    @State private var newFileShown = false
+    @State private var newFileName = ""
     @State private var renameTarget: FileItem?
     @State private var renameName = ""
     @State private var preview: FileItem?
@@ -151,6 +153,7 @@ struct FilesPane: View {
                 Menu {
                     Button { jumpShown = true } label: { Label(t("files.jump"), systemImage: "arrow.right.to.line") }
                     Button { newFolderShown = true } label: { Label(t("files.newFolder"), systemImage: "folder.badge.plus") }
+                    Button { newFileShown = true } label: { Label("New file", systemImage: "doc.badge.plus") }
                     Button { showImporter = true } label: { Label("Import files…", systemImage: "square.and.arrow.down") }
                     Divider()
                     Button { bookmarks.add(browser.path); status = tl("✓ 已加入书签") } label: {
@@ -186,6 +189,23 @@ struct FilesPane: View {
                 newFolderName = ""
             }
             Button(t("files.cancel"), role: .cancel) { newFolderName = "" }
+        }
+        .alert("New file", isPresented: $newFileShown) {
+            TextField("name.txt", text: $newFileName)
+            Button(t("common.ok")) {
+                let r = browser.createFile(newFileName)
+                if let p = r.path {
+                    status = "\u{2713} created \(newFileName) — tap to edit"
+                    if let target = browser.items.first(where: { $0.name == (p as NSString).lastPathComponent }) {
+                        preview = target
+                    }
+                    _ = p
+                } else {
+                    status = r.error ?? "create failed"
+                }
+                newFileName = ""
+            }
+            Button(t("files.cancel"), role: .cancel) { newFileName = "" }
         }
         .alert(t("files.rename"), isPresented: Binding(
             get: { renameTarget != nil },
