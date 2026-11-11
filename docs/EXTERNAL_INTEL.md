@@ -166,3 +166,36 @@ only. Borrowed rows (EN summary):
   Law applied: read the live plist first (p116_path), write to a COPY
   (e.g. `...MobileGestalt.lum1na_copy.plist`) via p116_rw_path — never the
   live MG cache.
+
+## filza27.2 + ipadn vendor pull (2026-11-11, ios-xnu-hunt/vendor_intel/*)
+- **git.jbjflab.top/admin/filza27.2 v27.2.0** ("worse_query build", iOS 26.0–27.2):
+  Filza fork over forcequitOS/worse_query + 0xjohnnydev/FilzaSlop, two
+  side-by-side builds (public = browser; develop = a-Shell terminal,
+  apt/dpkg, libssh root/mobile SSH, mount, Erosion WebKit respring).
+  **It is KRW-based**: `sandbox_escape.m` walks proc_ro→ucred→cr_label→
+  sandbox→ext_set, rewrites every extension path to "/" + class to
+  `app-sandbox.read-write`, fills all 16 hash slots, then swaps launchd's
+  ucred into its own proc at self_proc+0x10 for uid 0. Offsets from
+  CrazyMind90's 18.3_sandbox root.m; KRW provider = the vendored
+  `kexploit/kexploit_opa334` ("darksword-kexploit-fun", seo) — **the
+  CS2/socket lane** (inp_list/icmp6filt/ipi_zone/so_usecount — the lab's
+  own ClearSword family), 26.x offset-derivation patterns included
+  (thread t_tro/upcb/ctid/options hex rules), tested iPhone12,8/13,1/15,2/
+  iPad7,11/**14,6 iOS 26.0**.
+  **MCM proof rows (MHA-*, 24A5390f archive) — the P160-EPERM answer:**
+  classes 2 app / 4 ext / 6 VPN / 7 groups / 10 service / 12 system /
+  13 system-GROUP / 15 app-managed; lease flags 0x900000000, enumerate
+  0x100000000, part-write 0x8100000000. Class-12 `com.apple.geod` rides
+  ContainerManagerCommon's built-in lookup-bypass list and part-domain
+  traversal reaches the MobileGestalt Caches (275-byte RW extension proof).
+- **mengangs/ipadn** (GPL-2.0): App Store own-app installer — native on-device
+  install via developer-mode pairing (iOS 27+) or jkcoxson/idevice_pair
+  remote-pairing (17.4–26) + LocalDevVPN. Deployment plumbing, no exploits.
+- **Adoption status:** P164 = our own translation of the MCM census/probe
+  rows (read-only). Queued: p116 v4 fsgetpath inode enumeration (pathleak
+  rewrite — GPL-3, credit Taj C/forcequitOS), P165 post-KRW sandbox-unpatch
+  + launchd-ucred uid0 gated on hasKread (offsets cross-checked against our
+  LabKernelOffsets DB: proc_ro_ucred 0x28, ucred_cr_label 0x78 — matches).
+- Licenses: filza27.2 repo ships no LICENSE (our lab's server); FilzaSlop
+  base is Filza-derived — keep attribution, no wholesale vendoring into
+  the public repo. worse_query/pathleak = GPL family; technique credited.
