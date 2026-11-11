@@ -160,7 +160,7 @@ enum CABPayload {
         cfdata.append(contentsOf: cfdataPayload)
 
         var file = Data()
-        file.append(contentsOf: B.ascii("Cinder"))
+        file.append(contentsOf: B.ascii("Lab"))
         file.append(contentsOf: B.le32(0))                         // size
         file.append(contentsOf: B.le32(0))                         // offset in folder
         file.append(contentsOf: B.le16(0x20 | 0x01))               // attributes: archive

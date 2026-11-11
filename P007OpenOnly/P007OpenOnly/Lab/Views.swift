@@ -244,7 +244,7 @@ struct DashboardView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                Text("Full Cinder log: Documents/cinder_lab_log.txt  ·  per-module Documents/cinder/<id>_log.txt")
+                Text("Full Lab log: Documents/lum1na_lab_log.txt  ·  per-module Documents/lum1na/<id>_log.txt")
                     .font(T.tiny)
                     .foregroundColor(.white.opacity(0.32))
             }

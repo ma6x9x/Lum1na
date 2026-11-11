@@ -115,7 +115,7 @@ enum PDFPayload {
         var cmap = ""
         cmap += "%!PS-Adobe-3.0 Resource-CMap\n"
         cmap += "/CIDInit /ProcSet findresource begin\n12 dict begin begincmap\n"
-        cmap += "/CMapName /Cinder def\n/CMapType 1 def\n/WMode 0 def\n"
+        cmap += "/CMapName /Lab def\n/CMapType 1 def\n/WMode 0 def\n"
         cmap += "1 begincodespacerange\n"
         cmap += "<\(String(repeating: "0", count: 2))> <\(String(repeating: "F", count: max(2, codespaceLength)))>\n"
         cmap += "endcodespacerange\n"
@@ -128,9 +128,9 @@ enum PDFPayload {
         pdf.add(2, "<< /Type /Pages /Kids [3 0 R] /Count 1 >>")
         pdf.add(3, "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>")
         pdf.add(4, "<< /Length 30 >>", B.ascii("BT /F1 12 Tf 10 100 Td <0041> Tj ET"))
-        pdf.add(5, "<< /Type /Font /Subtype /Type0 /BaseFont /Cinder /Encoding 6 0 R /DescendantFonts [7 0 R] >>")
-        pdf.add(6, "<< /Type /CMap /CMapName /Cinder /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> /Length \(cmapBytes.count) >>", cmapBytes)
-        pdf.add(7, "<< /Type /Font /Subtype /CIDFontType2 /BaseFont /Cinder /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> /DW 500 >>")
+        pdf.add(5, "<< /Type /Font /Subtype /Type0 /BaseFont /Lab /Encoding 6 0 R /DescendantFonts [7 0 R] >>")
+        pdf.add(6, "<< /Type /CMap /CMapName /Lab /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> /Length \(cmapBytes.count) >>", cmapBytes)
+        pdf.add(7, "<< /Type /Font /Subtype /CIDFontType2 /BaseFont /Lab /CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> /DW 500 >>")
         return pdf.data()
     }
 }

@@ -733,7 +733,7 @@ struct LogListSheet: View {
         func consider(_ url: URL, label: String) {
             let name = url.lastPathComponent
             let keep = name.hasSuffix("_log.txt") || name == "p007_board.json" || name == "p011_tap_log.txt"
-                || name == "cinder_lab_log.txt" || name.hasSuffix(".json") && name.contains("journal")
+                || name == "lum1na_lab_log.txt" || name.hasSuffix(".json") && name.contains("journal")
             guard keep else { return }
             let rv = try? url.resourceValues(forKeys: [.contentModificationDateKey, .fileSizeKey])
             out.append((label, url.path, Int64(rv?.fileSize ?? 0), rv?.contentModificationDate ?? .distantPast))
@@ -746,13 +746,13 @@ struct LogListSheet: View {
         ) {
             for url in urls { consider(url, label: url.lastPathComponent) }
         }
-        let cinder = docs.appendingPathComponent("cinder", isDirectory: true)
+        let lum1na = docs.appendingPathComponent("lum1na", isDirectory: true)
         if let urls = try? fm.contentsOfDirectory(
-            at: cinder,
+            at: lum1na,
             includingPropertiesForKeys: [.contentModificationDateKey, .fileSizeKey],
             options: [.skipsHiddenFiles]
         ) {
-            for url in urls { consider(url, label: "cinder/\(url.lastPathComponent)") }
+            for url in urls { consider(url, label: "lum1na/\(url.lastPathComponent)") }
         }
         return out.sorted { $0.date > $1.date }
     }

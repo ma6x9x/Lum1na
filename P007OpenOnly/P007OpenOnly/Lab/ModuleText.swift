@@ -414,7 +414,7 @@ enum ModuleText {
         "tool.ipa": Row(
             title: "IPA surgery self-test (rename / inject / prepare for re-sign)",
             summary: """
-            Builds a minimal IPA on the spot (Info.plist plus a real Mach-O) and runs the full modification flow: unpack → change CFBundleIdentifier → inject LC_LOAD_DYLIB → remove LC_CODE_SIGNATURE → repack with the project's own ZIP writer. The output lands in Documents/Cinder27/IPA and can be signed directly.
+            Builds a minimal IPA on the spot (Info.plist plus a real Mach-O) and runs the full modification flow: unpack → change CFBundleIdentifier → inject LC_LOAD_DYLIB → remove LC_CODE_SIGNATURE → repack with the project's own ZIP writer. The output lands in Documents/Lum27/IPA and can be signed directly.
             """,
             notes: """
             This is not a vulnerability, it is proof of the toolchain. It passing means the IPA panel works on your device, not merely on the build machine.

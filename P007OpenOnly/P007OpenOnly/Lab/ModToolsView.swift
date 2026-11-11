@@ -274,7 +274,7 @@ struct HexPane: View {
 
     private func replace() {
         guard let target = target, let data = try? Data(contentsOf: target) else { return }
-        let backup = target.path + ".cinder27.bak"
+        let backup = target.path + ".lum1na27.bak"
         if !FileManager.default.fileExists(atPath: backup) {
             try? FileManager.default.copyItem(atPath: target.path, toPath: backup)
         }

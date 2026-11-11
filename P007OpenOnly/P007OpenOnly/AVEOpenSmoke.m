@@ -12781,7 +12781,7 @@ static void p005_try_mementry(NSMutableString *out, int logfd, mach_port_t selft
     [out appendFormat:@"map_jit_reachable=%d total_kptr_hits=%d\n", map_jit_ok, total_kptr_hits];
     if (total_kptr_hits == 0) {
         if (!map_jit_ok) {
-            [out appendString:@"0 kptr + no MAP_JIT: NOT a 64709 test. Grant JIT (StikDebug/LC debugger lane) and re-tap.\n"];
+            [out appendString:@"0 kptr + no MAP_JIT: NOT a 64709 test. Grant JIT (an LC debugger lane) and re-tap.\n"];
             [out appendString:@"0 hits on plain 0x41 pages is expected. Inconclusive, not neg control.\n"];
         } else {
             [out appendString:@"MAP_JIT reachable but 0 kptr: interesting — paste full log.\n"];

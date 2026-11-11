@@ -91,7 +91,7 @@ enum Container {
         Standard(id: "tmp", name: "tmp", base: .tmp),
         Standard(id: "nocloud", name: "NoCloud", base: .appSupport, suffix: "NoCloud"),
         Standard(id: "webkit", name: "WebKit", base: .library, suffix: "WebKit"),
-        Standard(id: "cinder27", name: "Lum1naDebugger", base: .appSupport, suffix: "Lum1naDebugger"),
+        Standard(id: "lum1na27", name: "Lum1naDebugger", base: .appSupport, suffix: "Lum1naDebugger"),
         Standard(id: "work", name: tl("工作区"), base: .appSupport, suffix: "Lum1naDebugger/work"),
         Standard(id: "backups", name: tl("备份"), base: .documents, suffix: "Lum1naDebugger/Backups"),
         Standard(id: "ipa", name: tl("IPA 产出"), base: .documents, suffix: "Lum1naDebugger/IPA"),
@@ -185,8 +185,8 @@ enum Container {
             result.canCreate = true
         }
 
-        let probeFile = url.appendingPathComponent(".cinder27-probe-\(UInt32.random(in: 0...UInt32.max))")
-        let payload = Data("cinder27-write-probe".utf8)
+        let probeFile = url.appendingPathComponent(".lum1na27-probe-\(UInt32.random(in: 0...UInt32.max))")
+        let payload = Data("lum1na27-write-probe".utf8)
 
         do {
             try payload.write(to: probeFile, options: .atomic)
@@ -259,14 +259,14 @@ enum Container {
         for standard in standards {
             let url = resolve(standard)
             guard let names = try? fm.contentsOfDirectory(atPath: url.path) else { continue }
-            for name in names where name.hasPrefix(".cinder27-probe-") {
+            for name in names where name.hasPrefix(".lum1na27-probe-") {
                 try? fm.removeItem(at: url.appendingPathComponent(name))
                 actions.append(tl("清理残留探针 ") + "\(name)")
             }
         }
 
         // 4. make sure the work directory is not carrying a half-written journal
-        let journal = appSupport.appendingPathComponent("cinder27-journal.json")
+        let journal = appSupport.appendingPathComponent("lum1na27-journal.json")
         if let data = try? Data(contentsOf: journal),
            (try? JSONSerialization.jsonObject(with: data)) == nil {
             try? fm.removeItem(at: journal)

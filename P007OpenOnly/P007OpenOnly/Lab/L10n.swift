@@ -7,7 +7,7 @@ import SwiftUI
 // invocation with no Xcode project, so resources would have to be copied by hand and
 // kept in sync. One table is one source of truth.
 //
-// English only. Device language and the saved cinder27.lang override are ignored,
+// English only. Device language and the saved lum1na27.lang override are ignored,
 // including a phone set to zh-Hans. The Chinese column stays in the table as source
 // text and is never shown.
 
@@ -49,7 +49,7 @@ final class L10n: ObservableObject {
     func set(_: Lang) {
         override = .en
         lang = .en
-        UserDefaults.standard.set(Lang.en.rawValue, forKey: "cinder27.lang")
+        UserDefaults.standard.set(Lang.en.rawValue, forKey: "lum1na27.lang")
         objectWillChange.send()
     }
 

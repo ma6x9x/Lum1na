@@ -300,7 +300,7 @@ enum LuminaMindTools {
         fn("run_tap", "Run a Lum1na probe/primitive by catalog id (p149, p114, ident, krw, …). Honor parked remaining-fire. One TAP per force-quit. Panic-possible probes may kill the process.",
            ["id": str("TAP id such as p149, p114, ident, krw, board")],
            ["id"]),
-        fn("list_probes", "List Lum1na and Cinder catalog ids. Optional substring filter.",
+        fn("list_probes", "List Lum1na and Lab catalog ids. Optional substring filter.",
            ["query": str("optional substring, e.g. AVE or p14")],
            []),
         fn("read_log", "Read a Documents log file (p149_t8150_krw_log.txt, p007_board.json, p011_tap_log.txt, …).",
@@ -333,8 +333,8 @@ enum LuminaMindTools {
         fn("va_law", "Apply flat-VA law: fileoff = (va & 0xFFFFFFF) - 0x7004000.",
            ["va": str("kernel/kext VA hex, e.g. 0xfffffe0008790cec")],
            ["va"]),
-        fn("run_cinder", "Run a Cinder catalog module by id (cg.shading, kern.ipc, kern.decmpfs, …).",
-           ["id": str("Cinder module id")],
+        fn("run_lab", "Run a Lab catalog module by id (cg.shading, kern.ipc, kern.decmpfs, …).",
+           ["id": str("Lab module id")],
            ["id"]),
         fn("chain_status", "Summarize Lum1na 17 KRW chain stages and last TAP.",
            [:], []),
@@ -409,8 +409,8 @@ enum LuminaMindTools {
             return P007Board.shared().kreadSignal
         case "va_law":
             return vaLaw(args["va"] ?? "")
-        case "run_cinder":
-            return runCinder(args["id"] ?? "", engine: engine)
+        case "run_lab":
+            return runLab(args["id"] ?? "", engine: engine)
         case "chain_status":
             return chainStatus()
         case "list_hour_logs":
@@ -604,9 +604,9 @@ enum LuminaMindTools {
                       v, fileoff, fileoff)
     }
 
-    private static func runCinder(_ id: String, engine: LabEngine?) -> String {
+    private static func runLab(_ id: String, engine: LabEngine?) -> String {
         let tid = id.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let module = Catalog.byID[tid] else { return "unknown Cinder id \(tid)" }
+        guard let module = Catalog.byID[tid] else { return "unknown Lab id \(tid)" }
         guard let engine else {
             // synchronous fallback
             let ctx = RunContext(workdir: Container.work, journal: GuardJournal())
@@ -622,7 +622,7 @@ enum LuminaMindTools {
             }
         }
         engine.run(module)
-        return "queued Cinder module \(tid) (\(module.title)). Watch Lab / System log."
+        return "queued Lab module \(tid) (\(module.title)). Watch Lab / System log."
     }
 
     private static func chainStatus() -> String {
@@ -1065,11 +1065,11 @@ final class LuminaMindAgent: ObservableObject {
         if let engine {
             let ids = engine.outcomes.keys.sorted()
             if !ids.isEmpty {
-                lines.append("Cinder last: " + ids.suffix(8).joined(separator: ", "))
+                lines.append("Lab last: " + ids.suffix(8).joined(separator: ", "))
             }
         }
         lines.append("")
-        lines.append("SUGGESTION: Ident → KERNEL (P139 harvest, then P044 N=192 on 23F77; harvest-only on 23H30). Skip P099/P073. Copy Lab/Cinder logs from the card or Console folder.")
+        lines.append("SUGGESTION: Ident → KERNEL (P139 harvest, then P044 N=192 on 23F77; harvest-only on 23H30). Skip P099/P073. Copy Lab/Lab logs from the card or Console folder.")
         lines.append("Mind gear: Ollama llama3.1:8b (local/free), deepseek-r1:1.5b (local/free), or Grok (xAI) with your key.")
         return lines.joined(separator: "\n")
     }

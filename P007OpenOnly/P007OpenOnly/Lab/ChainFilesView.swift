@@ -410,7 +410,7 @@ struct FilePreviewView: View {
                 return
             }
         }
-        let backup = item.path + ".cinder27.bak"
+        let backup = item.path + ".lum1na27.bak"
         if !FileManager.default.fileExists(atPath: backup) {
             try? FileManager.default.copyItem(atPath: item.path, toPath: backup)
         }

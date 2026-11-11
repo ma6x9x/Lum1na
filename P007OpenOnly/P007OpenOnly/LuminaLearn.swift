@@ -3,7 +3,7 @@
 //
 //  KernelLab 0.3.2 (github.com/ma6x9x/KernelLab @ 435a7bc) names the public
 //  ladder sandbox → leak → race → krw → sptm as map/emu labels. This file is
-//  the device half: every TAP and every Cinder module is a learn.<id> domain
+//  the device half: every TAP and every Lab module is a learn.<id> domain
 //  in Documents/lab_bandit.json, plus a per-SKU overlay in lab_promote.json.
 //
 //  Honest bar (NOTES/004_lum1na_parity.md):
@@ -151,7 +151,7 @@ enum LuminaLearn {
         return log + footer(id: id, verdict: v, attr: "")
     }
 
-    static func finishCinder(id: String, headline: String, detail: String, failed: Bool, died: Bool) -> String {
+    static func finishLab(id: String, headline: String, detail: String, failed: Bool, died: Bool) -> String {
         var log = headline + "\n" + detail
         if died { log += "\nprocessDied" }
         if failed { log += "\nfailed" }

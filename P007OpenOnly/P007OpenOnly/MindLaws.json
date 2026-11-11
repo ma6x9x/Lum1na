@@ -54,8 +54,8 @@
       "text": "One TAP per force-quit. Reboot after panic-possible. Do not stack P044, CS2, P149, LightSword in one process. Game Mode eligibility is LSSupportsGameMode + GCSupportsGameMode; overlay is Control Center."
     },
     {
-      "id": "law.cinder.probe",
-      "title": "Cinder vs public SKU",
+      "id": "law.lum1na.probe",
+      "title": "Lab vs public SKU",
       "text": "Probe (Lum1na-Debugger) MAY fire in-process ImageIO/CG/font modules. Public Lum1na must SKIP wrong primitives. 86950 PARK (P076/P131). Overlaps (p125 vs kern.ipc, p126 vs kern.decmpfs, p112 vs cg.shading) fire separately under isolation."
     },
     {
@@ -96,7 +96,7 @@
     {
       "id": "law.promote",
       "title": "Promotion lattice",
-      "text": "Every TAP and Cinder module is learn.<id> in Documents/lab_bandit.json plus lab_promote.json. Ladder: panic-class → survive-class (knob clamp, encode-first, isolation) → leak → write (PIPE-HIT / occupancy HIT) → kread (kread32==0xfeedfacf) → physrw/sptm HOLD. Learning down-ranks panic knobs and stores survivor knobs (16462, p147 cycles, p148 gop[0,8], cg.shading.sweep last R). It cannot skip kread32 and will not remaining-fire hop-1/163-sel/TrollRestore. GuardJournal armed-not-disarmed is the death-oracle. promote_apply never overwrites 16463."
+      "text": "Every TAP and Lab module is learn.<id> in Documents/lab_bandit.json plus lab_promote.json. Ladder: panic-class → survive-class (knob clamp, encode-first, isolation) → leak → write (PIPE-HIT / occupancy HIT) → kread (kread32==0xfeedfacf) → physrw/sptm HOLD. Learning down-ranks panic knobs and stores survivor knobs (16462, p147 cycles, p148 gop[0,8], cg.shading.sweep last R). It cannot skip kread32 and will not remaining-fire hop-1/163-sel/TrollRestore. GuardJournal armed-not-disarmed is the death-oracle. promote_apply never overwrites 16463."
     }
   ]
 }

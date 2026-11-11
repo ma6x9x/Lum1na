@@ -585,7 +585,7 @@ ctx.arm("cal.unzip", "probe")
                 // prove libarchive itself accepts a traversal name, so the containment check
                 // is what has to stop it
                 var zip = ZipWriter()
-                zip.add("../../cinder27_traversal_probe.txt", Data("cinder27".utf8))
+                zip.add("../../lum1na27_traversal_probe.txt", Data("lum1na27".utf8))
                 let evil = zip.build()
                 let probeDir = ctx.workdir.appendingPathComponent("traversal", isDirectory: true)
                 let result = Runners.Archive.extractAll(evil, to: probeDir)

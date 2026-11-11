@@ -111,7 +111,7 @@ struct ModuleDetailView: View {
                                     Text("\(outcome.elapsedMs) ms").font(T.monoSm).foregroundColor(.white.opacity(0.3))
                                     Button {
                                         LuminaCopyBus.shared.copy(
-                                            CinderLogStore.readFull(id: module.id)
+                                            LabLogStore.readFull(id: module.id)
                                             ?? outcome.copyBlock(moduleId: module.id),
                                             label: "Full log copied")
                                     } label: {
@@ -141,7 +141,7 @@ struct ModuleDetailView: View {
                                         .lineLimit(4)
                                         .textSelection(.enabled)
                                 }
-                                Text("Full log: Documents/cinder/\(CinderLogStore.safeId(module.id))_log.txt  ·  Console → folder")
+                                Text("Full log: Documents/lum1na/\(LabLogStore.safeId(module.id))_log.txt  ·  Console → folder")
                                     .font(T.tiny)
                                     .foregroundColor(.white.opacity(0.35))
                             }

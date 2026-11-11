@@ -50,15 +50,15 @@ struct ModuleOutcome {
     }
 }
 
-/// Documents/cinder/<id>_log.txt + Documents/cinder_lab_log.txt. Full text for Copy.
-enum CinderLogStore {
+/// Documents/lum1na/<id>_log.txt + Documents/lum1na_lab_log.txt. Full text for Copy.
+enum LabLogStore {
     static var dir: URL {
-        let u = Container.documents.appendingPathComponent("cinder", isDirectory: true)
+        let u = Container.documents.appendingPathComponent("lum1na", isDirectory: true)
         try? FileManager.default.createDirectory(at: u, withIntermediateDirectories: true)
         return u
     }
     static var labLog: URL {
-        Container.documents.appendingPathComponent("cinder_lab_log.txt")
+        Container.documents.appendingPathComponent("lum1na_lab_log.txt")
     }
 
     static func safeId(_ id: String) -> String {
@@ -129,12 +129,12 @@ final class RunContext {
         let bundle = Bundle.main
         let urls: [URL?] = [
             bundle.url(forResource: name, withExtension: nil),
-            bundle.url(forResource: name, withExtension: nil, subdirectory: "CinderSeeds"),
+            bundle.url(forResource: name, withExtension: nil, subdirectory: "LabSeeds"),
             bundle.url(forResource: (name as NSString).deletingPathExtension,
                        withExtension: (name as NSString).pathExtension),
             bundle.url(forResource: (name as NSString).deletingPathExtension,
                        withExtension: (name as NSString).pathExtension,
-                       subdirectory: "CinderSeeds")
+                       subdirectory: "LabSeeds")
         ]
         for url in urls {
             if let url, let data = try? Data(contentsOf: url) { return data }
@@ -204,11 +204,11 @@ final class LabEngine: ObservableObject {
             self.logLines.append(stamped)
             if self.logLines.count > 400 { self.logLines.removeFirst(self.logLines.count - 400) }
         }
-        CinderLogStore.append(stamped + "\n", to: CinderLogStore.labLog)
+        LabLogStore.append(stamped + "\n", to: LabLogStore.labLog)
     }
 
     func copyAllResults() -> String {
-        var parts = [CinderLogStore.copyAll()]
+        var parts = [LabLogStore.copyAll()]
         let ids = outcomes.keys.sorted()
         if !ids.isEmpty {
             parts.append("=== IN-MEMORY OUTCOMES \(ids.count) ===")
@@ -235,7 +235,7 @@ final class LabEngine: ObservableObject {
                 out.elapsedMs = Int(Date().timeIntervalSince(started) * 1000)
                 let footer = LuminaLearn.finish(module.id, log: out.headline + "\n" + out.detail)
                 let hist = ctx.journal.history(for: module.id)
-                let logURL = CinderLogStore.persist(id: module.id, title: module.title,
+                let logURL = LabLogStore.persist(id: module.id, title: module.title,
                                                     cve: module.cve, outcome: out, history: hist)
                 DispatchQueue.main.async {
                     self.outcomes[module.id] = out
@@ -254,7 +254,7 @@ final class LabEngine: ObservableObject {
                 out.elapsedMs = Int(Date().timeIntervalSince(started) * 1000)
                 _ = LuminaLearn.finish(module.id, log: "failed\n" + message)
                 let hist = ctx.journal.history(for: module.id)
-                _ = CinderLogStore.persist(id: module.id, title: module.title,
+                _ = LabLogStore.persist(id: module.id, title: module.title,
                                            cve: module.cve, outcome: out, history: hist)
                 DispatchQueue.main.async {
                     self.outcomes[module.id] = out
@@ -305,7 +305,7 @@ extension LabEngine {
             out.elapsedMs = Int(Date().timeIntervalSince(started) * 1000)
             let finished = out
             let hist = ctx.journal.history(for: module.id)
-            _ = CinderLogStore.persist(id: module.id, title: module.title,
+            _ = LabLogStore.persist(id: module.id, title: module.title,
                                        cve: module.cve, outcome: finished, history: hist)
             let next = index + 1
             DispatchQueue.main.async {

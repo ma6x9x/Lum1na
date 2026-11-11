@@ -171,7 +171,7 @@ ctx.arm("cm.fdleak", "handshake + vend")
                 lines.append("")
                 lines.append(tl("— 存在性预言机 —"))
                 for path in [FdLeak.readableDomain,
-                             FdLeak.readableDomain + "/cinder27_no_such_file"] {
+                             FdLeak.readableDomain + "/lum1na27_no_such_file"] {
                     let e = session.probeExistence(path)
                     let verdict = e.code == 0 ? tl("可开") :
                         (e.code == FdLeak.errAccessDenied ? tl("存在但被拒 (-12203)") :
@@ -230,8 +230,8 @@ ctx.arm("sbx.toctou", "swap read")
                     throw LabError(message: tl("sandbox_extension_issue_file / consume 无法解析"))
                 }
 
-                let link = ctx.workdir.appendingPathComponent("cinder27_link")
-                let decoy = ctx.workdir.appendingPathComponent("cinder27_decoy")
+                let link = ctx.workdir.appendingPathComponent("lum1na27_link")
+                let decoy = ctx.workdir.appendingPathComponent("lum1na27_decoy")
 
                 var bypassed = 0
                 var noSandbox = 0

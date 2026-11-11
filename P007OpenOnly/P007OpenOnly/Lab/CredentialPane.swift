@@ -4,7 +4,7 @@ import UIKit
 
 // MARK: - Signing credentials pane
 //
-// LiveContainer / StikDebug-style import + selection, scoped honestly: the
+// file-manager-style import + selection, scoped honestly: the
 // files are for signing or installing another IPA. The top card shows this
 // process's real entitlements, so nobody can mistake a file in Documents for
 // an app group on the running signature.

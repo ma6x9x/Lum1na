@@ -1,5 +1,5 @@
 //
-//  LuminaCatalog.swift — Lum1na TAP ids as Cinder ExploitModules.
+//  LuminaCatalog.swift — Lum1na TAP ids as Lab ExploitModules.
 //  Lab catalog run closures call LuminaTAP.execute so Console and Lab share one dispatcher.
 //
 
@@ -148,8 +148,8 @@ extension Catalog {
                 "P119. T020 STALE-UPL port (new-build reopen of the wire×replace lane): stage0 calibrate → stage1 re-ordered race (detach-idle → wirer commit → replace) → stage2 staging oracle (paints 0x41/0x11/0x43 vs FOREIGN) → stage3 reclaim-spray 0xE0 read-through. PANIC-POSSIBLE — one tap…"),
             lum("p121", "P121. iogpu_close × merge REOPEN (new build vs the P040-ABI): create(sel6)/destroy(sel7) calibra", "—", "Lum1na TAP", .uaf, .kernel, 2,
                 "P121. iogpu_close × merge REOPEN (new build vs the P040-ABI): create(sel6)/destroy(sel7) calibrate on THIS device, then the close-vs-merge race (destroy ping-pong × Metal blit commits, 10s). PANIC-POSSIBLE"),
-            lum("p125", "P125. kern.ipc REQUEST-TABLE race (CVE-2026-112507 port, Cinder27): 4-thread mach-namespace allo", "CVE-2026-112507", "Lum1na TAP", .uaf, .kernel, 2,
-                "P125. kern.ipc REQUEST-TABLE race (CVE-2026-112507 port, Cinder27): 4-thread mach-namespace alloc/notify/teardown interleave, bounded 5s/6000; 27.2 ships the fix = pre-fix live on 26.5/27.0; refused-notifications = the stale-index candidate signal. PANIC-POSSIBLE"),
+            lum("p125", "P125. kern.ipc REQUEST-TABLE race (CVE-2026-112507 port, Lum27): 4-thread mach-namespace allo", "CVE-2026-112507", "Lum1na TAP", .uaf, .kernel, 2,
+                "P125. kern.ipc REQUEST-TABLE race (CVE-2026-112507 port, Lum27): 4-thread mach-namespace alloc/notify/teardown interleave, bounded 5s/6000; 27.2 ships the fix = pre-fix live on 26.5/27.0; refused-notifications = the stale-index candidate signal. PANIC-POSSIBLE"),
             lum("p126", "P126. decmpfs KERNEL HEAP DISCLOSURE (CVE-2026-113910 port): crafted com.apple.decmpfs chunked-z", "CVE-2026-113910", "Lum1na TAP", .probe, .kernel, 2,
                 "P126. decmpfs KERNEL HEAP DISCLOSURE (CVE-2026-113910 port): crafted com.apple.decmpfs chunked-zlib xattr under-produces vs its chunk table; read-back scan for kernel pointers (>= 0xFFFFFFE000000000). READ-ONLY; hits = a kernel-content READ from a free app (the read prong rece…"),
             lum("p131", "P131. QUICKLOOK DETOUR (calif chain stage 2): the 86950 trigger PDF through the quicklookd hando", "—", "Lum1na TAP", .probe, .inProcess, 2,

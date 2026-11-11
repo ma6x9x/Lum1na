@@ -158,7 +158,7 @@ struct GateView: View {
                             .font(T.body)
                             .foregroundColor(.white.opacity(0.62))
                             .fixedSize(horizontal: false, vertical: true)
-                        Text("27.2+ patched the Cinder 27.2-gate set. Hunt 26.5 / 17 27.0 remain the primary SKUs. Research tools, filesystem, Console, and Mind still work.")
+                        Text("27.2+ patched the Lab 27.2-gate set. Hunt 26.5 / 17 27.0 remain the primary SKUs. Research tools, filesystem, Console, and Mind still work.")
                             .font(T.body)
                             .foregroundColor(T.warn)
                             .fixedSize(horizontal: false, vertical: true)

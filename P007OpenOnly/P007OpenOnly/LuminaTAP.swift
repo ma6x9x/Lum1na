@@ -1,6 +1,6 @@
 //
 //  LuminaTAP.swift — single dispatcher for every Lum1na-Debug probe id.
-//  Classic Console and the Cinder Lab catalog both call execute(_:).
+//  Classic Console and the Lab Lab catalog both call execute(_:).
 //
 
 import Foundation

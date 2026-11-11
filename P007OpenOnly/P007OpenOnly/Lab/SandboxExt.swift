@@ -116,7 +116,7 @@ enum SandboxExtension {
         }
 
         // 1. decoy file inside the sandbox + symlink pointing at it
-        try? "cinder27-decoy".write(to: decoy, atomically: true, encoding: .utf8)
+        try? "lum1na27-decoy".write(to: decoy, atomically: true, encoding: .utf8)
         unlink(link.path)
         guard symlink(decoy.path, link.path) == 0 else {
             out.errno = errno

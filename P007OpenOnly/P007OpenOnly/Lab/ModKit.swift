@@ -213,7 +213,7 @@ enum FileLoader {
         return String(data: data, encoding: .utf8) ?? String(data: data, encoding: .ascii)
     }
 
-    /// Last `maxBytes` of a TAP / Cinder log. Never load the whole file into the view.
+    /// Last `maxBytes` of a TAP / Lab log. Never load the whole file into the view.
     static func tail(at path: String, maxBytes: Int = 65_536) -> String? {
         guard let handle = FileHandle(forReadingAtPath: path) else { return nil }
         defer { try? handle.close() }

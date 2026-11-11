@@ -446,7 +446,7 @@ enum Runners {
         wav += B.ascii("data") + B.le32(UInt32(frames * 2))
         wav += [UInt8](repeating: 0, count: frames * 2)
 
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("cinder_haptic.wav")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("lum1na_haptic.wav")
         try? Data(wav).write(to: url)
 
         var resourceID: CHHapticAudioResourceID = 0

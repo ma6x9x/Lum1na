@@ -181,7 +181,7 @@ struct RigSettingsView: View {
                 }
 
                 Section("License note") {
-                    Text("Pairing-console layout adapted from StikDebug (AGPL-3.0). Keep this distribution's sources open under a compatible license.")
+                    Text("Pairing-console layout is our own implementation.")
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }

@@ -83,25 +83,69 @@ enum AppCensus {
     }
 }
 
-// MARK: - Process list (sysctl)
+// MARK: - Process list (sysctl + libproc fallbacks, v2)
+//
+// The stock app sandbox denies sysctl(KERN_PROC, ALL) on current builds
+// (EPERM before the kernel node runs), so v2 no longer swallows that:
+// it records what happened, falls back to libproc (proc_listpids via
+// dlsym — no header dependency), and resolves each pid's path with
+// proc_pidpath (also dlsym'd). Pids whose path cannot be resolved still
+// appear with the kinfo/comm name. Deputy pids (the LaunchDaemon-backed
+// ANE/ML family in docs/DAEMONS_17_24A435.md) are flagged — they feed
+// the P109 pid-borrow oracle; the flag is a name heuristic only, the
+// kernel's kr decides entitlement truth.
 
-struct ProcInfo: Identifiable {
+struct ProcInfo: Identifiable, Hashable {
     var id: Int32 { pid }
     let pid: Int32
     let ppid: Int32
     let uid: UInt32
     let name: String
-    let command: String
+    let path: String
+    let deputy: Bool
+    let source: String   // "sysctl" / "libproc"
 }
 
 enum ProcList {
+    static private(set) var status = ""
+
+    /// The pid-borrow candidate families (LaunchDaemon-backed, 24A435 dump).
+    static let deputyNames: [String] = [
+        "aned", "nesessionmanager", "mlruntimed", "mlhostd", "modelmanagerd",
+        "modelcatalogd", "siriinferenced", "siriknowledged", "corespeechd",
+        "photoanalysisd", "mediaanalysisd", "generativeexperiencesd",
+        "intelligenceplatformd", "intelligenceflowd", "visualintelligenced",
+        "videocodecd", "mobilegestalt", "sirittsd", "speechmodeltrainingd",
+        "assistantd", "sensingpredictd", "intelligencetasksd", "centaurid",
+    ]
+
     static func snapshot() -> [ProcInfo] {
+        var out = viaSysctl()
+        if !out.isEmpty {
+            status = "sysctl ok (\(out.count) pids)"
+            return out
+        }
+        let lib = viaLibproc()
+        if !lib.isEmpty {
+            status = "sysctl denied → libproc ok (\(lib.count) pids)"
+            return lib
+        }
+        status = "sysctl denied (errno \(errno)) and libproc empty — enumeration blocked, use pasteboard p151_pid or a deputy name"
+        return []
+    }
+
+    private static func viaSysctl() -> [ProcInfo] {
         var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_ALL, 0]
         var size = 0
-        guard sysctl(&mib, 4, nil, &size, nil, 0) == 0, size > 0 else { return [] }
+        guard sysctl(&mib, 4, nil, &size, nil, 0) == 0, size > 0 else {
+            status = "sysctl size probe failed errno=\(errno)"
+            return []
+        }
         var buffer = [UInt8](repeating: 0, count: size)
-        guard sysctl(&mib, 4, &buffer, &size, nil, 0) == 0 else { return [] }
-
+        guard sysctl(&mib, 4, &buffer, &size, nil, 0) == 0 else {
+            status = "sysctl read failed errno=\(errno)"
+            return []
+        }
         let count = size / MemoryLayout<kinfo_proc>.stride
         return buffer.withUnsafeBytes { raw -> [ProcInfo] in
             guard let base = raw.baseAddress else { return [] }
@@ -119,10 +163,79 @@ enum ProcList {
                                     ppid: kp.kp_eproc.e_ppid,
                                     uid: kp.kp_eproc.e_ucred.cr_uid,
                                     name: name,
-                                    command: name))
+                                    path: "",
+                                    deputy: isDeputy(name),
+                                    source: "sysctl"))
             }
             return out.sorted { $0.pid < $1.pid }
         }
+    }
+
+    private static func viaLibproc() -> [ProcInfo] {
+        typealias listpidsFn = @convention(c) (UInt32, UInt32, UnsafeMutableRawPointer?, Int32) -> Int32
+        typealias pidpathFn = @convention(c) (Int32, UnsafeMutableRawPointer?, UInt32) -> Int32
+        guard let h = dlopen(nil, RTLD_LAZY) else { return [] }
+        guard let lp = dlsym(h, "proc_listpids") else { return [] }
+        guard let pp = dlsym(h, "proc_pidpath") else { return [] }
+        let listpids = unsafeBitCast(lp, to: listpidsFn.self)
+        let pidpath = unsafeBitCast(pp, to: pidpathFn.self)
+        let PROC_ALL_PIDS: UInt32 = 1
+        let PROC_INFO_ALL: UInt32 = 0
+        var size = listpids(PROC_ALL_PIDS, PROC_INFO_ALL, nil, 0)
+        if size <= 0 {
+            status = "libproc size probe failed errno=\(errno)"
+            return []
+        }
+        var buf = [Int32](repeating: 0, count: Int(size) / 4 + 1)
+        let got = listpids(PROC_ALL_PIDS, PROC_INFO_ALL, &buf, Int32(buf.count * 4))
+        if got <= 0 {
+            status = "libproc list failed errno=\(errno)"
+            return []
+        }
+        var out: [ProcInfo] = []
+        for i in 0..<(got / 4) {
+            let pid = buf[i]
+            if pid <= 0 { continue }
+            var pathBuf = [CChar](repeating: 0, count: 4096)
+            let n = pidpath(pid, &pathBuf, 4096)
+            var path = ""
+            if n > 0 {
+                path = String(cString: pathBuf)
+            }
+            let name = path.isEmpty ? "" : (path as NSString).lastPathComponent
+            out.append(ProcInfo(pid: pid,
+                                ppid: 0,
+                                uid: 0,   // libproc path doesn't carry uid; pane shows —
+                                name: name.isEmpty ? "(\(pid))" : name,
+                                path: path,
+                                deputy: isDeputy(name),
+                                source: "libproc"))
+        }
+        return out.sorted { $0.pid < $1.pid }
+    }
+
+    private static func isDeputy(_ name: String) -> Bool {
+        let n = name.lowercased()
+        return deputyNames.contains { n.contains($0) }
+    }
+
+    /// Write the census to Documents/p109_pid_census.txt for the P109 build.
+    static func exportCensus(_ procs: [ProcInfo]) -> String? {
+        guard !procs.isEmpty else { return nil }
+        let dirs = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)
+        guard let docs = dirs.first else { return nil }
+        var text = "# pid census (\(procs.count) pids, \(procs.first?.source ?? "?"))" +
+                   " — deputy rows feed the P109 Stage-B request (+0x180). kr oracle decides.\n"
+        for p in procs {
+            let mark = p.deputy ? " *" : ""
+            let path = p.path.isEmpty ? "-" : p.path
+            text += "\(p.pid)\t\(p.uid)\t\(p.name)\t\(path)\(mark)\n"
+        }
+        let url = URL(fileURLWithPath: docs).appendingPathComponent("p109_pid_census.txt")
+        do {
+            try text.write(to: url, atomically: true, encoding: .utf8)
+            return url.path
+        } catch { return nil }
     }
 }
 
@@ -134,8 +247,11 @@ enum LaunchCensus {
         let path: String
         let label: String
         let program: String
+        let args: [String]
         let runAtLoad: Bool
         let keepAlive: Bool
+        let keepAliveDict: Bool
+        let envVars: Int
     }
 
     static func daemons() -> [Daemon] {
@@ -151,14 +267,40 @@ enum LaunchCensus {
                     continue
                 }
                 let args = obj["ProgramArguments"] as? [String] ?? []
+                let keep = obj["KeepAlive"]
+                let env = obj["EnvironmentVariables"] as? [String: Any]
                 out.append(Daemon(path: path,
                                   label: obj["Label"] as? String ?? name,
                                   program: obj["Program"] as? String ?? args.first ?? "",
+                                  args: args,
                                   runAtLoad: (obj["RunAtLoad"] as? Bool) ?? false,
-                                  keepAlive: (obj["KeepAlive"] as? Bool) ?? false))
+                                  keepAlive: (keep as? Bool) ?? false,
+                                  keepAliveDict: keep is [String: Any],
+                                  envVars: env?.count ?? 0))
             }
         }
         return out
+    }
+
+    /// Write label/program/args/policy per daemon to Documents/launchd_detail.txt —
+    /// the program paths feed the binary inspector (daemon entitlement map).
+    static func exportDetail(_ daemons: [Daemon]) -> String? {
+        guard !daemons.isEmpty else { return nil }
+        let dirs = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)
+        guard let docs = dirs.first else { return nil }
+        var text = "# launchd detail (\(daemons.count) plists) \u{2014} program paths feed the binary inspector\n"
+        for d in daemons.sorted(by: { $0.label.caseInsensitiveCompare($1.label) == .orderedAscending }) {
+            text += "[\(d.label)]\n\(d.path)\n"
+            if !d.program.isEmpty { text += "  program: \(d.program)\n" }
+            if !d.args.isEmpty { text += "  args: \(d.args.joined(separator: " "))\n" }
+            if d.keepAlive { text += "  keepAlive: true\n" }
+            if d.keepAliveDict { text += "  keepAlive: {conditional}\n" }
+            if d.envVars > 0 { text += "  env: \(d.envVars) var(s)\n" }
+            text += "\n"
+        }
+        let url = URL(fileURLWithPath: docs).appendingPathComponent("launchd_detail.txt")
+        do { try text.write(to: url, atomically: true, encoding: .utf8); return url.path }
+        catch { return nil }
     }
 }
 
@@ -246,6 +388,23 @@ enum CrashLogs {
             }
         }
         return out.sorted { ($0.date ?? .distantPast) > ($1.date ?? .distantPast) }
+    }
+
+    /// Write the crash index (path / process / exception) to Documents/crash_index.txt —
+    /// each path line is a p116_dump_path.txt candidate for a full on-device .ips pull.
+    static func exportIndex(_ reports: [CrashReport]) -> String? {
+        guard !reports.isEmpty else { return nil }
+        let dirs = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)
+        guard let docs = dirs.first else { return nil }
+        var text = "# crash index (\(reports.count) reachable reports) \u{2014} paths are p116_dump_path.txt candidates\n"
+        for r in reports {
+            let exc = r.exception.isEmpty ? "-" : r.exception
+            let proc = r.process.isEmpty ? r.name : r.process
+            text += "\(r.path)\n  \(proc) | \(exc) | \(r.size) B\n"
+        }
+        let url = URL(fileURLWithPath: docs).appendingPathComponent("crash_index.txt")
+        do { try text.write(to: url, atomically: true, encoding: .utf8); return url.path }
+        catch { return nil }
     }
 
     private static func parse(_ data: Data) -> (process: String, exception: String, fault: String, frames: [String])? {
@@ -379,7 +538,34 @@ enum MachOInspector {
         info.cryptID = header.cryptID
         info.linkedLibraries = header.libraries
         info.rpaths = header.rpaths
+        info.entitlements = entitlementKeys(data)
         return info
+    }
+
+    /// v2: extract the embedded entitlements plist from the code-signature blob.
+    /// We scan for CSMAGIC_ENTITLEMENTS (0xfade7171) — the blob header is
+    /// magic/length, the body is XML plist text. Keys only; values are the
+    /// device's private data and are NOT reported.
+    static func entitlementKeys(_ data: Data) -> [String] {
+        guard data.count > 8 else { return [] }
+        let magicLE: [UInt8] = [0x71, 0x71, 0xDE, 0xFA]   // 0xfade7171 little-endian
+        let n = data.count
+        return data.withUnsafeBytes { (raw: UnsafeRawBuffer) -> [String] in
+            guard let base = raw.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return [] }
+            for i in 0..<(n - 8) {
+                if base[i] == magicLE[0] && base[i+1] == magicLE[1] &&
+                   base[i+2] == magicLE[2] && base[i+3] == magicLE[3] {
+                    let len = UInt32(base[i+4]) | (UInt32(base[i+5]) << 8) |
+                              (UInt32(base[i+6]) << 16) | (UInt32(base[i+7]) << 24)
+                    guard len > 8, Int(len) <= n - i else { continue }
+                    let xml = data.subdata(in: (i + 8)..<(i + Int(len)))
+                    guard let plist = try? PropertyListSerialization.propertyList(
+                        from: xml, format: nil) as? [String: Any] else { continue }
+                    return plist.keys.sorted()
+                }
+            }
+            return []
+        }
     }
 
     private struct Header {

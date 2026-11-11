@@ -685,7 +685,7 @@ The night's misses (all honest, all now measured on the 17):
 - p122 (17!): freer + detach + replace = kr=0 both; 2000 raced reads =
   ZERO kernel-shaped occupants = the zone's natural population =
   user-class (the Shape-1 ceiling measured on the 17).
-- p125 Cinder27 = the faithful ring, all-notify-rejected = the class
+- p125 Lum27 = the faithful ring, all-notify-rejected = the class
   documented, not armed (same verdict as their own twin).
 - p023/64747-VT = the create-OK-on-everything + the -10279 tiny-encode
   soft-fail = the 64747 lane stays closed from the app (both devices).
@@ -1278,7 +1278,7 @@ door/stride laws; the p110 claim rows.
   CS2/libkrw era (path-test-3); decode-owed (the 17.3 banding + the lkrw lane's frames).
 
 ## 2026-11-07 — CVE-2026-112554 (the GPT-name OOB read) = a KREAD-CANDIDATE LANE on the 17 (the user's find)
-- The device's OWN Cinder tool (Payloads2.swift) builds the crafted GPT (4 x 128B entries, the
+- The device's OWN Lab tool (Payloads2.swift) builds the crafted GPT (4 x 128B entries, the
   overlong name) and documents the law: **27.0 scan bound = 0x48 (72B); 27.2 tightened to 0x24
   (36B)** => the vector is alive EXACTLY on our 17's build (24A435) and dead on later trains.
 - The reach question (the one census owed): the kernel GPT parser runs at DISK-IMAGE ATTACH;
@@ -1293,7 +1293,7 @@ door/stride laws; the p110 claim rows.
 - HONESTY: leak = not kread by itself; this lane = the disclosure primitive + the aim. The
   attach entitlement = the open census row (p108 re-run on the newest build = the tap).
 
-## 2026-11-07 — the Cinder CVE-tool fleet decoded (5 new classes from the device)
+## 2026-11-07 — the Lab CVE-tool fleet decoded (5 new classes from the device)
 - **kern.decmpfs (CVE-2026-113910) = THE GROOM-AWAITING LEAK LANE**: the under-produce read WORKS
   at real scale (xattr=true + 262KB/524KB read-backs, x5 runs) and the classifier says hits=0 —
   i.e. **the read primitive is live but the heap was clean every time: THE GROOM IS THE MISSING
@@ -1419,7 +1419,7 @@ door/stride laws; the p110 claim rows.
 ## 2026-11-07 14:09-15:09 — app logs pulled over AFC from the 17 (24A435)
 - AFC access: `afcclient -u <udid> --container ma6x9x.P007OpenOnly.GLVKP6RZ39`
   (`--documents` root gave Permission denied; `--container` + `ls Documents` works).
-  Logs live in Documents and Documents/cinder; the cinder aggregate (`cinder_lab_log.txt`)
+  Logs live in Documents and Documents/lum1na; the lum1na aggregate (`lum1na_lab_log.txt`)
   carries per-tap full output for probes with no dedicated file (p150/p151/p153).
 - **p044 v75.2-inlineopen on the 17 at 14:42 fired the v63 chosen write**: census target
   sid=279 (16384 B), foreign-lane `target=279 use 0->0 diff=512/16384`, word map 0x0000..0x00fc

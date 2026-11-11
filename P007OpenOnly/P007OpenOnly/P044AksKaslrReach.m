@@ -550,7 +550,7 @@ static int       g_guestHoldANE; /* v64: guest ANE-hold — hold the request
    OUTPUT surface (consumer-mapped, shared-registry candidate) instead of
    a plain task-owned tile (round-1 control, note 166: plain holds do NOT
    resolve cross-process; ANE-mapped is the open class) */
-/* v68 keep-alive (StikDebug BackgroundAudioManager shape). v67's
+/* v68 keep-alive (own background-audio keep-alive shape). v67's
    AVAudioPlayer on a 1 s WAV froze at playhead=0.9s / wall=249.9s —
    the file queue died at the first loop during the app switch, so the
    background-audio assertion never stuck and the guest suspended.
@@ -593,7 +593,7 @@ static int g_aneBFireRc = -1;
 static double g_aneBFireT = NAN;
 #define P044_GUEST_BLOOP_SEC 90.0
 
-/* v68: StikDebug's graph. playback+mixWithOthers, 1 s zero PCM buffer
+/* v68: the background-audio graph. playback+mixWithOthers, 1 s zero PCM buffer
    scheduled .loops on an AVAudioPlayerNode, engine.start. The IO callback
    is the assertion. A 2 s main-runloop health tick reclaims the session
    after an interruption; maxGap between ticks is the suspension oracle
@@ -2401,7 +2401,7 @@ static void *watch_worker(void *arg) {
        across force-quits). v60 FIX: /var/mobile/Documents is NOT
        app-readable (same sandbox bug class as the v59 sidecar) — the flag
        now lives in the app-container Documents dir the p044 log + sidecar
-       use. Write via SSH/Filza into the app container:
+       use. Write via SSH into the app container:
        .../Data/Application/&lt;UUID&gt;/Documents/p044_req_in.txt */
     {
         NSString *sweepDocs = NSSearchPathForDirectoriesInDomains(
@@ -2932,7 +2932,7 @@ static void *watch_worker(void *arg) {
                      learnedModel, COREML_MODEL_NAME];
                 }
             } else {
-                [out appendFormat:@"  [v61b] MODEL-FLAG MISS: Documents/p044_model.txt not found — default = addchain-191 B1 (in-bounds primitive test; no override needed). Override is OPTIONAL: write ONE bundled .mlmodelc NAME (e.g. XVRC27_254in_passthrough) into this exact path via SSH/Filza, force-quit, then tap again:\n    %@\n", flagPath];
+                [out appendFormat:@"  [v61b] MODEL-FLAG MISS: Documents/p044_model.txt not found — default = addchain-191 B1 (in-bounds primitive test; no override needed). Override is OPTIONAL: write ONE bundled .mlmodelc NAME (e.g. XVRC27_254in_passthrough) into this exact path via SSH, force-quit, then tap again:\n    %@\n", flagPath];
             }
         }
     }
@@ -3654,7 +3654,7 @@ static void *watch_worker(void *arg) {
                     /* v59: sidecar binary dump — full 0x4000 post-fire surface.
                        BUG FIX: /var/mobile/Documents is NOT app-sandbox-writable (open
                        failed 20:01 run). Use the SAME app-container Documents dir the
-                       p044 log writes to. Pull via Filza/SSH from the app container:
+                       p044 log writes to. Pull via SSH from the app container:
                        .../Data/Application/&lt;UUID&gt;/Documents/p044_outdump.bin */
                     {
                         NSString *docs = NSSearchPathForDirectoriesInDomains(

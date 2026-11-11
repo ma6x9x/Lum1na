@@ -314,7 +314,7 @@ struct PlistEditorView: View {
             status = "plist syntax error — not written"
             return
         }
-        let backup = item.path + ".cinder27.bak"
+        let backup = item.path + ".lum1na27.bak"
         if !FileManager.default.fileExists(atPath: backup) {
             try? FileManager.default.copyItem(atPath: item.path, toPath: backup)
         }
@@ -333,6 +333,8 @@ struct PlistEditorView: View {
 struct ProcessPane: View {
     @State private var procs: [ProcInfo] = []
     @State private var query = ""
+    @State private var status = ""
+    @State private var exportNote = ""
 
     private var filtered: [ProcInfo] {
         guard !query.isEmpty else { return procs }
@@ -351,14 +353,47 @@ struct ProcessPane: View {
             .background(RoundedRectangle(cornerRadius: 10).fill(T.panel))
             .padding(.horizontal, 16)
 
+            if !status.isEmpty {
+                Text(status).font(T.monoSm).foregroundColor(.white.opacity(0.35))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20).padding(.top, 6)
+            }
+
+            VStack(spacing: 0) {
+                HStack(spacing: 8) {
+                    Image(systemName: "star.fill").font(.system(size: 10)).foregroundColor(T.good)
+                    Text("★ = daemon-backed ANE/ML deputy (P109 borrow candidate) — tap to export the census")
+                        .font(T.monoSm).foregroundColor(.white.opacity(0.4))
+                    Spacer()
+                }
+                .padding(10)
+            }
+            .padding(.horizontal, 16)
+            .onTapGesture { exportNote = exportCensus() }
+
+            if !exportNote.isEmpty {
+                Text(exportNote).font(T.monoSm).foregroundColor(T.good)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20).padding(.top, 4)
+            }
+
             List {
                 ForEach(filtered) { p in
-                    HStack(spacing: 10) {
-                        Text("\(p.pid)").font(T.monoSm).foregroundColor(.white.opacity(0.3))
-                            .frame(width: 44, alignment: .leading)
-                        Text(p.name).font(T.mono).foregroundColor(.white.opacity(0.85)).lineLimit(1)
-                        Spacer()
-                        Text("uid \(p.uid)").font(T.monoSm).foregroundColor(.white.opacity(0.25))
+                    VStack(alignment: .leading, spacing: 2) {
+                        HStack(spacing: 10) {
+                            Text("\(p.pid)").font(T.monoSm).foregroundColor(.white.opacity(0.3))
+                                .frame(width: 44, alignment: .leading)
+                            Text((p.deputy ? "★ " : "") + p.name).font(T.mono)
+                                .foregroundColor(p.deputy ? T.good : .white.opacity(0.85)).lineLimit(1)
+                            Spacer()
+                            Text(p.uid == 0 ? "—" : "uid \(p.uid)")
+                                .font(T.monoSm).foregroundColor(.white.opacity(0.25))
+                        }
+                        if !p.path.isEmpty {
+                            Text(p.path).font(T.monoSm).foregroundColor(.white.opacity(0.28))
+                                .lineLimit(1).truncationMode(.middle)
+                                .padding(.leading, 54)
+                        }
                     }
                     .listRowBackground(T.panel)
                 }
@@ -366,7 +401,17 @@ struct ProcessPane: View {
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
         }
-        .onAppear { procs = ProcList.snapshot() }
+        .onAppear {
+            procs = ProcList.snapshot()
+            status = ProcList.status
+        }
+    }
+
+    private func exportCensus() -> String {
+        if ProcList.exportCensus(procs) != nil {
+            return "p109_pid_census.txt written (\(procs.count) pids)"
+        }
+        return "nothing to export"
     }
 }
 
@@ -375,6 +420,7 @@ struct ProcessPane: View {
 struct DaemonPane: View {
     @State private var daemons: [LaunchCensus.Daemon] = []
     @State private var query = ""
+    @State private var detailNote = ""
 
     private var filtered: [LaunchCensus.Daemon] {
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -406,6 +452,25 @@ struct DaemonPane: View {
                     Text("\(daemons.count)")
                         .font(T.monoSm)
                         .foregroundColor(.white.opacity(0.35))
+                }
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.primary)
+                .padding(10)
+                .background(RoundedRectangle(cornerRadius: 10).fill(T.panel))
+            }
+            .buttonStyle(.plain)
+            .disabled(daemons.isEmpty)
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+
+            Button(action: exportDetail) {
+                HStack(spacing: 8) {
+                    Image(systemName: "square.and.arrow.down")
+                    Text("Export detail (program + args)")
+                    Spacer()
+                    Text(detailNote.isEmpty ? "→ Documents" : detailNote)
+                        .font(T.monoSm)
+                        .foregroundColor(detailNote.isEmpty ? .white.opacity(0.35) : T.good)
                 }
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.primary)
@@ -462,6 +527,14 @@ struct DaemonPane: View {
         guard !paths.isEmpty else { return }
         LuminaCopyBus.shared.copy(paths.joined(separator: "\n"), label: "\(paths.count) paths copied")
     }
+
+    private func exportDetail() {
+        if LaunchCensus.exportDetail(daemons) != nil {
+            detailNote = "\(daemons.count) written"
+        } else {
+            detailNote = "nothing to export"
+        }
+    }
 }
 
 // MARK: - Crashes
@@ -469,6 +542,7 @@ struct DaemonPane: View {
 struct CrashPane: View {
     @State private var reports: [CrashReport] = []
     @State private var selected: CrashReport?
+    @State private var exportNote = ""
 
     var body: some View {
         List {
@@ -476,6 +550,22 @@ struct CrashPane: View {
                 Text("No crash reports in reachable paths.")
                     .font(T.monoSm).foregroundColor(.white.opacity(0.4))
                     .listRowBackground(T.panel)
+            } else {
+                Section {
+                    Button {
+                        exportNote = CrashLogs.exportIndex(reports) != nil
+                            ? "crash_index.txt written (\(reports.count))" : "nothing to export"
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "square.and.arrow.down")
+                            Text(exportNote.isEmpty ? "Export index (p116 dump candidates)" : exportNote)
+                                .font(T.monoSm)
+                                .foregroundColor(exportNote.isEmpty ? .white.opacity(0.6) : T.good)
+                            Spacer()
+                        }
+                    }
+                    .listRowBackground(T.panel)
+                }
             }
             ForEach(reports) { r in
                 Button { selected = r } label: {
@@ -590,6 +680,17 @@ struct BinaryPane: View {
                             KeyValueRow(key: "SDK", value: info.sdk)
                             KeyValueRow(key: "Crypt", value: info.isEncrypted ? "encrypted (\(info.cryptID))" : "plain",
                                         tint: info.isEncrypted ? T.ember : T.good)
+                        }
+                    }
+                    if !info.entitlements.isEmpty {
+                        Card {
+                            VStack(alignment: .leading, spacing: 4) {
+                                SectionLabel(text: "Entitlements (\(info.entitlements.count)) — embedded signature")
+                                ForEach(info.entitlements, id: \.self) { e in
+                                    Text(e).font(T.monoSm)
+                                        .foregroundColor(e.contains("private") ? T.good : .white.opacity(0.6))
+                                }
+                            }
                         }
                     }
                     if !info.linkedLibraries.isEmpty {
@@ -738,7 +839,7 @@ struct BackupPane: View {
         let rootPath = Container.rootPath
         let stamp = ISO8601DateFormatter().string(from: Date())
             .replacingOccurrences(of: ":", with: "-")
-        let target = backupDir.appendingPathComponent("cinder27-\(stamp).zip")
+        let target = backupDir.appendingPathComponent("lum1na27-\(stamp).zip")
         let skipCaches = !includeCaches
         let backupPrefix = "Documents/Lum1naDebugger/Backups/"
 

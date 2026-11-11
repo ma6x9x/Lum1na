@@ -19,7 +19,7 @@ extension Catalog {
             primitive: .probe,
             reach: .inProcess,
             tier: 1,
-            summaryZh: "现场造一个最小 IPA（Info.plist + 一个真的 Mach-O），跑完整的改机流程：解包 → 改 CFBundleIdentifier → 注入 LC_LOAD_DYLIB → 去掉 LC_CODE_SIGNATURE → 用自己写的 ZIP 写入器重新打包。产出留在 Documents/Cinder27/IPA，可以直接拿去签名。",
+            summaryZh: "现场造一个最小 IPA（Info.plist + 一个真的 Mach-O），跑完整的改机流程：解包 → 改 CFBundleIdentifier → 注入 LC_LOAD_DYLIB → 去掉 LC_CODE_SIGNATURE → 用自己写的 ZIP 写入器重新打包。产出留在 Documents/Lum27/IPA，可以直接拿去签名。",
             notesZh: "这条不是漏洞，是工具链的证明。它跑通说明 IPA 面板在你的设备上能用，而不是只在构建机上能用。",
             run: CatalogToolRuns.tool_ipa)
         out.append(m0)
@@ -124,7 +124,7 @@ ctx.arm("tool.ipa", "fixture + patch")
 
                 // ---- exercise the load-command injector, and carry the result forward
                 do {
-                    let injected = try MachO.injectLoad(working, dylibPath: "@executable_path/Frameworks/CinderHook.dylib")
+                    let injected = try MachO.injectLoad(working, dylibPath: "@executable_path/Frameworks/LabHook.dylib")
                     let after = MachO.header(injected)
                     let cmds = MachO.commands(injected)
                     let hasHook = cmds.contains { $0.cmd == 0x0C }
@@ -136,8 +136,8 @@ ctx.arm("tool.ipa", "fixture + patch")
 
                 // ---- exercise the string patcher on a string the binary really contains
                 do {
-                    let (patched, hits) = try MachO.patchStrings(working, find: "Cinder27", replace: "Cind3r27")
-                    lines.append(tl("字符串替换 Cinder27 → Cind3r27：") + "\(hits)" + tl(" 处"))
+                    let (patched, hits) = try MachO.patchStrings(working, find: "Lum27", replace: "Cind3r27")
+                    lines.append(tl("字符串替换 Lum27 → Cind3r27：") + "\(hits)" + tl(" 处"))
                     working = patched
                 } catch {
                     lines.append(tl("字符串替换失败：") + "\(error.localizedDescription)")
@@ -146,7 +146,7 @@ ctx.arm("tool.ipa", "fixture + patch")
                 // ---- build the fixture IPA and run the full surgeon
                 var zip = ZipWriter()
                 var info: [String: Any] = [
-                    "CFBundleIdentifier": "com.cinder.fixture",
+                    "CFBundleIdentifier": "com.lum1na.fixture",
                     "CFBundleExecutable": "Fixture",
                     "CFBundleName": "Fixture",
                     "CFBundleDisplayName": "Fixture",
@@ -164,12 +164,12 @@ ctx.arm("tool.ipa", "fixture + patch")
                 lines.append(tl("自造 IPA：") + "\(fixture.count)" + tl(" B（ZipWriter 产出，stored 条目）"))
 
                 var recipe = IPARecipe()
-                recipe.bundleID = "com.cinder.patched"
+                recipe.bundleID = "com.lum1na.patched"
                 recipe.displayName = "Patched"
                 recipe.version = "9.9"
-                recipe.injectedDylib = "@executable_path/Frameworks/CinderHook.dylib"
-                recipe.patchedString = "com.cinder.fixture"
-                recipe.patchedReplacement = "com.cinder.patched"
+                recipe.injectedDylib = "@executable_path/Frameworks/LabHook.dylib"
+                recipe.patchedString = "com.lum1na.fixture"
+                recipe.patchedReplacement = "com.lum1na.patched"
                 recipe.stripSignature = true
 
                 var output: URL?
@@ -286,7 +286,7 @@ ctx.arm("tool.hex", "roundtrip")
 
                 let hexHits = HexTool.search(buffer, pattern: "DE AD BE EF")
                 let rawHits = HexTool.search(buffer, pattern: "0xdeadbeef")
-                let textHits = HexTool.search(buffer, pattern: "Cinder27")
+                let textHits = HexTool.search(buffer, pattern: "Lum27")
 
                 let (patched, count) = HexTool.replace(buffer, pattern: "DE AD BE EF", with: "CA FE BA BE")
                 let after = HexTool.search(patched, pattern: "CA FE BA BE")
@@ -297,7 +297,7 @@ ctx.arm("tool.hex", "roundtrip")
                     tl("植入 ") + "\(planted.count)" + tl(" 处 @ ") + "\(planted.prefix(4).map { String(format: "0x%x", $0) }.joined(separator: ", "))",
                     tl("十六进制查找: ") + "\(hexHits.count)" + tl(" 处 · 偏移一致=") + "\(hexHits == planted)",
                     tl("0x 前缀写法: ") + "\(rawHits.count)" + tl(" 处 · 偏移一致=") + "\(rawHits == planted)",
-                    tl("文本查找 Cinder27: ") + "\(textHits.count)" + tl(" 处（应为 0）"),
+                    tl("文本查找 Lum27: ") + "\(textHits.count)" + tl(" 处（应为 0）"),
                     tl("替换: ") + "\(count)" + tl(" 处 → 新模式 ") + "\(after.count)" + tl(" 处 · 旧模式残留 ") + "\(leftover.count)" + tl(" 处"),
                 ]
                 let ok = hexHits == planted && rawHits == planted && after.count == planted.count && leftover.isEmpty
@@ -387,7 +387,7 @@ ctx.arm("tool.backup", "roundtrip")
                 var expected: [String: Data] = [:]
                 for i in 0..<12 {
                     let name = "sub\(i % 3)/note\(i).txt"
-                    let body = Data("cinder27 backup probe \(i) — \(UUID().uuidString)".utf8)
+                    let body = Data("lum1na27 backup probe \(i) — \(UUID().uuidString)".utf8)
                     expected[name] = body
                     let path = src.appendingPathComponent(name)
                     try? fm.createDirectory(at: path.deletingLastPathComponent(), withIntermediateDirectories: true)

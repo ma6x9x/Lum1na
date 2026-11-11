@@ -230,7 +230,7 @@ enum FdLeak {
                     var rp2: UnsafeMutableRawPointer?
                     if b.basicMessage(0x2E727032, 0, &rp2) == 0, let m2 = rp2 {
                         var recipient: UnsafeMutableRawPointer?
-                        let cr = "cinder27".withCString { b.recipient(r1, m2, $0, &recipient) }
+                        let cr = "lum1na27".withCString { b.recipient(r1, m2, $0, &recipient) }
                         let (r2, t2) = send(m2)
                         replyTypes.append(t2)
                         handshakeLog.append("'.rp2' recip=\(cr) → \(t2)")
