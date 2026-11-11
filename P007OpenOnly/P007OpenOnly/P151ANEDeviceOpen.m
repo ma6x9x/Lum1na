@@ -1,5 +1,5 @@
 //
-//  P151ANEDeviceOpen.m — ANE DirectPath DeviceOpen probe. p151 (v5).
+//  P151ANEDeviceOpen.m — ANE DirectPath DeviceOpen + LB selector census. p151 (v6).
 //  Lum1na-Debug (P007 rig). iOS kernel research (Lum1na).
 //
 //  STATIC RE (23F77, capstone, 2026-11-07): sel0 is NOT pid-resolved.
@@ -39,6 +39,81 @@
 #import <CoreML/CoreML.h>
 
 @implementation P151ANEDeviceOpen
+
+#define P151_ANE_DEVICEOPEN_BUILD @"p151-ane-deviceopen-v6-lbcensus"
+
+/* v6: census of the SELECTORS on an ACCEPTED client (sel0 kr=0). For 24A435
+   the H1xANELoadBalancer types 1/4 register via AddClient, so the LB's own
+   selector space is reachable for the first time. For each selector we try
+   each declared size with a ZERO-FILLED struct (never a send request, no
+   program, nothing fires — this is the p109/p153 census form). The decode
+   highlights the classes that matter: 0x2e2 = "Not permitted" entitlement
+   gate (the pid-borrow target class), kr=0 = a real responder, 2f0/2e3 =
+   registration/power echoes, 2c2/2c7 = shape noise (collapsed). */
++ (void)selCensus:(io_connect_t)conn svc:(NSString *)svcName type:(uint32_t)type
+           maxSel:(uint32_t)maxSel pid:(uint32_t)pid baseSz:(uint32_t)baseSz
+             out:(NSMutableString *)log {
+    [log appendFormat:@"      [sel census] %@ type=%u sels=0..0x%x sizes=0x%x/0x68/0x88/0x150 (zero-filled; PANIC-POSSIBLE class — one tap per force-quit)\n",
+        svcName, type, maxSel, baseSz];
+    uint32_t gates = 0, responders = 0, closed = 0;
+    NSMutableString *gateList = [NSMutableString string];
+    NSMutableString *respList = [NSMutableString string];
+    for (uint32_t sel = 2; sel < maxSel; sel++) {
+        uint32_t sizes[4] = { baseSz, 0x68, 0x88, 0x150 };
+        kern_return_t best = 0xe00002c2;
+        uint32_t bestSz = 0;
+        const char *why = "";
+        for (int i = 0; i < 4; i++) {
+            uint32_t sz = sizes[i];
+            uint8_t *in = calloc(1, sz);
+            uint8_t *ob = calloc(1, sz);
+            if (!in || !ob) { free(in); free(ob); return; }
+            if (pid && sz >= 4) { uint32_t p = pid; memcpy(in, &p, 4); }
+            size_t osz = sz;
+            kern_return_t kr = IOConnectCallStructMethod(conn, sel, in, sz, ob, &osz);
+            free(in); free(ob);
+            /* first call wins the row; later sizes only refine a 2c2 miss */
+            if (best == 0xe00002c2 && kr != 0xe00002c2) {
+                best = kr; bestSz = sz;
+                if (kr == 0) { why = " (RESPONDER)"; }
+                else if (kr == 0xe00002e2) { why = " (ENTITLEMENT GATE — pid-borrow target)"; }
+                else if (kr == 0xe00002f0) { why = " (registration miss)"; }
+                else if (kr == 0xe00002e3) { why = " (NoPower echo)"; }
+                else if (kr == 0xe00002c7) { why = " (Unsupported)"; }
+                else why = "";
+                if (kr != 0xe00002c2 && kr != 0xe00002c7) {
+                    /* capture the first 24 out bytes on the winning shape */
+                    uint8_t *ob2 = calloc(1, sz);
+                    uint8_t *in2 = calloc(1, sz);
+                    if (in2 && ob2) {
+                        if (pid && sz >= 4) { uint32_t p = pid; memcpy(in2, &p, 4); }
+                        size_t o2 = sz;
+                        kern_return_t k2 = IOConnectCallStructMethod(conn, sel, in2, sz, ob2, &o2);
+                        if (k2 == kr) {
+                            [log appendFormat:@"      sel%-3u in=0x%-5x kr=0x%x%s out=",
+                                sel, bestSz, kr, why];
+                            for (NSUInteger b = 0; b < 24 && b < o2; b++)
+                                [log appendFormat:@"%02x", ob2[b]];
+                            [log appendString:@"\n"];
+                        }
+                    }
+                    free(in2); free(ob2);
+                }
+            }
+        }
+        if (best == 0) { responders++; [respList appendFormat:@"sel%u ", sel]; }
+        else if (best == 0xe00002e2) { gates++; [gateList appendFormat:@"sel%u ", sel]; }
+        else if (best == 0xe00002c2 || best == 0xe00002c7) closed++;
+    }
+    [log appendFormat:@"      [sel census] %@ t%u total: responders=[%@] gates=[%@] shape-noise=%u\n",
+        svcName, type, respList.length ? respList : @"none", gateList.length ? gateList : @"none", closed];
+    if (gates) {
+        [log appendString:@"      [law] 2e2 rows = where the entitlement check sits; the request path behind them is\n"
+                          @"       the Stage-B pid-borrow target (kern.proc live pid at req+0x180 — next build).\n"];
+    } else {
+        [log appendString:@"      [law] no 2e2 rows this census — no entitlement gate is selector-visible on this client.\n"];
+    }
+}
 
 + (NSString *)pasteboardString {
     id pb = ((id (*)(Class, SEL))objc_msgSend)(
@@ -215,8 +290,8 @@
 
 + (NSString *)tap {
     NSMutableString *out = [NSMutableString string];
-    [out appendFormat:@"=== p151 session %@ BUILD p151-ane-deviceopen-v5.1-knobs ===\n",
-        LabLocalMilitaryNow()];
+    [out appendFormat:@"=== p151 session %@ BUILD %@ ===\n",
+        LabLocalMilitaryNow(), P151_ANE_DEVICEOPEN_BUILD];
     [out appendString:[LabDeviceProfile identBlock]];
 
     [out appendFormat:@"  [knobsrc] %@\n",
@@ -243,11 +318,16 @@
     uint32_t sweep = [self knobUInt:@"p151_sweep" def:1];
     BOOL qword     = [self knobUInt:@"p151_qword" def:0] != 0;
     uint32_t qoff  = [self knobUInt:@"p151_qoff" def:8];
+    uint32_t census = [self knobUInt:@"p151_census" def:1];
+    uint32_t maxSel = [self knobUInt:@"p151_maxsel" def:0x40];
 
-    [out appendFormat:@"  [knobs] pid=%u type=%u sweep=%u in=0x%x out=0x%x pid@0x%02x qword=%d qoff=0x%x\n",
-        pid, oneT, sweep, inSz, outSz, off, (int)qword, qoff];
+    [out appendFormat:@"  [knobs] pid=%u type=%u sweep=%u in=0x%x out=0x%x pid@0x%02x qword=%d qoff=0x%x census=%u maxsel=0x%x\n",
+        pid, oneT, sweep, inSz, outSz, off, (int)qword, qoff, census, maxSel];
     [out appendString:@"  [note] 24A435 sel0 = 0x88/0x88, no pid read, success when AddClient has\n"
-                       @"         out[0]==0; 23F77 sel0 = 0x68/0x68, pid is log-only, 2f0 = client-list miss\n"];
+                       @"         out[0]==0; H1xANELoadBalancer t1/t4 = the 24A435 door (H11ANEIn all 2c7);\n"
+                       @"         23F77 sel0 = 0x68/0x68, pid is log-only, 2f0 = client-list miss\n"];
+    [out appendString:@"  [!] PANIC-POSSIBLE (v6: unknown LB selectors receive zero-filled structs;\n"
+                       @"      census only, no send request, no program). One tap per force-quit.\n"];
 
     [self wakeANE:out];
 
@@ -266,6 +346,12 @@
             kern_return_t kr = [self callDeviceOpen:conn pid:pid inSz:inSz outSz:outSz
                                                 off:off qword:qword qoff:qoff out:out];
             if (kr == KERN_SUCCESS) zeros++;
+            /* v6: on an ACCEPTED client, census the selectors before closing.
+               Zero-filled structs only; sel0/sel1 skipped (already called). */
+            if (kr == KERN_SUCCESS && census) {
+                [self selCensus:conn svc:svcName type:type maxSel:maxSel
+                             pid:pid baseSz:(inSz > outSz ? inSz : outSz) out:out];
+            }
             {
                 uint32_t sc = 0;
                 kern_return_t ckr = IOConnectCallScalarMethod(conn, 1, NULL, 0, NULL, &sc);
