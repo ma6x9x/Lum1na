@@ -23,8 +23,17 @@
 #import <Foundation/Foundation.h>
 #import <dlfcn.h>
 #import <xpc/xpc.h>
+#import <Security/SecTask.h>
 #import <dirent.h>
 #import <fcntl.h>
+#if __has_include("pathleak.h")
+#import "pathleak.h"     /* Vendor/worse_query — verbatim GPL-3, credit Taj C (forcequit) */
+#define P164_HAS_PATHLEAK 1
+#endif
+#if __has_include("worse_query.h")
+#import "worse_query.h"  /* Vendor/worse_query — verbatim GPL-3; the real escape API */
+#define P164_HAS_WQ 1
+#endif
 
 #define P164_BUILD @"p164-mcm-census-v1"
 
@@ -176,7 +185,20 @@ static void p164_probe(NSMutableString *o, NSString *name, uint64_t cls,
         }
         closedir(d);
     } else {
-        Lf(@"      ls denied errno=%d", errno);
+        Lf(@"      ls denied errno=%d — vendored pathleak enumeration (worse_query, GPL-3)",
+           errno);
+#ifdef P164_HAS_PATHLEAK
+        NSArray<NSString *> *leaked = pathleak(root, 4096);
+        NSUInteger ln = 0;
+        for (NSString *p in leaked) {
+            if (ln >= 24) { Lf(@"      pathleak: … (%lu total)", (unsigned long)leaked.count); break; }
+            Lf(@"      pathleak: %@", [p lastPathComponent]);
+            ln++;
+        }
+        if (!leaked.count) Lf(@"      pathleak: 0 entries at this cap");
+#else
+        Lf(@"      pathleak: not vendored in this build tree — sklog only");
+#endif
     }
     for (NSString *exp in expected) {
         NSString *p = [root stringByAppendingPathComponent:exp];
@@ -239,6 +261,23 @@ done:
     Lf(@"[deputy] %d pids scanned, %d live deputies listed (kr oracle decides entitlements)", total, shown);
 }
 
+static NSArray<NSString *> *p164_app_groups(void) {
+    NSMutableArray<NSString *> *out = [NSMutableArray array];
+    SecTaskRef task = SecTaskCreateFromSelf(kCFAllocatorDefault);
+    if (task) {
+        CFTypeRef v = SecTaskCopyValueForEntitlement(
+            task, CFSTR("com.apple.security.application-groups"), NULL);
+        if (v) {
+            if ([(__bridge NSArray *)v isKindOfClass:[NSArray class]]) {
+                for (NSString *s in (__bridge NSArray *)v) [out addObject:s];
+            }
+            CFRelease(v);
+        }
+        CFRelease(task);
+    }
+    return out;
+}
+
 @implementation P164McmCensus
 
 + (NSString *)tap {
@@ -298,6 +337,34 @@ done:
                @"com.apple.geod", NO, 3,
                @"../../../../../../containers/Shared/SystemGroup/",
                0x8100000000ULL, nil);
+
+    [o appendString:@"--- vendored worse_query() lease rows (verbatim API, group-token) ---\n"];
+#ifdef P164_HAS_WQ
+    {
+        /* GestaltAccess.m law: worse_query(target=<dir>, group, false, false).
+           We ask for OUR app group + the MG caches dir; the receipt decides.
+           Handles released via worse_query_release; tokens never logged. */
+        NSString *g = [LabDeviceProfile skuName]; (void)g;
+        NSArray<NSString *> *groups = p164_app_groups();
+        for (NSString *gid in groups) {
+            NSString *mg = @"/private/var/containers/Shared/SystemGroup/"
+                           "systemgroup.com.apple.mobilegestaltcache/Library/Caches";
+            int64_t h = worse_query(mg, gid, NO, NO);
+            [o appendFormat:@"  [wq] %@ -> handle=%lld\n", gid, (long long)h];
+            if (h >= 0) {
+                /* read the resolved dir under the extension */
+                NSArray *items = [[NSFileManager defaultManager]
+                    contentsOfDirectoryAtPath:mg error:nil];
+                [o appendFormat:@"  [wq] MG caches listing = %lu item(s)\n",
+                    (unsigned long)items.count];
+                worse_query_release(h);
+            }
+        }
+        if (groups.count == 0) [o appendString:@"  [wq] no app-group on this install — skipped\n"];
+    }
+#else
+    [o appendString:@"  [wq] worse_query not vendored in this tree (P007 builds) — skipped\n"];
+#endif
 
     [o appendString:@"--- verdict ---\n"];
     [o appendString:@"[law] enumerated classes + resolved probe roots = the MCM access map on this\n"

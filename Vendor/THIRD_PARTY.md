@@ -5,7 +5,8 @@ directory carries its upstream license/provenance; nothing here was written
 by Lum1na.
 
 ## Vendor/worse_query — forcequitOS/worse_query (GPL-3.0-or-later)
-- Files: `pathleak.h`, `pathleak.m`, `worse_query.h` (copied verbatim from the
+- Files: `pathleak.h`, `pathleak.m`, `worse_query.h`, `worse_query.m`,
+  `fallback_query.h`, `fallback_query.m` (copied verbatim from the
   worse_query sources as shipped inside git.jbjflab.top/admin/filza27.2 v27.2.0).
 - Author: Taj C (forcequit), 2026. In-file GPL-3 headers preserved byte-exact.
 - Used by: P164 (directory enumeration fallback when `opendir` is denied).
