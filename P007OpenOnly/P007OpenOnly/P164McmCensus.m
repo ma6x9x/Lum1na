@@ -61,13 +61,21 @@ static p164_o_free     g_oFree;
 static p164_e_int      g_eInt;
 static p164_e_str      g_eStr;
 
+static NSMutableString *g_sink = nil;   /* the tap body; L/Lf append here (lab law) */
+
 static void L(NSString *s) {
-    NSLog(@"%@", s);
+    NSString *out = s;
+    if (g_sink) {
+        [g_sink appendString:[out hasSuffix:@"\n"] ? out : [out stringByAppendingString:@"\n"]];
+    } else {
+        NSLog(@"%@", s);
+    }
 }
 static void Lf(NSString *fmt, ...) {
     va_list ap; va_start(ap, fmt);
-    NSLogv(fmt, ap);
+    NSString *line = [[NSString alloc] initWithFormat:fmt arguments:ap];
     va_end(ap);
+    L(line);
 }
 
 
@@ -181,6 +189,7 @@ static void p164_probe(NSMutableString *o, NSString *name, uint64_t cls,
 
 + (NSString *)tap {
     NSMutableString *o = [NSMutableString string];
+    g_sink = o;
     [o appendFormat:@"=== p164 session %@ BUILD %@ ===\n", LabLocalMilitaryNow(), P164_BUILD];
     [o appendString:[LabDeviceProfile identBlock]];
     [o appendString:@"[law] lineage: jbjflab filza27.2 MCM integration (MHA-C2/-C10/-C12/-C13/-C15 proofs,\n"
@@ -238,6 +247,7 @@ static void p164_probe(NSMutableString *o, NSString *name, uint64_t cls,
                      @"       SKU. The 0x8100000000 part-write class is NOT exercised (copy-write test\n"
                      @"       queued for v2 behind the p116 copy-write law). hasKread=NO.\n"];
     [o appendFormat:@"=== p164 end %@ ===\n", LabLocalMilitaryNow()];
+    g_sink = nil;
     return o;
 }
 
