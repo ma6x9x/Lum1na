@@ -138,3 +138,31 @@ only. Borrowed rows (EN summary):
   disclosure timing, not tech.
 - V19 (medium): Calif's bare SHA-256 hash commitment (unverified meaning).
 - V18 (low): ikotas00's 27.2 root demo = image-only, unverified.
+
+## Ketamine/GestaltEdit MobileGestalt lane (2026-11-10)
+- withered.live/ketamine 2.1b1: MobileGestalt editing + customization are
+  carriers of the **worse_query** class (forcequitOS; bad_query = older,
+  0xjohnnydev AirLift = the second write path). Gate table by BUILD not device:
+  **26.0–26.6.2 ✗ | 26.7–26.7.2 customization ✓ / MobileGestalt ✗ |
+  27.0 stable, 27.0.1, 27.1 ✓✓ (worse_query) | 27.2 stable ✓✓ | 27.3+ ✗**.
+- github.com/frs0n/GestaltEdit (iOS 26+): same class ("FilzaSlop/worse_query
+  file access research"); writes com.apple.MobileGestalt.plist on-device,
+  respring to apply, warns restore may be needed on bad values.
+- **Fleet cross-validation (P160 = the same worse_query/mcm class):**
+  - 12/23F77 (26.5): table says ✗ — matches our P160 open=0 on the 12; the
+    12's read receipts came from P116's NOFOLLOW bug, a DIFFERENT hole.
+  - iPad8,7/23H30 (26.7.1): customization ✓ — matches p160 v2c class-7 read
+    receipts; the table also predicts **MobileGestalt editing ✗ here**
+    (consistent with our write=EPERM).
+  - 17/24A435 (27.0 stable): both ✓ — one p160 v2e tap on the 17 should now
+    give the class-7 read the iPad gets. NOT yet replicated on the 17.
+- **17 "better target" verdict:** for the write/customization lane yes
+  (27.0 stable is inside the worse_query window; 26.7.1's MG-edit door is
+  shut per the table), for KRW no (SPTM/MIE, T8150 ident-only, data-only
+  post-KRW law). The 12 remains the KRW hunt. **Do not let the 17
+  auto-update past 27.2 — 27.3+ kills the class.**
+- Write-leg experiment the table enables: P116 rw is /var/mobile-restricted,
+  which covers `/var/mobile/Library/Caches/com.apple.MobileGestalt.plist`.
+  Law applied: read the live plist first (p116_path), write to a COPY
+  (e.g. `...MobileGestalt.lum1na_copy.plist`) via p116_rw_path — never the
+  live MG cache.
