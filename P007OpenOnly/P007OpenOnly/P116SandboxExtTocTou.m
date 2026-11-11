@@ -41,7 +41,7 @@
 #import <stdio.h>
 #import <string.h>
 
-#define P116_BUILD @"p116-sandboxext-toctou-v3-dump"
+#define P116_BUILD @"p116-sandboxext-toctou-v3b-mgcopy"
 
 static NSMutableString *g_log = nil;
 static int g_fd = -1;
@@ -302,14 +302,28 @@ static long long p116_dump(const char *outPath, const char *s, const char *l, NS
                 stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
             if (!rw.length) {
                 L(@"[v2] rw skipped (create Documents/p116_rw_path.txt to enable; default read-only)");
-            } else if (!([rw hasPrefix:@"/var/mobile/"] || [rw hasPrefix:@"/private/var/mobile/"])) {
-                Lf(@"[v2] rw refused: %@ (target must be under /var/mobile)", rw);
             } else {
-                long w = p116_write_test(rw.UTF8String, s, l);
-                Lf(@"[v2] rw %@ — write=%ld", rw, w);
-                if (w > 0) {
-                    long rb = p116_read(rw.UTF8String, s, l, NULL);
-                    Lf(@"[v2] rw readback %ld bytes", rb);
+                /* v3b: the MobileGestalt systemgroup cache dir is the
+                   worse_query write class (GestaltAccess.m law: the group
+                   token reaches systemgroup.* dirs). Allow an OPT-IN write
+                   there ONLY to a .lum1na_copy.plist — the live
+                   com.apple.MobileGestalt.plist is NEVER a write target
+                   (first write to a copy law). */
+                NSString *mgDir = @"/private/var/containers/Shared/SystemGroup/systemgroup.com.apple.mobilegestaltcache/Library/Caches/";
+                BOOL underMobile = ([rw hasPrefix:@"/var/mobile/"] ||
+                                    [rw hasPrefix:@"/private/var/mobile/"]);
+                BOOL mgSafe = ([rw hasPrefix:@"/var/containers/Shared/SystemGroup/systemgroup.com.apple.mobilegestaltcache/Library/Caches/"] ||
+                               [rw hasPrefix:mgDir]) &&
+                               ![rw.lastPathComponent isEqualTo:@"com.apple.MobileGestalt.plist"];
+                if (!underMobile && !mgSafe) {
+                    Lf(@"[v2] rw refused: %@ (target must be under /var/mobile or the MG cache copy law)", rw);
+                } else {
+                    long w = p116_write_test(rw.UTF8String, s, l);
+                    Lf(@"[v2] rw %@ — write=%ld", rw, w);
+                    if (w > 0) {
+                        long rb = p116_read(rw.UTF8String, s, l, NULL);
+                        Lf(@"[v2] rw readback %ld bytes", rb);
+                    }
                 }
             }
 
