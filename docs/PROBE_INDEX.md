@@ -8,7 +8,7 @@ add a placeholder tap that does nothing.
 | # | Lane | State |
 |---|---|---|
 | P150 | ANE user-client reach (H11ANEIn / H16) | implemented, invoked by other probes |
-| P151 | ANE DeviceOpen census | implemented, invoked by other probes |
+| P151 | ANE DeviceOpen census | **implemented v6** — v5.1 proved sel0 is **not** pid-resolved: 2f0 = our UC missing from the ANE client list, the pid slot is log-only, and the wake knob's registration doesn't touch that list (12/iPad: sel0 refused at every pid/type; closed there). **24A435 (17): `H1xANELoadBalancer` types 1/4 open AND sel0 AddClient succeeds (`out[0]==0`, kr=0, twice-boot-confirmed)** while `H11ANEIn` is all 2c7 — the LB is the 17's only ANE door. v6 = `p151_census` (def 1): on every accepted client, sweep selectors 2..`p151_maxsel` (0x40) with zero-filled structs (sizes base/0x68/0x88/0x150), decode **2e2 = entitlement-gate rows (the Stage-B pid-borrow target)**, kr=0 responders, collapse 2c2/2c7 shape noise. No send request; PANIC-POSSIBLE badge; one tap per force-quit. |
 | P152 | IOSurface foreign lookup gate | implemented, invoked by other probes |
 | P153 | ANE selector/class probe | implemented, invoked by other probes |
 | **P154** | **IOSurface notification-listener ready-byte race (CVE-2026-112477)** | **reserved — mapped 2026-11-09, not built.** 23F77 add `0x986ba54`, remove `0x986bb98`, teardown `0x986e1fc`; 27.2 `+0xf1` gate `0x9be5210` / mark `0x9be5494`. Needs a PANIC-POSSIBLE race runner (sel 0x11 + `IOServiceClose`). Primitive is DoS/type-confusion + second-order lck_mtx UAF on 23F77. |
