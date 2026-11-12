@@ -57,6 +57,15 @@ final class TerminalSession: ObservableObject {
         case "rm": rm(args, recursive: false)
         case "echo": out(args.joined(separator: " "))
         case "date": out(stamp())
+        case "ashell":
+            if !LabShellEngine.aShellAvailable() {
+                err("a-Shell not embedded in this build (soft) — REPL only")
+            } else if let c = args.joined(separator: " ").isEmpty ? nil : args.joined(separator: " ") {
+                let outText = LabShellEngine.runAShell(c)
+                out(outText.isEmpty ? "(no output)" : outText)
+            } else {
+                err("ashell: command required")
+            }
         case "clear": lines = []
         default: err("unknown '\(head)' — try 'help'")
         }
@@ -267,5 +276,24 @@ struct TerminalPane: View {
         case .ok: return T.good
         case .out: return .white.opacity(0.82)
         }
+    }
+}
+
+
+// MARK: - a-Shell engine bridge (debug tree; WQTerminal is only vendored
+// into the debug target when P007OpenOnly/Vendor exists — same layout as
+// the main app. Soft: missing runtime = REPL law.)
+
+enum LabShellEngine {
+    static func aShellAvailable() -> Bool {
+        #if canImport(UIKit) && os(iOS)
+        return WQShellEngine.available()
+        #else
+        return false
+        #endif
+    }
+
+    static func runAShell(_ command: String) -> String {
+        return WQShellEngine.run(command)
     }
 }

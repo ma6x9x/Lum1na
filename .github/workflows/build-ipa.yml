@@ -762,6 +762,15 @@ jobs:
           ldid -S"P007OpenOnly/P007OpenOnly/P007OpenOnly.free.entitlements" "Payload/P007OpenOnly.app/P007OpenOnly"
           echo "✅ ldid fake-signed with P007OpenOnly.free.entitlements (app-group + get-task-allow)"
 
+          # a-Shell mini + libssh embeds for the debug terminal (soft)
+          for cand in "$HOME/Downloads/Terminal.ipa" "$HOME/Downloads"/a-Shell-mini*.ipa "$HOME/Downloads"/aShell-mini*.ipa; do
+            if [ -f "$cand" ]; then
+              python3 scripts/merge_ashell.py "Payload/P007OpenOnly.app" "$cand" || true
+              break
+            fi
+          done
+          ASHELL_IPA="" python3 scripts/merge_ashell.py "Payload/P007OpenOnly.app" || true
+
           zip -r "Lum1na-Debug.ipa" "Payload"
           echo "✅ Packaged Lum1na-Debug.ipa"
 

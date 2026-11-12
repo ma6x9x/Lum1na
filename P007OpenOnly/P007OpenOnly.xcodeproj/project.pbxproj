@@ -468,6 +468,15 @@
 					"-framework",
 					UniformTypeIdentifiers,
 					"-lsqlite3",
+					"-L$(SRCROOT)/Vendor/libssh",
+					"-lssh.4",
+				);
+HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/Vendor/libssh/include",
+					"$(SRCROOT)/Vendor/libssh",
+					"$(SRCROOT)/Vendor/worse_query",
+					"$(SRCROOT)/Vendor/filza27.2",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = ma6x9x.P007OpenOnly;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -532,6 +541,15 @@
 					"-framework",
 					UniformTypeIdentifiers,
 					"-lsqlite3",
+					"-L$(SRCROOT)/Vendor/libssh",
+					"-lssh.4",
+				);
+HEADER_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(SRCROOT)/Vendor/libssh/include",
+					"$(SRCROOT)/Vendor/libssh",
+					"$(SRCROOT)/Vendor/worse_query",
+					"$(SRCROOT)/Vendor/filza27.2",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = ma6x9x.P007OpenOnly;
 				PRODUCT_NAME = "$(TARGET_NAME)";
