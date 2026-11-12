@@ -54,23 +54,10 @@ def main():
     fw_dst = os.path.join(app, 'Frameworks')
     os.makedirs(fw_dst, exist_ok=True)
 
-    # libssh embeds unconditionally (independent of the a-Shell payload):
-    # the main target links -lssh.4 and Vendor/libssh carries the dylib.
-    libssh = os.environ.get('LIBSSH_DYLIB', '')
-    if not libssh:
-        for cand in ('Vendor/libssh/libssh.4.dylib',
-                     os.path.join(os.path.dirname(os.path.abspath(app)), '..', 'Vendor', 'libssh', 'libssh.4.dylib')):
-            if os.path.isfile(cand):
-                libssh = os.path.abspath(cand)
-                break
-    if libssh and os.path.isfile(libssh):
-        dst = os.path.join(fw_dst, 'libssh.4.dylib')
-        shutil.copyfile(libssh, dst)
-        os.chmod(dst, 0o755)
-        print('[merge_ashell] libssh.4.dylib embedded into Frameworks')
-    else:
-        print('[merge_ashell] WARNING: libssh.4.dylib not found - SSH pane will not load')
-
+    # libssh embeds ONLY inside the payload branch: the vendored dylib
+    # depends on @rpath/openssl.framework/openssl, which the a-Shell payload
+    # provides (Lum1na-2026-11-11-194203.ips: dyld launch crash when libssh
+    # shipped without openssl). Payload-less builds launch without SSH.
     copied = 0
     if z is not None:
         for n in names:
@@ -96,5 +83,23 @@ def main():
             print('[merge_ashell] ios_system.framework embedded')
         else:
             print('[merge_ashell] WARNING: ios_system.framework not found in the IPA')
+
+        if os.path.isdir(os.path.join(fw_dst,'openssl.framework')):
+            libssh = os.environ.get('LIBSSH_DYLIB', '')
+            if not libssh:
+                for cand in ('Vendor/libssh/libssh.4.dylib',
+                             os.path.join(os.path.dirname(os.path.abspath(app)), '..', 'Vendor', 'libssh', 'libssh.4.dylib')):
+                    if os.path.isfile(cand):
+                        libssh = os.path.abspath(cand)
+                        break
+            if libssh and os.path.isfile(libssh):
+                dst = os.path.join(fw_dst, 'libssh.4.dylib')
+                shutil.copyfile(libssh, dst)
+                os.chmod(dst, 0o755)
+                print('[merge_ashell] libssh.4.dylib embedded (openssl.framework present)')
+            else:
+                print('[merge_ashell] WARNING: libssh.4.dylib source not found - SSH will not load')
+        else:
+            print('[merge_ashell] WARNING: payload lacks openssl.framework - libssh NOT embedded')
 
 main()

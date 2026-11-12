@@ -87,6 +87,9 @@
 				"Vendor/filza27.2/WQArchive.m",
 				"Vendor/filza27.2/WQPackages.h",
 				"Vendor/filza27.2/WQPackages.m",
+				"Vendor/filza27.2/WQSSHServer.h",
+				"Vendor/filza27.2/WQSSHServer.m",
+				"Vendor/libssh/libssh.4.dylib",
 
 				"rust/lumina_core/README.md",
 				"tools",
