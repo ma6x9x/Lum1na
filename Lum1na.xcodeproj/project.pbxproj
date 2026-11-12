@@ -81,8 +81,7 @@
 				"UITests/Lum1naUITests.swift",
 				"P007OpenOnly",
 				"rust",
-				"Vendor/filza27.2/WQSSHServer.h",
-				"Vendor/filza27.2/WQSSHServer.m",
+
 				"rust/lumina_core/README.md",
 				"tools",
 				"tools/frida_root/README.md",
@@ -517,6 +516,10 @@
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(SRCROOT)/Support/IOSurfaceShim",
+					"$(SRCROOT)/Vendor/libssh/include",
+					"$(SRCROOT)/Vendor/libssh",
+					"$(SRCROOT)/Vendor/worse_query",
+					"$(SRCROOT)/Vendor/filza27.2",
 				);
 				INFOPLIST_KEY_CFBundleDisplayName = Lum1na;
 				INFOPLIST_KEY_GCSupportsGameMode = YES;
@@ -555,6 +558,10 @@
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(SRCROOT)/Support/IOSurfaceShim",
+					"$(SRCROOT)/Vendor/libssh/include",
+					"$(SRCROOT)/Vendor/libssh",
+					"$(SRCROOT)/Vendor/worse_query",
+					"$(SRCROOT)/Vendor/filza27.2",
 				);
 				INFOPLIST_KEY_CFBundleDisplayName = Lum1na;
 				INFOPLIST_KEY_GCSupportsGameMode = YES;
