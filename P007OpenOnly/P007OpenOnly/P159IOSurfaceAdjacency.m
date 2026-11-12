@@ -8,6 +8,8 @@
 #import "P159IOSurfaceAdjacency.h"
 #import "LabDeviceProfile.h"
 #import "LabLocalTime.h"
+#import "P007Board.h"
+#import "LabLearn.h"
 
 #import <Foundation/Foundation.h>
 #import <IOSurface/IOSurfaceRef.h>
@@ -15,7 +17,7 @@
 #import <signal.h>
 #include <string.h>
 
-#define P159_BUILD @"p159-iosurface-adjacency-v1"
+#define P159_BUILD @"p159-iosurface-adjacency-v2-tracked"
 
 static sigjmp_buf g_jmp;
 static volatile sig_atomic_t g_faulted;
@@ -88,6 +90,7 @@ static BOOL p159_is_kernel(uint64_t v) {
 
     /* Read-only scan: from b2 to b2+0x10000 (or the first fault). */
     uint64_t kptr = 0, poison = 0, nonzero = 0, sampled = 0;
+    uint64_t sample0 = 0;   /* first canonical kernel-band pointer (board anchor) */
     for (uintptr_t addr = b2; addr < b2 + 0x10000; addr += 8) {
         uint64_t v = 0;
         g_faulted = 0;
@@ -102,6 +105,7 @@ static BOOL p159_is_kernel(uint64_t v) {
         nonzero++;
         if (p159_is_kernel(v)) {
             kptr++;
+            if (!sample0) sample0 = v;
             if (sampled < 12) {
                 [o appendFormat:@"  [kptr] +0x%04llx = 0x%016llx\n",
                     (unsigned long long)(addr - b2), (unsigned long long)v];
@@ -117,9 +121,34 @@ static BOOL p159_is_kernel(uint64_t v) {
     [o appendFormat:@"  [res] nonzero=%llu canonical-kernel=%llu poison-like=%llu\n",
         (unsigned long long)nonzero, (unsigned long long)kptr,
         (unsigned long long)poison];
-    [o appendString:@"  [verdict] read-only adjacency receipt. Adjacency is real; the read window is mapped "
-                       @"user-VA pages (tags/tagged pointers), no canonical kernel VAs. SurfHeist's "
-                       @"kernel-heap claim is NOT reproduced on stock; its OOB write is user-VA adjacent.\n"];
+    /* v2 honesty law (2026-11-12 receipt): the old static verdict claimed
+       "no canonical kernel VAs" even on runs whose own [kptr] rows carried
+       15 of them. The verdict is now DERIVED from the counts. Heap-band
+       kernel pointers (0xffffffe0..0xffffffef) are LEAK receipts, not
+       kbase; heap VAs never derive a slide (P007Board contract). */
+    if (kptr > 0) {
+        [o appendFormat:@"  [verdict] kptr LEAK receipt: %llu canonical kernel-band pointers read from "
+                           @"user VA through the adjacency window (heap band). Leak-class, NOT kbase "
+                           @"(heap VAs never derive a slide). Tracked on board + learn.\n",
+            (unsigned long long)kptr];
+    } else {
+        [o appendString:@"  [verdict] read-only adjacency receipt. Adjacency real; this run's window was "
+                           @"tags/tagged values only (0 canonical kernel pointers). SurfHeist's kernel-heap "
+                           @"claim not reproduced on stock; its OOB write is user-VA adjacent.\n"];
+    }
+    if (kptr > 0) {
+        @try {
+            [[P007Board shared] recordHeapLeak:sample0 source:@"p159_isurface"];
+        } @catch (__unused NSException *e) {}
+        [LabLearn recordPath:@"p159"
+                      result:@"KPTR-LEAK"
+                    evidence:[NSString stringWithFormat:@"kptr=%llu nonzero=%llu sample=0x%016llx",
+                              (unsigned long long)kptr, (unsigned long long)nonzero,
+                              (unsigned long long)sample0]];
+    } else {
+        [LabLearn recordPath:@"p159" result:@"ADJACENCY-ONLY"
+                    evidence:[NSString stringWithFormat:@"nonzero=%llu", (unsigned long long)nonzero]];
+    }
     [o appendFormat:@"=== p159 end %@ ===\n", LabLocalMilitaryNow()];
 
     for (int i = 0; i < count; i++) CFRelease(surfaces[i]);
