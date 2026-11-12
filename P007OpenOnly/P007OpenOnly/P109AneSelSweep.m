@@ -28,7 +28,7 @@
 #import <unistd.h>
 #import <stdarg.h>
 
-#define P109_BUILD @"p109-ane-selsweep-v10-wake"
+#define P109_BUILD @"p109-ane-selsweep-v10.1-reg"
 
 typedef mach_port_t io_object_t;
 typedef mach_port_t io_service_t;
@@ -140,6 +140,42 @@ static BOOL p109_wake_ane(NSMutableString *out) {
     return pred != nil;
 }
 
+/* v10.1 BORROW (p073): the ANE client registration happens when a real
+   model EXECUTES on the engine, not on load. Run the addchain 254-in
+   predict once before the sweep; fail-soft with honest rows. */
+static BOOL p109_register_ane(NSMutableString *out) {
+    NSBundle *b = [NSBundle mainBundle];
+    NSURL *url = [b URLForResource:@"XVRC27_254in_1out_addchain" withExtension:@"mlmodelc"];
+    if (!url) {
+        [out appendString:@"  [reg] XVRC27_254in model missing (rig-only resource)\n"];
+        return NO;
+    }
+    NSError *err = nil;
+    MLModelConfiguration *cfg = [MLModelConfiguration new];
+    cfg.computeUnits = MLComputeUnitsAll;
+    MLModel *m = [MLModel modelWithContentsOfURL:url configuration:cfg error:&err];
+    if (!m) { [out appendFormat:@"  [reg] load FAILED: %@\n", err.localizedDescription]; return NO; }
+    NSString *nm = m.modelDescription.inputDescriptionsByName.allKeys.firstObject;
+    MLFeatureDescription *fd = nm ? m.modelDescription.inputDescriptionsByName[nm] : nil;
+    MLMultiArray *arr = nil;
+    if (fd.multiArrayConstraint) {
+        arr = [[MLMultiArray alloc] initWithShape:fd.multiArrayConstraint.shape
+                                         dataType:fd.multiArrayConstraint.dataType
+                                            error:&err];
+    }
+    if (!arr || !nm) { [out appendString:@"  [reg] input array unavailable\n"]; return NO; }
+    for (NSInteger i = 0; i < arr.count; i++) arr[i] = @((i + 1) & 0x7f);
+    MLDictionaryFeatureProvider *fp =
+        [[MLDictionaryFeatureProvider alloc] initWithDictionary:@{nm: arr} error:&err];
+    if (!fp) { [out appendFormat:@"  [reg] provider FAILED: %@\n", err.localizedDescription]; return NO; }
+    NSDate *t0 = [NSDate date];
+    id<MLFeatureProvider> pred = [m predictionFromFeatures:fp error:&err];
+    double ms = -[t0 timeIntervalSinceNow] * 1000.0;
+    [out appendFormat:@"  [reg] 254-in predict %@ in %.1f ms err=%@\n",
+        pred ? @"ok" : @"FAILED", ms, err ? err.localizedDescription : @"none"];
+    return pred != nil;
+}
+
 @implementation P109AneSelSweep
 
 + (NSString *)tap {
@@ -236,6 +272,14 @@ static BOOL p109_wake_ane(NSMutableString *out) {
     } @catch (NSException *e) {
         p109_log([NSString stringWithFormat:@"[wake] caught %@", e.reason ?: @"exception"]);
     }
+    @try {
+        NSMutableString *rg = [NSMutableString string];
+        BOOL reg = p109_register_ane(rg);
+        p109_log([NSString stringWithFormat:@"[reg] %@%@", reg ? @"OK" : @"MISS",
+                  rg.length ? [@"\n" stringByAppendingString:rg] : @""]);
+    } @catch (NSException *e) {
+        p109_log([NSString stringWithFormat:@"[reg] caught %@", e.reason ?: @"exception"]);
+    }
 
     void *h = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_LAZY);
     if (!h) { p109_log(@"dlopen IOKit FAIL"); goto done; }
@@ -321,23 +365,30 @@ static BOOL p109_wake_ane(NSMutableString *out) {
                pid band). First row per conn = the exact p151 sel0
                replication (zeros 0x88/0x88, pid=0) as the control. */
             (void)0; /* v7 size lattice retired — the v7 receipt pinned the structural law */
-            /* control row: exact p151 receipt — sel0, 0x88 in/out, zeros */
+            /* v10.1 ctrl rows — DUAL SHAPE (p151 v6 law): 23F77 sel0 = 0x68,
+               24A435 = 0x88. Both shapes probed per connection; order by train. */
             {
-                static uint8_t in[0x88];
-                static uint8_t out[0x88];
-                memset(in, 0, sizeof in);
-                memset(out, 0, sizeof out);
-                size_t osz = sizeof out;
-                kern_return_t kr = pStruct(conn, 0, in, sizeof in, out, &osz);
-                uint8_t o0[9];
-                memcpy(o0, out, 8); o0[8] = 0;
-                p109_log([NSString stringWithFormat:
-                    @"[ctrl sel0] zeros 0x88/0x88 kr=%@ osz=%zu out0=%02x%02x%02x%02x — %@",
-                    p109_krname(kr), osz,
-                    out[0], out[1], out[2], out[3],
-                    (kr == KERN_SUCCESS ? @"p151 REPLICATED (AddClient accepted)" :
-                     @"NOT replicated — shape law differs this boot (record it)")]);
+                static const size_t ctrlSizes[2][2] = { {0x68,0x88}, {0x88,0x68} };
+                int ord = [[LabDeviceProfile osversion] hasPrefix:@"23"] ? 0 : 1;
+                for (int ci = 0; ci < 2; ci++) {
+                    size_t csz = ctrlSizes[ord][ci];
+                    static uint8_t in[0x88];
+                    static uint8_t out[0x88];
+                    memset(in, 0, sizeof in);
+                    memset(out, 0, sizeof out);
+                    size_t osz = csz;
+                    kern_return_t kr = pStruct(conn, 0, in, csz, out, &osz);
+                    p109_log([NSString stringWithFormat:
+                        @"[ctrl sel0 %#zx] zeros kr=%@ osz=%zu out0=%02x%02x%02x%02x — %@",
+                        csz, p109_krname(kr), osz,
+                        out[0], out[1], out[2], out[3],
+                        (kr == KERN_SUCCESS ? @"ACCEPTED (AddClient registered)" :
+                         kr == 0xe00002f0 ? @"2f0 CLIENT-LIST MISS — registration not done" :
+                         kr == 0xe00002c2 ? @"2c2 size/content law rejects this shape" :
+                         @"record")]);
+                }
             }
+
             /* v8 METHOD-KIND sweep: 5 call kinds per sel, all with the
                v7 out-size law (struct out = in exactly). Kind tags:
                st = struct(0x88 zeros), sc = scalar, as = async struct,
