@@ -18,21 +18,28 @@ def main():
     if not app or not os.path.isdir(app):
         sys.exit('app not found')
     if not ipa or not os.path.isfile(ipa):
-        print('[merge_ashell] no a-Shell mini IPA provided - SKIPPING (soft)')
+        print('[merge_ashell] no a-Shell mini IPA provided - skipping the ios_system payload (soft)')
         print('[merge_ashell] set ASHELL_IPA (env/secret) to embed a full terminal')
-        return
+        # NOTE: the libssh embed below must still run (the app links -lssh.4;
+        # a missing dylib = dyld SIGABRT at launch). Fall through instead of
+        # returning. (Bug found by Lum1na-2026-11-11-193459.ips.)
 
-    z = zipfile.ZipFile(ipa)
-    names = z.namelist()
-    prefix = None
-    for n in names:
-        m = re.match(r'(Payload/[^/]+\.app/)', n)
-        if m:
-            prefix = m.group(1)
-            break
-    if not prefix:
-        sys.exit('cannot find an app prefix in the a-Shell IPA')
-    print('[merge_ashell] a-Shell app prefix:', prefix)
+    if ipa and os.path.isfile(ipa):
+        z = zipfile.ZipFile(ipa)
+        names = z.namelist()
+        prefix = None
+        for n in names:
+            m = re.match(r'(Payload/[^/]+\.app/)', n)
+            if m:
+                prefix = m.group(1)
+                break
+        if not prefix:
+            sys.exit('cannot find an app prefix in the a-Shell IPA')
+        print('[merge_ashell] a-Shell app prefix:', prefix)
+    else:
+        z = None
+        names = []
+        prefix = None
 
     def excluded(name):
         low = name.lower().replace('.framework', '')
@@ -58,35 +65,36 @@ def main():
                 break
     if libssh and os.path.isfile(libssh):
         dst = os.path.join(fw_dst, 'libssh.4.dylib')
-        shutil.copyfile(libssh_env, dst)
+        shutil.copyfile(libssh, dst)
         os.chmod(dst, 0o755)
         print('[merge_ashell] libssh.4.dylib embedded into Frameworks')
     else:
         print('[merge_ashell] WARNING: libssh.4.dylib not found - SSH pane will not load')
 
     copied = 0
-    for n in names:
-        rel = n[len(prefix):] if n.startswith(prefix) else None
-        if not rel or rel.endswith('/'):
-            continue
-        top = rel.split('/')[0].lower().replace('.framework','')
-        if excluded(top):
-            continue
-        dst = os.path.join(app, rel)
-        os.makedirs(os.path.dirname(dst), exist_ok=True)
-        with z.open(n) as s, open(dst,'wb') as d:
-            shutil.copyfileobj(s,d)
-        copied += 1
-    print('[merge_ashell] copied', copied, 'files into the app')
+    if z is not None:
+        for n in names:
+            rel = n[len(prefix):] if n.startswith(prefix) else None
+            if not rel or rel.endswith('/'):
+                continue
+            top = rel.split('/')[0].lower().replace('.framework','')
+            if excluded(top):
+                continue
+            dst = os.path.join(app, rel)
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            with z.open(n) as s2, open(dst,'wb') as d:
+                shutil.copyfileobj(s2,d)
+            copied += 1
+        print('[merge_ashell] copied', copied, 'files into the app')
 
-    iosfw = os.path.join(fw_dst,'ios_system.framework','ios_system')
-    if os.path.isfile(iosfw):
-        os.chmod(iosfw, 0o755)
-        sigdir = os.path.join(fw_dst,'ios_system.framework','_CodeSignature')
-        if os.path.isdir(sigdir):
-            shutil.rmtree(sigdir)
-        print('[merge_ashell] ios_system.framework embedded')
-    else:
-        print('[merge_ashell] WARNING: ios_system.framework not found in the IPA')
+        iosfw = os.path.join(fw_dst,'ios_system.framework','ios_system')
+        if os.path.isfile(iosfw):
+            os.chmod(iosfw, 0o755)
+            sigdir = os.path.join(fw_dst,'ios_system.framework','_CodeSignature')
+            if os.path.isdir(sigdir):
+                shutil.rmtree(sigdir)
+            print('[merge_ashell] ios_system.framework embedded')
+        else:
+            print('[merge_ashell] WARNING: ios_system.framework not found in the IPA')
 
 main()
