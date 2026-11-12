@@ -20,8 +20,8 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		LTF0000000000000000000005 /* WQSSHServer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "Vendor/filza27.2/WQSSHServer.m"; sourceTree = "<group>"; };
-		LTF0000000000000000000006 /* worse_query.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "Vendor/worse_query/worse_query.m"; sourceTree = "<group>"; };
+		LTF0000000000000000000005 /* WQSSHServer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = WQSSHServer.m; path = "Vendor/filza27.2/WQSSHServer.m"; sourceTree = SOURCE_ROOT; };
+		LTF0000000000000000000006 /* worse_query.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = worse_query.m; path = "Vendor/worse_query/worse_query.m"; sourceTree = SOURCE_ROOT; };
 		LTF0000000000000000000007 /* Vendor */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Vendor; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
