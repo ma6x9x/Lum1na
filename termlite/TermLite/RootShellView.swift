@@ -53,7 +53,7 @@ final class LiteSession: ObservableObject {
             emit("""
                 ls [-l] [p] · cd <d> · pwd · cat <f> · stat <p> · mkdir <d> · touch <f> · rm <f>
                 sbx <p> — escape read, P116 + class-13 engines (64 KB) · dump <p> — full read (256 MB)
-                deputies · ps · date · clear
+                deputies · jit (CS_DEBUGGED + dual-map check) · date · clear
                 """, .out)
         case "pwd": emit(cwd, .out)
         case "cd": change(args.first)
@@ -62,6 +62,7 @@ final class LiteSession: ObservableObject {
         case "stat": stat(args.first)
         case "sbx": sbx(args.first)
         case "dump": dump(args.first)
+        case "jit": emit(LabSandboxRead.jitProbe(), .out)
         case "deputies": deputies()
         case "mkdir": mkdirs(args.first)
         case "touch": touch(args.first)

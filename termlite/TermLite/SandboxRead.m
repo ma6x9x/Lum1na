@@ -243,4 +243,53 @@ static NSData *sbx_class13_data(NSString *target, NSUInteger maxBytes) {
     return @{@"path": [NSNull null], @"bytes": @(total), @"error": @"both engines refused"};
 }
 
++ (NSString *)jitProbe {
+    /* CS_DEBUGGED check + dual-mapped RX/RW attempt, Henge substrate shape
+       (Leviidev/Henge GPL-2.0+ via ammaarreshi/WindowsiOS). Detection and
+       mapping only — NO execution is attempted from the probe. */
+    NSMutableString *o = [NSMutableString string];
+    typedef int (*csops_t)(pid_t, unsigned int, void *, size_t);
+    csops_t csops_fn = (csops_t)dlsym(RTLD_DEFAULT, "csops");
+    uint32_t flags = 0;
+    int cr = csops_fn ? csops_fn(getpid(), 0 /*CS_OPS_STATUS*/, &flags, sizeof flags) : -1;
+    BOOL debugged = (flags & 0x10000000u) != 0;
+    [o appendFormat:@"csops=%d flags=0x%08x CS_DEBUGGED=%@\n", cr, flags, debugged ? @"YES" : @"NO"];
+
+    size_t sz = 0x4000;
+    uint8_t *rw = mmap(NULL, sz, PROT_READ | PROT_WRITE,
+                       MAP_PRIVATE | MAP_ANON, -1, 0);
+    if (rw == MAP_FAILED) {
+        [o appendFormat:@"mmap RW failed errno=%d\n", errno];
+        return o;
+    }
+    memset(rw, 0, sz);
+    /* local prototype — never import <mach/mach_vm.h> on iOS */
+    typedef kern_return_t (*vmr_t)(vm_map_t, mach_vm_address_t *, mach_vm_size_t,
+        mach_vm_offset_t, int, vm_map_t, mach_vm_offset_t, boolean_t,
+        vm_prot_t, vm_prot_t, vm_inherit_t);
+    vmr_t vmr = (vmr_t)dlsym(RTLD_DEFAULT, "mach_vm_remap");
+    mach_vm_address_t rx = 0;
+    kern_return_t kr = vmr ? vmr(mach_task_self(), &rx, sz, 0, 2 /*VM_FLAGS_ANYWHERE*/,
+        mach_task_self(), (mach_vm_offset_t)rw, TRUE,
+        VM_PROT_READ | VM_PROT_EXECUTE, VM_PROT_READ | VM_PROT_EXECUTE, 0)
+        : (kern_return_t)-1;
+    [o appendFormat:@"mach_vm_remap kr=0x%x rx=0x%llx\n", kr, (unsigned long long)rx];
+    if (kr == KERN_SUCCESS) {
+        int pr = mprotect((void *)rx, sz, PROT_READ | PROT_EXEC);
+        [o appendFormat:@"mprotect(RX) rc=%d errno=%d (%s)\n", pr, errno, strerror(errno)];
+        if (vmr) {
+            typedef kern_return_t (*vmd_t)(vm_map_t, mach_vm_address_t, mach_vm_size_t);
+            vmd_t vmd = (vmd_t)dlsym(RTLD_DEFAULT, "mach_vm_deallocate");
+            if (vmd) [o appendFormat:@"vm_deallocate rx kr=0x%x\n", vmd(mach_task_self(), rx, sz)];
+        }
+        [o appendString: debugged
+            ? @"[jit] dual-map available — process is CS_DEBUGGED (RX pages usable)\n"
+            : @"[jit] map returned; exec remains unblessed without CS_DEBUGGED — attach StikDebug/Xcode to bless\n"];
+    } else {
+        [o appendString:@"[jit] dual-map refused — not blessed; attach StikDebug/Xcode (CS_DEBUGGED) to enable JIT\n"];
+    }
+    munmap(rw, sz);
+    return o;
+}
+
 @end
