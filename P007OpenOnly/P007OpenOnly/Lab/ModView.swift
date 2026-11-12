@@ -35,6 +35,7 @@ struct ModView: View {
     private var panes: [(String, String)] {
         [
             (t("pane.files"), "folder.fill"),
+            ("Terminal", "terminal"),
             (t("pane.cross"), "arrow.left.arrow.right"),
             (t("pane.symlink"), "link.badge.plus"),
             (t("pane.apps"), "app.fill"),
@@ -101,16 +102,16 @@ struct ModView: View {
 
                 switch pane {
                 case 0: FilesPane()
-                case 1: CrossSandboxPane()
-                case 2: SymlinkPane()
-                case 3: AppsPane()
-                case 4: PrefsPane()
-                case 5: ProcessPane()
-                case 6: DaemonPane()
-                case 7: CrashPane()
-                case 8: BinaryPane()
-                case 9: HexPane()
-                case 10: XattrPane()
+                case 1: TerminalPane()
+                case 2: CrossSandboxPane()
+                case 3: SymlinkPane()
+                case 4: AppsPane()
+                case 5: PrefsPane()
+                case 6: ProcessPane()
+                case 7: DaemonPane()
+                case 8: CrashPane()
+                case 9: BinaryPane()
+                case 10: HexPane()
                 case 11: SQLitePane()
                 case 12: ArchivePane()
                 case 13: HashPane()
