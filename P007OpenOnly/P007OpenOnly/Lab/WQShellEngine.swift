@@ -21,7 +21,7 @@ enum WQShellEngine {
     @discardableResult
     static func run(_ command: String) -> String {
         prepareIfNeeded()
-        guard available else { return "" }
+        guard available() else { return "" }
         guard let ps = pSpawn else { return "" }
         typealias spawnFn = @convention(c) (UnsafeMutablePointer<Int32>?, String?) -> Int32
         let spawn = unsafeBitCast(ps, to: spawnFn.self)
