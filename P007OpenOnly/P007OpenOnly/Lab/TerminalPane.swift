@@ -150,9 +150,10 @@ final class TerminalSession: ObservableObject {
 
     private func dump(_ p: String?) {
         guard let p else { err("dump: path required"); return }
-        let r = LabSandboxRead.dumpIntoDocuments(resolve(p))
+        let r = LabSandboxRead.dump(intoDocuments: resolve(p))
         if let path = r["path"] as? String {
-            ok("dump -> \(path) (\((r["bytes"] as? Int) ?? 0) B)")
+            let bytes = (r["bytes"] as? Int) ?? 0
+            ok("dump -> \(path) (\(bytes) B)")
         } else {
             err("dump refused: \(r["error"] as? String ?? "?")")
         }

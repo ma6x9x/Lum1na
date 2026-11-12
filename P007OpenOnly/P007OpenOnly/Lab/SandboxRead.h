@@ -11,7 +11,9 @@
 /// Read `target` out-of-container through the NOFOLLOW TOCTOU and write the
 /// bytes to Documents/sbx_<basename>. Returns a receipt dictionary:
 ///   path (String?), bytes (NSNumber), error (String?)
-+ (NSDictionary *)dumpIntoDocuments:(NSString *)target;
++ (NSDictionary<NSString *, id> * _Nonnull)dumpIntoDocuments:(NSString *)target
+    NS_SWIFT_NAME(dump(intoDocuments:));
 /// Bounded out-of-container read as a string (maxBytes, default 64 KB).
-+ (NSString *)read:(NSString *)target maxBytes:(NSUInteger)maxBytes;
++ (NSString * _Nullable)read:(NSString *)target maxBytes:(NSUInteger)maxBytes
+    NS_SWIFT_NAME(read(_:maxBytes:));
 @end

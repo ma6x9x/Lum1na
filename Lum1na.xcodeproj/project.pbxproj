@@ -81,6 +81,8 @@
 				"UITests/Lum1naUITests.swift",
 				"P007OpenOnly",
 				"rust",
+				"Vendor/filza27.2/WQSSHServer.h",
+				"Vendor/filza27.2/WQSSHServer.m",
 				"rust/lumina_core/README.md",
 				"tools",
 				"tools/frida_root/README.md",
