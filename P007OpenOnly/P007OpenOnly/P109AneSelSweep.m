@@ -27,7 +27,7 @@
 #import <unistd.h>
 #import <stdarg.h>
 
-#define P109_BUILD @"p109-ane-selsweep-v6-contentlaw"
+#define P109_BUILD @"p109-ane-selsweep-v7-outsize"
 
 typedef mach_port_t io_object_t;
 typedef mach_port_t io_service_t;
@@ -206,16 +206,18 @@ static NSString *p109_krname(kern_return_t kr) {
                     static uint8_t out[0x1000];
                     memset(out, 0, sizeof out);
                     if (sz > 0x180) {
-                        /* big shapes: DEADBEEF filler probes the +0x180
-                           pid band (content-independent check) */
                         uint32_t *w = (uint32_t *)in;
                         for (size_t k = 0; k < sz/4; k++) w[k] = 0xDEADBEEFu;
                     } else {
-                        /* AddClient-class shapes: zeros (the accepted
-                           content class from the p151 receipt) */
                         memset(in, 0, sizeof in);
                     }
-                    size_t osz = sizeof out;
+                    /* v7 OUT-SIZE LAW (v6 receipt decode): the ctrl row
+                       passed (kr=0) with out=0x88 EXACTLY; the identical
+                       sel0/0x88 zeros call inside the sweep used
+                       outSz=0x1000 and returned 2c2. The LB validates the
+                       OUTPUT size too — out must match the shape exactly.
+                       v7: osz = sz (in==out per shape). */
+                    size_t osz = sz;
                     kern_return_t kr = pStruct(conn, sel, in, sz, out, &osz);
                     NSString *lbl = (sz == 0x88 ? @"s88z" : (sz == 0x68 ? @"s68z" :
                         (sz == 0x200 ? @"s200d" : (sz == 0x400 ? @"s400d" : @"s800d"))));

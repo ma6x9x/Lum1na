@@ -179,7 +179,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = GLVKP6RZ39;
-				GENERATE_INFOPLIST_FILE = NO;
+				/* sideload law: YES merges static plist with generated CFBundleIdentifier/Executable/Version (isideload nil-identifier fix) */
+				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(SRCROOT)/Vendor/libssh/include",
@@ -222,7 +223,8 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = GLVKP6RZ39;
-				GENERATE_INFOPLIST_FILE = NO;
+				/* sideload law: YES merges static plist with generated CFBundleIdentifier/Executable/Version (isideload nil-identifier fix) */
+				GENERATE_INFOPLIST_FILE = YES;
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(SRCROOT)/Vendor/libssh/include",
