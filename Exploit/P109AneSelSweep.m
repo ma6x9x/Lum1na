@@ -164,22 +164,32 @@ static NSString *p109_krname(kern_return_t kr) {
             /* v3: full 214-entry dispatch range (23F77 Stage-B sits at idx
                172; v2's 0..63 never reached the pid field on T8150). 3rd
                size 0x800 keeps the +0x180 pid offset deep in-bounds. */
-            const size_t sizes[3] = { 0x200, 0x400, 0x800 };
+            /* v5: + 0x88 first — the 24A435 law (p151 DeviceOpen receipt):
+               LB sel0 wants 0x88 and returns kr=0 with out[0]==0. All 214
+               sels at 0x200/0x400/0x800 came back uniform 2c2 on 24A435 =
+               a struct-SIZE wall, not a closed dispatch. 0x88 hits the
+               pinned T8150 shape; 0x68 = the 23F77 size, kept for the
+               cross-check. */
+            const size_t sizes[5] = { 0x88, 0x68, 0x200, 0x400, 0x800 };
             for (uint32_t sel = 0; sel <= 213; sel++) {
                 NSMutableString *line = [NSMutableString
                     stringWithFormat:@"[sel %2u]", sel];
-                for (int sz_i = 0; sz_i < 3; sz_i++) {
+                for (int sz_i = 0; sz_i < 5; sz_i++) {
                     size_t sz = sizes[sz_i];
                     static uint8_t in[0x800];
                     static uint8_t out[0x1000];
                     uint32_t *w = (uint32_t *)in;
                     for (size_t k = 0; k < sz/4; k++) w[k] = 0xDEADBEEFu;
+                    /* the pid field at +0x180 stays DEADBEEF in the small
+                       shapes (<0x200) only if out of range — 0x88/0x68 do
+                       NOT reach +0x180; the sweep records the kr-class
+                       wall first, pid placement comes on the hit row. */
                     memset(out, 0, sizeof out);
                     size_t osz = sizeof out;
                     kern_return_t kr = pStruct(conn, sel, in, sz, out, &osz);
-                    [line appendFormat:@" %@=%@",
-                        sizes[sz_i] == 0x200 ? @"s200" : (sizes[sz_i] == 0x400 ? @"s400" : @"s800"),
-                        p109_krname(kr)];
+                    NSString *lbl = (sz == 0x88 ? @"s88" : (sz == 0x68 ? @"s68" :
+                        (sz == 0x200 ? @"s200" : (sz == 0x400 ? @"s400" : @"s800"))));
+                    [line appendFormat:@" %@=%@", lbl, p109_krname(kr)];
                 }
                 p109_log(line);
             }
