@@ -869,3 +869,52 @@ jobs:
           echo "| IPA | ✅ Lum1na-Debug-unsigned-ipa (30-day retention) |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Runs P005–P099 primitives on ANY device (IDENT prints; unknown SKUs HOLD kernel-VA probes honestly)." >> $GITHUB_STEP_SUMMARY
+
+  # ============================================
+  # Term Lite — standalone payload-soft terminal
+  # ============================================
+  build-termlite:
+    runs-on: macos-15
+    needs: []
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build TermLite (unsigned)
+        run: |
+          set -euo pipefail
+          XCODE=/Applications/Xcode_16.4.app
+          [ -d "$XCODE" ] && DEVELOPER_DIR="$XCODE/Contents/Developer"
+          export DEVELOPER_DIR="${DEVELOPER_DIR:-$(xcode-select -p)}"
+          xcodebuild             -project termlite/TermLite.xcodeproj             -scheme TermLite             -configuration Release             -sdk iphoneos             -destination 'generic/platform=iOS'             -derivedDataPath "$RUNNER_TEMP/td"             CODE_SIGNING_ALLOWED=NO             CODE_SIGNING_REQUIRED=NO             CODE_SIGN_IDENTITY=""             build 2>&1 | tee "$RUNNER_TEMP/tl.log"
+          RC=${PIPESTATUS[0]}
+          if [ $RC -ne 0 ]; then
+            grep -nE ": error: |fatal error" "$RUNNER_TEMP/tl.log" | head -30 || true
+            exit $RC
+          fi
+          echo "✅ TermLite built"
+
+      - name: Package + soft payload embed
+        run: |
+          set -euo pipefail
+          APP=$(find "$RUNNER_TEMP/td/Build/Products/Release-iphoneos" -name "TermLite.app" | head -1)
+          [ -n "$APP" ] || { echo "no TermLite.app"; exit 1; }
+          mkdir -p Payload && cp -R "$APP" Payload/
+          for cand in "$HOME/Downloads/Terminal.ipa" "$HOME/Downloads"/a-Shell-mini*.ipa "$HOME/Downloads"/aShell-mini*.ipa; do
+            if [ -f "$cand" ]; then
+              python3 scripts/merge_ashell.py "Payload/TermLite.app" "$cand" || true
+              break
+            fi
+          done
+          # libssh embed is inside the payload branch of merge_ashell (openssl dep)
+          if ! command -v ldid >/dev/null 2>&1; then brew install ldid; fi
+          ldid -S"termlite/TermLite/TermLite.entitlements" "Payload/TermLite.app/TermLite"
+          ASHELL_IPA="" python3 scripts/merge_ashell.py "Payload/TermLite.app" || true
+          zip -r TermLite.ipa Payload
+          echo "✅ TermLite.ipa packaged"
+
+      - name: Upload TermLite.ipa
+        uses: actions/upload-artifact@v4
+        with:
+          name: TermLite-unsigned-ipa
+          path: TermLite.ipa
+
