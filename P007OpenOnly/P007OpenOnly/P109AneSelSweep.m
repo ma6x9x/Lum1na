@@ -19,6 +19,7 @@
 #import "LabLocalTime.h"
 
 #import <Foundation/Foundation.h>
+#import <CoreML/CoreML.h>
 #import <mach/mach.h>
 #import <fcntl.h>
 #import <string.h>
@@ -27,7 +28,7 @@
 #import <unistd.h>
 #import <stdarg.h>
 
-#define P109_BUILD @"p109-ane-selsweep-v9.1-autopid"
+#define P109_BUILD @"p109-ane-selsweep-v10-wake"
 
 typedef mach_port_t io_object_t;
 typedef mach_port_t io_service_t;
@@ -97,6 +98,46 @@ static NSString *p109_krname(kern_return_t kr) {
         case KERN_NO_SPACE:   return @"no-space";
         default:              return [NSString stringWithFormat:@"0x%08x", (unsigned)kr];
     }
+}
+
+/* v10 BORROW (p151 v4): a successful CoreML predict registers THIS pid as an
+   ANE client and powers the engine. p109's AddClient row accepted only on boots
+   where something else had woken the ANE — this makes the door deterministic.
+   Fail-soft: model missing / load error = honest rows, sweep continues. */
+static BOOL p109_wake_ane(NSMutableString *out) {
+    NSURL *url = [NSBundle.mainBundle URLForResource:@"simple_1in1out"
+                                       withExtension:@"mlmodelc"];
+    if (!url) {
+        [out appendString:@"  [wake] simple_1in1out.mlmodelc missing\n"];
+        return NO;
+    }
+    NSError *err = nil;
+    MLModelConfiguration *cfg = [MLModelConfiguration new];
+    cfg.computeUnits = MLComputeUnitsCPUAndNeuralEngine;
+    MLModel *m = [MLModel modelWithContentsOfURL:url configuration:cfg error:&err];
+    if (!m) { [out appendFormat:@"  [wake] load failed: %@\n", err.localizedDescription]; return NO; }
+    NSString *name = m.modelDescription.inputDescriptionsByName.allKeys.firstObject;
+    MLFeatureDescription *fd = name ? m.modelDescription.inputDescriptionsByName[name] : nil;
+    MLMultiArray *arr = nil;
+    if (fd.multiArrayConstraint) {
+        arr = [[MLMultiArray alloc] initWithShape:fd.multiArrayConstraint.shape
+                                         dataType:fd.multiArrayConstraint.dataType
+                                            error:&err];
+    }
+    if (!arr || !name) {
+        [out appendFormat:@"  [wake] feature array unavailable (%@)\n",
+            fd ? @"no multiArrayConstraint" : @"no input description"];
+        return NO;
+    }
+    MLDictionaryFeatureProvider *fp =
+        [[MLDictionaryFeatureProvider alloc] initWithDictionary:@{name: arr} error:&err];
+    if (!fp) { [out appendFormat:@"  [wake] provider failed: %@\n", err.localizedDescription]; return NO; }
+    NSDate *t0 = [NSDate date];
+    id<MLFeatureProvider> pred = [m predictionFromFeatures:fp error:&err];
+    double ms = -[t0 timeIntervalSinceNow] * 1000.0;
+    [out appendFormat:@"  [wake] predict %@ in %.1f ms err=%@ (registers this pid + powers the ANE)\n",
+        pred ? @"ok" : @"FAILED", ms, err ? err.localizedDescription : @"none"];
+    return pred != nil;
 }
 
 @implementation P109AneSelSweep
@@ -185,6 +226,16 @@ static NSString *p109_krname(kern_return_t kr) {
               [p109PidSrc hasPrefix:@"census-aned"] ? @"(live aned — entitlement borrow target)" :
               ([p109PidSrc isEqualToString:@"launchd-control"] ? @"(control pid — 2f0 oracle only)" :
                @"(explicit override)")]);
+
+    /* v10: wake/register the pid with the ANE before any open (p151 borrow) */
+    @try {
+        NSMutableString *wk = [NSMutableString string];
+        BOOL woke = p109_wake_ane(wk);
+        p109_log([NSString stringWithFormat:@"[wake] %@%@", woke ? @"OK" : @"MISS",
+                  wk.length ? [@"\n" stringByAppendingString:wk] : @""]);
+    } @catch (NSException *e) {
+        p109_log([NSString stringWithFormat:@"[wake] caught %@", e.reason ?: @"exception"]);
+    }
 
     void *h = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_LAZY);
     if (!h) { p109_log(@"dlopen IOKit FAIL"); goto done; }
@@ -332,29 +383,33 @@ static NSString *p109_krname(kern_return_t kr) {
                     deviant ? @"  <DEVIANT" : @""];
                 p109_log(line);
             }
-            /* v8 pid rows: sel0 AddClient shape with the live aned pid
-               written at three candidate offsets (0x60/0x78/0x80) that sit
-               inside the 0x88 accepted shape. Non-zero content may trip the
-               content law (2c2) — that is itself the mapping verdict. */
+            /* v10 pid rows — RECEIPT-PROVEN slots (p151 v6 law): 23F77 sel0 =
+               0x68/0x68 with the pid at 0x00/0x0c/0x10/0x54; 24A435 sel0 =
+               0x88/0x88 (pid log-only there). Both shapes tried with the same
+               four slots; the kr class is the mapping verdict. */
             {
-                static const size_t pidOffs[3] = { 0x60, 0x78, 0x80 };
-                for (int oi = 0; oi < 3; oi++) {
-                    static uint8_t pin[0x88];
-                    static uint8_t pout[0x88];
-                    memset(pin, 0, sizeof pin);
-                    memset(pout, 0, sizeof pout);
-                    uint32_t pid = p109Pid;
-                    memcpy(pin + pidOffs[oi], &pid, sizeof pid);
-                    size_t osz = sizeof pout;
-                    kern_return_t kr = pStruct(conn, 0, pin, sizeof pin, pout, &osz);
-                    uint8_t o0[9]; memcpy(o0, pout, 8); o0[8] = 0;
-                    p109_log([NSString stringWithFormat:
-                        @"[pid sel0 +%#zu] pid=%u zeros kr=%@ osz=%zu out0=%02x%02x%02x%02x — %@",
-                        pidOffs[oi], pid, p109_krname(kr), osz,
-                        pout[0], pout[1], pout[2], pout[3],
-                        (kr == KERN_SUCCESS ? @"ACCEPTED with pid — field tolerance" :
-                         kr == 0xe00002c2 ? @"2c2 — content law rejects non-zero here" :
-                         @"kind switch — MAPPED field")]);
+                static const size_t pidOffs[4] = { 0x00, 0x0c, 0x10, 0x54 };
+                static const size_t pidSizes[2] = { 0x68, 0x88 };
+                for (int si = 0; si < 2; si++) {
+                    for (int oi = 0; oi < 4; oi++) {
+                        static uint8_t pin[0x88];
+                        static uint8_t pout[0x88];
+                        memset(pin, 0, sizeof pin);
+                        memset(pout, 0, sizeof pout);
+                        uint32_t pid = p109Pid;
+                        memcpy(pin + pidOffs[oi], &pid, sizeof pid);
+                        size_t isz = pidSizes[si];
+                        size_t osz = isz;
+                        kern_return_t kr = pStruct(conn, 0, pin, isz, pout, &osz);
+                        p109_log([NSString stringWithFormat:
+                            @"[pid sel0 sz=%#zx +%#zx] pid=%u kr=%@ osz=%zu out0=%02x%02x%02x%02x — %@",
+                            isz, pidOffs[oi], pid, p109_krname(kr), osz,
+                            pout[0], pout[1], pout[2], pout[3],
+                            (kr == KERN_SUCCESS ? @"ACCEPTED with pid — field tolerance" :
+                             kr == 0xe00002f0 ? @"2f0 — pid NOT in client list (borrow miss)" :
+                             kr == 0xe00002c2 ? @"2c2 — size/content law rejects this slot" :
+                             @"kind switch — MAPPED field")]);
+                    }
                 }
             }
             if (notifPort && pPortDestroy) pPortDestroy(notifPort);
