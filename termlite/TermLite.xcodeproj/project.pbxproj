@@ -15,8 +15,8 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXBuildFile section */
-		LTB0000000000000000000001 /* WQSSHServer.m in Sources */ = {isa = PBXBuildFile; fileRef = LTF0000000000000000000005 /* WQSSHServer.m */; };
-		LTB0000000000000000000002 /* worse_query.m in Sources */ = {isa = PBXBuildFile; fileRef = LTF0000000000000000000006 /* worse_query.m */; };
+		LTX0000000000000000000005 /* WQSSHServer.m in Sources */ = {isa = PBXBuildFile; fileRef = LTF0000000000000000000005 /* WQSSHServer.m */; };
+		LTX0000000000000000000006 /* worse_query.m in Sources */ = {isa = PBXBuildFile; fileRef = LTF0000000000000000000006 /* worse_query.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -79,6 +79,7 @@
 				LastUpgradeCheck = 1600;
 			};
 			compatibilityVersion = "Xcode 14.0";
+			preferredProjectObjectVersion = 77;
 			buildConfigurationList = LTC0000000000000000000002;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
