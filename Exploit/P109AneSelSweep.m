@@ -27,7 +27,7 @@
 #import <unistd.h>
 #import <stdarg.h>
 
-#define P109_BUILD @"p109-ane-selsweep-v5-s88"
+#define P109_BUILD @"p109-ane-selsweep-v6-contentlaw"
 
 typedef mach_port_t io_object_t;
 typedef mach_port_t io_service_t;
@@ -170,7 +170,33 @@ static NSString *p109_krname(kern_return_t kr) {
                a struct-SIZE wall, not a closed dispatch. 0x88 hits the
                pinned T8150 shape; 0x68 = the 23F77 size, kept for the
                cross-check. */
+            /* v6 CONTENT LAW (v5 receipt, 17): the p151 DeviceOpen accepted
+               sel0 0x88/0x88 ALL-ZEROS (kr=0, out[0]==0) while v5's
+               DEADBEEF-filler sweep returned uniform 2c2 on every sel
+               including sel0 — the LB gate validates CONTENT (reserved
+               fields must be zero), not just size. v6: zeros-based fill
+               for the shapes at/below the AddClient size (0x88/0x68),
+               DEADBEEF filler kept for the big shapes (probing the +0x180
+               pid band). First row per conn = the exact p151 sel0
+               replication (zeros 0x88/0x88, pid=0) as the control. */
             const size_t sizes[5] = { 0x88, 0x68, 0x200, 0x400, 0x800 };
+            /* control row: exact p151 receipt — sel0, 0x88 in/out, zeros */
+            {
+                static uint8_t in[0x88];
+                static uint8_t out[0x88];
+                memset(in, 0, sizeof in);
+                memset(out, 0, sizeof out);
+                size_t osz = sizeof out;
+                kern_return_t kr = pStruct(conn, 0, in, sizeof in, out, &osz);
+                uint8_t o0[9];
+                memcpy(o0, out, 8); o0[8] = 0;
+                p109_log([NSString stringWithFormat:
+                    @"[ctrl sel0] zeros 0x88/0x88 kr=%@ osz=%zu out0=%02x%02x%02x%02x — %@",
+                    p109_krname(kr), osz,
+                    out[0], out[1], out[2], out[3],
+                    (kr == KERN_SUCCESS ? @"p151 REPLICATED (AddClient accepted)" :
+                     @"NOT replicated — shape law differs this boot (record it)")]);
+            }
             for (uint32_t sel = 0; sel <= 213; sel++) {
                 NSMutableString *line = [NSMutableString
                     stringWithFormat:@"[sel %2u]", sel];
@@ -178,17 +204,21 @@ static NSString *p109_krname(kern_return_t kr) {
                     size_t sz = sizes[sz_i];
                     static uint8_t in[0x800];
                     static uint8_t out[0x1000];
-                    uint32_t *w = (uint32_t *)in;
-                    for (size_t k = 0; k < sz/4; k++) w[k] = 0xDEADBEEFu;
-                    /* the pid field at +0x180 stays DEADBEEF in the small
-                       shapes (<0x200) only if out of range — 0x88/0x68 do
-                       NOT reach +0x180; the sweep records the kr-class
-                       wall first, pid placement comes on the hit row. */
                     memset(out, 0, sizeof out);
+                    if (sz > 0x180) {
+                        /* big shapes: DEADBEEF filler probes the +0x180
+                           pid band (content-independent check) */
+                        uint32_t *w = (uint32_t *)in;
+                        for (size_t k = 0; k < sz/4; k++) w[k] = 0xDEADBEEFu;
+                    } else {
+                        /* AddClient-class shapes: zeros (the accepted
+                           content class from the p151 receipt) */
+                        memset(in, 0, sizeof in);
+                    }
                     size_t osz = sizeof out;
                     kern_return_t kr = pStruct(conn, sel, in, sz, out, &osz);
-                    NSString *lbl = (sz == 0x88 ? @"s88" : (sz == 0x68 ? @"s68" :
-                        (sz == 0x200 ? @"s200" : (sz == 0x400 ? @"s400" : @"s800"))));
+                    NSString *lbl = (sz == 0x88 ? @"s88z" : (sz == 0x68 ? @"s68z" :
+                        (sz == 0x200 ? @"s200d" : (sz == 0x400 ? @"s400d" : @"s800d"))));
                     [line appendFormat:@" %@=%@", lbl, p109_krname(kr)];
                 }
                 p109_log(line);
