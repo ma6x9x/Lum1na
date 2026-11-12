@@ -52,6 +52,7 @@
 #import "Exploit/GPUStalePageProbe.h"
 #import "BadQueryProbe.h"
 #import "LabProbeGuard.h"
+#import "Vendor/filza27.2/WQTerminal.h"
 #import "Exploit/P010QueueLeak.h"
 #import "Exploit/P017ConfusedDeputy.h"
 #import "Exploit/P032ANEOpenSmoke.h"

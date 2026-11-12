@@ -6,8 +6,25 @@
 import SwiftUI
 
 struct ContentView: View {
+    @State private var showTerminal = false
     var body: some View {
-        RootView()
+        ZStack(alignment: .bottomTrailing) {
+            RootView()
+            Button {
+                showTerminal = true
+            } label: {
+                Image(systemName: "terminal")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.75))
+                    .frame(width: 40, height: 40)
+                    .background(Circle().fill(Color(.systemGray5).opacity(0.8)))
+            }
+            .buttonStyle(.plain)
+            .padding(.trailing, 14)
+            .padding(.bottom, 16)
+            .accessibilityLabel("Terminal")
+        }
+        .fullScreenCover(isPresented: $showTerminal) { MainTerminalPane() }
     }
 }
 

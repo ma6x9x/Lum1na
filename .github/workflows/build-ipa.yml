@@ -550,6 +550,22 @@ jobs:
           # Embed entitlements next to the binary for the sign step
           cp "Lum1na.entitlements" "Payload/${PROJECT_NAME}.app/"
 
+          # a-Shell mini runtime -> the in-app terminal (soft: builds green
+          # without the payload; the pane reports "not embedded").
+          if ASHELL_IPA_FILE=$(ls "$HOME/Downloads/Terminal.ipa" 2>/dev/null || true); [ -n "$ASHELL_IPA_FILE" ]; then
+            python3 scripts/merge_ashell.py "Payload/${PROJECT_NAME}.app" "$ASHELL_IPA_FILE" || true
+          else
+            ASHELL_IPA_FILE=""
+            for cand in "$HOME/Downloads"/a-Shell-mini*.ipa "$HOME/Downloads"/aShell-mini*.ipa; do
+              [ -f "$cand" ] && ASHELL_IPA_FILE="$cand" && break
+            done
+            if [ -n "$ASHELL_IPA_FILE" ]; then
+              python3 scripts/merge_ashell.py "Payload/${PROJECT_NAME}.app" "$ASHELL_IPA_FILE" || true
+            else
+              echo "no a-Shell mini payload present - terminal ships without ios_system (soft)"
+            fi
+          fi
+
           # Fake-sign for ldid/Sideloadly compatibility.
           # MUST succeed: the rig install path (Filza/appinst on Dopamine)
           # needs the ldid signature + embedded entitlements. If ldid is
