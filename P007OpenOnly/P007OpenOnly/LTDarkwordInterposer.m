@@ -11,20 +11,21 @@
 //
 
 #import <Foundation/Foundation.h>
+#import <pthread.h>
 #import <stdio.h>
 
 static void lt_interposed_exit(int code)
     __attribute__((noreturn));
 
+/* v2: pthread_exit instead of NSException. The exception unwind had to
+   cross Swift async closure frames (undefined propagation) — receipts
+   showed the app still exiting. pthread_exit kills ONLY the calling
+   thread: the vendored exploit now runs on a DarkswordBridge worker, so
+   a FAILURE-path exit() ends the worker; the app and chain live on, the
+   bridge reports the failure as an honest miss row. */
 static void lt_interposed_exit(int code) {
-    // record the vendored-failure exit and unwind via exception
-    fprintf(stderr, "[lt-interpose] exit(%d) intercepted -> raising\n", code);
-    [NSException exceptionWithName:@"LTDarkswordExit"
-                            reason:[NSString stringWithFormat:
-                                @"vendored exploit called exit(%d)", code]
-                          userInfo:@{@"exitCode": @(code)}];
-    // never reached; exceptions need no return
-    _exit(code);
+    fprintf(stderr, "[lt-interpose] exit(%d) intercepted -> pthread_exit\n", code);
+    pthread_exit((void *)(uintptr_t)(code | 0x1000));
 }
 
 static void (*lt_real_exit)(int) = NULL;
