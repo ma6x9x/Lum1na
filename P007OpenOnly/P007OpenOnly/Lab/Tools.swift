@@ -289,7 +289,9 @@ enum LaunchCensus {
         guard !daemons.isEmpty else { return nil }
         let dirs = NSSearchPathForDirectoriesInDomains(.documentDirectory, .userDomainMask, true)
         guard let docs = dirs.first else { return nil }
-        var text = "# launchd detail (\(daemons.count) plists) \u{2014} program paths feed the binary inspector\n"
+        var machine = sysctlString("hw.machine") ?? "?"
+        var osv = sysctlString("kern.osversion") ?? "?"
+        var text = "# launchd detail (\(daemons.count) plists) \u{2014} machine=\(machine) osversion=\(osv) date=\(Date()) — program paths feed the binary inspector\n"
         for d in daemons.sorted(by: { $0.label.caseInsensitiveCompare($1.label) == .orderedAscending }) {
             text += "[\(d.label)]\n\(d.path)\n"
             if !d.program.isEmpty { text += "  program: \(d.program)\n" }

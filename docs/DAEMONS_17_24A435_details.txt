@@ -1,0 +1,3359 @@
+# launchd detail (661 plists) — program paths feed the binary inspector
+[com.apple.ABDatabaseDoctor]
+/System/Library/LaunchDaemons/com.apple.ABDatabaseDoctor.plist
+  program: /System/Library/Frameworks/AddressBook.framework/Support/ABDatabaseDoctor
+  args: /System/Library/Frameworks/AddressBook.framework/Support/ABDatabaseDoctor
+
+[com.apple.abm-helper]
+/System/Library/LaunchDaemons/com.apple.abm-helper.plist
+  program: /System/Library/PrivateFrameworks/ABMHelper.framework/Support/abm-helper
+  keepAlive: {conditional}
+
+[com.apple.absd]
+/System/Library/LaunchDaemons/com.apple.absd.plist
+  program: /usr/sbin/absd
+
+[com.apple.accessibility.axassetsd]
+/System/Library/LaunchDaemons/com.apple.accessibility.axassetsd.plist
+  program: /System/Library/PrivateFrameworks/AXAssetLoader.framework/Support/axassetsd
+  args: /System/Library/PrivateFrameworks/AXAssetLoader.framework/Support/axassetsd
+  runAtLoad: true
+
+[com.apple.accessibility.axremoted]
+/System/Library/LaunchDaemons/com.apple.accessibility.axremoted.plist
+  program: /System/Library/PrivateFrameworks/AccessibilityRemoteServices.framework/Support/axremoted
+
+[com.apple.accessibility.heard]
+/System/Library/LaunchDaemons/com.apple.accessibility.heard.plist
+  program: /System/Library/PrivateFrameworks/HearingCore.framework/heard
+
+[com.apple.accessibility.motiontrackingd]
+/System/Library/LaunchDaemons/com.apple.accessibility.motiontrackingd.plist
+  program: /System/Library/PrivateFrameworks/AccessibilitySharedSupport.framework/Support/motiontrackingd
+  args: /System/Library/PrivateFrameworks/AccessibilitySharedSupport.framework/Support/motiontrackingd
+
+[com.apple.accessoryd]
+/System/Library/LaunchDaemons/com.apple.accessoryd.plist
+  program: /System/Library/PrivateFrameworks/CoreAccessories.framework/Support/accessoryd
+  args: /System/Library/PrivateFrameworks/CoreAccessories.framework/Support/accessoryd
+
+[com.apple.accessorysensormgrd]
+/System/Library/LaunchDaemons/com.apple.accessorysensormgrd.plist
+  program: /usr/libexec/accessorysensormgrd
+  args: /usr/libexec/accessorysensormgrd
+
+[com.apple.accessoryupdaterd]
+/System/Library/LaunchDaemons/com.apple.accessoryupdaterd.plist
+  program: /System/Library/PrivateFrameworks/MobileAccessoryUpdater.framework/Support/accessoryupdaterd
+  args: /System/Library/PrivateFrameworks/MobileAccessoryUpdater.framework/Support/accessoryupdaterd 120
+  runAtLoad: true
+
+[com.apple.accountsd]
+/System/Library/LaunchDaemons/com.apple.accountsd.plist
+  program: /System/Library/Frameworks/Accounts.framework/accountsd
+  args: /System/Library/Frameworks/Accounts.framework/accountsd
+
+[com.apple.activityawardsd]
+/System/Library/LaunchDaemons/com.apple.activityawardsd.plist
+  program: /System/Library/PrivateFrameworks/ActivityAwardsServices.framework/activityawardsd
+  args: /System/Library/PrivateFrameworks/ActivityAwardsServices.framework/activityawardsd
+  env: 1 var(s)
+
+[com.apple.activitysharingd]
+/System/Library/LaunchDaemons/com.apple.activitysharingd.plist
+  program: /System/Library/PrivateFrameworks/ActivitySharingServices.framework/activitysharingd
+  args: /System/Library/PrivateFrameworks/ActivitySharingServices.framework/activitysharingd
+  env: 1 var(s)
+
+[com.apple.adid]
+/System/Library/LaunchDaemons/com.apple.adid.plist
+  program: /usr/libexec/adid
+  keepAlive: {conditional}
+
+[com.apple.AdminLite]
+/System/Library/LaunchDaemons/com.apple.AdminLite.plist
+  program: /System/Library/PrivateFrameworks/AdminLite.framework/Resources/AdminLiteTool
+  args: /System/Library/PrivateFrameworks/AdminLite.framework/Resources/AdminLiteTool
+
+[com.apple.aeroml.intentrecommend.intentrecommendd]
+/System/Library/LaunchDaemons/com.apple.aeroml.intentrecommend.intentrecommendd.plist
+  program: /System/Library/PrivateFrameworks/IntentRecommendRuntime.framework/intentrecommendd
+  args: /System/Library/PrivateFrameworks/IntentRecommendRuntime.framework/intentrecommendd
+
+[com.apple.afcd]
+/System/Library/LaunchDaemons/com.apple.afcd.plist
+  program: /usr/libexec/afcd
+  args: /usr/libexec/afcd
+
+[com.apple.aggregated.addaily]
+/System/Library/LaunchDaemons/com.apple.aggregated.addaily.plist
+  program: /System/Library/PrivateFrameworks/AggregateDictionary.framework/Support/addaily
+
+[com.apple.airplayd]
+/System/Library/LaunchDaemons/com.apple.airplayd.plist
+  program: /usr/libexec/airplayd
+  args: /usr/libexec/airplayd
+
+[com.apple.akd]
+/System/Library/LaunchDaemons/com.apple.akd.plist
+  program: /System/Library/PrivateFrameworks/AuthKit.framework/akd
+  args: /System/Library/PrivateFrameworks/AuthKit.framework/akd
+
+[com.apple.alwaysonexclavesd]
+/System/Library/LaunchDaemons/com.apple.alwaysonexclavesd.plist
+  program: /usr/libexec/alwaysonexclavesd
+  keepAlive: {conditional}
+
+[com.apple.amsaccountsd]
+/System/Library/LaunchDaemons/com.apple.amsaccountsd.plist
+  program: /System/Library/PrivateFrameworks/AppleMediaServices.framework/amsaccountsd
+  args: /System/Library/PrivateFrameworks/AppleMediaServices.framework/amsaccountsd
+  runAtLoad: true
+
+[com.apple.amsengagementd]
+/System/Library/LaunchDaemons/com.apple.amsengagementd.plist
+  program: /System/Library/PrivateFrameworks/AppleMediaServicesUI.framework/amsengagementd
+  args: /System/Library/PrivateFrameworks/AppleMediaServicesUI.framework/amsengagementd
+
+[com.apple.amsondevicestoraged]
+/System/Library/LaunchDaemons/com.apple.amsondevicestoraged.plist
+  program: /System/Library/PrivateFrameworks/OnDeviceStorage.framework/Support/amsondevicestoraged
+  args: /System/Library/PrivateFrameworks/OnDeviceStorage.framework/Support/amsondevicestoraged
+
+[com.apple.analyticsagent]
+/System/Library/LaunchDaemons/com.apple.analyticsagent.plist
+  program: /System/Library/PrivateFrameworks/CoreAnalytics.framework/Support/analyticsagent
+  args: /System/Library/PrivateFrameworks/CoreAnalytics.framework/Support/analyticsagent
+
+[com.apple.analyticsd]
+/System/Library/LaunchDaemons/com.apple.analyticsd.plist
+  program: /System/Library/PrivateFrameworks/CoreAnalytics.framework/Support/analyticsd
+  args: /System/Library/PrivateFrameworks/CoreAnalytics.framework/Support/analyticsd
+
+[com.apple.and]
+/System/Library/LaunchDaemons/com.apple.and.plist
+  program: /System/Library/PrivateFrameworks/AccountNotification.framework/and
+  args: /System/Library/PrivateFrameworks/AccountNotification.framework/and
+
+[com.apple.aned]
+/System/Library/LaunchDaemons/com.apple.aned.plist
+  program: /usr/libexec/aned
+  args: /usr/libexec/aned
+
+[com.apple.announced]
+/System/Library/LaunchDaemons/com.apple.announced.plist
+  program: /usr/libexec/announced
+  args: /usr/libexec/announced
+
+[com.apple.anomalydetectiond]
+/System/Library/LaunchDaemons/com.apple.anomalydetectiond.plist
+  program: /usr/libexec/anomalydetectiond
+
+[com.apple.aonsensed]
+/System/Library/LaunchDaemons/com.apple.aonsensed.plist
+  program: /usr/libexec/aonsensed
+  runAtLoad: true
+  keepAlive: {conditional}
+
+[com.apple.ap.adprivacyd]
+/System/Library/LaunchDaemons/com.apple.ap.adprivacyd.plist
+  program: /usr/libexec/adprivacyd
+
+[com.apple.ap.promotedcontentd]
+/System/Library/LaunchDaemons/com.apple.ap.promotedcontentd.plist
+  program: /usr/libexec/promotedcontentd
+
+[com.apple.AppInstallationMetrics]
+/System/Library/LaunchDaemons/com.apple.appinstallationmetricsd.plist
+  program: /System/Library/PrivateFrameworks/AppInstallationMetrics.framework/Support/appinstallationmetricsd
+  args: /System/Library/PrivateFrameworks/AppInstallationMetrics.framework/Support/appinstallationmetricsd
+
+[com.apple.appleaccountd]
+/System/Library/LaunchDaemons/com.apple.appleaccountd.plist
+  program: /usr/libexec/appleaccountd
+  args: /usr/libexec/appleaccountd
+
+[com.apple.appleaccounttransparencyd]
+/System/Library/LaunchDaemons/com.apple.appleaccounttransparencyd.plist
+  program: /System/Library/PrivateFrameworks/AppleAccountTransparency.framework/appleaccounttransparencyd
+  args: /System/Library/PrivateFrameworks/AppleAccountTransparency.framework/appleaccounttransparencyd
+
+[com.apple.AppleCredentialManagerDaemon]
+/System/Library/LaunchDaemons/com.apple.AppleCredentialManagerDaemon.plist
+  program: /System/Library/PrivateFrameworks/AppleCredentialManager.framework/AppleCredentialManagerDaemon
+  args: /System/Library/PrivateFrameworks/AppleCredentialManager.framework/AppleCredentialManagerDaemon
+  runAtLoad: true
+
+[com.apple.appleh16camerad]
+/System/Library/LaunchDaemons/com.apple.appleh16camerad.plist
+  program: /usr/sbin/appleh16camerad
+  args: /usr/sbin/appleh16camerad
+
+[com.apple.appleidsetupd]
+/System/Library/LaunchDaemons/com.apple.appleidsetupd.plist
+  program: /usr/libexec/appleidsetupd
+  args: /usr/libexec/appleidsetupd
+
+[com.apple.applekeystored]
+/System/Library/LaunchDaemons/com.apple.applekeystored.plist
+  program: /usr/libexec/applekeystored
+
+[com.apple.applicensedeliveryd]
+/System/Library/LaunchDaemons/com.apple.applicensedeliveryd.plist
+  program: /System/Library/Frameworks/ManagedAppDistribution.framework/Support/applicensedeliveryd
+  args: /System/Library/Frameworks/ManagedAppDistribution.framework/Support/applicensedeliveryd
+
+[com.apple.appmanagedfeaturesd]
+/System/Library/LaunchDaemons/com.apple.appmanagedfeaturesd.plist
+  program: /System/Library/Frameworks/AppManagedFeatures.framework/Support/appmanagedfeaturesd
+
+[com.apple.appplaceholdersyncd]
+/System/Library/LaunchDaemons/com.apple.appplaceholdersyncd.plist
+  program: /System/Library/CoreServices/appplaceholdersyncd
+  args: /System/Library/CoreServices/appplaceholdersyncd
+
+[com.apple.appprotectiond]
+/System/Library/LaunchDaemons/com.apple.appprotectiond.plist
+  program: /usr/libexec/appprotectiond
+  args: /usr/libexec/appprotectiond
+
+[com.apple.AppSSODaemon]
+/System/Library/LaunchDaemons/com.apple.AppSSODaemon.plist
+  program: /System/Library/PrivateFrameworks/AppSSO.framework/Support/AppSSODaemon
+  args: /System/Library/PrivateFrameworks/AppSSO.framework/Support/AppSSODaemon
+
+[com.apple.appstorecomponentsd]
+/System/Library/LaunchDaemons/com.apple.appstorecomponentsd.plist
+  program: /System/Library/PrivateFrameworks/AppStoreComponents.framework/Support/appstorecomponentsd
+  args: /System/Library/PrivateFrameworks/AppStoreComponents.framework/Support/appstorecomponentsd
+
+[com.apple.appstored]
+/System/Library/LaunchDaemons/com.apple.appstored.plist
+  program: /System/Library/PrivateFrameworks/AppStoreDaemon.framework/Support/appstored
+  args: /System/Library/PrivateFrameworks/AppStoreDaemon.framework/Support/appstored
+
+[com.apple.apsd]
+/System/Library/LaunchDaemons/com.apple.apsd.plist
+  program: /System/Library/PrivateFrameworks/ApplePushService.framework/apsd
+  args: /System/Library/PrivateFrameworks/ApplePushService.framework/apsd
+  keepAlive: {conditional}
+
+[com.apple.arkitd]
+/System/Library/LaunchDaemons/com.apple.arkitd.plist
+  program: /usr/libexec/arkitd
+  args: /usr/libexec/arkitd
+
+[com.apple.asd]
+/System/Library/LaunchDaemons/com.apple.asd.plist
+  program: /usr/libexec/asd
+
+[com.apple.askpermissiond]
+/System/Library/LaunchDaemons/com.apple.askpermissiond.plist
+  program: /System/Library/PrivateFrameworks/AskPermission.framework/Support/askpermissiond
+  args: /System/Library/PrivateFrameworks/AskPermission.framework/Support/askpermissiond
+  runAtLoad: true
+
+[com.apple.asktod]
+/System/Library/LaunchDaemons/com.apple.asktod.plist
+  program: /usr/libexec/asktod
+  args: /usr/libexec/asktod
+
+[com.apple.aslmanager]
+/System/Library/LaunchDaemons/com.apple.aslmanager.plist
+  program: /usr/sbin/aslmanager
+  args: aslmanager
+
+[com.apple.assessmentagent]
+/System/Library/LaunchDaemons/com.apple.assessmentagent.plist
+  program: /usr/libexec/assessmentagent
+  keepAlive: {conditional}
+
+[com.apple.AssetCacheLocatorService]
+/System/Library/LaunchDaemons/com.apple.AssetCacheLocatorService.plist
+  program: /System/Library/PrivateFrameworks/AssetCacheServices.framework/XPCServices/AssetCacheLocatorService.xpc/AssetCacheLocatorService
+  args: /System/Library/PrivateFrameworks/AssetCacheServices.framework/XPCServices/AssetCacheLocatorService.xpc/AssetCacheLocatorService -d
+
+[com.apple.assetsd]
+/System/Library/LaunchDaemons/com.apple.assetsd.plist
+  program: /System/Library/Frameworks/AssetsLibrary.framework/Support/assetsd
+  args: assetsd
+  keepAlive: {conditional}
+
+[com.apple.assetsd.nebulad]
+/System/Library/LaunchDaemons/com.apple.assetsd.nebulad.plist
+  program: /System/Library/PrivateFrameworks/CameraUI.framework/Support/nebulad
+  args: /System/Library/PrivateFrameworks/CameraUI.framework/Support/nebulad
+  keepAlive: {conditional}
+
+[com.apple.assetsubscriptiond]
+/System/Library/LaunchDaemons/com.apple.assetsubscriptiond.plist
+  program: /usr/libexec/assetsubscriptiond
+  args: /usr/libexec/assetsubscriptiond
+
+[com.apple.assistant_cdmd]
+/System/Library/LaunchDaemons/com.apple.assistant_cdmd.plist
+  program: /System/Library/PrivateFrameworks/ContinuousDialogManagerService.framework/assistant_cdmd
+  args: /System/Library/PrivateFrameworks/ContinuousDialogManagerService.framework/assistant_cdmd
+  env: 1 var(s)
+
+[com.apple.assistant_service]
+/System/Library/LaunchDaemons/com.apple.assistant_service.plist
+  program: /System/Library/PrivateFrameworks/AssistantServices.framework/assistant_service
+  args: /System/Library/PrivateFrameworks/AssistantServices.framework/assistant_service
+
+[com.apple.assistantd]
+/System/Library/LaunchDaemons/com.apple.assistantd.plist
+  program: /System/Library/PrivateFrameworks/AssistantServices.framework/assistantd
+  args: /System/Library/PrivateFrameworks/AssistantServices.framework/assistantd
+  runAtLoad: true
+
+[com.apple.assistivetouchd]
+/System/Library/LaunchDaemons/com.apple.assistivetouchd.plist
+  program: /System/Library/CoreServices/AssistiveTouch.app/assistivetouchd
+  args: /System/Library/CoreServices/AssistiveTouch.app/assistivetouchd
+
+[com.apple.atc]
+/System/Library/LaunchDaemons/com.apple.atc.plist
+  program: /usr/libexec/atc
+  args: /usr/libexec/atc
+  runAtLoad: true
+  keepAlive: {conditional}
+
+[com.apple.attributionkitd]
+/System/Library/LaunchDaemons/com.apple.attributionkitd.plist
+  program: /System/Library/Frameworks/AdAttributionKit.framework/Support/attributionkitd
+  args: /System/Library/Frameworks/AdAttributionKit.framework/Support/attributionkitd
+
+[com.apple.audioanalyticsd]
+/System/Library/LaunchDaemons/com.apple.audioanalyticsd.plist
+  program: /usr/libexec/audioanalyticsd
+  args: /usr/libexec/audioanalyticsd
+
+[com.apple.audiomxd]
+/System/Library/LaunchDaemons/com.apple.audiomxd.plist
+  program: /usr/libexec/audiomxd
+  args: /usr/libexec/audiomxd
+
+[com.apple.AuthenticationServicesCore.AuthenticationServicesAgent]
+/System/Library/LaunchDaemons/com.apple.AuthenticationServicesCore.AuthenticationServicesAgent.plist
+  program: /System/Cryptexes/App/usr/libexec/AuthenticationServicesAgent
+
+[com.apple.avatarsd]
+/System/Library/LaunchDaemons/com.apple.avatarsd.plist
+  program: /System/Library/PrivateFrameworks/AvatarPersistence.framework/Support/avatarsd
+  args: /System/Library/PrivateFrameworks/AvatarPersistence.framework/Support/avatarsd
+
+[com.apple.avconferenced]
+/System/Library/LaunchDaemons/com.apple.avconferenced.plist
+  program: /usr/libexec/avconferenced
+  args: /usr/libexec/avconferenced
+
+[com.apple.backboardd]
+/System/Library/LaunchDaemons/com.apple.backboardd.plist
+  program: /usr/libexec/backboardd
+  args: /usr/libexec/backboardd
+  runAtLoad: true
+  keepAlive: true
+
+[com.apple.backgroundassets.user]
+/System/Library/LaunchDaemons/com.apple.backgroundassets.user.plist
+  program: /usr/libexec/backgroundassets.user
+  args: /usr/libexec/backgroundassets.user
+
+[com.apple.backupd]
+/System/Library/LaunchDaemons/com.apple.backupd.plist
+  program: /System/Library/PrivateFrameworks/MobileBackup.framework/backupd
+  args: /System/Library/PrivateFrameworks/MobileBackup.framework/backupd
+
+[com.apple.BarcodeSupport.BarcodeNotificationService]
+/System/Library/LaunchDaemons/com.apple.BarcodeSupport.BarcodeNotificationService.plist
+  program: /System/Library/PrivateFrameworks/BarcodeSupport.framework/com.apple.BarcodeSupport.BarcodeNotificationService
+
+[com.apple.BatteryDischargeService]
+/System/Library/LaunchDaemons/com.apple.BatteryDischargeService.plist
+  program: /usr/libexec/BatteryDischargeService
+
+[com.apple.batteryintelligenced]
+/System/Library/LaunchDaemons/com.apple.batteryintelligenced.plist
+  program: /usr/libexec/batteryintelligenced
+
+[com.apple.batterytrapd]
+/System/Library/LaunchDaemons/com.apple.batterytrapd.plist
+  program: /usr/libexec/batterytrapd
+  args: /usr/libexec/batterytrapd
+  runAtLoad: true
+
+[com.apple.betaenrollmentd]
+/System/Library/LaunchDaemons/com.apple.betaenrollmentd.plist
+  program: /usr/libexec/betaenrollmentd
+  args: /usr/libexec/betaenrollmentd
+
+[com.apple.biomed]
+/System/Library/LaunchDaemons/com.apple.biomed.plist
+  program: /System/Library/PrivateFrameworks/BiomeStreams.framework/Support/biomed
+  args: /System/Library/PrivateFrameworks/BiomeStreams.framework/Support/biomed
+
+[com.apple.biomesyncd]
+/System/Library/LaunchDaemons/com.apple.biomesyncd.plist
+  program: /usr/libexec/biomesyncd
+  args: /usr/libexec/biomesyncd
+
+[com.apple.biometrickitd.pearl]
+/System/Library/LaunchDaemons/com.apple.biometrickitd.pearl.plist
+  program: /usr/libexec/biometrickitd
+  args: /usr/libexec/biometrickitd
+  env: 1 var(s)
+
+[com.apple.bird]
+/System/Library/LaunchDaemons/com.apple.bird.plist
+  program: /System/Library/PrivateFrameworks/iCloudDriveCore.framework/bird
+  args: /System/Library/PrivateFrameworks/iCloudDriveCore.framework/bird
+
+[com.apple.BlueTool]
+/System/Library/LaunchDaemons/com.apple.BlueTool.plist
+  program: /usr/sbin/BlueTool
+  args: /usr/sbin/BlueTool -R
+
+[com.apple.bluetoothaudiod]
+/System/Library/LaunchDaemons/com.apple.bluetoothaudiod.plist
+  program: /usr/sbin/bluetoothaudiod
+  args: /usr/sbin/bluetoothaudiod
+
+[com.apple.bluetoothd]
+/System/Library/LaunchDaemons/com.apple.bluetoothd.plist
+  program: /usr/sbin/bluetoothd
+  args: /usr/sbin/bluetoothd
+  runAtLoad: true
+  keepAlive: {conditional}
+  env: 1 var(s)
+
+[com.apple.BluetoothUIService]
+/System/Library/LaunchDaemons/com.apple.bluetoothuiservice.plist
+  program: /System/Library/CoreServices/BluetoothUIService.app/BluetoothUIService
+
+[com.apple.bluetoothuserd]
+/System/Library/LaunchDaemons/com.apple.bluetoothuserd.plist
+  program: /usr/libexec/bluetoothuserd
+  args: /usr/libexec/bluetoothuserd
+
+[com.apple.bookassetd]
+/System/Library/LaunchDaemons/com.apple.bookassetd.plist
+  program: /System/Library/PrivateFrameworks/BookLibraryCore.framework/Support/bookassetd
+  args: /System/Library/PrivateFrameworks/BookLibraryCore.framework/Support/bookassetd
+
+[com.apple.bookdatastored]
+/System/Library/LaunchDaemons/com.apple.bookdatastored.plist
+  program: /System/Library/PrivateFrameworks/BookDataStore.framework/Support/bookdatastored
+  args: /System/Library/PrivateFrameworks/BookDataStore.framework/Support/bookdatastored
+
+[com.apple.bootpd]
+/System/Library/LaunchDaemons/bootps.plist
+  program: /usr/libexec/bootpd
+  args: /usr/libexec/bootpd
+
+[com.apple.browserkitd]
+/System/Library/LaunchDaemons/com.apple.browserkitd.plist
+  program: /System/Cryptexes/App/usr/libexec/browserkitd
+
+[com.apple.BTServer.avrcp]
+/System/Library/LaunchDaemons/com.apple.BTServer.avrcp.plist
+  program: /usr/sbin/BTAvrcp
+  args: /usr/sbin/BTAvrcp
+
+[com.apple.BTServer.le]
+/System/Library/LaunchDaemons/com.apple.BTServer.le.plist
+  program: /usr/sbin/BTLEServer
+  args: /usr/sbin/BTLEServer
+  env: 1 var(s)
+
+[com.apple.BTServer.map]
+/System/Library/LaunchDaemons/com.apple.BTServer.map.plist
+  program: /usr/sbin/BTMap
+  args: /usr/sbin/BTMap
+
+[com.apple.BTServer.pbap]
+/System/Library/LaunchDaemons/com.apple.BTServer.pbap.plist
+  program: /usr/sbin/BTPbap
+  args: /usr/sbin/BTPbap
+
+[com.apple.businessservicesd]
+/System/Library/LaunchDaemons/com.apple.businessservicesd.plist
+  program: /System/Library/PrivateFrameworks/BusinessChatService.framework/businessservicesd
+  args: /System/Library/PrivateFrameworks/BusinessChatService.framework/businessservicesd
+
+[com.apple.cache_delete]
+/System/Library/LaunchDaemons/com.apple.cache_delete.plist
+  program: /System/Library/PrivateFrameworks/CacheDelete.framework/deleted
+  args: /System/Library/PrivateFrameworks/CacheDelete.framework/deleted
+
+[com.apple.calaccessd]
+/System/Library/LaunchDaemons/com.apple.calaccessd.plist
+  program: /System/Library/PrivateFrameworks/CalendarDaemon.framework/Support/calaccessd
+  args: /System/Library/PrivateFrameworks/CalendarDaemon.framework/Support/calaccessd
+
+[com.apple.callhistoryd]
+/System/Library/LaunchDaemons/com.apple.callhistoryd.plist
+  program: /System/Library/PrivateFrameworks/CallHistory.framework/Support/callhistoryd
+  args: /System/Library/PrivateFrameworks/CallHistory.framework/Support/callhistoryd
+
+[com.apple.CallHistorySyncHelper]
+/System/Library/LaunchDaemons/com.apple.CallHistorySyncHelper.plist
+  program: /System/Library/PrivateFrameworks/CallHistory.framework/Support/CallHistorySyncHelper
+  args: /System/Library/PrivateFrameworks/CallHistory.framework/Support/CallHistorySyncHelper
+
+[com.apple.callintelligenced]
+/System/Library/LaunchDaemons/com.apple.callintelligenced.plist
+  program: /System/Library/PrivateFrameworks/CallIntelligence.framework/callintelligenced
+  args: /System/Library/PrivateFrameworks/CallIntelligence.framework/callintelligenced
+  env: 1 var(s)
+
+[com.apple.callverificationd]
+/System/Library/LaunchDaemons/com.apple.callverificationd.plist
+  program: /usr/libexec/callverificationd
+  args: /usr/libexec/callverificationd
+
+[com.apple.cameracaptured]
+/System/Library/LaunchDaemons/com.apple.cameracaptured.plist
+  program: /usr/libexec/cameracaptured
+  args: /usr/libexec/cameracaptured
+  keepAlive: {conditional}
+
+[com.apple.cameraispd]
+/System/Library/LaunchDaemons/com.apple.cameraispd.plist
+  program: /usr/libexec/cameraispd
+  args: /usr/libexec/cameraispd
+
+[com.apple.captiveagent]
+/System/Library/LaunchDaemons/com.apple.captiveagent.plist
+  program: /usr/libexec/captiveagent
+
+[com.apple.caraccessoryd]
+/System/Library/LaunchDaemons/com.apple.caraccessoryd.plist
+  program: /usr/libexec/caraccessoryd
+
+[com.apple.carkitd]
+/System/Library/LaunchDaemons/com.apple.carkitd.plist
+  program: /usr/libexec/carkitd
+
+[com.apple.CarPlayApp]
+/System/Library/LaunchDaemons/com.apple.CarPlayApp.plist
+  program: /System/Library/CoreServices/CarPlay.app/CarPlay
+  args: /System/Library/CoreServices/CarPlay.app/CarPlay
+
+[com.apple.carrierutilitiesd]
+/System/Library/LaunchDaemons/com.apple.carrierutilitiesd.plist
+  program: /usr/local/libexec/carrierutilitiesd
+  args: /usr/local/libexec/carrierutilitiesd
+  keepAlive: {conditional}
+
+[com.apple.cdpd]
+/System/Library/LaunchDaemons/com.apple.cdpd.plist
+  program: /System/Library/PrivateFrameworks/CoreCDP.framework/cdpd
+  args: /System/Library/PrivateFrameworks/CoreCDP.framework/cdpd
+
+[com.apple.cellularcertd]
+/System/Library/LaunchDaemons/com.apple.cellularcertd.plist
+  program: /usr/local/bin/cellularcertd
+  keepAlive: {conditional}
+
+[com.apple.centaurid]
+/System/Library/LaunchDaemons/com.apple.centaurid.plist
+  program: /usr/libexec/centaurid
+  keepAlive: {conditional}
+
+[com.apple.certui.relay]
+/System/Library/LaunchDaemons/com.apple.certui.relay.plist
+  program: /System/Library/PrivateFrameworks/CertUI.framework/certui_relay
+  args: /System/Library/PrivateFrameworks/CertUI.framework/certui_relay
+
+[com.apple.cfnetwork.AuthBrokerAgent]
+/System/Library/LaunchDaemons/com.apple.cfnetwork.AuthBrokerAgent.plist
+  program: /System/Library/Frameworks/CFNetwork.framework/AuthBrokerAgent
+  args: /System/Library/Frameworks/CFNetwork.framework/AuthBrokerAgent
+
+[com.apple.cfnetwork.cfnetworkagent]
+/System/Library/LaunchDaemons/com.apple.cfnetwork.cfnetworkagent.plist
+  program: /System/Library/Frameworks/CFNetwork.framework/CFNetworkAgent
+  args: /System/Library/Frameworks/CFNetwork.framework/CFNetworkAgent
+
+[com.apple.cfprefsd.xpc.daemon]
+/System/Library/LaunchDaemons/com.apple.cfprefsd.xpc.daemon.plist
+  program: /usr/sbin/cfprefsd
+  args: /usr/sbin/cfprefsd daemon
+
+[com.apple.cfprefsd.xpc.daemon.system]
+/System/Library/LaunchDaemons/com.apple.cfprefsd.xpc.daemon.system.plist
+  program: /usr/sbin/cfprefsd
+  args: /usr/sbin/cfprefsd daemon
+
+[com.apple.chassisplatformhostd]
+/System/Library/LaunchDaemons/com.apple.chassisplatformhostd.plist
+  program: /usr/libexec/chassisplatformhostd
+  args: /usr/libexec/chassisplatformhostd
+
+[com.apple.checkerboard]
+/System/Library/LaunchDaemons/com.apple.checkerboard.plist
+  program: /Applications/CheckerBoard.app/CheckerBoard
+  args: /Applications/CheckerBoard.app/CheckerBoard
+  runAtLoad: true
+  keepAlive: true
+
+[com.apple.checkerboardd]
+/System/Library/LaunchDaemons/com.apple.checkerboardd.plist
+  program: /usr/libexec/checkerboardd
+  args: /usr/libexec/checkerboardd
+
+[com.apple.chronod]
+/System/Library/LaunchDaemons/com.apple.chronod.plist
+  program: /System/Library/PrivateFrameworks/ChronoCore.framework/Support/chronod
+  args: /System/Library/PrivateFrameworks/ChronoCore.framework/Support/chronod
+  keepAlive: {conditional}
+  env: 1 var(s)
+
+[com.apple.ciphermld]
+/System/Library/LaunchDaemons/com.apple.ciphermld.plist
+  program: /usr/libexec/ciphermld
+  args: /usr/libexec/ciphermld
+
+[com.apple.ckdiscretionaryd]
+/System/Library/LaunchDaemons/com.apple.ckdiscretionaryd.plist
+  program: /System/Library/PrivateFrameworks/CloudKitDaemon.framework/Support/ckdiscretionaryd
+  args: /System/Library/PrivateFrameworks/CloudKitDaemon.framework/Support/ckdiscretionaryd
+
+[com.apple.cksharingmanagementd]
+/System/Library/LaunchDaemons/com.apple.cksharingmanagementd.plist
+  program: /System/Library/PrivateFrameworks/CKSharingManagementDaemon.framework/Support/cksharingmanagementd
+  args: /System/Library/PrivateFrameworks/CKSharingManagementDaemon.framework/Support/cksharingmanagementd
+
+[com.apple.ClarityBoard]
+/System/Library/LaunchDaemons/com.apple.ClarityBoard.plist
+  program: /System/Library/CoreServices/ClarityBoard.app/ClarityBoard
+  args: /System/Library/CoreServices/ClarityBoard.app/ClarityBoard
+  runAtLoad: true
+  keepAlive: true
+
+[com.apple.ClipServices.clipserviced]
+/System/Library/LaunchDaemons/com.apple.ClipServices.clipserviced.plist
+  program: /System/Library/PrivateFrameworks/ClipServices.framework/clipserviced
+  args: /System/Library/PrivateFrameworks/ClipServices.framework/clipserviced
+
+[com.apple.clocksyncd]
+/System/Library/LaunchDaemons/com.apple.clocksyncd.plist
+  program: /usr/libexec/clocksyncd
+  args: /usr/libexec/clocksyncd
+
+[com.apple.cloudd]
+/System/Library/LaunchDaemons/com.apple.cloudd.plist
+  program: /System/Library/PrivateFrameworks/CloudKitDaemon.framework/Support/cloudd
+  args: /System/Library/PrivateFrameworks/CloudKitDaemon.framework/Support/cloudd
+
+[com.apple.cloudos.meshnetd]
+/System/Library/LaunchDaemons/com.apple.cloudos.meshnetd.plist
+  program: /usr/libexec/meshnetd
+
+[com.apple.cloudpaird]
+/System/Library/LaunchDaemons/com.apple.cloudpaird.plist
+  program: /usr/libexec/audioaccessoryd
+  args: /usr/libexec/audioaccessoryd
+  keepAlive: {conditional}
+
+[com.apple.cloudphotod]
+/System/Library/LaunchDaemons/com.apple.cloudphotod.plist
+  program: /System/Library/PrivateFrameworks/CloudPhotoLibrary.framework/Support/cloudphotod
+  args: cloudphotod
+
+[com.apple.cloudsettingssyncagent]
+/System/Library/LaunchDaemons/com.apple.CloudSettingsSyncAgent.plist
+  program: /System/Library/CoreServices/CloudSettingsSyncAgent
+  args: /System/Library/CoreServices/CloudSettingsSyncAgent
+
+[com.apple.cloudtelemetryd]
+/System/Library/LaunchDaemons/com.apple.cloudtelemetryd.plist
+  program: /System/Library/PrivateFrameworks/CloudTelemetry.framework/Support/cloudtelemetryd
+  args: /System/Library/PrivateFrameworks/CloudTelemetry.framework/Support/cloudtelemetryd
+
+[com.apple.cmfsyncagent]
+/System/Library/LaunchDaemons/com.apple.cmfsyncagent.plist
+  program: /System/Library/PrivateFrameworks/CommunicationsFilter.framework/CMFSyncAgent
+  args: /System/Library/PrivateFrameworks/CommunicationsFilter.framework/CMFSyncAgent
+
+[com.apple.cmio.ContinuityCaptureAgent]
+/System/Library/LaunchDaemons/com.apple.cmio.ContinuityCaptureAgent.plist
+  program: /usr/libexec/ContinuityCaptureAgent
+  args: /usr/libexec/ContinuityCaptureAgent server
+
+[com.apple.commandandcontrol]
+/System/Library/LaunchDaemons/com.apple.commandandcontrol.plist
+  program: /System/Library/CoreServices/CommandAndControl.app/CommandAndControl
+  args: /System/Library/CoreServices/CommandAndControl.app/CommandAndControl
+
+[com.apple.CommCenter]
+/System/Library/LaunchDaemons/com.apple.CommCenter.plist
+  program: /System/Library/Frameworks/CoreTelephony.framework/Support/CommCenter
+  args: /System/Library/Frameworks/CoreTelephony.framework/Support/CommCenter
+  keepAlive: true
+
+[com.apple.CommCenter]
+/System/Library/LaunchDaemons/com.apple.CommCenter-noncellular.plist
+  program: /System/Library/Frameworks/CoreTelephony.framework/Support/CommCenter
+  args: /System/Library/Frameworks/CoreTelephony.framework/Support/CommCenter
+  keepAlive: true
+
+[com.apple.CommCenterMobileHelper]
+/System/Library/LaunchDaemons/com.apple.CommCenterMobileHelper.plist
+  program: /System/Library/Frameworks/CoreTelephony.framework/Support/CommCenterMobileHelper
+  args: /System/Library/Frameworks/CoreTelephony.framework/Support/CommCenterMobileHelper
+
+[com.apple.CommCenterRootHelper]
+/System/Library/LaunchDaemons/com.apple.CommCenterRootHelper.plist
+  program: /System/Library/Frameworks/CoreTelephony.framework/Support/CommCenterRootHelper
+  args: /System/Library/Frameworks/CoreTelephony.framework/Support/CommCenterRootHelper
+
+[com.apple.communicationtrustd]
+/System/Library/LaunchDaemons/com.apple.communicationtrustd.plist
+  program: /System/Library/PrivateFrameworks/CommunicationTrust.framework/Support/communicationtrustd
+  args: /System/Library/PrivateFrameworks/CommunicationTrust.framework/Support/communicationtrustd
+  env: 1 var(s)
+
+[com.apple.companion_proxy]
+/System/Library/LaunchDaemons/com.apple.companion_proxy.plist
+  program: /usr/libexec/companion_proxy
+
+[com.apple.companiond]
+/System/Library/LaunchDaemons/com.apple.companiond.plist
+  program: /usr/libexec/companiond
+  args: /usr/libexec/companiond
+
+[com.apple.configd]
+/System/Library/LaunchDaemons/com.apple.configd.plist
+  program: /usr/libexec/configd
+  args: /usr/libexec/configd
+  keepAlive: true
+
+[com.apple.contacts.donation-agent]
+/System/Library/LaunchDaemons/com.apple.contacts.donation-agent.plist
+  program: /System/Library/PrivateFrameworks/ContactsDonation.framework/Versions/A/Support/contactsdonationagent
+  args: /System/Library/PrivateFrameworks/ContactsDonation.framework/Versions/A/Support/contactsdonationagent
+
+[com.apple.contacts.postersyncd]
+/System/Library/LaunchDaemons/com.apple.contacts.postersyncd.plist
+  program: /System/Library/Frameworks/Contacts.framework/Support/postersyncd
+  args: /System/Library/Frameworks/Contacts.framework/Support/postersyncd
+
+[com.apple.contactsd]
+/System/Library/LaunchDaemons/com.apple.contactsd.plist
+  program: /System/Library/Frameworks/Contacts.framework/Support/contactsd
+  args: /System/Library/Frameworks/Contacts.framework/Support/contactsd
+
+[com.apple.containermanagerd]
+/System/Library/LaunchDaemons/com.apple.containermanagerd.plist
+  program: /usr/libexec/containermanagerd
+  args: /usr/libexec/containermanagerd --runmode=agent --user-container-mode=fixed --bundle-container-mode=proxy --system-container-mode=proxy --kernel-upcall=yes
+  runAtLoad: true
+
+[com.apple.containermanagerd.system]
+/System/Library/LaunchDaemons/com.apple.containermanagerd.system.plist
+  program: /usr/libexec/containermanagerd_system
+  args: /usr/libexec/containermanagerd_system --runmode=privileged --user-container-mode=none --bundle-container-mode=global --system-container-mode=global --kernel-upcall=no
+
+[com.apple.contextstored]
+/System/Library/LaunchDaemons/com.apple.contextstored.plist
+  program: /System/Library/PrivateFrameworks/CoreDuetContext.framework/Resources/contextstored
+
+[com.apple.continuitycaptured]
+/System/Library/LaunchDaemons/com.apple.continuitycaptured.plist
+  program: /usr/libexec/continuitycaptured
+  args: /usr/libexec/continuitycaptured
+
+[com.apple.CoreAuthentication.daemon]
+/System/Library/LaunchDaemons/com.apple.CoreAuthentication.daemon.plist
+  program: /System/Library/Frameworks/LocalAuthentication.framework/Support/coreauthd
+  args: /System/Library/Frameworks/LocalAuthentication.framework/Support/coreauthd
+
+[com.apple.corecaptured]
+/System/Library/LaunchDaemons/com.apple.corecaptured.plist
+  program: /usr/libexec/corecaptured
+  args: /usr/libexec/corecaptured
+
+[com.apple.coredatad]
+/System/Library/LaunchDaemons/com.apple.coredatad.plist
+  program: /usr/libexec/coredatad
+
+[com.apple.coreduetd]
+/System/Library/LaunchDaemons/com.apple.coreduetd.plist
+  program: /usr/libexec/coreduetd
+
+[com.apple.coreidvd]
+/System/Library/LaunchDaemons/com.apple.coreidvd.plist
+  program: /usr/libexec/coreidvd
+
+[com.apple.corercd]
+/System/Library/LaunchDaemons/com.apple.corercd.plist
+  program: /usr/libexec/corercd
+  args: /usr/libexec/corercd
+
+[com.apple.corerepaird]
+/System/Library/LaunchDaemons/com.apple.corerepaird.darwinos.plist
+  program: /usr/libexec/corerepaird
+  args: /usr/libexec/corerepaird
+
+[com.apple.corerepaird]
+/System/Library/LaunchDaemons/com.apple.corerepaird.plist
+  program: /usr/libexec/corerepaird
+  args: /usr/libexec/corerepaird
+
+[com.apple.coreservices.useractivityd]
+/System/Library/LaunchDaemons/com.apple.coreservices.useractivityd.plist
+  program: /System/Library/PrivateFrameworks/UserActivity.framework/Agents/useractivityd
+  args: /System/Library/PrivateFrameworks/UserActivity.framework/Agents/useractivityd
+
+[com.apple.coreservicesd]
+/System/Library/LaunchDaemons/com.apple.coreservicesd.plist
+  program: /System/Library/CoreServices/coreservicesd
+  args: /System/Library/CoreServices/coreservicesd
+
+[com.apple.corespeechd]
+/System/Library/LaunchDaemons/com.apple.corespeechd.plist
+  program: /System/Library/PrivateFrameworks/CoreSpeech.framework/corespeechd
+  args: /System/Library/PrivateFrameworks/CoreSpeech.framework/corespeechd
+  keepAlive: {conditional}
+
+[com.apple.corespotlightservice]
+/System/Library/LaunchDaemons/com.apple.corespotlightservice.plist
+  program: /System/Library/Frameworks/CoreSpotlight.framework/CoreSpotlightService
+  args: /System/Library/Frameworks/CoreSpotlight.framework/CoreSpotlightService
+
+[com.apple.coresymbolicationd]
+/System/Library/LaunchDaemons/com.apple.coresymbolicationd.plist
+  program: /System/Library/PrivateFrameworks/CoreSymbolication.framework/coresymbolicationd
+  args: /System/Library/PrivateFrameworks/CoreSymbolication.framework/coresymbolicationd
+
+[com.apple.countryd]
+/System/Library/LaunchDaemons/com.apple.countryd.plist
+  program: /usr/libexec/countryd
+  args: /usr/libexec/countryd
+
+[com.apple.crash_mover]
+/System/Library/LaunchDaemons/com.apple.crash_mover.plist
+  program: /usr/libexec/crash_mover
+  args: /usr/libexec/crash_mover
+
+[com.apple.crashreportcopymobile]
+/System/Library/LaunchDaemons/com.apple.crashreportcopymobile.plist
+  program: /usr/libexec/afcd
+  args: /usr/libexec/afcd -r
+
+[com.apple.ctkd]
+/System/Library/LaunchDaemons/com.apple.ctkd.plist
+  program: /System/Library/Frameworks/CryptoTokenKit.framework/ctkd
+  args: /System/Library/Frameworks/CryptoTokenKit.framework/ctkd -tsw
+
+[com.apple.dasd]
+/System/Library/LaunchDaemons/com.apple.dasd.plist
+  program: /usr/libexec/dasd
+
+[com.apple.dataaccess.dataaccessd]
+/System/Library/LaunchDaemons/com.apple.dataaccess.dataaccessd.plist
+  program: /System/Library/PrivateFrameworks/DataAccess.framework/Support/dataaccessd
+  args: /System/Library/PrivateFrameworks/DataAccess.framework/Support/dataaccessd
+
+[com.apple.DataDetectorsSourceAccess]
+/System/Library/LaunchDaemons/com.apple.DataDetectorsSourceAccess.plist
+  program: /usr/libexec/DataDetectorsSourceAccess
+  args: /usr/libexec/DataDetectorsSourceAccess
+
+[com.apple.datastored]
+/System/Library/LaunchDaemons/com.apple.datastored.plist
+  program: /usr/libexec/datastored
+  args: /usr/libexec/datastored
+
+[com.apple.deferredmediad]
+/System/Library/LaunchDaemons/com.apple.deferredmediad.plist
+  program: /usr/libexec/deferredmediad
+  args: /usr/libexec/deferredmediad
+
+[com.apple.deleted_helper]
+/System/Library/LaunchDaemons/com.apple.deleted_helper.plist
+  program: /System/Library/PrivateFrameworks/CacheDelete.framework/deleted_helper
+  args: /System/Library/PrivateFrameworks/CacheDelete.framework/deleted_helper
+
+[com.apple.DesktopServicesHelper]
+/System/Library/LaunchDaemons/com.apple.DesktopServicesHelper.plist
+  program: /System/Library/PrivateFrameworks/DesktopServicesPriv.framework/DesktopServicesHelper
+
+[com.apple.device-o-matic]
+/System/Library/LaunchDaemons/com.apple.device-o-matic.plist
+  program: /System/Library/CoreServices/DeviceOMatic.app/DeviceOMatic
+
+[com.apple.deviceaccessd]
+/System/Library/LaunchDaemons/com.apple.deviceaccessd.plist
+  program: /usr/libexec/deviceaccessd
+
+[com.apple.devicecheckd]
+/System/Library/LaunchDaemons/com.apple.devicecheckd.plist
+  program: /System/Library/PrivateFrameworks/DeviceCheckInternal.framework/devicecheckd
+  args: /System/Library/PrivateFrameworks/DeviceCheckInternal.framework/devicecheckd
+
+[com.apple.DeviceConfigurationAgent]
+/System/Library/LaunchDaemons/com.apple.DeviceConfigurationAgent.plist
+  program: /System/Library/PrivateFrameworks/DeviceConfiguration.framework/DeviceConfigurationAgent
+
+[com.apple.deviceconfigurationd]
+/System/Library/LaunchDaemons/com.apple.deviceconfigurationd.plist
+  program: /System/Library/PrivateFrameworks/DeviceConfiguration.framework/deviceconfigurationd
+
+[com.apple.devicedataresetd]
+/System/Library/LaunchDaemons/com.apple.devicedataresetd.plist
+  program: /System/Library/PrivateFrameworks/EmbeddedDataReset.framework/Support/devicedataresetd
+  args: /System/Library/PrivateFrameworks/EmbeddedDataReset.framework/Support/devicedataresetd
+
+[com.apple.devicemanagementclient.managedappsd]
+/System/Library/LaunchDaemons/com.apple.devicemanagementclient.managedappsd.plist
+  program: /usr/libexec/managedappsd
+  args: /usr/libexec/managedappsd
+
+[com.apple.devicemanagementclient.mdmd]
+/System/Library/LaunchDaemons/com.apple.devicemanagementclient.mdmd.plist
+  program: /usr/libexec/mdmd
+  args: /usr/libexec/mdmd
+  keepAlive: {conditional}
+
+[com.apple.devicemanagementclient.teslad]
+/System/Library/LaunchDaemons/com.apple.devicemanagementclient.teslad.plist
+  program: /usr/libexec/teslad
+  args: /usr/libexec/teslad
+
+[com.apple.devicerecoveryassistant]
+/System/Library/LaunchDaemons/com.apple.devicerecoveryassistant.plist
+  program: /Applications/Device Recovery Assistant.app/Device Recovery Assistant
+  args: /Applications/Device Recovery Assistant.app/Device Recovery Assistant
+  runAtLoad: true
+  keepAlive: true
+
+[com.apple.devicerecoveryd]
+/System/Library/LaunchDaemons/com.apple.devicerecoveryd.plist
+  program: /System/Library/PrivateFrameworks/DeviceRecovery.framework/Support/devicerecoveryd
+  args: /System/Library/PrivateFrameworks/DeviceRecovery.framework/Support/devicerecoveryd
+  keepAlive: {conditional}
+
+[com.apple.devicesharingd]
+/System/Library/LaunchDaemons/com.apple.devicesharingd.plist
+  program: /usr/libexec/devicesharingd
+  args: /usr/libexec/devicesharingd
+  env: 1 var(s)
+
+[com.apple.dhcp6d]
+/System/Library/LaunchDaemons/com.apple.dhcp6d.plist
+  program: /usr/libexec/dhcp6d
+  keepAlive: true
+
+[com.apple.diagnosticd]
+/System/Library/LaunchDaemons/com.apple.diagnosticd.plist
+  program: /usr/libexec/diagnosticd
+  env: 2 var(s)
+
+[com.apple.diagnosticextensionsd]
+/System/Library/LaunchDaemons/com.apple.diagnosticextensionsd.plist
+  program: /usr/libexec/diagnosticextensionsd
+
+[com.apple.diagnosticscheckupd]
+/System/Library/LaunchDaemons/com.apple.diagnosticscheckupd.plist
+  program: /usr/libexec/diagnosticscheckupd
+  args: /usr/libexec/diagnosticscheckupd
+
+[com.apple.diagnosticservicesd]
+/System/Library/LaunchDaemons/com.apple.diagnosticservicesd.plist
+  program: /System/Library/CoreServices/diagnosticservicesd
+  args: /System/Library/CoreServices/diagnosticservicesd
+
+[com.apple.diagnosticspushd]
+/System/Library/LaunchDaemons/com.apple.diagnosticspushd.plist
+  program: /usr/libexec/diagnosticspushd
+  args: /usr/libexec/diagnosticspushd
+
+[com.apple.dietapplecamerad]
+/System/Library/LaunchDaemons/com.apple.dietapplecamerad.plist
+  program: /usr/sbin/dietapplecamerad
+  args: /usr/sbin/dietapplecamerad
+
+[com.apple.dietappleh16camerad]
+/System/Library/LaunchDaemons/com.apple.dietappleh16camerad.plist
+  program: /usr/sbin/dietappleh16camerad
+  args: /usr/sbin/dietappleh16camerad
+
+[com.apple.diskarbitrationd]
+/System/Library/LaunchDaemons/com.apple.diskarbitrationd.plist
+  program: /usr/libexec/diskarbitrationd
+  env: 2 var(s)
+
+[com.apple.diskimagesiod]
+/System/Library/LaunchDaemons/com.apple.diskimagesiod.plist
+  program: /usr/libexec/diskimagesiod
+  args: /usr/libexec/diskimagesiod
+
+[com.apple.diskimagesiod.ram]
+/System/Library/LaunchDaemons/com.apple.diskimagesiod.ram.plist
+  program: /usr/libexec/diskimagesiod
+  args: /usr/libexec/diskimagesiod --ram
+
+[com.apple.diskimagespawner]
+/System/Library/LaunchDaemons/com.apple.diskimagespawner.plist
+  program: /usr/libexec/diskimagespawner
+  args: diskimagespawner
+
+[com.apple.distnoted.xpc.daemon]
+/System/Library/LaunchDaemons/com.apple.distnoted.xpc.daemon.plist
+  program: /usr/sbin/distnoted
+  args: /usr/sbin/distnoted daemon
+  keepAlive: true
+  env: 1 var(s)
+
+[com.apple.dmd]
+/System/Library/LaunchDaemons/com.apple.dmd.plist
+  program: /usr/libexec/dmd
+  args: /usr/libexec/dmd
+
+[com.apple.dockaccessoryd]
+/System/Library/LaunchDaemons/com.apple.dockaccessoryd.plist
+  program: /usr/libexec/dockaccessoryd
+
+[com.apple.donotdisturbd]
+/System/Library/LaunchDaemons/com.apple.donotdisturbd.plist
+  program: /System/Library/PrivateFrameworks/DoNotDisturbServer.framework/Support/donotdisturbd
+  args: /System/Library/PrivateFrameworks/DoNotDisturbServer.framework/Support/donotdisturbd
+  env: 1 var(s)
+
+[com.apple.dprivacyd]
+/System/Library/LaunchDaemons/com.apple.dprivacyd.plist
+  program: /usr/libexec/dprivacyd
+  args: /usr/libexec/dprivacyd
+
+[com.apple.DragUI.druid]
+/System/Library/LaunchDaemons/com.apple.DragUI.druid.plist
+  program: /System/Library/PrivateFrameworks/DragUI.framework/Support/druid
+  args: /System/Library/PrivateFrameworks/DragUI.framework/Support/druid
+
+[com.apple.driverkitd]
+/System/Library/LaunchDaemons/com.apple.driverkitd.plist
+  program: /usr/libexec/driverkitd
+  args: /usr/libexec/driverkitd
+  runAtLoad: true
+
+[com.apple.dt.automationmode-writer]
+/System/Library/LaunchDaemons/com.apple.dt.automationmode-writer.plist
+  program: /System/Library/PrivateFrameworks/AutomationMode.framework/automationmode-writer
+
+[com.apple.dt.AutomationModeUI]
+/System/Library/LaunchDaemons/com.apple.dt.AutomationModeUI.plist
+  program: /System/Library/PrivateFrameworks/AutomationMode.framework/AutomationModeUI.app/AutomationModeUI
+  keepAlive: {conditional}
+
+[com.apple.dt.fetchsymbolsd]
+/System/Library/LaunchDaemons/com.apple.dt.fetchsymbolsd.plist
+  program: /usr/libexec/dtfetchsymbolsd
+  args: /usr/libexec/dtfetchsymbolsd
+
+[com.apple.dt.previewsd]
+/System/Library/LaunchDaemons/com.apple.dt.previewsd.plist
+  program: /System/Library/PrivateFrameworks/PreviewsOSSupport.framework/Support/previewsd
+
+[com.apple.dt.remotepairingdeviced]
+/System/Library/LaunchDaemons/com.apple.dt.remotepairingdeviced.plist
+  program: /usr/libexec/remotepairingdeviced
+
+[com.apple.duetexpertd]
+/System/Library/LaunchDaemons/com.apple.duetexpertd.plist
+  program: /usr/libexec/duetexpertd
+  args: /usr/libexec/duetexpertd
+
+[com.apple.DumpBasebandCrash]
+/System/Library/LaunchDaemons/com.apple.DumpBasebandCrash.plist
+  program: /usr/bin/DumpBasebandCrash
+
+[com.apple.DumpPanic]
+/System/Library/LaunchDaemons/com.apple.DumpPanic.plist
+  program: /usr/libexec/DumpPanic
+  args: /usr/libexec/DumpPanic
+  runAtLoad: true
+  keepAlive: {conditional}
+
+[com.apple.ecosystemanalyticsd]
+/System/Library/LaunchDaemons/com.apple.ecosystemanalyticsd.plist
+  program: /System/Library/PrivateFrameworks/EcosystemAnalytics.framework/Support/ecosystemanalyticsd
+  args: /System/Library/PrivateFrameworks/EcosystemAnalytics.framework/Support/ecosystemanalyticsd
+
+[com.apple.eligibilityd]
+/System/Library/LaunchDaemons/com.apple.eligibilityd.plist
+  program: /usr/libexec/eligibilityd
+  keepAlive: {conditional}
+
+[com.apple.email.maild]
+/System/Library/LaunchDaemons/com.apple.email.maild.plist
+  program: /System/Library/PrivateFrameworks/EmailDaemon.framework/maild
+  args: /System/Library/PrivateFrameworks/EmailDaemon.framework/maild
+
+[com.apple.enhancedloggingd]
+/System/Library/LaunchDaemons/com.apple.enhancedloggingd.plist
+  program: /usr/libexec/enhancedloggingd
+  args: /usr/libexec/enhancedloggingd
+
+[com.apple.EscrowSecurityAlert]
+/System/Library/LaunchDaemons/com.apple.EscrowSecurityAlert.plist
+  program: /System/Library/CoreServices/EscrowSecurityAlert.app/EscrowSecurityAlert
+  args: /System/Library/CoreServices/EscrowSecurityAlert.app/EscrowSecurityAlert
+
+[com.apple.exchangesyncd]
+/System/Library/LaunchDaemons/com.apple.exchangesyncd.plist
+  program: /System/Library/PrivateFrameworks/ExchangeSync.framework/Support/exchangesyncd
+  args: /System/Library/PrivateFrameworks/ExchangeSync.framework/Support/exchangesyncd
+  keepAlive: {conditional}
+
+[com.apple.eyereliefd]
+/System/Library/LaunchDaemons/com.apple.eyereliefd.plist
+  program: /System/Library/PrivateFrameworks/EyeRelief.framework/Resources/eyereliefd
+  args: /System/Library/PrivateFrameworks/EyeRelief.framework/Resources/eyereliefd
+
+[com.apple.facemetricsd]
+/System/Library/LaunchDaemons/com.apple.facemetricsd.plist
+  program: /usr/libexec/facemetricsd
+
+[com.apple.facetimemessagestored]
+/System/Library/LaunchDaemons/com.apple.facetimemessagestored.plist
+  program: /System/Library/PrivateFrameworks/FaceTimeMessageStore.framework/facetimemessagestored
+  args: /System/Library/PrivateFrameworks/FaceTimeMessageStore.framework/facetimemessagestored
+  env: 1 var(s)
+
+[com.apple.fairplayd.H2]
+/System/Library/LaunchDaemons/com.apple.fairplayd.H2.plist
+  program: /usr/sbin/fairplayd.H2
+  keepAlive: true
+
+[com.apple.fairplaydeviceidentityd]
+/System/Library/LaunchDaemons/com.apple.fairplaydeviceidentityd.plist
+  program: /usr/libexec/fairplaydeviceidentityd
+  env: 1 var(s)
+
+[com.apple.familycircled]
+/System/Library/LaunchDaemons/com.apple.familycircled.plist
+  program: /System/Library/PrivateFrameworks/FamilyCircle.framework/familycircled
+  args: /System/Library/PrivateFrameworks/FamilyCircle.framework/familycircled
+
+[com.apple.FamilyControlsAgent]
+/System/Library/LaunchDaemons/com.apple.FamilyControlsAgent.plist
+  program: /System/Library/Frameworks/FamilyControls.framework/FamilyControlsAgent
+
+[com.apple.familynotification]
+/System/Library/LaunchDaemons/com.apple.familynotificationd.plist
+  program: /System/Library/PrivateFrameworks/FamilyNotification.framework/familynotificationd
+  args: /System/Library/PrivateFrameworks/FamilyNotification.framework/familynotificationd
+
+[com.apple.fdrhelper]
+/System/Library/LaunchDaemons/com.apple.fdrhelper.plist
+  program: /usr/libexec/fdrhelper
+  args: /usr/libexec/fdrhelper
+
+[com.apple.featureaccessd]
+/System/Library/LaunchDaemons/com.apple.featureaccessd.plist
+  program: /System/Library/PrivateFrameworks/CloudSubscriptionFeatures.framework/featureaccessd
+  args: /System/Library/PrivateFrameworks/CloudSubscriptionFeatures.framework/featureaccessd
+
+[com.apple.feedbackd]
+/System/Library/LaunchDaemons/com.apple.feedbackd.plist
+  program: /usr/libexec/feedbackd
+
+[com.apple.FileCoordination]
+/System/Library/LaunchDaemons/com.apple.FileCoordination.plist
+  program: /usr/sbin/filecoordinationd
+
+[com.apple.filederivatived]
+/System/Library/LaunchDaemons/com.apple.filederivatived.plist
+  program: /System/Library/PrivateFrameworks/FileDerivatives.framework/Support/filederivatived
+  args: /System/Library/PrivateFrameworks/FileDerivatives.framework/Support/filederivatived
+
+[com.apple.fileindexerd]
+/System/Library/LaunchDaemons/com.apple.fileindexerd.plist
+  program: /System/Library/PrivateFrameworks/FileIndexerDaemon.framework/Support/fileindexerd
+  env: 2 var(s)
+
+[com.apple.FileProvider]
+/System/Library/LaunchDaemons/com.apple.FileProvider.plist
+  program: /System/Library/Frameworks/FileProvider.framework/Support/fileproviderd
+  env: 2 var(s)
+
+[com.apple.filesystems.apfs_iosd]
+/System/Library/LaunchDaemons/com.apple.filesystems.apfs_iosd.plist
+  program: /System/Library/Filesystems/apfs.fs/apfs_iosd
+  args: /System/Library/Filesystems/apfs.fs/apfs_iosd
+
+[com.apple.filesystems.doubleagentd]
+/System/Library/LaunchDaemons/com.apple.doubleagentd.plist
+  program: /System/Library/PrivateFrameworks/DoubleAgent.framework/doubleagentd
+  args: doubleagentd
+
+[com.apple.filesystems.fskitd]
+/System/Library/LaunchDaemons/com.apple.filesystems.fskitd.plist
+  program: /usr/libexec/fskitd
+  args: /usr/libexec/fskitd
+  keepAlive: {conditional}
+
+[com.apple.filesystems.smbclientd]
+/System/Library/LaunchDaemons/com.apple.filesystems.smbclientd.plist
+  program: /System/Library/PrivateFrameworks/SMBClientProvider.framework/smbclientd
+  args: /System/Library/PrivateFrameworks/SMBClientProvider.framework/smbclientd
+
+[com.apple.filesystems.userfs_helper]
+/System/Library/LaunchDaemons/com.apple.filesystems.userfs_helper.plist
+  program: /System/Library/PrivateFrameworks/UserFS.framework/userfs_helper
+  args: /System/Library/PrivateFrameworks/UserFS.framework/userfs_helper
+
+[com.apple.filesystems.userfsd]
+/System/Library/LaunchDaemons/com.apple.filesystems.userfsd.plist
+  program: /System/Library/PrivateFrameworks/UserFS.framework/userfsd
+  args: /System/Library/PrivateFrameworks/UserFS.framework/userfsd -c -S
+
+[com.apple.financed]
+/System/Library/LaunchDaemons/com.apple.financed.plist
+  program: /System/Library/Frameworks/FinanceKit.framework/financed
+  args: /System/Library/Frameworks/FinanceKit.framework/financed
+
+[com.apple.findmy.findmybeaconingd]
+/System/Library/LaunchDaemons/com.apple.findmy.findmybeaconingd.plist
+  program: /usr/libexec/findmybeaconingd
+
+[com.apple.findmy.findmylocated]
+/System/Library/LaunchDaemons/com.apple.findmy.findmylocated.plist
+  program: /usr/libexec/findmylocated
+
+[com.apple.finhealthd]
+/System/Library/LaunchDaemons/com.apple.finhealthd.plist
+  program: /System/Library/PrivateFrameworks/FinHealth.framework/finhealthd
+  args: /System/Library/PrivateFrameworks/FinHealth.framework/finhealthd
+
+[com.apple.fitcore]
+/System/Library/LaunchDaemons/com.apple.fitcore.plist
+  program: /System/Library/PrivateFrameworks/SeymourServices.framework/fitcored
+  args: /System/Library/PrivateFrameworks/SeymourServices.framework/fitcored
+  env: 2 var(s)
+
+[com.apple.fitcore.session]
+/System/Library/LaunchDaemons/com.apple.fitcore.session.plist
+  program: /System/Library/PrivateFrameworks/SeymourServices.framework/fitcoresessiond
+  args: /System/Library/PrivateFrameworks/SeymourServices.framework/fitcoresessiond
+  keepAlive: {conditional}
+  env: 2 var(s)
+
+[com.apple.fitnesscoachingd]
+/System/Library/LaunchDaemons/com.apple.fitnesscoachingd.plist
+  program: /System/Library/PrivateFrameworks/FitnessCoachingServices.framework/fitnesscoachingd
+  args: /System/Library/PrivateFrameworks/FitnessCoachingServices.framework/fitnesscoachingd
+  env: 1 var(s)
+
+[com.apple.fitnessintelligenced]
+/System/Library/LaunchDaemons/com.apple.fitnessintelligenced.plist
+  program: /System/Library/PrivateFrameworks/FitnessIntelligenceDaemonCore.framework/fitnessintelligenced
+  args: /System/Library/PrivateFrameworks/FitnessIntelligenceDaemonCore.framework/fitnessintelligenced
+  env: 1 var(s)
+
+[com.apple.followupd]
+/System/Library/LaunchDaemons/com.apple.followupd.plist
+  program: /System/Library/PrivateFrameworks/CoreFollowUp.framework/followupd
+  args: /System/Library/PrivateFrameworks/CoreFollowUp.framework/followupd
+
+[com.apple.fontservicesd]
+/System/Library/LaunchDaemons/com.apple.fontservicesd.plist
+  program: /System/Library/PrivateFrameworks/FontServices.framework/Support/fontservicesd
+  args: /System/Library/PrivateFrameworks/FontServices.framework/Support/fontservicesd
+
+[com.apple.fpassetmanagerd]
+/System/Library/LaunchDaemons/com.apple.fpassetmanagerd.plist
+  program: /usr/libexec/fpassetmanagerd
+
+[com.apple.frauddefensed]
+/System/Library/LaunchDaemons/com.apple.frauddefensed.plist
+  program: /usr/libexec/frauddefensed
+  args: /usr/libexec/frauddefensed
+
+[com.apple.fs_task_scheduler]
+/System/Library/LaunchDaemons/com.apple.fs_task_scheduler.plist
+  program: /usr/libexec/FSTaskScheduler
+  args: /usr/libexec/FSTaskScheduler
+
+[com.apple.fseventsd]
+/System/Library/LaunchDaemons/com.apple.fseventsd.plist
+  program: /usr/libexec/fseventsd
+  args: /usr/libexec/fseventsd
+  runAtLoad: true
+  keepAlive: true
+
+[com.apple.fskit.fskit_helper]
+/System/Library/LaunchDaemons/com.apple.fskit.fskit_helper.plist
+  program: /usr/libexec/fskit_helper
+  args: /usr/libexec/fskit_helper
+
+[com.apple.ftp-proxy-embedded]
+/System/Library/LaunchDaemons/com.apple.ftp-proxy-embedded.plist
+  program: /usr/libexec/ftp-proxy
+  args: ftp-proxy -p -n -V -D3 -u _ftp -t1800
+
+[com.apple.fullkeyboardaccess]
+/System/Library/LaunchDaemons/com.apple.fullkeyboardaccess.plist
+  program: /System/Library/CoreServices/FullKeyboardAccess.app/FullKeyboardAccess
+  args: /System/Library/CoreServices/FullKeyboardAccess.app/FullKeyboardAccess
+
+[com.apple.fusiond]
+/System/Library/LaunchDaemons/com.apple.fusiond.plist
+  program: /usr/libexec/fusiond
+
+[com.apple.GameController.gamecontrollerd]
+/System/Library/LaunchDaemons/com.apple.GameController.gamecontrollerd.plist
+  program: /usr/libexec/gamecontrollerd
+  args: /usr/libexec/gamecontrollerd
+
+[com.apple.gamed]
+/System/Library/LaunchDaemons/com.apple.gamed.plist
+  program: /usr/libexec/gamed
+  args: /usr/libexec/gamed
+
+[com.apple.gamepolicyd]
+/System/Library/LaunchDaemons/com.apple.gamepolicyd.plist
+  program: /usr/libexec/gamepolicyd
+  args: /usr/libexec/gamepolicyd
+
+[com.apple.gamesaved]
+/System/Library/LaunchDaemons/com.apple.gamesaved.plist
+  program: /usr/libexec/gamesaved
+  args: /usr/libexec/gamesaved
+
+[com.apple.generativeexperiencesd]
+/System/Library/LaunchDaemons/com.apple.generativeexperiencesd.plist
+  program: /System/Library/PrivateFrameworks/GenerativeExperiencesRuntime.framework/generativeexperiencesd
+  args: /System/Library/PrivateFrameworks/GenerativeExperiencesRuntime.framework/generativeexperiencesd
+
+[com.apple.GenerativeFunctions.agentstored]
+/System/Library/LaunchDaemons/com.apple.GenerativeFunctions.agentstored.plist
+  program: /System/Library/PrivateFrameworks/AgentSessionKitRuntime.framework/agentstored
+  args: /System/Library/PrivateFrameworks/AgentSessionKitRuntime.framework/agentstored
+
+[com.apple.geoanalyticsd]
+/System/Library/LaunchDaemons/com.apple.geoanalyticsd.plist
+  program: /System/Library/PrivateFrameworks/GeoAnalytics.framework/geoanalyticsd
+  args: /System/Library/PrivateFrameworks/GeoAnalytics.framework/geoanalyticsd
+
+[com.apple.geod]
+/System/Library/LaunchDaemons/com.apple.geod.plist
+  program: /System/Library/PrivateFrameworks/GeoServices.framework/geod
+  args: /System/Library/PrivateFrameworks/GeoServices.framework/geod
+
+[com.apple.gpsd]
+/System/Library/LaunchDaemons/com.apple.gpsd.plist
+  program: /usr/libexec/gpsd
+  args: /usr/libexec/gpsd
+  keepAlive: {conditional}
+
+[com.apple.griddatad]
+/System/Library/LaunchDaemons/com.apple.griddatad.plist
+  program: /usr/libexec/griddatad
+
+[com.apple.GSSCred]
+/System/Library/LaunchDaemons/com.apple.GSSCred.plist
+  program: /System/Library/Frameworks/GSS.framework/Helpers/GSSCred
+  args: /System/Library/Frameworks/GSS.framework/Helpers/GSSCred
+
+[com.apple.guidedbrowsingd]
+/System/Library/LaunchDaemons/com.apple.guidedbrowsingd.plist
+  program: /System/Cryptexes/App/usr/libexec/guidedbrowsingd
+
+[com.apple.handwritingd]
+/System/Library/LaunchDaemons/com.apple.handwritingd.plist
+  program: /usr/libexec/handwritingd
+  args: /usr/libexec/handwritingd
+
+[com.apple.hangreporter]
+/System/Library/LaunchDaemons/com.apple.hangreporter.plist
+  program: /usr/libexec/hangreporter
+  args: /usr/libexec/hangreporter
+
+[com.apple.hangtelemetryd]
+/System/Library/LaunchDaemons/com.apple.hangtelemetryd.plist
+  program: /usr/libexec/hangtelemetryd
+  args: /usr/libexec/hangtelemetryd
+
+[com.apple.hangtracerd]
+/System/Library/LaunchDaemons/com.apple.hangtracerd.plist
+  program: /usr/libexec/hangtracerd
+  args: /usr/libexec/hangtracerd
+
+[com.apple.healthappd]
+/System/Library/LaunchDaemons/com.apple.healthappd.plist
+  program: /System/Library/PrivateFrameworks/HealthPluginHost.framework/healthappd
+  args: /System/Library/PrivateFrameworks/HealthPluginHost.framework/healthappd
+
+[com.apple.healthcontentd]
+/System/Library/LaunchDaemons/com.apple.healthcontentd.plist
+  program: /System/Library/PrivateFrameworks/HealthContent.framework/healthcontentd
+  args: /System/Library/PrivateFrameworks/HealthContent.framework/healthcontentd
+
+[com.apple.healthd]
+/System/Library/LaunchDaemons/com.apple.healthd.plist
+  program: /System/Library/Frameworks/HealthKit.framework/healthd
+  args: /System/Library/Frameworks/HealthKit.framework/healthd
+  runAtLoad: true
+  keepAlive: {conditional}
+
+[com.apple.healtheventsd]
+/System/Library/LaunchDaemons/com.apple.healtheventsd.plist
+  program: /System/Library/PrivateFrameworks/HealthEventsDaemonImplementation.framework/healtheventsd
+  args: /System/Library/PrivateFrameworks/HealthEventsDaemonImplementation.framework/healtheventsd
+
+[com.apple.healthrecordsd]
+/System/Library/LaunchDaemons/com.apple.healthrecordsd.plist
+  program: /System/Library/PrivateFrameworks/HealthRecordServices.framework/healthrecordsd
+  args: /System/Library/PrivateFrameworks/HealthRecordServices.framework/healthrecordsd
+
+[com.apple.heartratecoordinatord]
+/System/Library/LaunchDaemons/com.apple.heartratecoordinatord.plist
+  program: /usr/libexec/heartratecoordinatord
+
+[com.apple.homed]
+/System/Library/LaunchDaemons/com.apple.homed.plist
+  program: /System/Library/PrivateFrameworks/HomeKitDaemon.framework/Support/homed
+  args: /System/Library/PrivateFrameworks/HomeKitDaemon.framework/Support/homed
+  keepAlive: {conditional}
+
+[com.apple.homeenergyd]
+/System/Library/LaunchDaemons/com.apple.homeenergyd.plist
+  program: /System/Library/PrivateFrameworks/HomeEnergyDaemon.framework/Support/homeenergyd
+
+[com.apple.homeeventsd]
+/System/Library/LaunchDaemons/com.apple.homeeventsd.plist
+  program: /System/Library/PrivateFrameworks/HomeKitEvents.framework/Support/homeeventsd
+  args: /System/Library/PrivateFrameworks/HomeKitEvents.framework/Support/homeeventsd
+  keepAlive: {conditional}
+
+[com.apple.hybridsearchd]
+/System/Library/LaunchDaemons/com.apple.hybridsearchd.plist
+  program: /usr/libexec/hybridsearchd
+  args: /usr/libexec/hybridsearchd
+
+[com.apple.iapauthd]
+/System/Library/LaunchDaemons/com.apple.iapauthd.plist
+  program: /System/Library/PrivateFrameworks/IAPAuthentication.framework/Support/iapauthd
+  args: /System/Library/PrivateFrameworks/IAPAuthentication.framework/Support/iapauthd
+
+[com.apple.iapd]
+/System/Library/LaunchDaemons/com.apple.iapd.plist
+  program: /System/Library/PrivateFrameworks/IAP.framework/Support/iapd
+  args: /System/Library/PrivateFrameworks/IAP.framework/Support/iapd
+
+[com.apple.icloud.findmydeviced]
+/System/Library/LaunchDaemons/com.apple.icloud.findmydeviced.plist
+  program: /usr/libexec/findmydeviced
+
+[com.apple.icloud.fmflocatord]
+/System/Library/LaunchDaemons/com.apple.icloud.fmflocatord.plist
+  program: /usr/libexec/fmflocatord
+
+[com.apple.icloud.searchpartyd]
+/System/Library/LaunchDaemons/com.apple.icloud.searchpartyd.plist
+  program: /usr/libexec/searchpartyd
+
+[com.apple.icloudmailagent]
+/System/Library/LaunchDaemons/com.apple.icloudmailagent.plist
+  program: /usr/libexec/icloudmailagent
+  args: /usr/libexec/icloudmailagent
+
+[com.apple.icloudsubscriptionoptimizerd]
+/System/Library/LaunchDaemons/com.apple.icloudsubscriptionoptimizerd.plist
+  program: /System/Library/PrivateFrameworks/iCloudSubscriptionOptimizerDaemon.framework/icloudsubscriptionoptimizerd/icloudsubscriptionoptimizerd
+  args: /System/Library/PrivateFrameworks/iCloudSubscriptionOptimizerDaemon.framework/icloudsubscriptionoptimizerd/icloudsubscriptionoptimizerd
+
+[com.apple.icloudwebd]
+/System/Library/LaunchDaemons/com.apple.icloudwebd.plist
+  program: /usr/libexec/icloudwebd
+  args: /usr/libexec/icloudwebd
+
+[com.apple.iconservices.iconservicesagent]
+/System/Library/LaunchDaemons/com.apple.iconservices.iconservicesagent.plist
+  program: /System/Library/CoreServices/iconservicesagent
+  args: /System/Library/CoreServices/iconservicesagent
+
+[com.apple.idamd]
+/System/Library/LaunchDaemons/com.apple.idamd.plist
+  program: /usr/libexec/idamd
+
+[com.apple.idcredd]
+/System/Library/LaunchDaemons/com.apple.idcredd.plist
+  program: /usr/libexec/idcredd
+
+[com.apple.identityservicesd]
+/System/Library/LaunchDaemons/com.apple.identityservicesd.plist
+  program: /System/Library/PrivateFrameworks/IDS.framework/identityservicesd.app/identityservicesd
+  args: /System/Library/PrivateFrameworks/IDS.framework/identityservicesd.app/identityservicesd
+  runAtLoad: true
+  keepAlive: {conditional}
+  env: 2 var(s)
+
+[com.apple.ids.IDSCredentialsAgent]
+/System/Library/LaunchDaemons/com.apple.idscredentialsagent.plist
+  program: /System/Library/PrivateFrameworks/IDSFoundation.framework/IDSCredentialsAgent.app/IDSCredentialsAgent
+  args: /System/Library/PrivateFrameworks/IDSFoundation.framework/IDSCredentialsAgent.app/IDSCredentialsAgent
+  env: 1 var(s)
+
+[com.apple.idsfoundation.IDSRemoteURLConnectionAgent]
+/System/Library/LaunchDaemons/com.apple.idsremoteurlconnectionagent.plist
+  program: /System/Library/PrivateFrameworks/IDSFoundation.framework/IDSRemoteURLConnectionAgent.app/IDSRemoteURLConnectionAgent
+  args: /System/Library/PrivateFrameworks/IDSFoundation.framework/IDSRemoteURLConnectionAgent.app/IDSRemoteURLConnectionAgent
+  env: 1 var(s)
+
+[com.apple.imagent]
+/System/Library/LaunchDaemons/com.apple.imagent.plist
+  program: /System/Library/PrivateFrameworks/IMCore.framework/imagent.app/imagent
+  args: /System/Library/PrivateFrameworks/IMCore.framework/imagent.app/imagent
+  runAtLoad: true
+  keepAlive: {conditional}
+  env: 1 var(s)
+
+[com.apple.imageplaygroundd]
+/System/Library/LaunchDaemons/com.apple.imageplaygroundd.plist
+  program: /System/Library/PrivateFrameworks/SuggestedImage.framework/Support/imageplaygroundd
+  args: /System/Library/PrivateFrameworks/SuggestedImage.framework/Support/imageplaygroundd
+
+[com.apple.imautomatichistorydeletionagent]
+/System/Library/LaunchDaemons/com.apple.imautomatichistorydeletionagent.plist
+  program: /System/Library/PrivateFrameworks/IMDPersistence.framework/IMAutomaticHistoryDeletionAgent.app/IMAutomaticHistoryDeletionAgent
+  args: /System/Library/PrivateFrameworks/IMDPersistence.framework/IMAutomaticHistoryDeletionAgent.app/IMAutomaticHistoryDeletionAgent
+
+[com.apple.imcore.imtransferagent]
+/System/Library/LaunchDaemons/com.apple.imtransferagent.plist
+  program: /System/Library/PrivateFrameworks/IMTransferServices.framework/IMTransferAgent.app/IMTransferAgent
+  args: /System/Library/PrivateFrameworks/IMTransferServices.framework/IMTransferAgent.app/IMTransferAgent
+  env: 1 var(s)
+
+[com.apple.inboxupdaterd]
+/System/Library/LaunchDaemons/com.apple.inboxupdaterd.plist
+  program: /usr/libexec/inboxupdaterd
+  args: /usr/libexec/inboxupdaterd
+  keepAlive: {conditional}
+
+[com.apple.ind]
+/System/Library/LaunchDaemons/com.apple.ind.plist
+  program: /System/Library/PrivateFrameworks/iCloudNotification.framework/ind
+  args: /System/Library/PrivateFrameworks/iCloudNotification.framework/ind
+
+[com.apple.inputanalyticsd]
+/System/Library/LaunchDaemons/com.apple.inputanalyticsd.plist
+  program: /usr/libexec/inputanalyticsd
+  args: /usr/libexec/inputanalyticsd
+
+[com.apple.installcoordination_proxy]
+/System/Library/LaunchDaemons/com.apple.installcoordination_proxy.plist
+  program: /System/Library/PrivateFrameworks/InstallCoordination.framework/Support/installcoordination_proxy
+  args: /System/Library/PrivateFrameworks/InstallCoordination.framework/Support/installcoordination_proxy
+
+[com.apple.installcoordinationd]
+/System/Library/LaunchDaemons/com.apple.installcoordinationd.plist
+  program: /System/Library/PrivateFrameworks/InstallCoordination.framework/Support/installcoordinationd
+  args: /System/Library/PrivateFrameworks/InstallCoordination.framework/Support/installcoordinationd
+  keepAlive: {conditional}
+
+[com.apple.intelligencecontextd]
+/System/Library/LaunchDaemons/com.apple.intelligencecontextd.plist
+  program: /System/Library/PrivateFrameworks/IntelligenceFlowContextRuntime.framework/intelligencecontextd
+  args: /System/Library/PrivateFrameworks/IntelligenceFlowContextRuntime.framework/intelligencecontextd
+
+[com.apple.intelligenceflowd]
+/System/Library/LaunchDaemons/com.apple.intelligenceflowd.plist
+  program: /System/Library/PrivateFrameworks/IntelligenceFlowRuntime.framework/intelligenceflowd
+  args: /System/Library/PrivateFrameworks/IntelligenceFlowRuntime.framework/intelligenceflowd
+
+[com.apple.intelligenceplatformd]
+/System/Library/LaunchDaemons/com.apple.intelligenceplatformd.plist
+  program: /System/Library/PrivateFrameworks/IntelligencePlatformCore.framework/intelligenceplatformd
+  args: /System/Library/PrivateFrameworks/IntelligencePlatformCore.framework/intelligenceplatformd
+
+[com.apple.intelligencetasksd]
+/System/Library/LaunchDaemons/com.apple.intelligencetasksd.plist
+  program: /System/Library/PrivateFrameworks/IntelligenceTasksEngine.framework/Support/intelligencetasksd
+  args: /System/Library/PrivateFrameworks/IntelligenceTasksEngine.framework/Support/intelligencetasksd
+
+[com.apple.intelligentroutingd]
+/System/Library/LaunchDaemons/com.apple.intelligentroutingd.plist
+  program: /usr/libexec/intelligentroutingd
+  args: /usr/libexec/intelligentroutingd
+  env: 1 var(s)
+
+[com.apple.internal.ptdremoted]
+/System/Library/LaunchDaemons/com.apple.internal.ptdremoted.plist
+  program: /usr/appleinternal/libexec/ptdremoted
+  args: /usr/appleinternal/libexec/ptdremoted
+
+[com.apple.IOAccelMemoryInfoCollector]
+/System/Library/LaunchDaemons/com.apple.IOAccelMemoryInfoCollector.plist
+  program: /usr/libexec/IOAccelMemoryInfoCollector
+  args: /usr/libexec/IOAccelMemoryInfoCollector
+
+[com.apple.iomfb_bics_daemon]
+/System/Library/LaunchDaemons/com.apple.iomfb_bics_daemon.plist
+  program: /usr/libexec/IOMFB_bics_daemon
+  args: /usr/libexec/IOMFB_bics_daemon
+  runAtLoad: true
+  env: 1 var(s)
+
+[com.apple.iomfb_fdr_loader]
+/System/Library/LaunchDaemons/com.apple.iomfb_fdr_loader.plist
+  program: /usr/bin/IOMFB_FDR_Loader
+  args: /usr/bin/IOMFB_FDR_Loader --launchd_boot
+  runAtLoad: true
+
+[com.apple.iosdiagnosticsd]
+/System/Library/LaunchDaemons/com.apple.iosdiagnosticsd.plist
+  program: /System/Library/PrivateFrameworks/iOSDiagnostics.framework/iosdiagnosticsd
+  args: /System/Library/PrivateFrameworks/iOSDiagnostics.framework/iosdiagnosticsd
+
+[com.apple.ioupsd]
+/System/Library/LaunchDaemons/com.apple.ioupsd.plist
+  program: /usr/libexec/ioupsd
+
+[com.apple.itunescloudd]
+/System/Library/LaunchDaemons/com.apple.itunescloudd.plist
+  program: /System/Library/PrivateFrameworks/iTunesCloud.framework/Support/itunescloudd
+  args: /System/Library/PrivateFrameworks/iTunesCloud.framework/Support/itunescloudd
+
+[com.apple.itunesstored]
+/System/Library/LaunchDaemons/com.apple.itunesstored.plist
+  program: /System/Library/PrivateFrameworks/iTunesStore.framework/Support/itunesstored
+  args: /System/Library/PrivateFrameworks/iTunesStore.framework/Support/itunesstored
+  keepAlive: {conditional}
+
+[com.apple.jetpackassetd]
+/System/Library/LaunchDaemons/com.apple.jetpackassetd.plist
+  program: /System/Library/PrivateFrameworks/JetCore.framework/Support/jetpackassetd
+  args: /System/Library/PrivateFrameworks/JetCore.framework/Support/jetpackassetd
+
+[com.apple.jetsamproperties.V54.plist]
+/System/Library/LaunchDaemons/com.apple.jetsamproperties.V54.plist
+
+[com.apple.keychainsharingmessagingd]
+/System/Library/LaunchDaemons/com.apple.keychainsharingmessagingd.plist
+  program: /usr/libexec/keychainsharingmessagingd
+  args: /usr/libexec/keychainsharingmessagingd
+
+[com.apple.knowledgeconstructiond]
+/System/Library/LaunchDaemons/com.apple.knowledgeconstructiond.plist
+  program: /System/Library/PrivateFrameworks/IntelligencePlatformCore.framework/knowledgeconstructiond
+  args: /System/Library/PrivateFrameworks/IntelligencePlatformCore.framework/knowledgeconstructiond
+
+[com.apple.languageassetd]
+/System/Library/LaunchDaemons/com.apple.languageassetd.plist
+  program: /usr/libexec/languageassetd
+  args: /usr/libexec/languageassetd
+
+[com.apple.libsqlite3.dbtelemetryd]
+/System/Library/LaunchDaemons/com.apple.libsqlite3.dbtelemetryd.plist
+  program: /usr/libexec/dbtelemetryd
+  args: /usr/libexec/dbtelemetryd
+
+[com.apple.linkd]
+/System/Library/LaunchDaemons/com.apple.linkd.plist
+  program: /usr/libexec/linkd
+  args: /usr/libexec/linkd
+
+[com.apple.liveactivitiesd]
+/System/Library/LaunchDaemons/com.apple.liveactivitiesd.plist
+  program: /System/Library/PrivateFrameworks/SessionCore.framework/Support/liveactivitiesd
+  args: /System/Library/PrivateFrameworks/SessionCore.framework/Support/liveactivitiesd
+  keepAlive: {conditional}
+  env: 1 var(s)
+
+[com.apple.localizationswitcherd]
+/System/Library/LaunchDaemons/com.apple.localizationswitcherd.plist
+  program: /System/Library/PrivateFrameworks/IntlPreferences.framework/Support/localizationswitcherd
+
+[com.apple.locationaccessstored]
+/System/Library/LaunchDaemons/com.apple.locationaccessstored.plist
+  program: /usr/libexec/locationaccessstored
+  args: /usr/libexec/locationaccessstored
+
+[com.apple.locationd]
+/System/Library/LaunchDaemons/com.apple.locationd.plist
+  program: /usr/libexec/locationd
+  args: /usr/libexec/locationd
+  runAtLoad: true
+  keepAlive: {conditional}
+  env: 1 var(s)
+
+[com.apple.locationpushd]
+/System/Library/LaunchDaemons/com.apple.locationpushd.plist
+  program: /usr/libexec/locationpushd
+  args: /usr/libexec/locationpushd
+  env: 1 var(s)
+
+[com.apple.lockdownmoded]
+/System/Library/LaunchDaemons/com.apple.lockdownmoded.plist
+  program: /System/Library/PrivateFrameworks/LockdownMode.framework/lockdownmoded
+  args: /System/Library/PrivateFrameworks/LockdownMode.framework/lockdownmoded
+
+[com.apple.logd]
+/System/Library/LaunchDaemons/com.apple.logd.plist
+  program: /usr/libexec/logd
+  runAtLoad: true
+  keepAlive: true
+  env: 2 var(s)
+
+[com.apple.logd_helper]
+/System/Library/LaunchDaemons/com.apple.logd_helper.plist
+  program: /usr/libexec/logd_helper
+  env: 2 var(s)
+
+[com.apple.logd_reporter]
+/System/Library/LaunchDaemons/com.apple.logd_reporter.plist
+  program: /usr/libexec/logd_reporter
+
+[com.apple.lsd]
+/System/Library/LaunchDaemons/com.apple.lsd.plist
+  program: /usr/libexec/lsd
+  args: /usr/libexec/lsd
+
+[com.apple.lsd.system]
+/System/Library/LaunchDaemons/com.apple.lsd.system.plist
+  program: /usr/libexec/lsd
+  args: /usr/libexec/lsd systemSessionDaemon runAsRoot
+
+[com.apple.lskdd]
+/System/Library/LaunchDaemons/com.apple.lskdd.plist
+  program: /usr/libexec/lskdd
+
+[com.apple.lskdP7d]
+/System/Library/LaunchDaemons/com.apple.lskdP7d.plist
+  program: /usr/libexec/lskdP7d
+
+[com.apple.managedappdistributiond]
+/System/Library/LaunchDaemons/com.apple.managedappdistributiond.plist
+  program: /System/Library/Frameworks/ManagedAppDistribution.framework/Support/managedappdistributiond
+  args: /System/Library/Frameworks/ManagedAppDistribution.framework/Support/managedappdistributiond
+
+[com.apple.managedassetsd]
+/System/Library/LaunchDaemons/com.apple.managedassetsd.plist
+  program: /usr/libexec/managedassetsd
+
+[com.apple.managedconfiguration.passcodenagd]
+/System/Library/LaunchDaemons/com.apple.managedconfiguration.passcodenagd.plist
+  program: /usr/libexec/passcodenagd
+  args: /usr/libexec/passcodenagd
+  keepAlive: {conditional}
+
+[com.apple.managedconfiguration.profiled]
+/System/Library/LaunchDaemons/com.apple.managedconfiguration.profiled.plist
+  program: /usr/libexec/profiled
+  args: /usr/libexec/profiled
+  keepAlive: {conditional}
+
+[com.apple.manageddeviced]
+/System/Library/LaunchDaemons/com.apple.manageddeviced.plist
+  program: /usr/libexec/manageddeviced
+  args: /usr/libexec/manageddeviced
+
+[com.apple.ManagedSettingsAgent]
+/System/Library/LaunchDaemons/com.apple.ManagedSettingsAgent.plist
+  program: /System/Library/Frameworks/ManagedSettings.framework/ManagedSettingsAgent
+
+[com.apple.maps.destinationd]
+/System/Library/LaunchDaemons/com.apple.maps.destinationd.plist
+  program: /System/Library/PrivateFrameworks/MapsSuggestions.framework/destinationd
+  args: /System/Library/PrivateFrameworks/MapsSuggestions.framework/destinationd
+
+[com.apple.Maps.geocorrectiond]
+/System/Library/LaunchDaemons/com.apple.Maps.geocorrectiond.plist
+  program: /System/Library/PrivateFrameworks/MapsSupport.framework/geocorrectiond
+  args: /System/Library/PrivateFrameworks/MapsSupport.framework/geocorrectiond
+
+[com.apple.Maps.mapspushd]
+/System/Library/LaunchDaemons/com.apple.Maps.pushdaemon.plist
+  program: /System/Library/PrivateFrameworks/MapsSupport.framework/mapspushd
+  args: /System/Library/PrivateFrameworks/MapsSupport.framework/mapspushd
+
+[com.apple.Maps.mapssyncd]
+/System/Library/LaunchDaemons/com.apple.Maps.mapssyncd.plist
+  program: /System/Library/PrivateFrameworks/MapsSync.framework/mapssyncd
+
+[com.apple.matd]
+/System/Library/LaunchDaemons/com.apple.matd.plist
+  program: /System/Library/PrivateFrameworks/WelcomeKit.framework/matd
+  args: /System/Library/PrivateFrameworks/WelcomeKit.framework/matd
+
+[com.apple.mDNSResponder.reloaded]
+/System/Library/LaunchDaemons/com.apple.mDNSResponder.plist
+  program: /usr/sbin/mDNSResponder
+  args: /usr/sbin/mDNSResponder
+
+[com.apple.mDNSResponderHelper.reloaded]
+/System/Library/LaunchDaemons/com.apple.mDNSResponderHelper.plist
+  program: /usr/sbin/mDNSResponderHelper
+  args: /usr/sbin/mDNSResponderHelper
+
+[com.apple.mdt]
+/System/Library/LaunchDaemons/com.apple.mdt.plist
+  program: /usr/libexec/transitd
+  args: /usr/libexec/transitd
+
+[com.apple.mediaanalysisd]
+/System/Library/LaunchDaemons/com.apple.mediaanalysisd.plist
+  program: /System/Library/PrivateFrameworks/MediaAnalysis.framework/mediaanalysisd
+  args: /System/Library/PrivateFrameworks/MediaAnalysis.framework/mediaanalysisd
+
+[com.apple.mediaanalysisd.service]
+/System/Library/LaunchDaemons/com.apple.mediaanalysisd.service.plist
+  program: /System/Library/PrivateFrameworks/MediaAnalysis.framework/mediaanalysisd-service
+  args: /System/Library/PrivateFrameworks/MediaAnalysis.framework/mediaanalysisd-service
+
+[com.apple.mediaartworkd]
+/System/Library/LaunchDaemons/com.apple.mediaartworkd.plist
+  program: /System/Library/PrivateFrameworks/MediaServices.framework/Support/mediaartworkd
+  args: /System/Library/PrivateFrameworks/MediaServices.framework/Support/mediaartworkd
+
+[com.apple.mediacontinuityd]
+/System/Library/LaunchDaemons/com.apple.mediacontinuityd.plist
+  program: /usr/libexec/mediacontinuityd
+  args: /usr/libexec/mediacontinuityd
+
+[com.apple.medialibraryd]
+/System/Library/LaunchDaemons/com.apple.medialibraryd.plist
+  program: /System/Library/PrivateFrameworks/MusicLibrary.framework/Support/medialibraryd
+  args: /System/Library/PrivateFrameworks/MusicLibrary.framework/Support/medialibraryd
+
+[com.apple.mediaparserd]
+/System/Library/LaunchDaemons/com.apple.mediaparserd.plist
+  program: /usr/libexec/mediaparserd
+  args: /usr/libexec/mediaparserd
+  env: 1 var(s)
+
+[com.apple.mediaplaybackd]
+/System/Library/LaunchDaemons/com.apple.mediaplaybackd.plist
+  program: /usr/libexec/mediaplaybackd
+  args: /usr/libexec/mediaplaybackd
+  env: 1 var(s)
+
+[com.apple.mediaremoted]
+/System/Library/LaunchDaemons/com.apple.mediaremoted.plist
+  program: /System/Library/PrivateFrameworks/MediaRemote.framework/Support/mediaremoted
+  args: /System/Library/PrivateFrameworks/MediaRemote.framework/Support/mediaremoted
+  keepAlive: {conditional}
+
+[com.apple.mediasetupd]
+/System/Library/LaunchDaemons/com.apple.mediasetupd.plist
+  program: /usr/libexec/mediasetupd
+  args: /usr/libexec/mediasetupd
+
+[com.apple.mediastream.mstreamd]
+/System/Library/LaunchDaemons/com.apple.mediastream.mstreamd.plist
+  program: /System/Library/PrivateFrameworks/MediaStream.framework/Support/mstreamd
+  keepAlive: {conditional}
+
+[com.apple.memory-maintenance]
+/System/Library/LaunchDaemons/com.apple.memory-maintenance.plist
+  program: /usr/libexec/mmaintenanced
+  args: /usr/libexec/mmaintenanced
+
+[com.apple.merchantd]
+/System/Library/LaunchDaemons/com.apple.merchantd.plist
+  program: /usr/libexec/merchantd
+  args: /usr/libexec/merchantd
+
+[com.apple.messagesescrowd]
+/System/Library/LaunchDaemons/com.apple.messagesescrowd.plist
+  program: /System/Library/PrivateFrameworks/MessagesEscrow.framework/Daemon/messagesescrowd.xpc/messagesescrowd
+  args: /System/Library/PrivateFrameworks/MessagesEscrow.framework/Daemon/messagesescrowd.xpc/messagesescrowd
+  env: 1 var(s)
+
+[com.apple.metrickitd]
+/System/Library/LaunchDaemons/com.apple.metrickitd.plist
+  program: /usr/libexec/metrickitd
+  args: /usr/libexec/metrickitd
+  env: 1 var(s)
+
+[com.apple.midiserver]
+/System/Library/LaunchDaemons/com.apple.midiserver-ios.plist
+  program: /System/Library/Frameworks/CoreMIDI.framework/MIDIServer
+  args: /System/Library/Frameworks/CoreMIDI.framework/MIDIServer
+
+[com.apple.migrationd]
+/System/Library/LaunchDaemons/com.apple.migrationd.plist
+  program: /System/Library/PrivateFrameworks/MigrationKit.framework/migrationd
+  args: /System/Library/PrivateFrameworks/MigrationKit.framework/migrationd
+  keepAlive: {conditional}
+
+[com.apple.milod]
+/System/Library/LaunchDaemons/com.apple.milod.plist
+  program: /usr/libexec/milod
+  args: /usr/libexec/milod
+  env: 1 var(s)
+
+[com.apple.misagent]
+/System/Library/LaunchDaemons/com.apple.misagent.plist
+  program: /usr/libexec/misagent
+  args: /usr/libexec/misagent
+
+[com.apple.mlhostd]
+/System/Library/LaunchDaemons/com.apple.mlhostd.plist
+  program: /usr/libexec/mlhostd
+  args: /usr/libexec/mlhostd
+
+[com.apple.mlruntimed]
+/System/Library/LaunchDaemons/com.apple.mlruntimed.plist
+  program: /usr/libexec/mlruntimed
+  args: /usr/libexec/mlruntimed
+
+[com.apple.mobile.assertion_agent]
+/System/Library/LaunchDaemons/com.apple.mobile.assertion_agent.plist
+  program: /usr/libexec/mobile_assertion_agent
+  args: /usr/libexec/mobile_assertion_agent
+
+[com.apple.mobile.cache_delete_app_container_caches]
+/System/Library/LaunchDaemons/com.apple.mobile.cache_delete_app_container_caches.plist
+  program: /System/Library/CoreServices/CacheDeleteAppContainerCaches
+  args: /System/Library/CoreServices/CacheDeleteAppContainerCaches
+
+[com.apple.mobile.cache_delete_daily]
+/System/Library/LaunchDaemons/com.apple.mobile.cache_delete_daily.plist
+  program: /System/Library/CoreServices/CacheDeleteDaily
+  args: /System/Library/CoreServices/CacheDeleteDaily
+
+[com.apple.mobile.cache_delete_mobile_backup]
+/System/Library/LaunchDaemons/com.apple.mobile.cache_delete_mobile_backup.plist
+  program: /System/Library/PrivateFrameworks/MobileBackup.framework/MobileBackupCacheDeleteService
+  args: /System/Library/PrivateFrameworks/MobileBackup.framework/MobileBackupCacheDeleteService
+
+[com.apple.mobile.heartbeat]
+/System/Library/LaunchDaemons/com.apple.mobile.heartbeat.plist
+  program: /usr/libexec/heartbeatd
+  args: /usr/libexec/heartbeatd
+
+[com.apple.mobile.house_arrest]
+/System/Library/LaunchDaemons/com.apple.mobile.house_arrest.plist
+  program: /usr/libexec/mobile_house_arrest
+  args: /usr/libexec/mobile_house_arrest
+
+[com.apple.mobile.insecure_notification_proxy]
+/System/Library/LaunchDaemons/com.apple.mobile.insecure_notification_proxy.plist
+  program: /usr/libexec/notification_proxy
+  args: /usr/libexec/notification_proxy -i
+
+[com.apple.mobile.installation_proxy]
+/System/Library/LaunchDaemons/com.apple.mobile_installation_proxy.plist
+  program: /usr/libexec/mobile_installation_proxy
+
+[com.apple.mobile.installd]
+/System/Library/LaunchDaemons/com.apple.mobile.installd.plist
+  program: /usr/libexec/installd
+  args: /usr/libexec/installd
+
+[com.apple.mobile.keybagd]
+/System/Library/LaunchDaemons/com.apple.mobile.keybagd.plist
+  program: /usr/libexec/keybagd
+  args: /usr/libexec/keybagd -t 15
+  runAtLoad: true
+  env: 2 var(s)
+
+[com.apple.mobile.lockdown]
+/System/Library/LaunchDaemons/com.apple.mobile.lockdown.plist
+  program: /usr/libexec/lockdownd
+  args: /usr/libexec/lockdownd
+  runAtLoad: true
+
+[com.apple.mobile.MCInstall]
+/System/Library/LaunchDaemons/com.apple.mobile.MCInstall.plist
+  program: /usr/libexec/mc_mobile_tunnel
+  args: /usr/libexec/mc_mobile_tunnel
+
+[com.apple.mobile.notification_proxy]
+/System/Library/LaunchDaemons/com.apple.mobile.notification_proxy.plist
+  program: /usr/libexec/notification_proxy
+  args: /usr/libexec/notification_proxy
+
+[com.apple.mobile.NRDUpdated]
+/System/Library/LaunchDaemons/com.apple.mobile.NRDUpdated.plist
+  program: /usr/libexec/NRDUpdated
+  args: /usr/libexec/NRDUpdated
+
+[com.apple.mobile.obliteration]
+/System/Library/LaunchDaemons/com.apple.mobile.obliteration.plist
+  program: /usr/libexec/mobile_obliterator
+  args: /usr/libexec/mobile_obliterator
+
+[com.apple.mobile.softwareupdated]
+/System/Library/LaunchDaemons/com.apple.mobile.softwareupdated.plist
+  program: /System/Library/PrivateFrameworks/MobileSoftwareUpdate.framework/Support/softwareupdated
+  args: /System/Library/PrivateFrameworks/MobileSoftwareUpdate.framework/Support/softwareupdated
+  runAtLoad: true
+
+[com.apple.mobile.storage_mounter]
+/System/Library/LaunchDaemons/com.apple.mobile.storage_mounter.plist
+  program: /usr/libexec/MobileStorageMounter
+  args: /usr/libexec/MobileStorageMounter
+  env: 1 var(s)
+
+[com.apple.mobile.storage_mounter_proxy]
+/System/Library/LaunchDaemons/com.apple.mobile.storage_mounter_proxy.plist
+  program: /usr/libexec/mobile_storage_proxy
+  args: /usr/libexec/mobile_storage_proxy
+
+[com.apple.mobile.usermanagerd]
+/System/Library/LaunchDaemons/com.apple.mobile.usermanagerd.plist
+  program: /usr/libexec/usermanagerd
+  args: /usr/libexec/usermanagerd -t 15
+  runAtLoad: true
+  env: 2 var(s)
+
+[com.apple.mobile_diagnostics_relay]
+/System/Library/LaunchDaemons/com.apple.mobile_diagnostics_relay.plist
+  program: /usr/libexec/mobile_diagnostics_relay
+  args: /usr/libexec/mobile_diagnostics_relay
+
+[com.apple.mobileactivationd]
+/System/Library/LaunchDaemons/com.apple.mobileactivationd.plist
+  program: /usr/libexec/mobileactivationd
+  args: /usr/libexec/mobileactivationd
+
+[com.apple.mobileassetd]
+/System/Library/LaunchDaemons/com.apple.mobileassetd.plist
+  program: /usr/libexec/mobileassetd
+  args: /usr/libexec/mobileassetd
+
+[com.apple.mobilebackup2]
+/System/Library/LaunchDaemons/com.apple.mobilebackup2.plist
+  program: /usr/libexec/BackupAgent2
+  args: /usr/libexec/BackupAgent2 --lockdown --oneshot -v
+  env: 1 var(s)
+
+[com.apple.mobilecheckpoint.checkpointd]
+/System/Library/LaunchDaemons/com.apple.mobilecheckpoint.checkpointd.plist
+  program: /usr/libexec/checkpointd
+
+[com.apple.MobileFileIntegrity]
+/System/Library/LaunchDaemons/com.apple.MobileFileIntegrity.plist
+  program: /usr/libexec/amfid
+  args: /usr/libexec/amfid
+  runAtLoad: true
+
+[com.apple.mobilegestalt.xpc]
+/System/Library/LaunchDaemons/com.apple.mobilegestalt.xpc.plist
+  program: /usr/libexec/MobileGestaltHelper
+
+[com.apple.MobileInternetSharing]
+/System/Library/LaunchDaemons/com.apple.MobileInternetSharing.plist
+  program: /usr/libexec/misd
+  args: /usr/libexec/misd
+
+[com.apple.mobilerepaird]
+/System/Library/LaunchDaemons/com.apple.mobilerepaird.plist
+  program: /usr/libexec/mobilerepaird
+  args: /usr/libexec/mobilerepaird
+
+[com.apple.mobilestoredemod]
+/System/Library/LaunchDaemons/com.apple.mobilestoredemod.plist
+  program: /usr/libexec/demod
+  args: /usr/libexec/demod
+  keepAlive: {conditional}
+
+[com.apple.mobilestoredemodhelper]
+/System/Library/LaunchDaemons/com.apple.mobilestoredemodhelper.plist
+  program: /usr/libexec/demod_helper
+  args: /usr/libexec/demod_helper
+
+[com.apple.mobiletimerd]
+/System/Library/LaunchDaemons/com.apple.mobiletimerd.plist
+  program: /System/Library/PrivateFrameworks/MobileTimer.framework/Executables/mobiletimerd
+  args: /System/Library/PrivateFrameworks/MobileTimer.framework/Executables/mobiletimerd
+  runAtLoad: true
+  env: 1 var(s)
+
+[com.apple.modelcatalogd]
+/System/Library/LaunchDaemons/com.apple.modelcatalogd.plist
+  program: /System/Library/PrivateFrameworks/ModelCatalogRuntime.framework/modelcatalogd
+  args: /System/Library/PrivateFrameworks/ModelCatalogRuntime.framework/modelcatalogd
+
+[com.apple.modelmanagerd]
+/System/Library/LaunchDaemons/com.apple.modelmanagerd.plist
+  program: /usr/libexec/modelmanagerd
+
+[com.apple.momentsd]
+/System/Library/LaunchDaemons/com.apple.momentsd.plist
+  program: /usr/libexec/momentsd
+  args: /usr/libexec/momentsd
+
+[com.apple.MTLAssetUpgraderD]
+/System/Library/LaunchDaemons/com.apple.MTLAssetUpgraderD.plist
+  program: /usr/libexec/MTLAssetUpgraderD
+  args: /usr/libexec/MTLAssetUpgraderD
+  env: 1 var(s)
+
+[com.apple.mtmergeprops]
+/System/Library/LaunchDaemons/com.apple.mtmergeprops.plist
+  program: /usr/libexec/mtmergeprops
+  args: /usr/libexec/mtmergeprops
+  runAtLoad: true
+  keepAlive: {conditional}
+
+[com.apple.musicd]
+/System/Library/LaunchDaemons/com.apple.musicd.plist
+  program: /System/Library/Frameworks/MusicKit.framework/Support/musicd
+  args: /System/Library/Frameworks/MusicKit.framework/Support/musicd
+
+[com.apple.nand.aspcarry]
+/System/Library/LaunchDaemons/com.apple.nand.aspcarry.plist
+  program: /usr/libexec/ASPCarryLog
+  args: /usr/libexec/ASPCarryLog
+
+[com.apple.nand_task_scheduler]
+/System/Library/LaunchDaemons/com.apple.nand_task_scheduler.plist
+  program: /usr/libexec/NANDTaskScheduler
+  args: /usr/libexec/NANDTaskScheduler
+
+[com.apple.nanobackupd]
+/System/Library/LaunchDaemons/com.apple.nanobackupd.plist
+  program: /System/Library/PrivateFrameworks/NanoBackup.framework/nanobackupd
+  args: /System/Library/PrivateFrameworks/NanoBackup.framework/nanobackupd
+
+[com.apple.nanoprefsyncd.2]
+/System/Library/LaunchDaemons/com.apple.nanoprefsyncd.plist
+  program: /System/Library/PrivateFrameworks/NanoPreferencesSync.framework/nanoprefsyncd
+  args: /System/Library/PrivateFrameworks/NanoPreferencesSync.framework/nanoprefsyncd -companion
+  runAtLoad: true
+
+[com.apple.nanoregistryd]
+/System/Library/LaunchDaemons/com.apple.nanoregistryd.plist
+  program: /usr/libexec/nanoregistryd
+  args: /usr/libexec/nanoregistryd
+  keepAlive: {conditional}
+
+[com.apple.nanoregistrylaunchd]
+/System/Library/LaunchDaemons/com.apple.nanoregistrylaunchd.plist
+  program: /usr/libexec/nanoregistrylaunchd
+  args: /usr/libexec/nanoregistrylaunchd
+
+[com.apple.nanotimekitcompaniond]
+/System/Library/LaunchDaemons/com.apple.nanotimekitcompaniond.plist
+  program: /System/Library/PrivateFrameworks/NanoTimeKit.framework/nanotimekitcompaniond
+
+[com.apple.naturallanguaged]
+/System/Library/LaunchDaemons/com.apple.naturallanguaged.plist
+  program: /usr/libexec/naturallanguaged
+  args: /usr/libexec/naturallanguaged
+
+[com.apple.navd]
+/System/Library/LaunchDaemons/com.apple.navd.plist
+  program: /System/Library/PrivateFrameworks/MapsSupport.framework/navd
+  args: /System/Library/PrivateFrameworks/MapsSupport.framework/navd
+  runAtLoad: true
+  keepAlive: {conditional}
+
+[com.apple.ndoagent]
+/System/Library/LaunchDaemons/com.apple.ndoagent.plist
+  program: /System/Library/PrivateFrameworks/NewDeviceOutreach.framework/ndoagent
+  args: /System/Library/PrivateFrameworks/NewDeviceOutreach.framework/ndoagent
+
+[com.apple.neagent-ios]
+/System/Library/LaunchDaemons/com.apple.neagent-ios.plist
+  program: /usr/libexec/neagent
+
+[com.apple.nearbyd]
+/System/Library/LaunchDaemons/com.apple.nearbyd.plist
+  program: /usr/libexec/nearbyd
+  args: /usr/libexec/nearbyd
+  keepAlive: {conditional}
+  env: 1 var(s)
+
+[com.apple.nehelper]
+/System/Library/LaunchDaemons/com.apple.nehelper-embedded.plist
+  program: /usr/libexec/nehelper
+
+[com.apple.nesessionmanager]
+/System/Library/LaunchDaemons/com.apple.nesessionmanager.plist
+  program: /usr/libexec/nesessionmanager
+
+[com.apple.network.latticed]
+/System/Library/LaunchDaemons/com.apple.network.latticed.plist
+  program: /usr/libexec/latticed
+  args: /usr/libexec/latticed
+
+[com.apple.networkserviceproxy]
+/System/Library/LaunchDaemons/com.apple.networkserviceproxy.plist
+  program: /usr/libexec/networkserviceproxy
+
+[com.apple.newsd]
+/System/Library/LaunchDaemons/com.apple.newsd.plist
+  program: /System/Library/PrivateFrameworks/NewsDaemon.framework/newsd
+
+[com.apple.nexusd]
+/System/Library/LaunchDaemons/com.apple.nexusd.plist
+  program: /usr/libexec/nexusd
+
+[com.apple.nfcd]
+/System/Library/LaunchDaemons/com.apple.nfcd.plist
+  program: /usr/libexec/nfcd
+
+[com.apple.nlcd]
+/System/Library/LaunchDaemons/com.apple.NetworkLinkConditioner.plist
+  program: /usr/libexec/nlcd
+  args: /usr/libexec/nlcd
+
+[com.apple.notifyd]
+/System/Library/LaunchDaemons/com.apple.notifyd.plist
+  program: /usr/sbin/notifyd
+  args: /usr/sbin/notifyd
+  env: 1 var(s)
+
+[com.apple.nsurlsessiond]
+/System/Library/LaunchDaemons/com.apple.nsurlsessiond.plist
+  program: /usr/libexec/nsurlsessiond
+
+[com.apple.online-auth-agent.xpc]
+/System/Library/LaunchDaemons/com.apple.online-authd.xpc.plist
+  program: /usr/libexec/online-auth-agent
+
+[com.apple.osanalytics.osanalyticshelper]
+/System/Library/LaunchDaemons/com.apple.osanalytics.osanalyticshelper.plist
+  program: /System/Library/CoreServices/osanalyticshelper
+  args: /System/Library/CoreServices/osanalyticshelper server-init
+
+[com.apple.osanalytics.osanalyticshelper.agent]
+/System/Library/LaunchDaemons/com.apple.osanalytics.osanalyticshelper.agent.plist
+  program: /System/Library/CoreServices/osanalyticshelper
+  args: /System/Library/CoreServices/osanalyticshelper agent-init
+
+[com.apple.ospredictiond]
+/System/Library/LaunchDaemons/com.apple.ospredictiond.plist
+  program: /usr/libexec/ospredictiond
+
+[com.apple.OTACrashCopier]
+/System/Library/LaunchDaemons/com.apple.OTACrashCopier.plist
+  program: /System/Library/CoreServices/OTACrashCopier
+  args: OTACrashCopier
+  runAtLoad: true
+
+[com.apple.OTATaskingAgent]
+/System/Library/LaunchDaemons/com.apple.OTATaskingAgent.plist
+  program: /usr/libexec/OTATaskingAgent
+  args: /usr/libexec/OTATaskingAgent server-init
+
+[com.apple.parsec-fbf]
+/System/Library/LaunchDaemons/com.apple.parsec-fbf.plist
+  program: /System/Library/PrivateFrameworks/CoreParsec.framework/parsec-fbf
+
+[com.apple.parsecd]
+/System/Library/LaunchDaemons/com.apple.parsecd.plist
+  program: /System/Library/PrivateFrameworks/CoreParsec.framework/parsecd
+
+[com.apple.passd]
+/System/Library/LaunchDaemons/com.apple.passd.plist
+  program: /System/Library/PrivateFrameworks/PassKitCore.framework/passd
+  args: /System/Library/PrivateFrameworks/PassKitCore.framework/passd
+
+[com.apple.pasteboard.pasted]
+/System/Library/LaunchDaemons/com.apple.pasteboard.pasted.plist
+  program: /System/Library/PrivateFrameworks/Pasteboard.framework/Support/pasted
+  args: /System/Library/PrivateFrameworks/Pasteboard.framework/Support/pasted
+
+[com.apple.pcapd]
+/System/Library/LaunchDaemons/com.apple.pcapd.plist
+  program: /usr/libexec/pcapd
+  args: /usr/libexec/pcapd
+
+[com.apple.peakpowermanagerd]
+/System/Library/LaunchDaemons/com.apple.peakpowermanagerd.plist
+  program: /usr/libexec/peakpowermanagerd
+  runAtLoad: true
+
+[com.apple.peopled]
+/System/Library/LaunchDaemons/com.apple.peopled.plist
+  program: /System/Library/PrivateFrameworks/People.framework/peopled
+  args: /System/Library/PrivateFrameworks/People.framework/peopled
+  runAtLoad: true
+
+[com.apple.perfdiagsselfenabled]
+/System/Library/LaunchDaemons/com.apple.perfdiagsselfenabled.plist
+  program: /usr/libexec/perfdiagsselfenabled
+  args: /usr/libexec/perfdiagsselfenabled
+
+[com.apple.PerformanceTrace.ptpassivecollectiond]
+/System/Library/LaunchDaemons/com.apple.PerformanceTrace.ptpassivecollectiond.plist
+  program: /usr/libexec/ptpassivecollectiond
+  args: /usr/libexec/ptpassivecollectiond
+
+[com.apple.perfpowermetricd]
+/System/Library/LaunchDaemons/com.apple.perfpowermetricd.plist
+  program: /usr/bin/perfpowermetricd
+  args: /usr/bin/perfpowermetricd
+
+[com.apple.PerfPowerServices]
+/System/Library/LaunchDaemons/com.apple.PerfPowerServices.plist
+  program: /usr/libexec/PerfPowerServices
+  args: /usr/libexec/PerfPowerServices
+  keepAlive: true
+
+[com.apple.PerfPowerServicesExtended]
+/System/Library/LaunchDaemons/com.apple.PerfPowerServicesExtended.plist
+  program: /usr/libexec/PerfPowerServicesExtended
+  args: /usr/libexec/PerfPowerServicesExtended
+  keepAlive: {conditional}
+  env: 1 var(s)
+
+[com.apple.pfd]
+/System/Library/LaunchDaemons/com.apple.pfd.plist
+  program: /usr/libexec/pfd
+  args: /usr/libexec/pfd
+
+[com.apple.photoanalysisd]
+/System/Library/LaunchDaemons/com.apple.photoanalysisd.plist
+  program: /System/Library/PrivateFrameworks/PhotoAnalysis.framework/Support/photoanalysisd
+
+[com.apple.photos.ImageConversionService]
+/System/Library/LaunchDaemons/com.apple.photos.ImageConversionService.plist
+  program: /System/Library/PrivateFrameworks/MediaConversionService.framework/XPCServices/com.apple.photos.ImageConversionService.xpc/com.apple.photos.ImageConversionService
+  args: com.apple.photos.ImageConversionService
+
+[com.apple.photos.VideoConversionService]
+/System/Library/LaunchDaemons/com.apple.photos.VideoConversionService.plist
+  program: /System/Library/PrivateFrameworks/MediaConversionService.framework/XPCServices/com.apple.photos.VideoConversionService.xpc/com.apple.photos.VideoConversionService
+  args: com.apple.photos.VideoConversionService
+
+[com.apple.photosface]
+/System/Library/LaunchDaemons/com.apple.photosface.plist
+  program: /usr/libexec/photosfaced
+  args: /usr/libexec/photosfaced
+  env: 1 var(s)
+
+[com.apple.pipelined]
+/System/Library/LaunchDaemons/com.apple.pipelined.plist
+  program: /usr/libexec/pipelined
+  args: /usr/libexec/pipelined
+  env: 1 var(s)
+
+[com.apple.pluginkit.pkd]
+/System/Library/LaunchDaemons/com.apple.pluginkit.pkd.plist
+  program: /usr/libexec/pkd
+  args: /usr/libexec/pkd
+
+[com.apple.pluginkit.pkreporter]
+/System/Library/LaunchDaemons/com.apple.pluginkit.pkreporter.plist
+  program: /usr/libexec/pkreporter
+  args: /usr/libexec/pkreporter
+
+[com.apple.PointerUI.pointeruid]
+/System/Library/LaunchDaemons/com.apple.PointerUI.pointeruid.plist
+  program: /System/Library/PrivateFrameworks/PointerUIServices.framework/Support/pointeruid
+  args: /System/Library/PrivateFrameworks/PointerUIServices.framework/Support/pointeruid
+
+[com.apple.polarisd]
+/System/Library/LaunchDaemons/com.apple.polarisd.plist
+  program: /usr/libexec/polarisd
+  args: /usr/libexec/polarisd
+
+[com.apple.powerd]
+/System/Library/LaunchDaemons/com.apple.powerd.plist
+  program: /System/Library/CoreServices/powerd.bundle/powerd
+  keepAlive: true
+
+[com.apple.powerdatad]
+/System/Library/LaunchDaemons/com.apple.powerdatad.plist
+  program: /usr/libexec/powerdatad
+
+[com.apple.powerexceptionsd]
+/System/Library/LaunchDaemons/com.apple.powerexceptionsd.plist
+  program: /usr/libexec/powerexceptionsd
+  args: /usr/libexec/powerexceptionsd
+  keepAlive: true
+
+[com.apple.powerexperienced]
+/System/Library/LaunchDaemons/com.apple.powerexperienced.plist
+  program: /usr/libexec/powerexperienced
+
+[com.apple.powerlogHelperd]
+/System/Library/LaunchDaemons/com.apple.powerlogHelperd.plist
+  program: /usr/bin/powerlogHelperd
+  args: /usr/bin/powerlogHelperd
+  env: 1 var(s)
+
+[com.apple.PowerUIAgent]
+/System/Library/LaunchDaemons/com.apple.PowerUIAgent.plist
+  program: /usr/libexec/PowerUIAgent
+
+[com.apple.preboardservice]
+/System/Library/LaunchDaemons/com.apple.preboardservice.plist
+  program: /usr/libexec/PreboardService
+
+[com.apple.preboardservice_v2]
+/System/Library/LaunchDaemons/com.apple.preboardservice_v2.plist
+  program: /usr/libexec/PreboardService
+  args: /usr/libexec/PreboardService -v 2
+
+[com.apple.privacyaccountingd]
+/System/Library/LaunchDaemons/com.apple.privacyaccountingd.plist
+  program: /System/Library/PrivateFrameworks/PrivacyAccounting.framework/Versions/A/Resources/privacyaccountingd
+  args: /System/Library/PrivateFrameworks/PrivacyAccounting.framework/Versions/A/Resources/privacyaccountingd
+
+[com.apple.privatecloudcomputed]
+/System/Library/LaunchDaemons/com.apple.privatecloudcomputed.plist
+  program: /System/Library/PrivateFrameworks/PrivateCloudCompute.framework/privatecloudcomputed.app/privatecloudcomputed
+  args: /System/Library/PrivateFrameworks/PrivateCloudCompute.framework/privatecloudcomputed.app/privatecloudcomputed
+
+[com.apple.prngseedd]
+/System/Library/LaunchDaemons/com.apple.prngseedd.plist
+  program: /usr/libexec/seputil
+  args: /usr/libexec/seputil --daemonize-reseed
+
+[com.apple.proactiveeventtrackerd]
+/System/Library/LaunchDaemons/com.apple.proactiveeventtrackerd.plist
+  program: /usr/libexec/proactiveeventtrackerd
+  args: /usr/libexec/proactiveeventtrackerd
+
+[com.apple.progressd]
+/System/Library/LaunchDaemons/com.apple.progressd.plist
+  program: /System/Library/Frameworks/ClassKit.framework/progressd
+  env: 2 var(s)
+
+[com.apple.protectedcloudstorage.protectedcloudkeysyncing]
+/System/Library/LaunchDaemons/com.apple.protectedcloudstorage.protectedcloudkeysyncing.plist
+  program: /System/Library/PrivateFrameworks/ProtectedCloudStorage.framework/Helpers/ProtectedCloudKeySyncing
+
+[com.apple.ProxiedCrashCopier.ProxyingDevice]
+/System/Library/LaunchDaemons/com.apple.ProxiedCrashCopier.ProxyingDevice.plist
+  program: /usr/libexec/ProxiedCrashCopier
+  args: /usr/libexec/ProxiedCrashCopier
+
+[com.apple.proximitycontrold]
+/System/Library/LaunchDaemons/com.apple.proximitycontrold.plist
+  program: /usr/libexec/proximitycontrold
+  args: /usr/libexec/proximitycontrold
+
+[com.apple.ptpcamerad]
+/System/Library/LaunchDaemons/com.apple.ptpcamerad.plist
+  program: /usr/libexec/ptpcamerad
+  args: /usr/libexec/ptpcamerad
+
+[com.apple.ptpd]
+/System/Library/LaunchDaemons/com.apple.ptpd.plist
+  program: /usr/libexec/ptpd
+  args: /usr/libexec/ptpd -t usb
+  keepAlive: {conditional}
+
+[com.apple.purplebuddy.budd]
+/System/Library/LaunchDaemons/com.apple.purplebuddy.budd.plist
+  program: /System/Library/PrivateFrameworks/SetupAssistant.framework/budd
+  args: /System/Library/PrivateFrameworks/SetupAssistant.framework/budd
+
+[com.apple.PurpleReverseProxy]
+/System/Library/LaunchDaemons/com.apple.PurpleReverseProxy.plist
+  program: /usr/libexec/PurpleReverseProxy
+  args: /usr/libexec/PurpleReverseProxy
+
+[com.apple.quicklook.ThumbnailsAgent]
+/System/Library/LaunchDaemons/com.apple.quicklook.ThumbnailsAgent.plist
+  program: /System/Library/Frameworks/QuickLookThumbnailing.framework/Support/com.apple.quicklook.ThumbnailsAgent
+
+[com.apple.racoon]
+/System/Library/LaunchDaemons/com.apple.racoon.plist
+  program: /usr/sbin/racoon
+  args: /usr/sbin/racoon -D
+
+[com.apple.rapportd]
+/System/Library/LaunchDaemons/com.apple.rapportd.plist
+  program: /usr/libexec/rapportd
+
+[com.apple.realitycamerad]
+/System/Library/LaunchDaemons/com.apple.realitycamerad.plist
+  program: /System/Library/PrivateFrameworks/RealityCamera.framework/realitycamerad
+  args: /System/Library/PrivateFrameworks/RealityCamera.framework/realitycamerad
+
+[com.apple.recentsd]
+/System/Library/LaunchDaemons/com.apple.recentsd.plist
+  program: /System/Library/PrivateFrameworks/CoreRecents.framework/recentsd
+  args: /System/Library/PrivateFrameworks/CoreRecents.framework/recentsd
+
+[com.apple.relatived]
+/System/Library/LaunchDaemons/com.apple.relatived.plist
+  program: /usr/libexec/relatived
+  args: /usr/libexec/relatived
+
+[com.apple.remindd]
+/System/Library/LaunchDaemons/com.apple.remindd.plist
+  program: /usr/libexec/remindd
+  args: /usr/libexec/remindd
+  runAtLoad: true
+
+[com.apple.remoteappintentsd]
+/System/Library/LaunchDaemons/com.apple.remoteappintentsd.plist
+  program: /usr/libexec/remoteappintentsd
+  args: /usr/libexec/remoteappintentsd
+
+[com.apple.remoted]
+/System/Library/LaunchDaemons/com.apple.remoted.plist
+  program: /usr/libexec/remoted
+  args: /usr/libexec/remoted
+  keepAlive: {conditional}
+  env: 2 var(s)
+
+[com.apple.RemoteManagementAgent]
+/System/Library/LaunchDaemons/com.apple.RemoteManagementAgent.plist
+  program: /System/Library/PrivateFrameworks/RemoteManagement.framework/RemoteManagementAgent
+
+[com.apple.remotemanagementd]
+/System/Library/LaunchDaemons/com.apple.remotemanagementd.plist
+  program: /System/Library/PrivateFrameworks/RemoteManagement.framework/remotemanagementd
+
+[com.apple.replayd]
+/System/Library/LaunchDaemons/com.apple.replayd.plist
+  program: /usr/libexec/replayd
+  args: /usr/libexec/replayd
+
+[com.apple.replicatord]
+/System/Library/LaunchDaemons/com.apple.replicatord.plist
+  program: /System/Library/PrivateFrameworks/ReplicatorCore.framework/Support/replicatord
+  args: /System/Library/PrivateFrameworks/ReplicatorCore.framework/Support/replicatord
+  keepAlive: {conditional}
+  env: 1 var(s)
+
+[com.apple.ReportCrash]
+/System/Library/LaunchDaemons/com.apple.ReportCrash.plist
+  program: /System/Library/CoreServices/ReportCrash
+  args: /System/Library/CoreServices/ReportCrash agent
+
+[com.apple.ReportMemoryException]
+/System/Library/LaunchDaemons/com.apple.ReportMemoryException.plist
+  program: /usr/libexec/ReportMemoryException
+  args: /usr/libexec/ReportMemoryException
+  env: 1 var(s)
+
+[com.apple.ReportSystemMemory]
+/System/Library/LaunchDaemons/com.apple.ReportSystemMemory.plist
+  program: /System/Library/CoreServices/ReportSystemMemory
+  args: /System/Library/CoreServices/ReportSystemMemory
+
+[com.apple.restorecameraispd]
+/System/Library/LaunchDaemons/com.apple.restorecameraispd.plist
+  program: /usr/libexec/restorecameraispd
+  args: /usr/libexec/restorecameraispd
+
+[com.apple.RestoreRemoteServices.restoreserviced]
+/System/Library/LaunchDaemons/com.apple.RestoreRemoteServices.restoreserviced.plist
+  program: /usr/libexec/restoreserviced
+  args: /usr/libexec/restoreserviced
+
+[com.apple.retimerd]
+/System/Library/LaunchDaemons/com.apple.retimerd.plist
+  program: /usr/libexec/retimerd
+  args: /usr/libexec/retimerd report
+
+[com.apple.reversetemplated]
+/System/Library/LaunchDaemons/com.apple.reversetemplated.plist
+  program: /System/Library/PrivateFrameworks/CoreSuggestions.framework/reversetemplated
+  args: /System/Library/PrivateFrameworks/CoreSuggestions.framework/reversetemplated
+
+[com.apple.revisiond]
+/System/Library/LaunchDaemons/com.apple.revisiond.plist
+  program: /System/Library/PrivateFrameworks/GenerationalStorage.framework/revisiond
+  args: /System/Library/PrivateFrameworks/GenerationalStorage.framework/revisiond
+  keepAlive: {conditional}
+
+[com.apple.riskdatad]
+/System/Library/LaunchDaemons/com.apple.riskdatad.plist
+  program: /usr/libexec/riskdatad
+
+[com.apple.routined]
+/System/Library/LaunchDaemons/com.apple.routined.plist
+  program: /usr/libexec/routined
+  args: /usr/libexec/routined LAUNCHED_BY_LAUNCHD
+  runAtLoad: true
+
+[com.apple.roya.royacaptured]
+/System/Library/LaunchDaemons/com.apple.roya.royacaptured.plist
+  program: /usr/libexec/royacaptured
+  args: /usr/libexec/royacaptured
+
+[com.apple.rtcreportingd]
+/System/Library/LaunchDaemons/com.apple.rtcreportingd.plist
+  program: /usr/libexec/rtcreportingd
+  args: /usr/libexec/rtcreportingd
+
+[com.apple.runningboardd]
+/System/Library/LaunchDaemons/com.apple.runningboardd.plist
+  program: /usr/libexec/runningboardd
+  runAtLoad: true
+  keepAlive: true
+
+[com.apple.Safari.History]
+/System/Library/LaunchDaemons/com.apple.Safari.History.plist
+  program: /System/Cryptexes/App/usr/libexec/com.apple.Safari.History
+
+[com.apple.Safari.passwordbreachd]
+/System/Library/LaunchDaemons/com.apple.Safari.passwordbreachd.plist
+  program: /System/Cryptexes/App/usr/libexec/passwordbreachd
+
+[com.apple.Safari.SafeBrowsing.Service]
+/System/Library/LaunchDaemons/com.apple.Safari.SafeBrowsing.Service.plist
+  program: /System/Library/PrivateFrameworks/SafariSafeBrowsing.framework/com.apple.Safari.SafeBrowsing.Service
+
+[com.apple.SafariBookmarksSyncAgent]
+/System/Library/LaunchDaemons/com.apple.SafariBookmarksSyncAgent.plist
+  program: /System/Cryptexes/App/usr/libexec/SafariBookmarksSyncAgent
+
+[com.apple.safarifetcherd]
+/System/Library/LaunchDaemons/com.apple.safarifetcherd.plist
+  program: /System/Cryptexes/App/usr/libexec/safarifetcherd
+
+[com.apple.safetyalertsd]
+/System/Library/LaunchDaemons/com.apple.safetyalertsd.plist
+  program: /usr/libexec/safetyalertsd
+  args: /usr/libexec/safetyalertsd
+  runAtLoad: true
+
+[com.apple.safetycheckd]
+/System/Library/LaunchDaemons/com.apple.safetycheckd.plist
+  program: /usr/libexec/safetycheckd
+  args: /usr/libexec/safetycheckd
+
+[com.apple.SCHelper]
+/System/Library/LaunchDaemons/com.apple.SCHelper.plist
+  program: /System/Library/Frameworks/SystemConfiguration.framework/SCHelper
+
+[com.apple.screensharingserver]
+/System/Library/LaunchDaemons/com.apple.screensharingserver.plist
+  program: /System/Library/CoreServices/ScreenSharingServer.app/ScreenSharingServer
+  args: System/Library/CoreServices/ScreenSharingServer.app/ScreenSharingServer
+
+[com.apple.ScreenTimeAgent]
+/System/Library/LaunchDaemons/com.apple.ScreenTimeAgent.plist
+  program: /System/Library/PrivateFrameworks/ScreenTimeCore.framework/ScreenTimeAgent
+
+[com.apple.ScreenTimeSettingsAgent]
+/System/Library/LaunchDaemons/com.apple.ScreenTimeSettingsAgent.plist
+  program: /System/Library/PrivateFrameworks/ScreenTimeSettingsFoundation.framework/ScreenTimeSettingsAgent
+  args: /System/Library/PrivateFrameworks/ScreenTimeSettingsFoundation.framework/ScreenTimeSettingsAgent -com.apple.CoreData.ConcurrencyDebug 1
+
+[com.apple.scrod]
+/System/Library/LaunchDaemons/com.apple.scrod.plist
+  program: /System/Library/CoreServices/VoiceOverTouch.app/scrod
+  args: /System/Library/CoreServices/VoiceOverTouch.app/scrod
+
+[com.apple.searchd]
+/System/Library/LaunchDaemons/com.apple.searchd.plist
+  program: /System/Library/PrivateFrameworks/Search.framework/searchd
+  args: /System/Library/PrivateFrameworks/Search.framework/searchd
+  env: 8 var(s)
+
+[com.apple.searchtoold]
+/System/Library/LaunchDaemons/com.apple.searchtoold.plist
+  program: /System/Library/PrivateFrameworks/OmniSearch.framework/searchtoold
+  args: /System/Library/PrivateFrameworks/OmniSearch.framework/searchtoold
+  env: 4 var(s)
+
+[com.apple.SecureBackupDaemon]
+/System/Library/LaunchDaemons/com.apple.SecureBackupDaemon.plist
+  program: /System/Library/PrivateFrameworks/CloudServices.framework/Helpers/com.apple.sbd
+  args: /System/Library/PrivateFrameworks/CloudServices.framework/Helpers/com.apple.sbd
+
+[com.apple.securemessagingagent]
+/System/Library/LaunchDaemons/com.apple.securemessagingagent.plist
+  program: /System/Library/PrivateFrameworks/SecureMessaging.framework/SecureMessagingAgent
+
+[com.apple.securepairingd]
+/System/Library/LaunchDaemons/com.apple.securepairingd.plist
+  program: /usr/libexec/securepairingd
+  args: /usr/libexec/securepairingd
+
+[com.apple.security.CircleJoinRequested]
+/System/Library/LaunchDaemons/com.apple.security.CircleJoinRequested.plist
+  program: /System/Library/Frameworks/Security.framework/CircleJoinRequested/CircleJoinRequested
+  args: /System/Library/Frameworks/Security.framework/CircleJoinRequested/CircleJoinRequested
+
+[com.apple.security.cloudkeychainproxy3]
+/System/Library/LaunchDaemons/com.apple.security.cloudkeychainproxy3.plist
+  program: /System/Library/Frameworks/Security.framework/CloudKeychainProxy.bundle/CloudKeychainProxy
+  args: /System/Library/Frameworks/Security.framework/CloudKeychainProxy.bundle/CloudKeychainProxy
+  env: 1 var(s)
+
+[com.apple.security.cryptexd]
+/System/Library/LaunchDaemons/com.apple.security.cryptexd.plist
+  program: /usr/libexec/cryptexd
+  keepAlive: {conditional}
+
+[com.apple.security.swcagent]
+/System/Library/LaunchDaemons/com.apple.security.swcagent.plist
+  program: /System/Library/Frameworks/Security.framework/swcagent
+  args: /System/Library/Frameworks/Security.framework/swcagent
+  env: 1 var(s)
+
+[com.apple.securityd]
+/System/Library/LaunchDaemons/com.apple.securityd.plist
+  program: /usr/libexec/securityd
+  args: /usr/libexec/securityd
+  env: 1 var(s)
+
+[com.apple.securityresearchdeviceinit]
+/System/Library/LaunchDaemons/com.apple.securityresearchdeviceinit.plist
+  program: /usr/libexec/securityresearchdevice-init
+  args: /usr/libexec/securityresearchdevice-init
+  runAtLoad: true
+  keepAlive: {conditional}
+
+[com.apple.securityuploadd]
+/System/Library/LaunchDaemons/com.apple.securityuploadd.plist
+  program: /usr/libexec/securityuploadd
+  args: /usr/libexec/securityuploadd
+
+[com.apple.seld]
+/System/Library/LaunchDaemons/com.apple.seld.plist
+  program: /usr/libexec/seld
+  runAtLoad: true
+
+[com.apple.sensingpredictd]
+/System/Library/LaunchDaemons/com.apple.sensingpredictd.plist
+  program: /usr/libexec/sensingpredictd
+  args: /usr/libexec/sensingpredictd
+
+[com.apple.SensorKitALSHelper]
+/System/Library/LaunchDaemons/com.apple.SensorKitALSHelper.plist
+  program: /usr/libexec/SensorKitALSHelper
+  args: /usr/libexec/SensorKitALSHelper
+
+[com.apple.sensorkitd]
+/System/Library/LaunchDaemons/com.apple.sensorkitd.plist
+  program: /usr/libexec/sensorkitd
+  args: /usr/libexec/sensorkitd
+
+[com.apple.servicesintelligenced]
+/System/Library/LaunchDaemons/com.apple.servicesintelligenced.plist
+  program: /System/Library/PrivateFrameworks/ServicesIntelligence.framework/servicesintelligenced
+  args: /System/Library/PrivateFrameworks/ServicesIntelligence.framework/servicesintelligenced
+
+[com.apple.seserviced]
+/System/Library/LaunchDaemons/com.apple.seserviced.plist
+  program: /usr/libexec/seserviced
+
+[com.apple.sharereportingd]
+/System/Library/LaunchDaemons/com.apple.sharereportingd.plist
+  program: /usr/libexec/sharereportingd
+  args: /usr/libexec/sharereportingd
+
+[com.apple.sharingd]
+/System/Library/LaunchDaemons/com.apple.sharingd.plist
+  program: /usr/libexec/sharingd
+  runAtLoad: true
+  keepAlive: true
+
+[com.apple.shazamd]
+/System/Library/LaunchDaemons/com.apple.shazamd.plist
+  program: /System/Library/Frameworks/ShazamKit.framework/shazamd
+  args: /System/Library/Frameworks/ShazamKit.framework/shazamd
+
+[com.apple.shazameventsd]
+/System/Library/LaunchDaemons/com.apple.shazameventsd.plist
+  program: /System/Library/PrivateFrameworks/ShazamEvents.framework/shazameventsd
+  args: /System/Library/PrivateFrameworks/ShazamEvents.framework/shazameventsd
+
+[com.apple.sidecar-relay]
+/System/Library/LaunchDaemons/com.apple.sidecar-relay.plist
+  program: /usr/libexec/SidecarRelay
+
+[com.apple.signpost.signpost_reporter]
+/System/Library/LaunchDaemons/com.apple.signpost.signpost_reporter.plist
+  program: /usr/libexec/signpost_reporter
+  args: /usr/libexec/signpost_reporter
+
+[com.apple.siri.sirireaderd]
+/System/Library/LaunchDaemons/com.apple.siri.sirireaderd.plist
+  program: /usr/libexec/sirireaderd
+  args: /usr/libexec/sirireaderd
+
+[com.apple.siriactionsd]
+/System/Library/LaunchDaemons/com.apple.siriactionsd.plist
+  program: /System/Library/PrivateFrameworks/VoiceShortcuts.framework/Support/siriactionsd
+  args: /System/Library/PrivateFrameworks/VoiceShortcuts.framework/Support/siriactionsd
+  env: 1 var(s)
+
+[com.apple.siriappintentsd]
+/System/Library/LaunchDaemons/com.apple.siriappintentsd.plist
+  program: /System/Library/PrivateFrameworks/SiriAppIntentsRuntime.framework/siriappintentsd
+  args: /System/Library/PrivateFrameworks/SiriAppIntentsRuntime.framework/siriappintentsd
+
+[com.apple.siriinferenced]
+/System/Library/LaunchDaemons/com.apple.siriinferenced.plist
+  program: /System/Library/PrivateFrameworks/SiriInference.framework/Support/siriinferenced
+  args: /System/Library/PrivateFrameworks/SiriInference.framework/Support/siriinferenced
+
+[com.apple.siriknowledged]
+/System/Library/LaunchDaemons/com.apple.siriknowledged.plist
+  program: /usr/libexec/siriknowledged
+  args: /usr/libexec/siriknowledged
+
+[com.apple.sirittsd]
+/System/Library/LaunchDaemons/com.apple.sirittsd.plist
+  program: /System/Library/PrivateFrameworks/SiriTTSService.framework/sirittsd
+  args: /System/Library/PrivateFrameworks/SiriTTSService.framework/sirittsd
+
+[com.apple.SiriTTSTrainingAgent]
+/System/Library/LaunchDaemons/com.apple.SiriTTSTrainingAgent.plist
+  program: /System/Library/PrivateFrameworks/SiriTTSTraining.framework/SiriTTSTrainingAgent
+  args: /System/Library/PrivateFrameworks/SiriTTSTraining.framework/SiriTTSTrainingAgent
+
+[com.apple.sleepd]
+/System/Library/LaunchDaemons/com.apple.sleepd.plist
+  program: /System/Library/PrivateFrameworks/SleepDaemon.framework/sleepd
+  args: /System/Library/PrivateFrameworks/SleepDaemon.framework/sleepd
+  runAtLoad: true
+  env: 1 var(s)
+
+[com.apple.sntpd]
+/System/Library/LaunchDaemons/com.apple.sntpd.plist
+  program: /usr/sbin/sntpd
+  runAtLoad: true
+  keepAlive: true
+
+[com.apple.sociallayerd]
+/System/Library/LaunchDaemons/com.apple.sociallayerd.plist
+  program: /System/Library/PrivateFrameworks/SocialLayer.framework/sociallayerd.app/sociallayerd
+
+[com.apple.softposreaderd]
+/System/Library/LaunchDaemons/com.apple.softposreaderd.plist
+  program: /usr/libexec/softposreaderd
+
+[com.apple.softwareupdateservicesd]
+/System/Library/LaunchDaemons/com.apple.softwareupdateservicesd.plist
+  program: /System/Library/PrivateFrameworks/SoftwareUpdateServices.framework/Support/softwareupdateservicesd
+  args: /System/Library/PrivateFrameworks/SoftwareUpdateServices.framework/Support/softwareupdateservicesd
+  keepAlive: {conditional}
+
+[com.apple.sosd]
+/System/Library/LaunchDaemons/com.apple.sosd.plist
+  program: /System/Library/PrivateFrameworks/SOS.framework/sosd
+  keepAlive: {conditional}
+
+[com.apple.soundanalysisd]
+/System/Library/LaunchDaemons/com.apple.soundanalysisd.plist
+  program: /usr/libexec/soundanalysisd
+  args: /usr/libexec/soundanalysisd
+
+[com.apple.spaceattributiond]
+/System/Library/LaunchDaemons/com.apple.spaceattributiond.plist
+  program: /System/Library/PrivateFrameworks/SpaceAttribution.framework/spaceattributiond
+  args: /System/Library/PrivateFrameworks/SpaceAttribution.framework/spaceattributiond
+
+[com.apple.speechmaintenanced]
+/System/Library/LaunchDaemons/com.apple.speechmaintenanced.plist
+  program: /System/Library/PrivateFrameworks/CoreEmbeddedSpeechRecognition.framework/speechmaintenanced
+
+[com.apple.speechmodeltrainingd]
+/System/Library/LaunchDaemons/com.apple.speechmodeltrainingd.plist
+  program: /System/Library/PrivateFrameworks/CoreSpeech.framework/speechmodeltrainingd
+  args: /System/Library/PrivateFrameworks/CoreSpeech.framework/speechmodeltrainingd
+
+[com.apple.spindump]
+/System/Library/LaunchDaemons/com.apple.spindump.plist
+  program: /usr/sbin/spindump
+  args: /usr/sbin/spindump
+
+[com.apple.splashboard]
+/System/Library/LaunchDaemons/com.apple.splashboardd.plist
+  program: /usr/libexec/splashboardd
+  args: /usr/libexec/splashboardd
+
+[com.apple.sportsd]
+/System/Library/LaunchDaemons/com.apple.sportsd.plist
+  program: /usr/libexec/sportsd
+
+[com.apple.spotlight.IndexAgent]
+/System/Library/LaunchDaemons/com.apple.spotlight.IndexAgent.plist
+  program: /System/Library/Frameworks/CoreSpotlight.framework/Support/com.apple.spotlight.IndexAgent
+
+[com.apple.spotlightknowledged]
+/System/Library/LaunchDaemons/com.apple.spotlightknowledged.plist
+  program: /System/Library/Frameworks/CoreSpotlight.framework/spotlightknowledged
+  args: /System/Library/Frameworks/CoreSpotlight.framework/spotlightknowledged
+
+[com.apple.spotlightknowledged.updater]
+/System/Library/LaunchDaemons/com.apple.spotlightknowledged.updater.plist
+  program: /usr/libexec/spotlightknowledged.updater
+  args: /usr/libexec/spotlightknowledged.updater -u
+
+[com.apple.SpringBoard]
+/System/Library/LaunchDaemons/com.apple.SpringBoard.plist
+  program: /System/Library/CoreServices/SpringBoard.app/SpringBoard
+  args: /System/Library/CoreServices/SpringBoard.app/SpringBoard
+  runAtLoad: true
+  keepAlive: true
+  env: 1 var(s)
+
+[com.apple.srp-mdns-proxy]
+/System/Library/LaunchDaemons/com.apple.srp-mdns-proxy.plist
+  program: /usr/libexec/srp-mdns-proxy
+  args: /usr/libexec/srp-mdns-proxy
+
+[com.apple.StatusKitAgent]
+/System/Library/LaunchDaemons/com.apple.StatusKitAgent.plist
+  program: /System/Library/PrivateFrameworks/StatusKit.framework/StatusKitAgent
+
+[com.apple.stickersd]
+/System/Library/LaunchDaemons/com.apple.stickersd.plist
+  program: /System/Library/PrivateFrameworks/Stickers.framework/Support/stickersd
+  args: /System/Library/PrivateFrameworks/Stickers.framework/Support/stickersd
+
+[com.apple.storagedatad]
+/System/Library/LaunchDaemons/com.apple.storagedatad.plist
+  program: /usr/libexec/storagedatad
+  args: /usr/libexec/storagedatad
+
+[com.apple.storagekitd]
+/System/Library/LaunchDaemons/com.apple.storagekitd.plist
+  program: /usr/libexec/storagekitd
+  args: /usr/libexec/storagekitd
+
+[com.apple.storekitd]
+/System/Library/LaunchDaemons/com.apple.storekitd.plist
+  program: /System/Library/Frameworks/StoreKit.framework/Support/storekitd
+  args: /System/Library/Frameworks/StoreKit.framework/Support/storekitd
+
+[com.apple.streaming_zip_conduit]
+/System/Library/LaunchDaemons/com.apple.streaming_zip_conduit.plist
+  program: /usr/libexec/streaming_zip_conduit
+
+[com.apple.subridged]
+/System/Library/LaunchDaemons/com.apple.subridged.plist
+  program: /System/Library/PrivateFrameworks/SoftwareUpdateBridge.framework/Support/subridged
+  args: /System/Library/PrivateFrameworks/SoftwareUpdateBridge.framework/Support/subridged
+
+[com.apple.suggestd]
+/System/Library/LaunchDaemons/com.apple.suggestd.plist
+  program: /System/Library/PrivateFrameworks/CoreSuggestions.framework/suggestd
+  args: /System/Library/PrivateFrameworks/CoreSuggestions.framework/suggestd
+
+[com.apple.swcd]
+/System/Library/LaunchDaemons/com.apple.swcd.plist
+  program: /usr/libexec/swcd
+  args: /usr/libexec/swcd
+
+[com.apple.swiftuitracingsupport.xpc]
+/System/Library/LaunchDaemons/com.apple.swiftuitraced.plist
+  program: /usr/libexec/swiftuitraced
+  args: /usr/libexec/swiftuitraced
+
+[com.apple.swtransparencyd]
+/System/Library/LaunchDaemons/com.apple.swtransparencyd.plist
+  program: /usr/libexec/swtransparencyd
+
+[com.apple.symptomsd]
+/System/Library/LaunchDaemons/com.apple.symptomsd.plist
+  program: /usr/libexec/symptomsd
+  args: /usr/libexec/symptomsd
+
+[com.apple.symptomsd-darwin]
+/System/Library/LaunchDaemons/com.apple.symptomsd-darwin.plist
+  program: /usr/libexec/symptomsd-darwin
+  args: /usr/libexec/symptomsd-darwin
+
+[com.apple.symptomsd-diag]
+/System/Library/LaunchDaemons/com.apple.symptomsd-diag.plist
+  program: /usr/libexec/symptomsd-diag
+  args: /usr/libexec/symptomsd-diag
+
+[com.apple.symptomsd.distributed]
+/System/Library/LaunchDaemons/com.apple.symptomsd.distributed.plist
+  program: /usr/libexec/symptomsd-distributed
+  args: /usr/libexec/symptomsd-distributed
+
+[com.apple.symptomsd.helper]
+/System/Library/LaunchDaemons/com.apple.symptomsd.helper.plist
+  program: /usr/libexec/symptomsd-helper
+  args: /usr/libexec/symptomsd-helper
+
+[com.apple.synapse.contentlinkingd]
+/System/Library/LaunchDaemons/com.apple.synapse.contentlinkingd.plist
+  program: /System/Library/PrivateFrameworks/Synapse.framework/Support/contentlinkingd
+  args: /System/Library/PrivateFrameworks/Synapse.framework/Support/contentlinkingd
+
+[com.apple.SyncAgent]
+/System/Library/LaunchDaemons/com.apple.SyncAgent.plist
+  program: /usr/libexec/SyncAgent
+  args: /usr/libexec/SyncAgent --lockdown --oneshot -v
+
+[com.apple.syncdefaultsd]
+/System/Library/LaunchDaemons/com.apple.syncdefaultsd.plist
+  program: /System/Library/PrivateFrameworks/SyncedDefaults.framework/Support/syncdefaultsd
+  args: /System/Library/PrivateFrameworks/SyncedDefaults.framework/Support/syncdefaultsd
+
+[com.apple.sysdiagnose]
+/System/Library/LaunchDaemons/com.apple.sysdiagnose.plist
+  program: /usr/libexec/sysdiagnosed
+  args: /usr/libexec/sysdiagnosed
+
+[com.apple.sysdiagnose]
+/System/Library/LaunchDaemons/com.apple.sysdiagnose.darwinos.plist
+  program: /usr/libexec/sysdiagnosed
+  args: /usr/libexec/sysdiagnosed
+
+[com.apple.sysdiagnose_helper]
+/System/Library/LaunchDaemons/com.apple.sysdiagnose_helper.plist
+  program: /usr/libexec/sysdiagnose_helper
+  args: /usr/libexec/sysdiagnose_helper
+
+[com.apple.syslogd]
+/System/Library/LaunchDaemons/com.apple.syslogd.plist
+  program: /usr/sbin/syslogd
+  args: /usr/sbin/syslogd
+  keepAlive: true
+  env: 1 var(s)
+
+[com.apple.sysmond]
+/System/Library/LaunchDaemons/com.apple.sysmond.darwinos.plist
+  program: /usr/libexec/sysmond
+
+[com.apple.systemstats.microstackshot_periodic]
+/System/Library/LaunchDaemons/com.apple.systemstats.microstackshot_periodic.plist
+  program: /usr/libexec/microstackshot
+  args: /usr/libexec/microstackshot
+
+[com.apple.systemstatusd]
+/System/Library/LaunchDaemons/com.apple.systemstatusd.plist
+  program: /System/Library/PrivateFrameworks/SystemStatusServer.framework/Support/systemstatusd
+  args: /System/Library/PrivateFrameworks/SystemStatusServer.framework/Support/systemstatusd
+
+[com.apple.systemstatusd]
+/System/Library/LaunchDaemons/com.apple.systemstatusd-nonui.plist
+  program: /System/Library/PrivateFrameworks/SystemStatusServer.framework/Support/systemstatusd
+  args: /System/Library/PrivateFrameworks/SystemStatusServer.framework/Support/systemstatusd
+
+[com.apple.tailspind]
+/System/Library/LaunchDaemons/com.apple.tailspind.plist
+  program: /usr/libexec/tailspind
+  args: /usr/libexec/tailspind
+
+[com.apple.tccd]
+/System/Library/LaunchDaemons/com.apple.tccd.plist
+  program: /System/Library/PrivateFrameworks/TCC.framework/Support/tccd
+  args: /System/Library/PrivateFrameworks/TCC.framework/Support/tccd
+
+[com.apple.telephonyutilities.callservicesd]
+/System/Library/LaunchDaemons/com.apple.telephonyutilities.callservicesd.plist
+  program: /System/Library/PrivateFrameworks/TelephonyUtilities.framework/callservicesd
+  args: /System/Library/PrivateFrameworks/TelephonyUtilities.framework/callservicesd
+  env: 1 var(s)
+
+[com.apple.terminusd]
+/System/Library/LaunchDaemons/com.apple.terminusd.plist
+  program: /usr/libexec/terminusd
+  args: /usr/libexec/terminusd
+  keepAlive: {conditional}
+  env: 1 var(s)
+
+[com.apple.textcomposerd]
+/System/Library/LaunchDaemons/com.apple.textcomposerd.plist
+  program: /usr/libexec/textcomposerd
+  args: /usr/libexec/textcomposerd
+
+[com.apple.textcontextd]
+/System/Library/LaunchDaemons/com.apple.Archetype.textcontextd.plist
+  program: /usr/libexec/textcontextd
+  args: /usr/libexec/textcontextd
+
+[com.apple.TextInput.kbd]
+/System/Library/LaunchDaemons/com.apple.TextInput.kbd.plist
+  program: /System/Library/TextInput/kbd
+  args: /System/Library/TextInput/kbd
+  env: 1 var(s)
+
+[com.apple.textunderstandingd]
+/System/Library/LaunchDaemons/com.apple.textunderstandingd.plist
+  program: /usr/libexec/textunderstandingd
+  args: /usr/libexec/textunderstandingd
+
+[com.apple.thermalmonitord]
+/System/Library/LaunchDaemons/com.apple.thermalmonitord.plist
+  program: /usr/libexec/thermalmonitord
+  args: /usr/libexec/thermalmonitord
+  keepAlive: {conditional}
+
+[com.apple.ThreadCommissionerService]
+/System/Library/LaunchDaemons/com.apple.ThreadCommissionerService.plist
+  program: /System/Library/PrivateFrameworks/CoreThreadCommissionerService.framework/CoreThreadCommissionerServiced
+  args: /System/Library/PrivateFrameworks/CoreThreadCommissionerService.framework/CoreThreadCommissionerServiced
+
+[com.apple.threadradiod]
+/System/Library/LaunchDaemons/com.apple.threadradiod.plist
+  program: /System/Library/PrivateFrameworks/CoreThreadRadio.framework/threadradiod
+  args: /System/Library/PrivateFrameworks/CoreThreadRadio.framework/threadradiod
+  keepAlive: {conditional}
+
+[com.apple.timed]
+/System/Library/LaunchDaemons/com.apple.timed.plist
+  program: /usr/libexec/timed
+  args: /usr/libexec/timed
+  runAtLoad: true
+  keepAlive: true
+
+[com.apple.timezoneupdates.tzd]
+/System/Library/LaunchDaemons/com.apple.timezoneupdates.tzd.plist
+  program: /usr/libexec/tzd
+  keepAlive: {conditional}
+
+[com.apple.tipsd]
+/System/Library/LaunchDaemons/com.apple.tipsd.plist
+  program: /usr/libexec/tipsd
+  args: /usr/libexec/tipsd
+
+[com.apple.toolkitd]
+/System/Library/LaunchDaemons/com.apple.toolkitd.plist
+  program: /usr/libexec/toolkitd
+  args: /usr/libexec/toolkitd
+  env: 1 var(s)
+
+[com.apple.translationd]
+/System/Library/LaunchDaemons/com.apple.translationd.plist
+  program: /System/Library/Frameworks/Translation.framework/translationd
+  args: /System/Library/Frameworks/Translation.framework/translationd
+
+[com.apple.transparencyd]
+/System/Library/LaunchDaemons/com.apple.transparencyd.plist
+  program: /usr/libexec/transparencyd
+
+[com.apple.transparencyStaticKey]
+/System/Library/LaunchDaemons/com.apple.transparencyStaticKey.plist
+  program: /usr/libexec/transparencyStaticKey
+
+[com.apple.triald]
+/System/Library/LaunchDaemons/com.apple.triald.plist
+  program: /usr/libexec/triald
+  args: /usr/libexec/triald
+
+[com.apple.trustd]
+/System/Library/LaunchDaemons/com.apple.trustd.plist
+  program: /usr/libexec/trustd
+  args: /usr/libexec/trustd
+  env: 2 var(s)
+
+[com.apple.trustdFileHelper]
+/System/Library/LaunchDaemons/com.apple.trustdFileHelper.plist
+  program: /usr/libexec/trustdFileHelper
+  args: /usr/libexec/trustdFileHelper
+  env: 2 var(s)
+
+[com.apple.tvremoted]
+/System/Library/LaunchDaemons/com.apple.tvremoted.plist
+  program: /usr/libexec/tvremoted
+  args: /usr/libexec/tvremoted
+
+[com.apple.tzlinkd]
+/System/Library/LaunchDaemons/com.apple.tzlinkd.plist
+  program: /usr/libexec/tzlinkd
+
+[com.apple.uarpassetmanagerd]
+/System/Library/LaunchDaemons/com.apple.uarpassetmanagerd.plist
+  program: /usr/libexec/uarpassetmanagerd
+  args: /usr/libexec/uarpassetmanagerd
+
+[com.apple.uarpd]
+/System/Library/LaunchDaemons/com.apple.uarpd.plist
+  program: /usr/libexec/uarpd
+
+[com.apple.uarphidd]
+/System/Library/LaunchDaemons/com.apple.uarphidd.plist
+  program: /usr/libexec/uarphidd
+
+[com.apple.uarppersonalizationd]
+/System/Library/LaunchDaemons/com.apple.uarppersonalizationd.plist
+  program: /usr/libexec/uarppersonalizationd
+
+[com.apple.uikit.eyedropperd]
+/System/Library/LaunchDaemons/com.apple.uikit.eyedropperd.plist
+  program: /System/Library/PrivateFrameworks/Eyedropper.framework/Support/eyedropperd
+  args: /System/Library/PrivateFrameworks/Eyedropper.framework/Support/eyedropperd
+
+[com.apple.UsageTrackingAgent]
+/System/Library/LaunchDaemons/com.apple.UsageTrackingAgent.plist
+  program: /System/Library/PrivateFrameworks/UsageTracking.framework/UsageTrackingAgent
+
+[com.apple.usb.networking.addNetworkInterface]
+/System/Library/LaunchDaemons/com.apple.usb.networking.addNetworkInterface.plist
+  program: /usr/sbin/addNetworkInterface
+  args: /usr/sbin/addNetworkInterface -x -s -c AppleUSBNCMData -c AppleUSBEthernetController -c AppleUSBEthernetHost -c AppleUSBDeviceNCMData -c AppleUSBECMData -c AppleEthernetAquantiaAqtion -c BCM5701Enet -c AppleIntelI210 -c IOUserNetworkEthernet
+
+[com.apple.usbaudiod]
+/System/Library/LaunchDaemons/com.apple.usbaudiod.plist
+  program: /System/Library/Audio/Plug-Ins/usbaudio.bundle/usbaudiod
+  args: /System/Library/Audio/Plug-Ins/usbaudio.bundle/usbaudiod
+
+[com.apple.usbctelemetryd]
+/System/Library/LaunchDaemons/com.apple.usbctelemetryd.plist
+  program: /usr/libexec/usbctelemetryd
+  args: /usr/libexec/usbctelemetryd
+
+[com.apple.usbsmartcardreaderd]
+/System/Library/LaunchDaemons/com.apple.usbsmartcardreaderd.plist
+  program: /System/Library/CryptoTokenKit/usbsmartcardreaderd.slotd/usbsmartcardreaderd
+  args: /System/Library/CryptoTokenKit/usbsmartcardreaderd.slotd/usbsmartcardreaderd
+
+[com.apple.UserEventAgent-System]
+/System/Library/LaunchDaemons/com.apple.UserEventAgent-System.plist
+  program: /usr/libexec/UserEventAgent
+  args: /usr/libexec/UserEventAgent (System)
+  keepAlive: true
+
+[com.apple.usernotificationsd]
+/System/Library/LaunchDaemons/com.apple.usernotificationsd.plist
+  program: /System/Library/PrivateFrameworks/UserNotificationsCore.framework/Support/usernotificationsd
+  args: /System/Library/PrivateFrameworks/UserNotificationsCore.framework/Support/usernotificationsd
+
+[com.apple.ValidUpdater]
+/System/Library/LaunchDaemons/com.apple.ValidUpdater.plist
+  program: /usr/libexec/ValidUpdater
+
+[com.apple.videocodecd]
+/System/Library/LaunchDaemons/com.apple.videocodecd.plist
+  program: /usr/libexec/videocodecd
+  args: /usr/libexec/videocodecd
+  env: 1 var(s)
+
+[com.apple.videosubscriptionsd]
+/System/Library/LaunchDaemons/com.apple.videosubscriptionsd.plist
+  program: /usr/libexec/videosubscriptionsd
+  args: /usr/libexec/videosubscriptionsd
+
+[com.apple.visioncompaniond]
+/System/Library/LaunchDaemons/com.apple.visioncompaniond.plist
+  program: /usr/libexec/visioncompaniond
+  args: /usr/libexec/visioncompaniond
+  env: 1 var(s)
+
+[com.apple.visionhwserverd]
+/System/Library/LaunchDaemons/com.apple.visionhwserverd.plist
+  program: /usr/libexec/visionhwserverd
+  args: /usr/libexec/visionhwserverd
+
+[com.apple.visualintelligenced]
+/System/Library/LaunchDaemons/com.apple.visualintelligenced.plist
+  program: /System/Library/PrivateFrameworks/VisualIntelligenceServices.framework/visualintelligenced
+
+[com.apple.voicebankingd]
+/System/Library/LaunchDaemons/com.apple.voicebankingd.plist
+  program: /System/Library/PrivateFrameworks/TextToSpeechVoiceBankingSupport.framework/Support/voicebankingd
+  args: /System/Library/PrivateFrameworks/TextToSpeechVoiceBankingSupport.framework/Support/voicebankingd
+  env: 2 var(s)
+
+[com.apple.voiced]
+/System/Library/LaunchDaemons/com.apple.voiced.plist
+  program: /System/Library/PrivateFrameworks/VoiceServices.framework/Support/voiced
+  args: /System/Library/PrivateFrameworks/VoiceServices.framework/Support/voiced
+
+[com.apple.voicemail.vmd]
+/System/Library/LaunchDaemons/com.apple.voicemail.vmd.plist
+  program: /System/Library/PrivateFrameworks/VisualVoicemail.framework/vmd
+  args: /System/Library/PrivateFrameworks/VisualVoicemail.framework/vmd
+  env: 1 var(s)
+
+[com.apple.voicememod]
+/System/Library/LaunchDaemons/com.apple.voicememod.plist
+  program: /System/Library/PrivateFrameworks/VoiceMemos.framework/Support/voicememod
+  env: 3 var(s)
+
+[com.apple.VoiceOverTouch]
+/System/Library/LaunchDaemons/com.apple.VoiceOverTouch.plist
+  program: /System/Library/CoreServices/VoiceOverTouch.app/vot
+  args: /System/Library/CoreServices/VoiceOverTouch.app/vot
+
+[com.apple.watchdogd]
+/System/Library/LaunchDaemons/com.apple.watchdogd.plist
+  program: /usr/libexec/watchdogd
+  args: /usr/libexec/watchdogd
+  keepAlive: {conditional}
+
+[com.apple.watchlistd]
+/System/Library/LaunchDaemons/com.apple.watchlistd.plist
+  program: /System/Library/PrivateFrameworks/WatchListKit.framework/Support/watchlistd
+  args: /System/Library/PrivateFrameworks/WatchListKit.framework/Support/watchlistd
+  env: 1 var(s)
+
+[com.apple.watchpresenced]
+/System/Library/LaunchDaemons/com.apple.watchpresenced.plist
+  program: /usr/libexec/watchpresenced
+  args: /usr/libexec/watchpresenced
+
+[com.apple.wcd]
+/System/Library/LaunchDaemons/com.apple.wcd.plist
+  program: /usr/libexec/wcd
+  runAtLoad: true
+
+[com.apple.weatherd]
+/System/Library/LaunchDaemons/com.apple.weatherd.plist
+  program: /System/Library/PrivateFrameworks/WeatherDaemon.framework/weatherd
+
+[com.apple.WebBookmarks.webbookmarksd]
+/System/Library/LaunchDaemons/com.apple.WebBookmarks.webbookmarksd.plist
+  program: /System/Cryptexes/App/usr/libexec/webbookmarksd
+
+[com.apple.webinspectord]
+/System/Library/LaunchDaemons/com.apple.webinspectord.plist
+  program: /System/Cryptexes/App/usr/libexec/webinspectord
+
+[com.apple.webkit.adattributiond]
+/System/Library/LaunchDaemons/com.apple.webkit.adattributiond.plist
+  program: /System/Cryptexes/OS/System/Library/Frameworks/WebKit.framework/Daemons/adattributiond
+  args: /System/Cryptexes/OS/System/Library/Frameworks/WebKit.framework/Daemons/adattributiond --machServiceName com.apple.webkit.adattributiond.service --storageLocation /var/mobile/Library/com.apple.webkit.adattributiond/Version1 --startActivity
+
+[com.apple.webkit.webpushd]
+/System/Library/LaunchDaemons/com.apple.webkit.webpushd.plist
+  program: /System/Cryptexes/App/usr/libexec/webpushd
+  args: /System/Cryptexes/App/usr/libexec/webpushd --machServiceName com.apple.webkit.webpushd.service
+
+[com.apple.webprivacyd]
+/System/Library/LaunchDaemons/com.apple.webprivacyd.plist
+  program: /System/Library/PrivateFrameworks/WebPrivacy.framework/webprivacyd
+
+[com.apple.wifi.hostapd]
+/System/Library/LaunchDaemons/com.apple.wifi.hostapd.plist
+  program: /usr/libexec/hostapd
+  args: /usr/libexec/hostapd -l
+
+[com.apple.wifi.wapic]
+/System/Library/LaunchDaemons/com.apple.wifi.wapic.plist
+  program: /usr/libexec/wapic
+  args: /usr/libexec/wapic
+
+[com.apple.wifianalyticsd]
+/System/Library/LaunchDaemons/com.apple.wifianalyticsd.plist
+  program: /usr/libexec/wifianalyticsd
+
+[com.apple.wifid]
+/System/Library/LaunchDaemons/com.apple.wifid.plist
+  program: /usr/sbin/wifid
+  runAtLoad: true
+  keepAlive: true
+
+[com.apple.wifiFirmwareLoader]
+/System/Library/LaunchDaemons/com.apple.wifiFirmwareLoader.plist
+  program: /usr/libexec/wifiFirmwareLoader
+  args: /usr/libexec/wifiFirmwareLoader
+  keepAlive: {conditional}
+
+[com.apple.wifip2pd]
+/System/Library/LaunchDaemons/com.apple.wifip2pd.plist
+  program: /usr/libexec/wifip2pd
+  env: 1 var(s)
+
+[com.apple.wifivelocityd]
+/System/Library/LaunchDaemons/com.apple.wifivelocityd.plist
+  program: /usr/libexec/wifivelocityd
+
+[com.apple.wirelessinsightsd]
+/System/Library/LaunchDaemons/com.apple.wirelessinsightsd.plist
+  program: /System/Library/Frameworks/WirelessInsights.framework/Support/wirelessinsightsd
+  args: /System/Library/Frameworks/WirelessInsights.framework/Support/wirelessinsightsd
+
+[com.apple.WirelessRadioManager]
+/System/Library/LaunchDaemons/com.apple.WirelessRadioManager.plist
+  program: /usr/sbin/WirelessRadioManagerd
+  args: /usr/sbin/WirelessRadioManagerd
+  keepAlive: true
+
+[com.apple.xpc.roleaccountd]
+/System/Library/LaunchDaemons/com.apple.xpc.roleaccountd.plist
+  program: /usr/libexec/xpcroleaccountd
+  args: /usr/libexec/xpcroleaccountd -launchd
+
