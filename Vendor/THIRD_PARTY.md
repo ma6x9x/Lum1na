@@ -47,3 +47,21 @@ names (the two CMakeLists.txt and two README.md were removed for this).
   `Kernel/Lum1naDarkswordLane.{h,m}` lane (cascade slot 4). Slide is
   recomputed against OUR LabStaticBase — the vendored g_kernel_slide
   subtracts only the A14 link base.
+
+## External reference pulls (Vendor/external — NOT built into the app)
+
+- **brotli-111497** (`MchinaMd57764/CVE-2026-111497-PoC`, MIT): Brotli
+  BlockSwitch OOB-write trigger generator + decode harness (userspace
+  libcompression/CFNetwork layer; vulnerable on 24A446/24B119/24C5037i,
+  patched 27.2.1/24B156 — our 24A435 and 23F77 trains predate the fix;
+  verify per-firmware before relying on it). Userspace primitive only.
+- **henge-jit** (`ammaarreshi/WindowsiOS`, GPL-2.0-or-later, adapted from
+  `Leviidev/Henge` + `Leviidev/Husk`; StikDebug/StikJIT lineage):
+  dual-mapped RX/RW JIT substrate for iOS 17–27 including 26/27 TXM
+  (`winios_jit.c`), and the `henge-jit.js` page-blessing protocol notes.
+  Value: executable memory without a jailbreak (CS_DEBUGGED ledger-exempt
+  path) — payload staging / post-KRW codegen candidate.
+- **terminal-worse** (`git.jbjflab.top/admin/terminal_worse`, GPL-3.0;
+  a-Shell BSD-2, worse_query GPL-3 by Taj C/forcequitOS, badshell,
+  pathleak): full a-Shell 2.3.2 + worse_query integration tested on
+  24A446/27.0.1 (`TerminalSBX.m`) — reference for our terminal lane.

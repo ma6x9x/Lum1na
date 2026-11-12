@@ -1,0 +1,9 @@
+terminal_worse is a security-research fork built from:
+
+- a-Shell by Nicolas Holzschuch (BSD-2-Clause)
+- worse_query by Taj C / forcequitOS (GPL-3.0)
+- badshell by wormprojects
+- pathleak by forcequitOS
+- neofetch by Dylan Araps (ASCII art / field inspiration, MIT)
+
+Project-specific additions are distributed under GPL-3.0.  See LICENSE.

@@ -68,6 +68,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				".github",
+				"Vendor/external",
 				".gitignore",
 				"docs",
 				"App/Info.plist",
