@@ -550,20 +550,16 @@ jobs:
           # Embed entitlements next to the binary for the sign step
           cp "Lum1na.entitlements" "Payload/${PROJECT_NAME}.app/"
 
-          # a-Shell mini runtime -> the in-app terminal (soft: builds green
-          # without the payload; the pane reports "not embedded").
-          if ASHELL_IPA_FILE=$(ls "$HOME/Downloads/Terminal.ipa" 2>/dev/null || true); [ -n "$ASHELL_IPA_FILE" ]; then
-            python3 scripts/merge_ashell.py "Payload/${PROJECT_NAME}.app" "$ASHELL_IPA_FILE" || true
-          else
-            ASHELL_IPA_FILE=""
-            for cand in "$HOME/Downloads"/a-Shell-mini*.ipa "$HOME/Downloads"/aShell-mini*.ipa; do
-              [ -f "$cand" ] && ASHELL_IPA_FILE="$cand" && break
-            done
-            if [ -n "$ASHELL_IPA_FILE" ]; then
-              python3 scripts/merge_ashell.py "Payload/${PROJECT_NAME}.app" "$ASHELL_IPA_FILE" || true
-            else
-              echo "no a-Shell mini payload present - terminal ships without ios_system (soft)"
+          # a-Shell mini runtime + libssh -> the in-app terminal/SSH (soft:
+          # builds green without payloads; the panes report "not embedded").
+          for cand in "$HOME/Downloads/Terminal.ipa" "$HOME/Downloads"/a-Shell-mini*.ipa "$HOME/Downloads"/aShell-mini*.ipa; do
+            if [ -f "$cand" ]; then
+              python3 scripts/merge_ashell.py "Payload/${PROJECT_NAME}.app" "$cand" || true
+              break
             fi
+          done
+          if [ ! -f "Payload/${PROJECT_NAME}.app/Frameworks/libssh.4.dylib" ]; then
+            python3 scripts/merge_ashell.py "Payload/${PROJECT_NAME}.app" 2>/dev/null ||               ASHELL_IPA="" python3 scripts/merge_ashell.py "Payload/${PROJECT_NAME}.app" || true
           fi
 
           # Fake-sign for ldid/Sideloadly compatibility.

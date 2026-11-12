@@ -46,6 +46,24 @@ def main():
 
     fw_dst = os.path.join(app, 'Frameworks')
     os.makedirs(fw_dst, exist_ok=True)
+
+    # libssh embeds unconditionally (independent of the a-Shell payload):
+    # the main target links -lssh.4 and Vendor/libssh carries the dylib.
+    libssh = os.environ.get('LIBSSH_DYLIB', '')
+    if not libssh:
+        for cand in ('Vendor/libssh/libssh.4.dylib',
+                     os.path.join(os.path.dirname(os.path.abspath(app)), '..', 'Vendor', 'libssh', 'libssh.4.dylib')):
+            if os.path.isfile(cand):
+                libssh = os.path.abspath(cand)
+                break
+    if libssh and os.path.isfile(libssh):
+        dst = os.path.join(fw_dst, 'libssh.4.dylib')
+        shutil.copyfile(libssh_env, dst)
+        os.chmod(dst, 0o755)
+        print('[merge_ashell] libssh.4.dylib embedded into Frameworks')
+    else:
+        print('[merge_ashell] WARNING: libssh.4.dylib not found - SSH pane will not load')
+
     copied = 0
     for n in names:
         rel = n[len(prefix):] if n.startswith(prefix) else None
