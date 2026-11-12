@@ -52,7 +52,7 @@ final class LiteSession: ObservableObject {
         case "help":
             emit("""
                 ls [-l] [p] · cd <d> · pwd · cat <f> · stat <p> · mkdir <d> · touch <f> · rm <f>
-                sbx <p> — P116 out-of-container read (64 KB) · dump <p> — full read (256 MB)
+                sbx <p> — escape read, P116 + class-13 engines (64 KB) · dump <p> — full read (256 MB)
                 deputies · ps · date · clear
                 """, .out)
         case "pwd": emit(cwd, .out)
@@ -141,7 +141,11 @@ final class LiteSession: ObservableObject {
     private func dump(_ p: String?) {
         guard let p else { return }
         let r = LabSandboxRead.dump(intoDocuments: resolve(p))
-        if let path = r["path"] as? String { emit("dump -> \(path)", .ok) }
+        if let path = r["path"] as? String {
+            let eng = r["engine"] as? String ?? "?"
+            let bytes = (r["bytes"] as? NSNumber)?.intValue ?? 0
+            emit("dump -> \(path) (\(bytes) B, engine=\(eng))", .ok)
+        }
         else { emit("dump refused: \(r["error"] as? String ?? "?")", .err) }
     }
     private func deputies() {
