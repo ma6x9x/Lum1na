@@ -27,7 +27,7 @@
 #import <unistd.h>
 #import <stdarg.h>
 
-#define P109_BUILD @"p109-ane-selsweep-v9-asyncfix"
+#define P109_BUILD @"p109-ane-selsweep-v9.1-autopid"
 
 typedef mach_port_t io_object_t;
 typedef mach_port_t io_service_t;
@@ -120,19 +120,71 @@ static NSString *p109_krname(kern_return_t kr) {
         return p109_buf;
     }
     p109_log([LabDeviceProfile identBlock]);
-    /* v8 pid knob: Documents/p109_pid.txt holds the live aned pid (Term
-       Lite `ps` feeds it). zeros = honest, no pid fire. */
+    /* v9.1 AUTO-PID CENSUS: no manual knob needed. Order:
+       1) Documents/p109_pid.txt (explicit override wins)
+       2) libproc census: proc_listpids(PROC_ALL_PIDS) + proc_pidpath,
+          first process whose basename contains "aned"
+       3) launchd (pid 1) as the resolvability control — the 2f0 oracle
+          (cannot find task from pid) proves the pid->task path works even
+          without the ANE deputy; the aned pid upgrades it to the real
+          entitlement borrow. Every step is logged honestly. */
     uint32_t p109Pid = 0;
+    NSString *p109PidSrc = @"zeros";
     {
         NSString *docs = NSSearchPathForDirectoriesInDomains(
             NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
         NSString *pidPath = [docs stringByAppendingPathComponent:@"p109_pid.txt"];
         NSString *txt = [NSString stringWithContentsOfFile:pidPath
                              encoding:NSUTF8StringEncoding error:nil];
-        p109Pid = (uint32_t)[txt intValue];
-        p109_log([NSString stringWithFormat:@"[pid knob] p109_pid.txt pid=%u %@",
-                  p109Pid, p109Pid ? @"(live — pid rows armed)" : @"(zeros — pid rows all-zero)"]);
+        if ([txt intValue] > 0) { p109Pid = (uint32_t)[txt intValue]; p109PidSrc = @"knob"; }
     }
+    if (p109Pid == 0) {
+        typedef int (*listFn)(uint32_t, uint32_t, void *, int);
+        typedef int (*pathFn)(int, void *, uint32_t);
+        void *lh = dlopen(nil, RTLD_LAZY);
+        listFn lp = lh ? (listFn)dlsym(lh, "proc_listpids") : NULL;
+        pathFn pp = lh ? (pathFn)dlsym(lh, "proc_pidpath") : NULL;
+        if (lp && pp) {
+            int need = lp(1 /*PROC_ALL_PIDS*/, 0, NULL, 0);
+            if (need > 0) {
+                int n = need / (int)sizeof(int) + 16;
+                int *buf = calloc((size_t)n, sizeof(int));
+                int got = buf ? lp(1, 0, buf, n * (int)sizeof(int)) : 0;
+                int anedPid = 0; int censusRows = 0;
+                NSMutableString *firstRows = [NSMutableString string];
+                for (int i = 0; buf && i < got / (int)sizeof(int); i++) {
+                    int pid = buf[i];
+                    if (pid <= 0) continue;
+                    char pb[1024] = {0};
+                    if (pp(pid, pb, sizeof pb) <= 0) continue;
+                    censusRows++;
+                    NSString *nm = [@(pb) lastPathComponent];
+                    if (censusRows <= 8)
+                        [firstRows appendFormat:@" %@/%d", nm, pid];
+                    if (!anedPid && [nm.lowercaseString containsString:@"aned"])
+                        anedPid = pid;
+                }
+                free(buf);
+                p109_log([NSString stringWithFormat:
+                    @"[census] proc_listpids rows=%d sample=%@", censusRows,
+                    censusRows ? firstRows : @"(empty — sandbox denied pidpath)"]);
+                if (anedPid) { p109Pid = (uint32_t)anedPid; p109PidSrc = @"census-aned"; }
+            } else {
+                p109_log(@"[census] proc_listpids(PROC_ALL_PIDS) returned 0 — sandbox denied");
+            }
+        } else {
+            p109_log(@"[census] libproc dlsym failed");
+        }
+    }
+    if (p109Pid == 0) {
+        p109Pid = 1; p109PidSrc = @"launchd-control";
+        p109_log(@"[census] aned not running (OnDemand/pressured-exit) — launchd(1) as resolvability control");
+    }
+    p109_log([NSString stringWithFormat:@"[pid knob] pid=%u source=%@ %@",
+              p109Pid, p109PidSrc,
+              [p109PidSrc hasPrefix:@"census-aned"] ? @"(live aned — entitlement borrow target)" :
+              ([p109PidSrc isEqualToString:@"launchd-control"] ? @"(control pid — 2f0 oracle only)" :
+               @"(explicit override)")]);
 
     void *h = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_LAZY);
     if (!h) { p109_log(@"dlopen IOKit FAIL"); goto done; }
