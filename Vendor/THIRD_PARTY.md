@@ -32,6 +32,10 @@ non-source files into the app bundle and Xcode fails on duplicate output
 names (the two CMakeLists.txt and two README.md were removed for this).
 
 ## Vendor/darksword provenance notes
+- `kpf/` (patchfinder) was NOT vendored: it imports opa334/xpf (MIT) which
+  itself needs ChOma + img4lib — three more trees for a module the Lum1na
+  chain never calls. The vendored kexploit/ is self-contained. Vendor xpf
+  + ChOma when a patchfinder integration actually lands.
 - Entry point: `int kexploit_opa334(void)`; on success `g_kernel_base`/
   `g_kernel_slide` are live and krw/m (`kreadbuf/kwritebuf/kread64/...`)
   works on the phys lane; `kutils`: proc_self/proc_find(_by_name).
