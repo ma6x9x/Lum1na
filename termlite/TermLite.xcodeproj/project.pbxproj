@@ -6,14 +6,6 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXFileSystemSynchronizedRootGroup section */
-		LTA0000000000000000000002 /* TermLite */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			path = TermLite;
-			sourceTree = "<group>";
-		};
-/* End PBXFileSystemSynchronizedRootGroup section */
-
 /* Begin PBXBuildFile section */
 		LTX0000000000000000000005 /* WQSSHServer.m in Sources */ = {isa = PBXBuildFile; fileRef = LTF0000000000000000000005 /* WQSSHServer.m */; };
 		LTX0000000000000000000006 /* worse_query.m in Sources */ = {isa = PBXBuildFile; fileRef = LTF0000000000000000000006 /* worse_query.m */; };
@@ -21,25 +13,28 @@
 		LTX0000000000000000000008 /* RootShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = LTF0000000000000000000009 /* RootShellView.swift */; };
 		LTX0000000000000000000009 /* SSHView.swift in Sources */ = {isa = PBXBuildFile; fileRef = LTF0000000000000000000010 /* SSHView.swift */; };
 		LTX000000000000000000000a /* WQShellEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = LTF0000000000000000000011 /* WQShellEngine.swift */; };
+		LTX000000000000000000000b /* SandboxRead.m in Sources */ = {isa = PBXBuildFile; fileRef = LTF0000000000000000000014 /* SandboxRead.m */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		LTF0000000000000000000012 /* TermLite-Bridging-Header.h */ = {isa = PBXFileReference; fileEncoding = 4; name = "TermLite-Bridging-Header.h"; path = "TermLite/TermLite-Bridging-Header.h"; sourceTree = SOURCE_ROOT; };
+		LTF0000000000000000000001 /* TermLite.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TermLite.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		LTF0000000000000000000005 /* WQSSHServer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = WQSSHServer.m; path = "Vendor/filza27.2/WQSSHServer.m"; sourceTree = SOURCE_ROOT; };
+		LTF0000000000000000000006 /* worse_query.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = worse_query.m; path = "Vendor/worse_query/worse_query.m"; sourceTree = SOURCE_ROOT; };
 		LTF0000000000000000000008 /* TermLiteApp.swift */ = {isa = PBXFileReference; name = TermLiteApp.swift; path = "TermLite/TermLiteApp.swift"; sourceTree = SOURCE_ROOT; };
 		LTF0000000000000000000009 /* RootShellView.swift */ = {isa = PBXFileReference; name = RootShellView.swift; path = "TermLite/RootShellView.swift"; sourceTree = SOURCE_ROOT; };
 		LTF0000000000000000000010 /* SSHView.swift */ = {isa = PBXFileReference; name = SSHView.swift; path = "TermLite/SSHView.swift"; sourceTree = SOURCE_ROOT; };
 		LTF0000000000000000000011 /* WQShellEngine.swift */ = {isa = PBXFileReference; name = WQShellEngine.swift; path = "TermLite/WQShellEngine.swift"; sourceTree = SOURCE_ROOT; };
+		LTF0000000000000000000012 /* TermLite-Bridging-Header.h */ = {isa = PBXFileReference; fileEncoding = 4; name = "TermLite-Bridging-Header.h"; path = "TermLite/TermLite-Bridging-Header.h"; sourceTree = SOURCE_ROOT; };
+		LTF0000000000000000000014 /* SandboxRead.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; name = SandboxRead.m; path = "TermLite/SandboxRead.m"; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
-/* Begin PBXFileReference section */
-		LTF0000000000000000000005 /* WQSSHServer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = WQSSHServer.m; path = "Vendor/filza27.2/WQSSHServer.m"; sourceTree = SOURCE_ROOT; };
-		LTF0000000000000000000006 /* worse_query.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = worse_query.m; path = "Vendor/worse_query/worse_query.m"; sourceTree = SOURCE_ROOT; };
-		LTF0000000000000000000007 /* Vendor */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Vendor; sourceTree = "<group>"; };
-/* End PBXFileReference section */
-
-/* Begin PBXFileReference section */
-		LTF0000000000000000000001 /* TermLite.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TermLite.app; sourceTree = BUILT_PRODUCTS_DIR; };
-/* End PBXFileReference section */
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		LTA0000000000000000000002 /* TermLite */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = TermLite;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		LTF0000000000000000000002 /* Frameworks */ = {
@@ -56,7 +51,6 @@
 			isa = PBXGroup;
 			children = (
 				LTA0000000000000000000002 /* TermLite */,
-				LTF0000000000000000000007 /* Vendor */,
 				LTF0000000000000000000001 /* TermLite.app */,
 			);
 			sourceTree = "<group>";
@@ -102,8 +96,6 @@
 				LTA0000000000000000000002 /* TermLite */,
 			);
 			mainGroup = LTG0000000000000000000001;
-			minimizedProjectReferenceProxies = 1;
-			preferredProjectObjectVersion = 77;
 			productRefGroup = LTG0000000000000000000001;
 			projectDirPath = "";
 			projectRoot = "";
@@ -134,6 +126,7 @@
 				LTX0000000000000000000008 /* RootShellView.swift in Sources */,
 				LTX0000000000000000000009 /* SSHView.swift in Sources */,
 				LTX000000000000000000000a /* WQShellEngine.swift in Sources */,
+				LTX000000000000000000000b /* SandboxRead.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -187,7 +180,6 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = GLVKP6RZ39;
 				GENERATE_INFOPLIST_FILE = NO;
-				SWIFT_OBJC_BRIDGING_HEADER = "TermLite/TermLite-Bridging-Header.h";
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(SRCROOT)/Vendor/libssh/include",
@@ -218,6 +210,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.lum1na.termlite;
 				PRODUCT_NAME = TermLite;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "TermLite/TermLite-Bridging-Header.h";
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
@@ -230,7 +223,6 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = GLVKP6RZ39;
 				GENERATE_INFOPLIST_FILE = NO;
-				SWIFT_OBJC_BRIDGING_HEADER = "TermLite/TermLite-Bridging-Header.h";
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(SRCROOT)/Vendor/libssh/include",
@@ -261,6 +253,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.lum1na.termlite;
 				PRODUCT_NAME = TermLite;
 				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OBJC_BRIDGING_HEADER = "TermLite/TermLite-Bridging-Header.h";
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
