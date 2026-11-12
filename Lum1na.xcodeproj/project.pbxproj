@@ -107,6 +107,7 @@
 			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
 			buildPhase = E6DAA27E305DD94500B0914F /* Resources */;
 			membershipExceptions = (
+				"Vendor/external",
 				"rust/lumina_core/README.md",
 				"tools/frida_root/README.md",
 				"Assets.xcassets/README.md",
