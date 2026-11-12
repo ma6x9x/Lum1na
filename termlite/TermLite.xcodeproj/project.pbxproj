@@ -17,7 +17,18 @@
 /* Begin PBXBuildFile section */
 		LTX0000000000000000000005 /* WQSSHServer.m in Sources */ = {isa = PBXBuildFile; fileRef = LTF0000000000000000000005 /* WQSSHServer.m */; };
 		LTX0000000000000000000006 /* worse_query.m in Sources */ = {isa = PBXBuildFile; fileRef = LTF0000000000000000000006 /* worse_query.m */; };
+		LTX0000000000000000000007 /* TermLiteApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = LTF0000000000000000000008 /* TermLiteApp.swift */; };
+		LTX0000000000000000000008 /* RootShellView.swift in Sources */ = {isa = PBXBuildFile; fileRef = LTF0000000000000000000009 /* RootShellView.swift */; };
+		LTX0000000000000000000009 /* SSHView.swift in Sources */ = {isa = PBXBuildFile; fileRef = LTF0000000000000000000010 /* SSHView.swift */; };
+		LTX000000000000000000000a /* WQShellEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = LTF0000000000000000000011 /* WQShellEngine.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		LTF0000000000000000000008 /* TermLiteApp.swift */ = {isa = PBXFileReference; name = TermLiteApp.swift; path = "TermLite/TermLiteApp.swift"; sourceTree = SOURCE_ROOT; };
+		LTF0000000000000000000009 /* RootShellView.swift */ = {isa = PBXFileReference; name = RootShellView.swift; path = "TermLite/RootShellView.swift"; sourceTree = SOURCE_ROOT; };
+		LTF0000000000000000000010 /* SSHView.swift */ = {isa = PBXFileReference; name = SSHView.swift; path = "TermLite/SSHView.swift"; sourceTree = SOURCE_ROOT; };
+		LTF0000000000000000000011 /* WQShellEngine.swift */ = {isa = PBXFileReference; name = WQShellEngine.swift; path = "TermLite/WQShellEngine.swift"; sourceTree = SOURCE_ROOT; };
+/* End PBXFileReference section */
 
 /* Begin PBXFileReference section */
 		LTF0000000000000000000005 /* WQSSHServer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = WQSSHServer.m; path = "Vendor/filza27.2/WQSSHServer.m"; sourceTree = SOURCE_ROOT; };
@@ -118,6 +129,10 @@
 			files = (
 				LTX0000000000000000000005 /* WQSSHServer.m in Sources */,
 				LTX0000000000000000000006 /* worse_query.m in Sources */,
+				LTX0000000000000000000007 /* TermLiteApp.swift in Sources */,
+				LTX0000000000000000000008 /* RootShellView.swift in Sources */,
+				LTX0000000000000000000009 /* SSHView.swift in Sources */,
+				LTX000000000000000000000a /* WQShellEngine.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
