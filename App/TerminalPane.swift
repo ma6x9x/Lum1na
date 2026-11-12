@@ -27,16 +27,33 @@ final class TerminalPTY: ObservableObject {
     private var master: Int32 = -1
     private var reader: DispatchSourceRead?
 
+    // Payload-soft: resolved by dlsym at runtime (same law as the rig engine).
+    private static func wqSymbols() -> (prepare: UnsafeMutableRawPointer, spawn: UnsafeMutableRawPointer)? {
+        let handle = dlopen(nil, RTLD_LAZY)
+        guard let h = handle else { return nil }
+        guard let pp = dlsym(h, "WQTerminalPrepare"),
+              let ps = dlsym(h, "WQTerminalSpawnShell") else { return nil }
+        return (pp, ps)
+    }
+
     func start(initialDir: String?) {
         guard master < 0 else { return }
-        let ok = WQTerminalPrepare()
-        guard ok else {
+        guard let syms = Self.wqSymbols() else {
             notice = "ios_system runtime not embedded — the a-Shell mini payload was not merged into this build (soft). Commands beyond the basic REPL need Frameworks/ios_system.framework."
             connected = false
             return
         }
+        typealias prepFn = @convention(c) () -> Bool
+        typealias spawnFn = @convention(c) (UnsafeMutablePointer<Int32>?, String?) -> Int32
+        let prep = unsafeBitCast(syms.prepare, to: prepFn.self)
+        guard prep() else {
+            notice = "ios_system dlopen failed at runtime (payload missing from this install)."
+            connected = false
+            return
+        }
+        let spawn = unsafeBitCast(syms.spawn, to: spawnFn.self)
         var pid: Int32 = 0
-        let fd = WQTerminalSpawnShell(&pid, initialDir)
+        let fd = spawn(&pid, initialDir)
         guard fd >= 0 else {
             notice = "shell spawn failed"
             return

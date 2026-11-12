@@ -81,6 +81,12 @@
 				"UITests/Lum1naUITests.swift",
 				"P007OpenOnly",
 				"rust",
+				"Vendor/filza27.2/WQTerminal.h",
+				"Vendor/filza27.2/WQTerminal.m",
+				"Vendor/filza27.2/WQArchive.h",
+				"Vendor/filza27.2/WQArchive.m",
+				"Vendor/filza27.2/WQPackages.h",
+				"Vendor/filza27.2/WQPackages.m",
 
 				"rust/lumina_core/README.md",
 				"tools",

@@ -7,11 +7,13 @@ import Foundation
 
 enum WQShellEngine {
     private static var prepared = false
-    private static var available = false
+    private static var live = false
+    private static var pPrepare: UnsafeMutableRawPointer?
+    private static var pSpawn: UnsafeMutableRawPointer?
 
     static func available() -> Bool {
         prepareIfNeeded()
-        return available
+        return live
     }
 
     /// Run one command through the in-process shell, capturing the master PTY.
@@ -20,8 +22,11 @@ enum WQShellEngine {
     static func run(_ command: String) -> String {
         prepareIfNeeded()
         guard available else { return "" }
+        guard let ps = pSpawn else { return "" }
+        typealias spawnFn = @convention(c) (UnsafeMutablePointer<Int32>?, String?) -> Int32
+        let spawn = unsafeBitCast(ps, to: spawnFn.self)
         var pid: Int32 = 0
-        let fd = WQTerminalSpawnShell(&pid, nil)
+        let fd = spawn(&pid, nil)
         guard fd >= 0 else { return "" }
         var cmd = command + "\nexit\n"
         _ = cmd.withCString { write(fd, $0, strlen($0)) }
@@ -44,9 +49,21 @@ enum WQShellEngine {
         return String(data: out, encoding: .utf8) ?? String(decoding: out, as: UTF8.self)
     }
 
+    // Payload-soft: resolved by dlsym at runtime, never at link. When the
+    // WQ runtime object files are not in this build (payload not embedded)
+    // the symbols are absent -> live=false -> REPL law.
     static func prepareIfNeeded() {
         guard !prepared else { return }
         prepared = true
-        available = WQTerminalPrepare()
+        if pPrepare == nil {
+            pPrepare = dlsym(UnsafeMutableRawPointer(bitPattern: -1), "WQTerminalPrepare")
+        }
+        if pSpawn == nil {
+            pSpawn = dlsym(UnsafeMutableRawPointer(bitPattern: -1), "WQTerminalSpawnShell")
+        }
+        guard let pp = pPrepare else { live = false; return }
+        typealias prepFn = @convention(c) () -> Bool
+        let prep = unsafeBitCast(pp, to: prepFn.self)
+        live = prep()
     }
 }

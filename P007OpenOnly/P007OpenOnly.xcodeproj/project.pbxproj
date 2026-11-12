@@ -110,6 +110,12 @@
 				NECPRace.inc.h.stub.txt,
 				P005Probe.inc.h.stub.txt,
 				P007OpenOnlyTests/P007OpenOnlyTests.swift,
+				"Vendor/filza27.2/WQTerminal.h",
+				"Vendor/filza27.2/WQTerminal.m",
+				"Vendor/filza27.2/WQArchive.h",
+				"Vendor/filza27.2/WQArchive.m",
+				"Vendor/filza27.2/WQPackages.h",
+				"Vendor/filza27.2/WQPackages.m",
 			);
 			target = E687D359302ADD6E00E24ACE /* P007OpenOnly */;
 		};
