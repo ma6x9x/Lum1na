@@ -27,7 +27,7 @@
 #import <unistd.h>
 #import <stdarg.h>
 
-#define P109_BUILD @"p109-ane-selsweep-v8-methodkinds"
+#define P109_BUILD @"p109-ane-selsweep-v9-asyncfix"
 
 typedef mach_port_t io_object_t;
 typedef mach_port_t io_service_t;
@@ -41,19 +41,23 @@ typedef kern_return_t (*IOConnectCallStructMethod_t)(io_connect_t, uint32_t,
         const void *, size_t, void *, size_t *);
 typedef kern_return_t (*IOConnectCallScalarMethod_t)(io_connect_t, uint32_t,
         const uint64_t *, uint32_t, uint64_t *, uint32_t *);
+/* v9 PROTOTYPE LAW (v8 crash .ips 09:38:57.796, BOTH devices, SIGBUS
+   KERN_PROTECTION_FAILURE inside IOConnectCallAsyncStructMethod): the real
+   async family takes NINE args — wake_port + reference/referenceCnt BEFORE
+   the struct/scalar pair. v8's 7-arg calls read the missing arg registers
+   inside IOKit userlib and faulted. Reference = NULL/0 is legal. */
 typedef kern_return_t (*IOConnectCallAsyncStructMethod_t)(io_connect_t, uint32_t,
-        mach_port_t, const void *, size_t, void *, size_t *);
+        mach_port_t, const uint64_t *, uint32_t,
+        const void *, size_t, void *, size_t *);
 typedef kern_return_t (*IOConnectCallAsyncScalarMethod_t)(io_connect_t, uint32_t,
-        mach_port_t, const uint64_t *, uint32_t, uint64_t *, uint32_t *);
+        mach_port_t, const uint64_t *, uint32_t,
+        const uint64_t *, uint32_t, uint64_t *, uint32_t *);
 /* v8 METHOD-KIND LAW (v7 receipt): struct methods accept ONLY sel0 0x88/0x88
    zeros (AddClient); every other sel bounces structural on all sizes — so
    the Stage-B send path (request-type array) is a different METHOD KIND.
    A sel that returns a kind-specific kr to scalar/async/memory but stays
    2c2 under struct names its true dispatch slot. */
-typedef void *lt_io_buf_ptr_t;
-typedef kern_return_t (*IOConnectCallMemoryMethod_t)(io_connect_t, uint32_t,
-        const void *, size_t, void *, size_t *,
-        lt_io_buf_ptr_t, size_t, lt_io_buf_ptr_t *, size_t *);
+/* v9: IOConnectCallMemoryMethod does not exist in the public IOKitLib — the om column retired (dlsym would have returned NULL anyway). */
 
 static int p109_fd = -1;
 static NSMutableString *p109_buf = nil;
@@ -141,7 +145,6 @@ static NSString *p109_krname(kern_return_t kr) {
     IOConnectCallScalarMethod_t pScalar = dlsym(h, "IOConnectCallScalarMethod");
     IOConnectCallAsyncStructMethod_t pAsyncStruct = dlsym(h, "IOConnectCallAsyncStructMethod");
     IOConnectCallAsyncScalarMethod_t pAsyncScalar = dlsym(h, "IOConnectCallAsyncScalarMethod");
-    IOConnectCallMemoryMethod_t pMem = dlsym(h, "IOConnectCallMemoryMethod");
     void *(*pPortCreate)(mach_port_t) = dlsym(h, "IONotificationPortCreate");
     mach_port_t (*pPortMach)(void *) = dlsym(h, "IONotificationPortGetMachPort");
     void (*pPortDestroy)(void *) = dlsym(h, "IONotificationPortDestroy");
@@ -244,7 +247,6 @@ static NSString *p109_krname(kern_return_t kr) {
             static uint8_t st_in[0x88];
             static uint8_t st_out[0x88];
             memset(st_in, 0, sizeof st_in);
-            static uint8_t om_out[0x1000];
             for (uint32_t sel = 0; sel <= 213; sel++) {
                 memset(st_out, 0, sizeof st_out);
                 size_t osz = sizeof st_out;
@@ -256,29 +258,25 @@ static NSString *p109_krname(kern_return_t kr) {
                 kern_return_t kr_sc = pScalar ?
                     pScalar(conn, sel, sc_in, 4, sc_out, &sc_cnt) : 0xe00002be;
 
+                static uint64_t as_ref[4] = {0,0,0,0};
                 memset(st_out, 0, sizeof st_out);
                 osz = sizeof st_out;
                 kern_return_t kr_as = (pAsyncStruct && notifyPort) ?
-                    pAsyncStruct(conn, sel, notifyPort, st_in, 0x88, st_out, &osz) : 0xe00002be;
+                    pAsyncStruct(conn, sel, notifyPort, as_ref, 0,
+                                 st_in, 0x88, st_out, &osz) : 0xe00002be;
 
+                static uint64_t am_ref[4] = {0,0,0,0};
                 memset(sc_out, 0, sizeof sc_out);
                 sc_cnt = 8;
                 kern_return_t kr_am = (pAsyncScalar && notifyPort) ?
-                    pAsyncScalar(conn, sel, notifyPort, sc_in, 4, sc_out, &sc_cnt) : 0xe00002be;
+                    pAsyncScalar(conn, sel, notifyPort, am_ref, 0,
+                                 sc_in, 4, sc_out, &sc_cnt) : 0xe00002be;
 
-                memset(st_in, 0, sizeof st_in);   /* OOL payload: zeros 0x88 */
-                memset(st_out, 0, sizeof st_out);
-                static lt_io_buf_ptr_t om_ret = NULL;
-                om_ret = NULL;
-                size_t om_cnt = sizeof om_out;
-                kern_return_t kr_om = pMem ?
-                    pMem(conn, sel, st_in, 0x88, st_out, &osz, st_in, 0x88, &om_ret, &om_cnt) : 0xe00002be;
-
-                int deviant = !(kr_sc == kr_st && kr_as == kr_st && kr_am == kr_st && kr_om == kr_st);
+                int deviant = !(kr_sc == kr_st && kr_as == kr_st && kr_am == kr_st);
                 NSMutableString *line = [NSMutableString
-                    stringWithFormat:@"[sel %3u] st=%@ sc=%@ as=%@ am=%@ om=%@%@",
+                    stringWithFormat:@"[sel %3u] st=%@ sc=%@ as=%@ am=%@%@",
                     sel, p109_krname(kr_st), p109_krname(kr_sc),
-                    p109_krname(kr_as), p109_krname(kr_am), p109_krname(kr_om),
+                    p109_krname(kr_as), p109_krname(kr_am),
                     deviant ? @"  <DEVIANT" : @""];
                 p109_log(line);
             }
