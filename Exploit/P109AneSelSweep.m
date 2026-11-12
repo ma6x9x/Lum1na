@@ -28,7 +28,7 @@
 #import <unistd.h>
 #import <stdarg.h>
 
-#define P109_BUILD @"p109-ane-selsweep-v10.2-selfpid"
+#define P109_BUILD @"p109-ane-selsweep-v10.3-regall"
 
 typedef mach_port_t io_object_t;
 typedef mach_port_t io_service_t;
@@ -155,18 +155,29 @@ static BOOL p109_register_ane(NSMutableString *out) {
     cfg.computeUnits = MLComputeUnitsAll;
     MLModel *m = [MLModel modelWithContentsOfURL:url configuration:cfg error:&err];
     if (!m) { [out appendFormat:@"  [reg] load FAILED: %@\n", err.localizedDescription]; return NO; }
-    NSString *nm = m.modelDescription.inputDescriptionsByName.allKeys.firstObject;
-    MLFeatureDescription *fd = nm ? m.modelDescription.inputDescriptionsByName[nm] : nil;
-    MLMultiArray *arr = nil;
-    if (fd.multiArrayConstraint) {
-        arr = [[MLMultiArray alloc] initWithShape:fd.multiArrayConstraint.shape
-                                         dataType:fd.multiArrayConstraint.dataType
-                                            error:&err];
+    /* v10.3: the addchain model declares MANY named inputs (x_000..x_NNN).
+       The 15:30 receipt failed with "Feature x_095 is required but not
+       specified" — provide EVERY named feature whose description carries a
+       multiArrayConstraint, filled deterministically. */
+    NSDictionary<NSString *, MLFeatureDescription *> *descs =
+        m.modelDescription.inputDescriptionsByName;
+    NSMutableDictionary<NSString *, id> *featDict =
+        [NSMutableDictionary dictionary];
+    for (NSString *fname in descs) {
+        MLFeatureDescription *fd = descs[fname];
+        if (!fd.multiArrayConstraint) continue;
+        NSError *aerr = nil;
+        MLMultiArray *arr = [[MLMultiArray alloc] initWithShape:fd.multiArrayConstraint.shape
+                                                       dataType:fd.multiArrayConstraint.dataType
+                                                          error:&aerr];
+        if (!arr) continue;
+        for (NSInteger i = 0; i < arr.count; i++) arr[i] = @((i + 1) & 0x7f);
+        featDict[fname] = arr;
     }
-    if (!arr || !nm) { [out appendString:@"  [reg] input array unavailable\n"]; return NO; }
-    for (NSInteger i = 0; i < arr.count; i++) arr[i] = @((i + 1) & 0x7f);
+    [out appendFormat:@"  [reg] features supplied=%lu of %lu named\n",
+        (unsigned long)featDict.count, (unsigned long)descs.count];
     MLDictionaryFeatureProvider *fp =
-        [[MLDictionaryFeatureProvider alloc] initWithDictionary:@{nm: arr} error:&err];
+        [[MLDictionaryFeatureProvider alloc] initWithDictionary:featDict error:&err];
     if (!fp) { [out appendFormat:@"  [reg] provider FAILED: %@\n", err.localizedDescription]; return NO; }
     NSDate *t0 = [NSDate date];
     id<MLFeatureProvider> pred = [m predictionFromFeatures:fp error:&err];

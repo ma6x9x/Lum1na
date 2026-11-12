@@ -140,6 +140,7 @@ enum LuminaTAP {
         case "p157":        result = P157AVEWriterReach.tap()
         case "p160":        result = P160SandboxEscape.tap()
         case "p159":        result = P159IOSurfaceAdjacency.tap()
+        case "p164":        result = P164McmCensus.tap()
         case "p166":        result = P166BrotliOOB.tap()
         case "p162":        result = P162IOHIDReach.tap()
         case "p014ane", "p014b", "p015", "p017":
