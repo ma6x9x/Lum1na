@@ -10,7 +10,13 @@ import Foundation
 /// of the original string.
 func tl(_ zh: String) -> String {
     guard Lang.resolved == .en else { return zh }
-    return RuntimeText.map[zh] ?? zh
+    if let en = RuntimeText.map[zh] { return en }
+    // Unknown key: never leak untranslated Chinese to the UI. The hash keeps
+    // repeated unknown keys consistent (and greppable in logs as one row).
+    if zh.unicodeScalars.contains(where: { $0.value >= 0x4E00 && $0.value <= 0x9FFF }) {
+        return "[untranslated \(String(zh.hashValue, radix: 16))]"
+    }
+    return zh
 }
 
 enum RuntimeText {

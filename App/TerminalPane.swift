@@ -1,5 +1,12 @@
 import SwiftUI
 
+struct TerminalLine: Identifiable {
+    let id = UUID()
+    let text: String
+    let kind: Kind
+    enum Kind { case input, out, err, ok }
+}
+
 // MARK: - In-app full terminal (main app, a-Shell bridge)
 //
 // The PTY-backed shell over the vendored WQTerminal bridge (a-Shell mini's
@@ -48,11 +55,7 @@ final class TerminalPTY: ObservableObject {
             guard n > 0 else { return }
             let chunk = String(decoding: buf[0..<n], as: UTF8.self)
             DispatchQueue.main.async {
-                for l in chunk.split(separator: "\n", omittingEmptySubsequences: false) {
-                    let s = String(l).replacingOccurrences(of: "\r", with: "")
-                    self.lines.append(TerminalLine(text: s, kind: .out))
-                    if self.lines.count > 2000 { self.lines.removeFirst(self.lines.count - 2000) }
-                }
+                self.appendChunk(chunk)
             }
         }
         src.setCancelHandler { [weak self] in
@@ -63,6 +66,17 @@ final class TerminalPTY: ObservableObject {
         }
         src.resume()
         reader = src
+    }
+
+    private func appendChunk(_ chunk: String) {
+        let parts = chunk.split(separator: "\n", omittingEmptySubsequences: false)
+        for part in parts {
+            let cleaned = part.replacingOccurrences(of: "\r", with: "")
+            lines.append(TerminalLine(text: cleaned, kind: .out))
+        }
+        if lines.count > 2000 {
+            lines.removeFirst(lines.count - 2000)
+        }
     }
 
     func send(_ text: String) {
