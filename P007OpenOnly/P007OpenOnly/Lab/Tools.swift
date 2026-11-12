@@ -294,6 +294,7 @@ enum LaunchCensus {
             text += "[\(d.label)]\n\(d.path)\n"
             if !d.program.isEmpty { text += "  program: \(d.program)\n" }
             if !d.args.isEmpty { text += "  args: \(d.args.joined(separator: " "))\n" }
+            if d.runAtLoad { text += "  runAtLoad: true\n" }
             if d.keepAlive { text += "  keepAlive: true\n" }
             if d.keepAliveDict { text += "  keepAlive: {conditional}\n" }
             if d.envVars > 0 { text += "  env: \(d.envVars) var(s)\n" }
