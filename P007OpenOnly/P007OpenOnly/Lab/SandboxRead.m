@@ -10,6 +10,8 @@
 #import <unistd.h>
 #import <errno.h>
 #import <string.h>
+#import <mach/mach.h>
+#import <mach/vm_prot.h>
 #import <stdio.h>
 #import <xpc/xpc.h>
 
