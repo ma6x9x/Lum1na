@@ -156,7 +156,6 @@ static void p164_probe(NSMutableString *o, NSString *name, uint64_t cls,
     g_qFlags(q, flags);
     if (g_qPart && part != 0) g_qPart(q, part);
     void *obj = g_qSingle(q);
-    g_qFree(q);
     (void)partDomain;
     if (!obj) {
         Lf(@"    [-] lookup denied (class %llu %@%@part=%llu)%s%s%s",
@@ -165,11 +164,18 @@ static void p164_probe(NSMutableString *o, NSString *name, uint64_t cls,
            partDomain ? @" domain=" : @"",
            partDomain ? partDomain.UTF8String : "",
            "");
+        g_qFree(q);
         return;
     }
+    /* OWNERSHIP LAW (Lum1na-2026-11-11-201442.ips — malloc abort in
+       container_object_free): the queried object is OWNED BY THE QUERY;
+       read the path while the query is alive, then query_free releases
+       both. container_object_free(obj) here = freeing a pointer the
+       object does not own = double free. The vendored MCMBridge does the
+       same (path read while the lease query lives). */
     const char *raw = g_oPath ? g_oPath(obj) : NULL;
     NSString *root = raw ? [NSString stringWithUTF8String:raw] : nil;
-    if (g_oFree) g_oFree(obj);
+    g_qFree(q);
     if (!root.length) { L(@"    [-] no path"); return; }
     if ([root isEqualToString:@"/var"] || [root hasPrefix:@"/var/"])
         root = [@"/private" stringByAppendingString:root];
