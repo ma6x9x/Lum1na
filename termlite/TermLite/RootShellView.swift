@@ -169,7 +169,12 @@ final class LiteSession: ObservableObject {
 
 // MARK: - small proc census + file loader (local, no rig dependency)
 
-struct ProcRowLite: Identifiable { let id = pid; let pid: Int32; let name: String; let deputy: Bool }
+struct ProcRowLite: Identifiable {
+    let pid: Int32
+    let name: String
+    let deputy: Bool
+    var id: Int32 { pid }
+}
 
 enum ProcListLite {
     static let deputies = ["aned", "nesessionmanager", "mlruntimed", "mlhostd", "modelmanagerd",

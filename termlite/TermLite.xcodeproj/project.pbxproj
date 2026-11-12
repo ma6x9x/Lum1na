@@ -24,6 +24,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		LTF0000000000000000000012 /* TermLite-Bridging-Header.h */ = {isa = PBXFileReference; fileEncoding = 4; name = "TermLite-Bridging-Header.h"; path = "TermLite/TermLite-Bridging-Header.h"; sourceTree = SOURCE_ROOT; };
 		LTF0000000000000000000008 /* TermLiteApp.swift */ = {isa = PBXFileReference; name = TermLiteApp.swift; path = "TermLite/TermLiteApp.swift"; sourceTree = SOURCE_ROOT; };
 		LTF0000000000000000000009 /* RootShellView.swift */ = {isa = PBXFileReference; name = RootShellView.swift; path = "TermLite/RootShellView.swift"; sourceTree = SOURCE_ROOT; };
 		LTF0000000000000000000010 /* SSHView.swift */ = {isa = PBXFileReference; name = SSHView.swift; path = "TermLite/SSHView.swift"; sourceTree = SOURCE_ROOT; };
@@ -186,6 +187,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = GLVKP6RZ39;
 				GENERATE_INFOPLIST_FILE = NO;
+				SWIFT_OBJC_BRIDGING_HEADER = "TermLite/TermLite-Bridging-Header.h";
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(SRCROOT)/Vendor/libssh/include",
@@ -228,6 +230,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = GLVKP6RZ39;
 				GENERATE_INFOPLIST_FILE = NO;
+				SWIFT_OBJC_BRIDGING_HEADER = "TermLite/TermLite-Bridging-Header.h";
 				HEADER_SEARCH_PATHS = (
 					"$(inherited)",
 					"$(SRCROOT)/Vendor/libssh/include",
