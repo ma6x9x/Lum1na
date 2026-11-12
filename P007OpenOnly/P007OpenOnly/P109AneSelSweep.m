@@ -28,7 +28,7 @@
 #import <unistd.h>
 #import <stdarg.h>
 
-#define P109_BUILD @"p109-ane-selsweep-v10.1-reg"
+#define P109_BUILD @"p109-ane-selsweep-v10.2-selfpid"
 
 typedef mach_port_t io_object_t;
 typedef mach_port_t io_service_t;
@@ -434,15 +434,19 @@ static BOOL p109_register_ane(NSMutableString *out) {
                     deviant ? @"  <DEVIANT" : @""];
                 p109_log(line);
             }
-            /* v10 pid rows — RECEIPT-PROVEN slots (p151 v6 law): 23F77 sel0 =
-               0x68/0x68 with the pid at 0x00/0x0c/0x10/0x54; 24A435 sel0 =
-               0x88/0x88 (pid log-only there). Both shapes tried with the same
-               four slots; the kr class is the mapping verdict. */
+            /* v10.2 pid rows — the 14:54 receipt: pid at +0 with a LIVE aned pid
+               (315, alive in syslog at tap time) still returns 2f0, so offset 0
+               is either a filtered lookup (client-list law) or an OPCODE with
+               the pid at +4/+8 — slots never tried. Rows now cover
+               +0/+4/+8/+0xc/+0x10/+0x54 in both shapes, for the knob pid AND
+               for SELF (getpid — after the wake predict this app IS an ANE
+               client, so a self row discriminates "filtered lookup" from
+               "offset-0-is-opcode" against the same connection). */
             {
-                static const size_t pidOffs[4] = { 0x00, 0x0c, 0x10, 0x54 };
+                static const size_t pidOffs[6] = { 0x00, 0x04, 0x08, 0x0c, 0x10, 0x54 };
                 static const size_t pidSizes[2] = { 0x68, 0x88 };
                 for (int si = 0; si < 2; si++) {
-                    for (int oi = 0; oi < 4; oi++) {
+                    for (int oi = 0; oi < 6; oi++) {
                         static uint8_t pin[0x88];
                         static uint8_t pout[0x88];
                         memset(pin, 0, sizeof pin);
@@ -461,6 +465,26 @@ static BOOL p109_register_ane(NSMutableString *out) {
                              kr == 0xe00002c2 ? @"2c2 — size/content law rejects this slot" :
                              @"kind switch — MAPPED field")]);
                     }
+                }
+                /* v10.2 SELF pass: the same slots with OUR pid (an ANE client
+                   after the wake predict). ACCEPT here + 2f0 for the knob pid
+                   = the lookup is client-filtered; 2f0 here too = offset 0 is
+                   not the pid field on this path. */
+                uint32_t selfPid = (uint32_t)getpid();
+                for (int oi = 0; oi < 6; oi++) {
+                    static uint8_t pin[0x88];
+                    static uint8_t pout[0x88];
+                    memset(pin, 0, sizeof pin);
+                    memset(pout, 0, sizeof pout);
+                    memcpy(pin + pidOffs[oi], &selfPid, sizeof selfPid);
+                    size_t osz = 0x88;
+                    kern_return_t kr = pStruct(conn, 0, pin, 0x88, pout, &osz);
+                    p109_log([NSString stringWithFormat:
+                        @"[pid sel0 sz=0x88 +%#zx SELF] pid=%u kr=%@ osz=%zu — %@",
+                        pidOffs[oi], selfPid, p109_krname(kr), osz,
+                        (kr == KERN_SUCCESS ? @"SELF ACCEPTED — client lookup resolved OUR task" :
+                         kr == 0xe00002f0 ? @"2f0 for SELF too — offset 0 is not the pid field here" :
+                         @"record")]);
                 }
             }
             if (notifPort && pPortDestroy) pPortDestroy(notifPort);
