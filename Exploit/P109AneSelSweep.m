@@ -28,7 +28,7 @@
 #import <unistd.h>
 #import <stdarg.h>
 
-#define P109_BUILD @"p109-ane-selsweep-v10.3-regall"
+#define P109_BUILD @"p109-ane-selsweep-v10.4-pidsweep"
 
 typedef mach_port_t io_object_t;
 typedef mach_port_t io_service_t;
@@ -477,7 +477,33 @@ static BOOL p109_register_ane(NSMutableString *out) {
                              @"kind switch — MAPPED field")]);
                     }
                 }
-                /* v10.2 SELF pass: the same slots with OUR pid (an ANE client
+                /* v10.4 PID SWEEP (the 15:30/decoded law): 2f0 is NOT a lookup
+               miss — ANE_find_task_from_pid resolves the pid and then gates on
+               task+0x448 bit1. Every pid we tried (1/aned/SELF) lacked the
+               flag. Sweep a bounded pid range at +0 (0x88 shape) and log only
+               rows that are NOT 2f0: a non-2f0 nonzero-pid row = a task that
+               CARRIES the flag = a borrowable deputy. Read-only oracle. */
+            {
+                int found = 0;
+                for (uint32_t sp = 1; sp <= 512; sp++) {
+                    static uint8_t pin[0x88];
+                    static uint8_t pout[0x88];
+                    memset(pin, 0, sizeof pin);
+                    memset(pout, 0, sizeof pout);
+                    memcpy(pin, &sp, sizeof sp);
+                    size_t osz = 0x88;
+                    kern_return_t kr = pStruct(conn, 0, pin, 0x88, pout, &osz);
+                    if (kr != 0xe00002f0 && kr != 0xe00002c2) {
+                        p109_log([NSString stringWithFormat:
+                            @"[sweep pid %u] kr=%@  <-- FLAG CARRIER (borrowable)", sp,
+                            p109_krname(kr)]);
+                        if (++found >= 8) break;
+                    }
+                }
+                p109_log([NSString stringWithFormat:@"[sweep] flagged carriers=%@ (of pids 1..512)",
+                          found ? @(found) : @"none this boot"]);
+            }
+            /* v10.2 SELF pass: the same slots with OUR pid (an ANE client
                    after the wake predict). ACCEPT here + 2f0 for the knob pid
                    = the lookup is client-filtered; 2f0 here too = offset 0 is
                    not the pid field on this path. */
