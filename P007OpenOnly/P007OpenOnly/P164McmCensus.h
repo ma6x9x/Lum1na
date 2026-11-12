@@ -7,4 +7,6 @@
 #import <Foundation/Foundation.h>
 
 @interface P164McmCensus : NSObject
+/// Read-only MCM census + system-group lease probes; returns the tap body.
++ (NSString *)tap;
 @end
