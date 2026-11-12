@@ -80,6 +80,7 @@
 				"UITests",
 				"UITests/Lum1naUITests.swift",
 				"P007OpenOnly",
+				"termlite",
 				"rust",
 				"Vendor/filza27.2/WQTerminal.h",
 				"Vendor/filza27.2/WQTerminal.m",

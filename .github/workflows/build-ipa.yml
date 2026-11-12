@@ -366,8 +366,8 @@ jobs:
       # a separate checkout and is unaffected.
       - name: Remove Lab App Tree (implicit-subproject guard)
         run: |
-          rm -rf P007OpenOnly
-          echo "✅ Removed P007OpenOnly from the shell-build tree"
+          rm -rf P007OpenOnly termlite
+          echo "✅ Removed P007OpenOnly + termlite from the shell-build tree"
           # Host-only trees. Xcode 26 Copy Bundle Resources flattens nested
           # README.md to Lum1na.app/README.md (rust/ + tools/ collide).
           rm -rf rust tools

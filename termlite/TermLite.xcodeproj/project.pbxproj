@@ -6,33 +6,24 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		LTA0000000000000000000001 /* Exceptions for "TermLite" folder in "TermLite" target */ = {
-			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
-			membershipExceptions = (
-				"Vendor/filza27.2/WQTerminal.h",
-				"Vendor/filza27.2/WQTerminal.m",
-				"Vendor/filza27.2/WQArchive.h",
-				"Vendor/filza27.2/WQArchive.m",
-				"Vendor/filza27.2/WQPackages.h",
-				"Vendor/filza27.2/WQPackages.m",
-				"Vendor/libssh/libssh.4.dylib",
-				"Vendor/filza27.2/WQSSHServer.h",
-			);
-			target = LTT0000000000000000000001 /* TermLite */;
-		};
-/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
-
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		LTA0000000000000000000002 /* TermLite */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-				LTA0000000000000000000001,
-			);
 			path = TermLite;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXBuildFile section */
+		LTB0000000000000000000001 /* WQSSHServer.m in Sources */ = {isa = PBXBuildFile; fileRef = LTF0000000000000000000005 /* WQSSHServer.m */; };
+		LTB0000000000000000000002 /* worse_query.m in Sources */ = {isa = PBXBuildFile; fileRef = LTF0000000000000000000006 /* worse_query.m */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		LTF0000000000000000000005 /* WQSSHServer.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = WQSSHServer.m; sourceTree = "<group>"; };
+		LTF0000000000000000000006 /* worse_query.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = worse_query.m; sourceTree = "<group>"; };
+		LTF0000000000000000000007 /* Vendor */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Vendor; sourceTree = "<group>"; };
+/* End PBXFileReference section */
 
 /* Begin PBXFileReference section */
 		LTF0000000000000000000001 /* TermLite.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TermLite.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -53,6 +44,7 @@
 			isa = PBXGroup;
 			children = (
 				LTA0000000000000000000002 /* TermLite */,
+				LTF0000000000000000000007 /* Vendor */,
 				LTF0000000000000000000001 /* TermLite.app */,
 			);
 			sourceTree = "<group>";
@@ -92,6 +84,9 @@
 			knownRegions = (
 				en,
 			);
+			fileSystemSynchronizedGroups = (
+				LTA0000000000000000000002 /* TermLite */,
+			);
 			mainGroup = LTG0000000000000000000001;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
@@ -119,6 +114,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				LTB0000000000000000000001 /* WQSSHServer.m in Sources */,
+				LTB0000000000000000000002 /* worse_query.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
