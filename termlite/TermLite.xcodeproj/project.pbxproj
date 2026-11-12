@@ -116,8 +116,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				LTB0000000000000000000001 /* WQSSHServer.m in Sources */,
-				LTB0000000000000000000002 /* worse_query.m in Sources */,
+				LTX0000000000000000000005 /* WQSSHServer.m in Sources */,
+				LTX0000000000000000000006 /* worse_query.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
