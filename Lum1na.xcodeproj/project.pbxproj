@@ -70,6 +70,7 @@
 				".github",
 				".gitignore",
 				"docs",
+				"App/Info.plist",
 				"Exploit/ClearSword.m",
 				"Exploit/UPLLeak.m",
 				"Lum1na.xcodeproj",

