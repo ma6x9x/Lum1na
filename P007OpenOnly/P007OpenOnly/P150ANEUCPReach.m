@@ -26,6 +26,7 @@
 #import "P150ANEUCPReach.h"
 #import "LabDeviceProfile.h"
 #import "LabLocalTime.h"
+#import "LabLearn.h"
 
 #import <Foundation/Foundation.h>
 #import <IOKit/IOKitLib.h>
@@ -81,6 +82,8 @@
     [out appendFormat:@"[res] services=%d opened=%d — %@\n", found, opened,
         opened ? @"UC OPEN: ProgramCreate path is app-reachable in principle (p151 next)"
                : @"UC CLOSED to this install: ANE kernel paths are daemon-only"];
+    [LabLearn recordPath:@"p150" result:(opened > 0 ? @"DOOR-LB-OPEN" : @"DOOR-CLOSED")
+                evidence:[NSString stringWithFormat:@"LB t1/t4 open=%d H11ANEIn=2c7", opened]];
 
     NSArray<NSString *> *cls = @[@"_ANEClient", @"_ANEModel",
                                  @"_ANEIOSurfaceObject", @"_ANEDeviceController",

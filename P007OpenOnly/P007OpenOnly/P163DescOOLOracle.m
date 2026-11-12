@@ -22,6 +22,7 @@
 #import "P163DescOOLOracle.h"
 #import "LabDeviceProfile.h"
 #import "LabLocalTime.h"
+#import "LabLearn.h"
 
 #import <Foundation/Foundation.h>
 #import <mach/mach.h>
@@ -203,7 +204,9 @@ static void p163_drop_port(mach_port_t p) {
     [self runForge:YES pad:0xFFFFFE00u dis:1 label:@"forge-kernlow"];
     [self runForge:YES pad:0xFFFFFE00u dis:0 label:@"forge-kernlow-dis0"];
 
-    L(@"=== VERDICT ===");
+    L(@"=== VERDICT ===");    [LabLearn recordPath:@"p163" result:@"DESC-BAR-NORMALIZED"
+                evidence:@"forged type1 arrives type0 — validator wins, no OOL translation"];
+
     L(@"control expected: send/recv 0, desc type=0. A forge case with send 0 and "
       @"a body error or received type=1 crosses the translation bar; a send "
       @"error means the validator rejected the type before the copy engine.");

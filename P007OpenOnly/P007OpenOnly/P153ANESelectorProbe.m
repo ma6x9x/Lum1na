@@ -6,6 +6,7 @@
 #import "P153ANESelectorProbe.h"
 #import "LabDeviceProfile.h"
 #import "LabLocalTime.h"
+#import "LabLearn.h"
 
 #import <Foundation/Foundation.h>
 #import <IOKit/IOKitLib.h>
@@ -297,7 +298,9 @@
         IOServiceClose(conn);
     }
 
-    [out appendFormat:@"  [res] opens=%d deviceOpen_success=%d\n", opened, success];
+    [out appendFormat:@"  [res] opens=%d deviceOpen_success=%d\n", opened, success];    [LabLearn recordPath:@"p153" result:(success ? @"DOOR-DEVICEOPEN" : @"DOOR-NO")
+                evidence:[NSString stringWithFormat:@"sel0 0x88 success=%d", success]];
+
     [out appendFormat:@"  [verdict] %@\n",
         success ? @"DeviceOpen accepted after the preceding selector(s) — path live"
                 : @"no DeviceOpen success; class map is the receipt"];

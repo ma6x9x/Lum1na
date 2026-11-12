@@ -12,6 +12,7 @@
 #import "P162IOHIDReach.h"
 #import "LabDeviceProfile.h"
 #import "LabLocalTime.h"
+#import "LabLearn.h"
 
 #import <Foundation/Foundation.h>
 #import <IOKit/IOKitLib.h>
