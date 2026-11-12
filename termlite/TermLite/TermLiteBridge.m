@@ -62,6 +62,16 @@ BOOL WQTerminalPrepare(void) {
     return lt_ios_init();
 }
 
+NSString *WQVirtualRootFolder(void) {
+    /* the filza build rooted its hub in Documents/worse_query — same law */
+    NSString *docs = [NSSearchPathForDirectoriesInDomains(
+        NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
+    NSString *root = [docs stringByAppendingPathComponent:@"worse_query"];
+    [[NSFileManager defaultManager] createDirectoryAtPath:root
+        withIntermediateDirectories:YES attributes:nil error:nil];
+    return root;
+}
+
 int WQTerminalSpawnShell(int *pidOut, NSString *chdir) {
     if (!lt_ios_init()) {
         if (pidOut) *pidOut = 0;
