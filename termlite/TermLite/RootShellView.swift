@@ -140,7 +140,7 @@ final class LiteSession: ObservableObject {
     }
     private func dump(_ p: String?) {
         guard let p else { return }
-        let r = LabSandboxRead.dumpIntoDocuments(resolve(p))
+        let r = LabSandboxRead.dump(intoDocuments: resolve(p))
         if let path = r["path"] as? String { emit("dump -> \(path)", .ok) }
         else { emit("dump refused: \(r["error"] as? String ?? "?")", .err) }
     }
