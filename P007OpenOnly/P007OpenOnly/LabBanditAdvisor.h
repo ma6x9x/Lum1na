@@ -1,0 +1,24 @@
+//
+//  LabBanditAdvisor.h — the ONE Swift-visible face of the v3 contextual
+//  layer (LabBandit itself stays C-only, like LabLocalTime). The
+//  individual-test-mode advisor: on every solo catalog tap, ExploitManager
+//  prints one advisory line — the best-scoring input-feature arm for that
+//  probe's ledger domain, or the domain's documented cold-start hint when
+//  only one arm exists. Never changes probe behavior; physics laws and the
+//  operator outrank it.
+//
+
+#import <Foundation/Foundation.h>
+
+NS_ASSUME_NONNULL_BEGIN
+
+@interface LabBanditAdvisor : NSObject
+
+/* Reads Documents/lab_bandit.json and returns the advisor line for the
+   catalog id's domain (~"" when nothing can be said). Called before the
+   probe runs; the line is printed, not acted on. */
++ (NSString *)adviceForCatalogId:(NSString *)catalogId;
+
+@end
+
+NS_ASSUME_NONNULL_END

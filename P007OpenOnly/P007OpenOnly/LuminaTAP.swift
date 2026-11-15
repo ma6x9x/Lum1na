@@ -63,6 +63,10 @@ enum LuminaTAP {
         if let stop = blocked(id) { return LuminaLearn.observeParked(id: id, log: stop) }
         LuminaLearn.begin(id)
         LuminaLearn.prepare(id)
+        // v3 individual-test mode: advisory input line (UCB1-ranked arm or
+        // the documented cold-start hint). ADVISORY ONLY — nothing changes.
+        let advice = LabBanditAdvisor.advice(forCatalogId: id) ?? ""
+        let advicePrefix = advice.isEmpty ? "" : advice + "\n"
         var result: String
         switch id {
         case "ident":       result = DeviceIdentProbe.runIdentity()
@@ -659,6 +663,6 @@ enum LuminaTAP {
         default:
             result = "unknown"
         }
-        return LuminaLearn.finish(id, log: result)
+        return LuminaLearn.finish(id, log: advicePrefix + result)
     }
 }

@@ -1,5 +1,6 @@
 #import "LabLocalTime.h"
 #import "LabBandit.h"
+#import "LabBanditAdvisor.h"
 #import "P113DescForgeControl.h"
 #import "LabDeviceProfile.h"
 #import "DeviceIdentProbe.h"
