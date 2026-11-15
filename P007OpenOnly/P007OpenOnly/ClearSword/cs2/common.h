@@ -158,4 +158,12 @@ typedef struct pe_context {
 } cs2_context_t;
 extern cs2_context_t cs2_ctx;
 
+/* LSWARM-TARGET (2026-11-15): the calib's PROVEN WRONG windows
+   (lightsword_wrong.txt boot-learn list), filled by the ObjC runner before
+   cs2_run(). The 2026-10-24 arm license carried only a COUNT — tonight's
+   receipts show the full 8x128MiB sweep missing every pcb on the same
+   boot the calib produced 6 WRONG crossings. */
+extern uint64_t g_lsw_wrong_offs[16];
+extern int g_lsw_wrong_n;
+
 #endif /* cs2_common_h */
