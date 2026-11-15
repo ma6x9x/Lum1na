@@ -217,7 +217,22 @@ static void p143_bandit(const char *outcome) {
        v5's row and 0x24 per the static UC contract), scalar counts 0 and 4.
        Any kr other than 2c2 = the shape gate crossed. */
     if (ourQid) {
+        /* v6.1 knob: Documents/p143_resid.txt lets the stale-entry census feed
+           a LIVE/stale resource id straight into the sz-4 submit (the
+           IOGPUStaleEntryProbe ids are the candidates). qid stays the default. */
         uint32_t v4in = (uint32_t)ourQid;
+        {
+            NSString *docs = [NSSearchPathForDirectoriesInDomains(
+                NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
+            NSString *kn = [docs stringByAppendingPathComponent:@"p143_resid.txt"];
+            NSString *txt = [NSString stringWithContentsOfFile:kn
+                             encoding:NSUTF8StringEncoding error:nil];
+            uint32_t rid = (uint32_t)[txt intValue];
+            if (rid) {
+                v4in = rid;
+                Lf(@"[v6.1] knob p143_resid.txt resourceId=%u overrides qid", rid);
+            }
+        }
         for (int si = 0; si < 2; si++) {
             uint32_t selx = si ? 0x24 : 0x19;
             for (int nsc = 0; nsc <= 4; nsc += 4) {
@@ -226,8 +241,8 @@ static void p143_bandit(const char *outcome) {
                 uint32_t no6 = 4;
                 kern_return_t kr6 = call(conn, selx, nsc ? sc : NULL, (uint32_t)nsc,
                                          &v4in, 4, o6, &no6, NULL, NULL);
-                Lf(@"[3c] v6 sz=4 sel-0x%x nsc=%d qid=%llu kr=0x%08x out0=0x%llx%@",
-                   selx, nsc, (unsigned long long)ourQid, (unsigned)kr6,
+                Lf(@"[3c] v6 sz=4 sel-0x%x nsc=%d res=%llu kr=0x%08x out0=0x%llx%@",
+                   selx, nsc, (unsigned long long)v4in, (unsigned)kr6,
                    (unsigned long long)o6[0],
                    kr6 != 0xe00002c2 ? @" <== SHAPE GATE CROSSED" : @"");
             }
