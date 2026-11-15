@@ -63,6 +63,7 @@ enum LuminaTAP {
         if let stop = blocked(id) { return LuminaLearn.observeParked(id: id, log: stop) }
         LuminaLearn.begin(id)
         LuminaLearn.prepare(id)
+        LabPanicSigDrain()   // v3 panic-PC ingest: score any pushed rows first
         // v3 individual-test mode: advisory input line (UCB1-ranked arm or
         // the documented cold-start hint). ADVISORY ONLY — nothing changes.
         let advice = LabBanditAdvisor.advice(forCatalogId: id) ?? ""

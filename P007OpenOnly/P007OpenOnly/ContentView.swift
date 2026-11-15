@@ -12,6 +12,10 @@ struct ContentView: View {
     @State private var showSettings = false
     @State private var showLogs = false
     @State private var kreadSignal = P007Board.shared().kreadSignal
+    // v3 knob editor state (long-press a tile to edit that test's input)
+    @State private var knobId = ""
+    @State private var knobText = ""
+    @State private var showKnobAlert = false
 
     var body: some View {
         NavigationStack {
@@ -120,6 +124,15 @@ struct ContentView: View {
                 showLogs = false
             }
         }
+        // v3 knob editor: long-press any tile to set that test's input value.
+        .alert("Knob — \(knobId)", isPresented: $showKnobAlert) {
+            TextField("e.g. resid / pid / untagged", text: $knobText)
+            Button("Save") { LabKnobWrite(knobId, knobText) }
+            Button("Clear", role: .destructive) { LabKnobWrite(knobId, "") }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Input value used by this test at tap time (empty = stock behavior).")
+        }
     }
 
     @ViewBuilder
@@ -148,6 +161,16 @@ struct ContentView: View {
         .disabled(running)
         .opacity(running ? 0.5 : 1)
         .accessibilityLabel(title)
+        .contextMenu {
+            Button {
+                knobId = id
+                var buf: [CChar] = Array(repeating: 0, count: 256)
+                knobText = LabKnobRead(id, &buf, 256) == 1 ? String(cString: buf) : ""
+                showKnobAlert = true
+            } label: {
+                Label("Edit knob…", systemImage: "slider.horizontal.3")
+            }
+        }
     }
 
     @ViewBuilder

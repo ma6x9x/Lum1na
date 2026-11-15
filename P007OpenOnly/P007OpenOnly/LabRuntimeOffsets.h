@@ -118,6 +118,12 @@ typedef struct {
 // MARK: - Public API
 const LabOffTab *LabOff(void);
 const LabOffTab *LabOffForSku(LabSku sku);
+
+/* v3 panic-PC ingest pins: the SKU's VA-valued table rows, straight from
+   LabRuntimeOffsets (the ONLY VA source). LabPanicSig scores a captured
+   panic PC's proximity against these. */
+typedef struct { const char *tag; uint64_t va; } LabOffPin;
+int LabOffPins(const LabOffPin **pinsOut);
 uint64_t LabKernSlide(void);
 void LabSetKernSlide(uint64_t slide);
 /* Shared FIELD/VA convention both SKUs. Do not paste T8101 text VAs onto T8020. */

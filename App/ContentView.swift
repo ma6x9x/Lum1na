@@ -31,6 +31,17 @@ struct ContentView: View {
 struct AllExploitsSheet: View {
     @ObservedObject var viewModel: ExploitManager
     @Environment(\.dismiss) var dismiss
+    // v3 knob editor: long-press any row to set that test's input value.
+    @State private var knobEntryId: String?
+    @State private var knobEntryName = ""
+    @State private var knobText = ""
+    @State private var showKnobAlert = false
+
+    private func knobValue(_ id: String) -> String {
+        var buf: [CChar] = Array(repeating: 0, count: 256)
+        return LabKnobRead(id, &buf, 256) == 1
+            ? String(cString: buf) : ""
+    }
 
     var body: some View {
         NavigationView {
@@ -71,6 +82,16 @@ struct AllExploitsSheet: View {
                             }
                         }
                         .disabled(viewModel.isRunning)
+                        .contextMenu {
+                            Button {
+                                knobEntryId = entry.id
+                                knobEntryName = entry.name
+                                knobText = knobValue(entry.id)
+                                showKnobAlert = true
+                            } label: {
+                                Label("Edit knob…", systemImage: "slider.horizontal.3")
+                            }
+                        }
                     }
                 }
 
@@ -80,6 +101,18 @@ struct AllExploitsSheet: View {
             }
             .navigationTitle("All Exploits")
             .navigationBarTitleDisplayMode(.inline)
+            .alert("Knob — \(knobEntryName)", isPresented: $showKnobAlert) {
+                TextField("e.g. pid / resid / untagged", text: $knobText)
+                Button("Save") {
+                    if let id = knobEntryId { LabKnobWrite(id, knobText) }
+                }
+                Button("Clear", role: .destructive) {
+                    if let id = knobEntryId { LabKnobWrite(id, "") }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Input value used by this test at tap time (empty = stock behavior).")
+            }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }

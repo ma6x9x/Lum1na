@@ -442,3 +442,33 @@ uint32_t LabAneInBoundsRecords(const LabOffTab *off) {
         return off->ane_table_entries ? off->ane_table_entries : 255u;
     return off->ane_table_entries;
 }
+
+/* v3 panic-PC ingest pins: only VA-valued rows of the active table (sizes,
+   counts and record offsets are NOT addresses — excluded by construction). */
+int LabOffPins(const LabOffPin **pinsOut) {
+    static LabOffPin pins[8];
+    static int pinsN = 0;
+    static int built = 0;
+    if (!built) {
+        built = 1;
+        const LabOffTab *off = LabOff();
+        if (off) {
+            pinsN = 0;
+            pins[pinsN++] = (LabOffPin){ "static_base", off->static_base };
+            if (off->ane_checkandprewire)
+                pins[pinsN++] = (LabOffPin){ "ane-checkandprewire",
+                                             off->ane_checkandprewire };
+            if (off->ane_memorymap)
+                pins[pinsN++] = (LabOffPin){ "ane-memorymap",
+                                             off->ane_memorymap };
+            if (off->ane_memorymap_locked)
+                pins[pinsN++] = (LabOffPin){ "ane-memorymap-locked",
+                                             off->ane_memorymap_locked };
+            if (off->ane_alloc_type_desc)
+                pins[pinsN++] = (LabOffPin){ "ane-alloc-type-desc",
+                                             off->ane_alloc_type_desc };
+        }
+    }
+    if (pinsOut) *pinsOut = pins;
+    return pinsN;
+}
