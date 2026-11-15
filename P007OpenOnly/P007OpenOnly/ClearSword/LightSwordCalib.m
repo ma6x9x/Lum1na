@@ -245,7 +245,7 @@ static uint32_t rc_hotsync_warm(uint64_t *warm, uint32_t warmNin) {
                 if (sscanf(ln, "%llx", &v) == 1 && v) {
                     int dup = 0;
                     for (uint32_t k = 0; k < warmN; k++) if (warm[k] == v) { dup = 1; break; }
-                    if (!dup && warmN < 64) { warm[warmN++] = v; merged++; }
+                    if (!dup && warmN < 512) { warm[warmN++] = v; merged++; }
                 }
             }
             if (merged && oIdent) {
@@ -310,7 +310,7 @@ static CFNumberRef RCNUM(int64_t v) {
        windows rotate/recur across boots; the tuner accumulates the set).
        Reads lightsword_hot.txt, falling back to the legacy racecalib_hot.txt
        so pre-rename accumulated warm sets survive. Writes under the new name. */
-    uint64_t rc_warm[64]; uint32_t warmN = 0;
+    uint64_t rc_warm[512]; uint32_t warmN = 0;
     char hotfile[512];
     char wrongfile[512];
     {
@@ -328,7 +328,7 @@ static CFNumberRef RCNUM(int64_t v) {
             char ln0[64];
             while (fgets(ln0, sizeof ln0, hf0)) {
                 uint64_t v = 0;
-                if (sscanf(ln0, "%llx", &v) == 1 && v && warmN < 64) rc_warm[warmN++] = v;
+                if (sscanf(ln0, "%llx", &v) == 1 && v && warmN < 512) rc_warm[warmN++] = v;
             }
             fclose(hf0);
         }
@@ -639,7 +639,9 @@ static CFNumberRef RCNUM(int64_t v) {
             for (uint32_t k = 0; k < nHot; k++) if (hot[k] == rc_hotOffs[i]) { dup = 1; break; }
             if (!dup) hot[nHot++] = rc_hotOffs[i];
         }
-        for (uint32_t i = 0; i < warmN && nHot < 96; i++) {
+        /* v11.1: warm NEWEST-first so the replay leads with fresh offsets */
+        for (uint32_t ii = 0; ii < warmN && nHot < 96; ii++) {
+            uint32_t i = warmN - 1 - ii;
             int dup = 0;
             for (uint32_t k = 0; k < nHot; k++) if (hot[k] == rc_warm[i]) { dup = 1; break; }
             if (!dup) hot[nHot++] = rc_warm[i];

