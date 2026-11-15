@@ -45,6 +45,7 @@
 #import "Exploit/P054APFSReapList.h"
 #import "Exploit/LabRuntimeOffsets.h"
 #import "Exploit/LabDeviceProfile.h"
+#import "Exploit/LabBanditAdvisor.h"   // v3 individual-test advisor (LabBandit itself stays C-only)
 #import "Exploit/A14_23F77_LabOffsets.h"
 #import "Exploit/A12X_23G71_LabOffsets.h"
 #import "Exploit/DeviceIdentProbe.h"

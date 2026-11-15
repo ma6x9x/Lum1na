@@ -139,6 +139,44 @@ int    LabBanditPick2(const char *domain, char *lineOut, int lineCap);
 int    LabBanditPlan(char *lineOut, int lineCap);
 
 /* One-arm convenience for the Swift promotion lattice (learn.<id>). */
+/* ---- v3 ("the Learner"): contextual input-feature arms + the individual-
+   test advisor (the 2026-11-15 self-learning guide, phases 1-2) ---- */
+
+/* KRW-oriented intermediate-signal outcome keys. They ride the SAME
+   arm-stats math as the shared reward law (labb_reward checks them first,
+   then falls back to the win/mid/miss/crash classes). The board contract
+   stays the ONLY +1.0 — a signal reward is progress toward the line,
+   never a win, and never overrides hasKread. */
+#define LABB_SIG_PTR_NEW    "sig-ptr-new"    /* +0.3 canonical kernel-band pointer          */
+#define LABB_SIG_PTR_STABLE "sig-ptr-stable" /* +0.4 same signal reappears across boots     */
+#define LABB_SIG_FOREIGN    "sig-foreign"    /* +0.5 FOREIGN>0 / non-own tag copied         */
+#define LABB_SIG_SHAPE      "sig-shape"      /* +0.6 non-generic error after a shape tweak  */
+#define LABB_SIG_PANIC_VA   "sig-panic-va"   /* +0.8 panic PC lands near a known unslid VA  */
+
+/* one input-feature pair (features ride the history row verbatim) */
+typedef struct { const char *k; const char *v; } LabBanditFeat;
+
+/* Record like LabBanditRecordE plus the run's input FEATURES: the history
+   row carries "feat:<k>" pairs and dom["last_feats"] mirrors the last row.
+   fe may be NULL (features optional, counts still land). This is the
+   guide's Phase-1 offline-correlation stream — logging only. */
+void   LabBanditRecordFeat(const char *domain, int armIndex,
+                           const char *outcome, const char *evidenceClass,
+                           const LabBanditFeat *fe, int featCount);
+
+/* Individual-test-mode ADVISOR: deterministic (UCB1-ranked, never
+   Thompson — a recommendation must be reproducible). Writes one line:
+     "recommend: <arm> (UCB1 n=%.1f mean=%.3f)"  multi-arm domain w/ counts
+     "recommend: <cold-start hint> (cold-start)" single-arm / unknown domain
+     (the hint table is documented lab history: p109 pid=1/aned, p114
+     stable-p159-input, cscali untagged spray, p149 panic-PC capture,
+     p143 kind=4 sz=4 ...). Returns the recommended arm index into the
+     domain's registered order (0 for a single-arm domain, -1 when only a
+     hint applies). ADVISORY ONLY — physics laws outrank it; the probe
+     keeps its own default input unless the operator applies the hint. */
+int    LabBanditRecommendInput(const char *domain, char *out, int cap);
+
+/* One-arm convenience for the Swift promotion lattice (learn.<id>). */
 int    LabBanditRegister1(const char *domain, const char *arm,
                           const char *seededFrom,
                           const char *bootChangeOpen,

@@ -102,6 +102,14 @@ static NSMutableDictionary *labb_load(void) {
                              @"miss-adjacency", @"survived" ],
                 @"mid":   @[ @"abort", @"fires" ],
             },
+            /* v3 signals: progress dials, never a win (honesty note) */
+            @"signals": @{
+                @"sig-ptr-new":    @0.3,
+                @"sig-ptr-stable": @0.4,
+                @"sig-foreign":    @0.5,
+                @"sig-shape":      @0.6,
+                @"sig-panic-va":   @0.8,
+            },
         };
     }
     if (!doc[@"domains"]) doc[@"domains"] = [NSMutableDictionary dictionary];
@@ -159,6 +167,21 @@ static double labb_ev_weight(const char *cls) {
     return 1.0;                                             /* device/other */
 }
 
+/* v3 intermediate-signal layer ON TOP of the shared reward law. The board
+   contract stays the only +1.0; these are progress dials (the 2026-11-15
+   guide), and the crash-penalty math in labb_arm_stats only trips on the
+   <=0.001 crash class, so signals never look like crashes. */
+static double labb_reward(const char *outcome) {
+    if (outcome && *outcome) {
+        if (strcmp(outcome, LABB_SIG_PTR_NEW)    == 0) return 0.3;
+        if (strcmp(outcome, LABB_SIG_PTR_STABLE) == 0) return 0.4;
+        if (strcmp(outcome, LABB_SIG_FOREIGN)    == 0) return 0.5;
+        if (strcmp(outcome, LABB_SIG_SHAPE)      == 0) return 0.6;
+        if (strcmp(outcome, LABB_SIG_PANIC_VA)   == 0) return 0.8;
+    }
+    return LabBanditReward(outcome);
+}
+
 static void labb_arm_stats(NSDictionary *arms, NSString *armName,
                            double *nOut, double *meanOut) {
     NSDictionary *a = arms[armName];
@@ -172,7 +195,7 @@ static void labb_arm_stats(NSDictionary *arms, NSString *armName,
             NSRange colon = [ok rangeOfString:@":"];
             if (colon.location != NSNotFound && colon.location > 0)
                 ok = [ok substringFromIndex:colon.location + 1];
-            double r = LabBanditReward(ok.UTF8String);
+            double r = labb_reward(ok.UTF8String);
             /* the crash cost = the reboot: only the crash/maf class goes
                negative (-0.25); MISS/MID keep their honest low rewards */
             double rEff = (r <= 0.001) ? -0.25 : r;
@@ -656,4 +679,162 @@ int LabBanditRegister1(const char *domain, const char *arm,
     return LabBanditRegister(domain, arms, 1, NULL, 0, seededFrom,
                              bootChangeOpen, sameBootOpen,
                              attrLineOut, attrLineCap);
+}
+
+/* ---- v3 ("the Learner"): cold-start hint table, the deterministic
+   individual-test advisor, and the feature-recorded history stream ---- */
+
+/* Documented lab history ONLY (the logs' own next-step requests; the
+   2026-11-15 guide's cold-start list). A hint is advisory text — it names
+   the input the probe itself logged as its next experiment. */
+static const char *labb_hint_locked(NSString *domain) {
+    if ([domain isEqualToString:@"p109"] ||
+        [domain isEqualToString:@"ane"])
+        return "pid=1 (launchd) or the aned pid at structIn+0x8 (0x88 shape)";
+    if ([domain isEqualToString:@"p114"])
+        return "sel-8 input = the stable p159 pointer (not 0 / own-sid)";
+    if ([domain isEqualToString:@"p159"])
+        return "cross-feed the stable pointer into p114 sel-8 / p109 pid field";
+    if ([domain isEqualToString:@"cscali"] ||
+        [domain isEqualToString:@"lightsword"] ||
+        [domain isEqualToString:@"lscalib"])
+        return "untagged spray (drop the a11a marker); create sockets before other activity";
+    if ([domain isEqualToString:@"p149"])
+        return "capture panic PC + backtrace BEFORE force-quit; pair the p142 resolver";
+    if ([domain isEqualToString:@"p143"] ||
+        [domain isEqualToString:@"rocket"])
+        return "kind=4 + 4-byte structIn (v6 law); Documents/p143_resid.txt knob";
+    if ([domain isEqualToString:@"staleentry"] ||
+        [domain isEqualToString:@"iogpu"])
+        return "census sel-3 oracle is constant kr=0 on 0x750b — use the plant-new id only";
+    if ([domain isEqualToString:@"p156"])
+        return "blocked on kbase — needs a kernel-text pointer first";
+    return NULL;
+}
+
+int LabBanditRecommendInput(const char *domain, char *out, int cap) {
+    if (out && cap > 0) out[0] = '\0';
+    if (!domain || !*domain || !out || cap <= 0) return -1;
+
+    int retIdx = -1;
+    os_unfair_lock_lock(&g_labbLock);
+    NSMutableDictionary *doc = labb_load();
+    NSMutableDictionary *dom = labb_domain(doc, domain);
+    NSArray *order = labb_mut(dom[@"arm_order"], [NSMutableArray class],
+                              [NSMutableArray array]);
+    dom[@"arm_order"] = order;
+    NSMutableDictionary *arms = labb_mut(dom[@"arms"],
+                                         [NSMutableDictionary class],
+                                         [NSMutableDictionary dictionary]);
+    dom[@"arms"] = arms;
+
+    NSString *line = nil;
+    int n = (int)order.count;
+    if (n > LABB_MAX_ARMS) n = LABB_MAX_ARMS;
+
+    /* count scored, non-manual arms: 2+ = a real input choice to rank */
+    int scored = 0;
+    for (int i = 0; i < n; i++) {
+        if (labb_is_manual([(NSString *)order[i] UTF8String])) continue;
+        double nn = 0, rr = 0;
+        labb_arm_stats(arms, order[i], &nn, &rr);
+        if (nn > 0) scored++;
+    }
+
+    if (scored >= 2) {
+        /* deterministic UCB1 rank over the feature arms — reproducible per
+           the guide ("display Recommended input", never a dice roll) */
+        double bestU = -1e300; int bestI = -1;
+        double nTotal = 0;
+        double nArm[LABB_MAX_ARMS], mean[LABB_MAX_ARMS];
+        for (int i = 0; i < n; i++) {
+            labb_arm_stats(arms, order[i], &nArm[i], &mean[i]);
+            nTotal += nArm[i];
+        }
+        double N = nTotal > 1.0 ? nTotal : 2.0;
+        for (int i = 0; i < n; i++) {
+            if (labb_is_manual([(NSString *)order[i] UTF8String])) continue;
+            if (nArm[i] <= 0) continue;
+            double u = lumina_ucb1(mean[i], nArm[i], N);
+            if (u > bestU) { bestU = u; bestI = i; }
+        }
+        if (bestI >= 0) {
+            line = [NSString stringWithFormat:
+                @"recommend: %@ (UCB1 n=%.1f mean=%.3f)",
+                order[bestI], nArm[bestI], mean[bestI]];
+            retIdx = bestI;
+        }
+    }
+
+    if (!line) {
+        /* cold start: single/unknown arm — the domain's documented hint
+           (or the honest no-hint line). Single registered arm still
+           returns its index 0 (there is nothing else to run). */
+        NSString *dn = [NSString stringWithUTF8String:domain];
+        const char *h = labb_hint_locked(dn);
+        if (h) line = [NSString stringWithFormat:
+            @"recommend: %s (cold-start)", h];
+        else    line = @"recommend: main (cold-start — no documented hint yet)";
+        retIdx = n >= 1 ? 0 : -1;
+    }
+
+    dom[@"last_recommend"] = line;   /* fsync'd with the next save */
+    (void)labb_save_locked(doc);
+    os_unfair_lock_unlock(&g_labbLock);
+
+    int used = snprintf(out, (size_t)cap, "%s", line.UTF8String ?: "");
+    (void)used;
+    return retIdx;
+}
+
+void LabBanditRecordFeat(const char *domain, int armIndex,
+                         const char *outcome, const char *evidenceClass,
+                         const LabBanditFeat *fe, int featCount) {
+    if (!domain || !*domain || !outcome || !*outcome) return;
+    const char *arm = LabBanditArmName(domain, armIndex);
+    if (!arm || !*arm) return;
+    const char *cls = (evidenceClass && *evidenceClass)
+                    ? evidenceClass : LABB_E_DEVICE;
+    double w = labb_ev_weight(cls);
+
+    os_unfair_lock_lock(&g_labbLock);
+    NSMutableDictionary *doc = labb_load();
+    NSMutableDictionary *dom = labb_domain(doc, domain);
+    NSString *key1 = [NSString stringWithFormat:@"%@:%@", @(cls), @(outcome)];
+    NSMutableDictionary *arms = labb_mut(dom[@"arms"],
+                                         [NSMutableDictionary class],
+                                         [NSMutableDictionary dictionary]);
+    dom[@"arms"] = arms;
+    NSMutableDictionary *a = labb_mut(arms[@(arm)],
+                                      [NSMutableDictionary class],
+                                      [NSMutableDictionary dictionary]);
+    arms[@(arm)] = a;
+    double prev = [a[key1] isKindOfClass:[NSNumber class]]
+                ? [a[key1] doubleValue] : 0.0;
+    a[key1] = @(prev + w);              /* the honest fractional count */
+
+    /* the correlation stream: feature pairs on the history row + the
+       domain's last_feats mirror (bounded; verbatim values) */
+    NSMutableDictionary *row = [NSMutableDictionary dictionary];
+    row[@"t"]    = LabLocalMilitaryNow() ?: @"?";
+    row[@"arm"]  = @(arm);
+    row[@"outcome"] = key1;
+    row[@"cls"]  = @(cls);
+    if (fe && featCount > 0) {
+        NSMutableDictionary *lf = [NSMutableDictionary dictionary];
+        for (int i = 0; i < featCount && i < 16; i++) {
+            if (!fe[i].k || !fe[i].v) continue;
+            NSString *k = [NSString stringWithFormat:@"feat:%s", fe[i].k];
+            row[k] = [NSString stringWithUTF8String:fe[i].v] ?: @"?";
+            lf[[NSString stringWithUTF8String:fe[i].k] ?: @"?"] = row[k];
+        }
+        dom[@"last_feats"] = lf;
+    }
+    NSMutableArray *h = labb_mut(dom[@"history"], [NSMutableArray class],
+                                 [NSMutableArray array]);
+    dom[@"history"] = h;
+    [h addObject:row];
+    while (h.count > LABB_HIST_RING) [h removeObjectAtIndex:0];
+    (void)labb_save_locked(doc);
+    os_unfair_lock_unlock(&g_labbLock);
 }
