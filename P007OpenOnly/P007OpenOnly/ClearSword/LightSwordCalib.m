@@ -91,6 +91,16 @@ static uint32_t g_rcHoldCap = RC_HOLD_MAX; /* 12 EMFILE receipts: cap the groom 
 static int g_rc_log_fd;   /* forward decl: the spray thread's wall diagnostic
                              runs before the definition below */
 
+/* v14 knob-ID fix (2026-11-15): the catalog row's id is "cscalib" — the
+   in-app knob editor writes Documents/knob_cscalib.txt. The calib used to
+   read only "cscali", so UI-set knobs NEVER reached a tap (every install
+   ran the default v12+v12.2 plan and stalled at v12). Catalog id first,
+   legacy alias second. */
+static int rc_knob(char *out, int cap) {
+    if (LabKnobRead("cscalib", out, cap) == 1) return 1;
+    return LabKnobRead("cscali", out, cap);
+}
+
 /* ---- v13 RECLAIM machinery (purgeable state-1 feed) --------------------
    The staleentry census pattern, granular: Metal texture plant on the
    LOCK window's own bound surface → port-scan IOGPU conns →
@@ -456,7 +466,7 @@ static CFNumberRef RCNUM(int64_t v) {
     NSString *lp = [docs stringByAppendingPathComponent:@"racecalib_log.txt"];
     g_rc_log_fd = open([lp UTF8String], O_CREAT | O_TRUNC | O_WRONLY, 0644);
     rc_log("time %s", [[[NSDate date] description] UTF8String]);
-    rc_log("=== LightSword calib v11-wrongsample — SOCK_DGRAM socket spray ===");
+    rc_log("=== LightSword calib v14 — SOCK_DGRAM socket spray ===");
     {
         char mch[64] = "?", osv[32] = "?";
         size_t mlen = sizeof mch, olen = sizeof osv;
@@ -544,7 +554,7 @@ static CFNumberRef RCNUM(int64_t v) {
        with the spray tag; anything foreign lands as an honest FOREIGN. */
     {
         char knobv[32];
-        g_rcUntagged = (LabKnobRead("cscali", knobv, (int)sizeof knobv) == 1)
+        g_rcUntagged = (rc_knob(knobv, (int)sizeof knobv) == 1)
                        && (strncmp(knobv, "untagged", 8) == 0);
     }
     uint64_t m0 = g_rcUntagged ? hmarker : M0_TAG;
@@ -980,8 +990,9 @@ static CFNumberRef RCNUM(int64_t v) {
            knob "v14" runs ONLY the cs2-order spray-then-reread stage;
            unset/other runs both v12 stages */
         char knv[32];
+        knv[0] = 0;
         BOOL g_runWhole = YES, g_runMlock = YES, g_runV13 = NO, g_runV14 = NO;
-        if (LabKnobRead("cscali", knv, (int)sizeof knv) == 1) {
+        if (rc_knob(knv, (int)sizeof knv) == 1) {
             if (strncmp(knv, "v12.2", 5) == 0) g_runWhole = NO;
             else if (strncmp(knv, "v14", 3) == 0) {
                 g_runWhole = NO; g_runMlock = NO; g_runV14 = YES;
@@ -992,6 +1003,10 @@ static CFNumberRef RCNUM(int64_t v) {
             else if (strncmp(knv, "v12", 3) == 0) g_runMlock = NO;
             else if (strncmp(knv, "untagged", 8) == 0) { /* spray-mode knob, run both */ }
         }
+        /* receipt law: the knob that THIS tap saw, and the plan it chose */
+        rc_log("[calib] knob cscalib=%s plan=%s%s%s%s", knv[0] ? knv : "(unset)",
+               g_runWhole ? "v12 " : "", g_runMlock ? "v12.2 " : "",
+               g_runV13 ? "v13 " : "", g_runV14 ? "v14 " : "");
     /* ---- v12 RECLAIM: free our page, let the kernel reuse it, re-race
        the same stale index. FOREIGN content in the window = real kread.
        PANIC-POSSIBLE (UAF-class by construction); solo tap, one per
