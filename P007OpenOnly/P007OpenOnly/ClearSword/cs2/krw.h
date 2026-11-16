@@ -7,6 +7,7 @@
 #define CS2_EARLY_KRW_LENGTH 0x20  // 32
 
 uint64_t cs2_early_kread64(uint64_t where);
+int cs2_early_kread64_ok(uint64_t where, uint64_t *out);   /* 0 = success, -1 = no read */
 void cs2_early_kwrite64(uint64_t where, uint64_t what);
 
 int cs2_kreadbuf(uint64_t kaddr, void* output, size_t size);
