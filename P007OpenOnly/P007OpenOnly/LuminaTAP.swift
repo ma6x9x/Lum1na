@@ -147,6 +147,8 @@ enum LuminaTAP {
         case "p159":        result = P159IOSurfaceAdjacency.tap()
         case "p164":        result = P164McmCensus.tap()
         case "p166":        result = P166BrotliOOB.tap()
+        case "p167":        result = P167F1SliceWrap.tap()
+        case "p168":        result = P168Iosurface112477.tap()
         case "p162":        result = P162IOHIDReach.tap()
         case "p014ane", "p014b", "p015", "p017":
             result = "STOP \(id) intercepted — leftover. Use p017v2 for holder/install."
