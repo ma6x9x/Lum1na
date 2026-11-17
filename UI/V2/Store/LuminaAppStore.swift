@@ -26,7 +26,7 @@ final class LuminaAppStore {
 
     // MARK: Device / honesty
     var machine: String = DeviceUtils.currentDeviceIdentifier
-    var boardConfig: String = Self.readBoardConfig()
+    var boardConfig: String = ""
     var iosVersion: String = DeviceUtils.marketingVersion
     var build: String = DeviceUtils.osversion
     var skuTag: String = labOffsetTag()
@@ -59,7 +59,7 @@ final class LuminaAppStore {
     var shareText: String?
     var showShareSheet: Bool = false
 
-    let settings = LuminaV2Settings()
+    var settings = LuminaV2Settings()
 
     @ObservationIgnored private let manager = ExploitManager.shared
     @ObservationIgnored private var bag = Set<AnyCancellable>()
@@ -81,6 +81,7 @@ final class LuminaAppStore {
 
     init() {
         expandedGroups = [settings.defaultGroup, .taps]
+        boardConfig = LuminaAppStore.readBoardConfig()
         bind()
         refreshHonesty()
         honestyTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
@@ -153,7 +154,7 @@ final class LuminaAppStore {
         boardConfig = Self.readBoardConfig()
     }
 
-    private static func readBoardConfig() -> String {
+    static func readBoardConfig() -> String {
         var size = 0
         sysctlbyname("hw.model", nil, &size, nil, 0)
         guard size > 0 else { return "?" }

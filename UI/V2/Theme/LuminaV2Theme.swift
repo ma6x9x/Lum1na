@@ -122,7 +122,11 @@ private struct LuminaChromeGlassModifier: ViewModifier {
         } else {
             #if compiler(>=6.2)
             if #available(iOS 26.0, *) {
-                content.glassEffect(.regular.interactive(interactive), in: shape)
+                if interactive {
+                    content.glassEffect(.regular.interactive(), in: shape)
+                } else {
+                    content.glassEffect(.regular, in: shape)
+                }
             } else {
                 content
                     .background {
@@ -161,7 +165,11 @@ private struct LuminaCapsuleGlassModifier: ViewModifier {
         } else {
             #if compiler(>=6.2)
             if #available(iOS 26.0, *) {
-                content.glassEffect(.regular.interactive(interactive), in: Capsule(style: .continuous))
+                if interactive {
+                    content.glassEffect(.regular.interactive(), in: Capsule(style: .continuous))
+                } else {
+                    content.glassEffect(.regular, in: Capsule(style: .continuous))
+                }
             } else {
                 content
                     .background {
