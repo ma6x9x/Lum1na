@@ -110,11 +110,12 @@ final class LuminaV2Settings {
         liveStream = d.object(forKey: Keys.liveStream) as? Bool ?? true
         let buf = d.object(forKey: Keys.bufferSize) as? Int ?? 10_000
         bufferSize = max(500, min(buf, 50_000))
-        showMilliseconds = d.object(forKey: Keys.showMilliseconds) as? Bool ?? true
+        let showMs = d.object(forKey: Keys.showMilliseconds) as? Bool ?? true
+        showMilliseconds = showMs
         if let raw = d.string(forKey: Keys.timestampMode), let m = TimestampMode(rawValue: raw) {
             timestampMode = m
         } else {
-            timestampMode = showMilliseconds ? .milliseconds : .seconds
+            timestampMode = showMs ? .milliseconds : .seconds
         }
         if let raw = d.string(forKey: Keys.defaultLogLevel), let m = ConsoleDefaultLevel(rawValue: raw) {
             defaultLogLevel = m
