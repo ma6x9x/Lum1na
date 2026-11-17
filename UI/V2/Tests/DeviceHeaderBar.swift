@@ -19,6 +19,15 @@ struct DeviceHeaderBar: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
 
+            Text(store.skuTag)
+                .font(.caption.weight(.semibold).monospaced())
+                .foregroundStyle(LuminaV2Theme.accent)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(Capsule().fill(LuminaV2Theme.accent.opacity(0.14)))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+
             Text("iOS \(store.iosVersion)")
                 .font(.caption)
                 .foregroundStyle(.secondary)

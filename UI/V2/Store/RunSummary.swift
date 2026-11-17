@@ -1,6 +1,6 @@
 //
 //  RunSummary.swift
-//  Lum1na — pinned chip after a test finishes.
+//  Lum1na — pinned chip + reopen snapshot.
 //
 
 import Foundation
@@ -49,5 +49,9 @@ struct RunSummary: Identifiable, Equatable {
         self.duration = duration
         self.finishedAt = finishedAt
         self.lineSnapshot = lineSnapshot
+    }
+
+    var snapshotText: String {
+        lineSnapshot.map(\.formatted).joined(separator: "\n")
     }
 }

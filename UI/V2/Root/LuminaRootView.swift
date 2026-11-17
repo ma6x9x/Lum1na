@@ -1,6 +1,6 @@
 //
 //  LuminaRootView.swift
-//  Lum1na — v2 4-tab shell root.
+//  Lum1na — v2 4-tab shell root with floating glass pill tab bar.
 //
 
 import SwiftUI
@@ -10,33 +10,84 @@ struct LuminaRootView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        TabView(selection: $store.selectedTab) {
-            TestsTabView()
-                .tabItem { Label("Tests", systemImage: "list.bullet.rectangle") }
-                .tag(LuminaAppStore.LuminaTab.tests)
+        @Bindable var store = store
+        ZStack {
+            LuminaV2CircuitCanvas()
 
-            ChainsTabView()
-                .tabItem { Label("Chains", systemImage: "link") }
-                .tag(LuminaAppStore.LuminaTab.chains)
+            VStack(spacing: 0) {
+                Group {
+                    switch store.selectedTab {
+                    case .tests:
+                        TestsTabView()
+                    case .chains:
+                        ChainsTabView()
+                    case .console:
+                        ConsoleTabView()
+                    case .tools:
+                        ToolsTabView()
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            ConsoleTabView()
-                .tabItem { Label("Console", systemImage: "chevron.left.forwardslash.chevron.right") }
-                .tag(LuminaAppStore.LuminaTab.console)
+                LuminaFloatingTabBar(selection: $store.selectedTab)
+            }
 
-            ToolsTabView()
-                .tabItem { Label("Tools", systemImage: "wrench.and.screwdriver") }
-                .tag(LuminaAppStore.LuminaTab.tools)
+            // Pinned summary chip — root overlay above tab bar, every tab.
+            VStack {
+                Spacer()
+                if let summary = store.pinnedSummary, !store.showResultsSheet {
+                    PinnedSummaryChip(summary: summary) {
+                        store.reopenPinnedSummary()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, LuminaV2Theme.tabBarHeight + LuminaV2Theme.tabBarBottomInset + 8)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .animation(LuminaV2Theme.spring(reduceMotion: reduceMotion), value: store.pinnedSummary?.id)
+            .animation(LuminaV2Theme.spring(reduceMotion: reduceMotion), value: store.showResultsSheet)
+
+            // Floating results card over dimmed content (no system nav chrome).
+            if store.showResultsSheet {
+                TestResultsSheet()
+                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                    .zIndex(20)
+            }
+
+            // Toast
+            VStack {
+                Spacer()
+                if let toast = store.toastMessage {
+                    Text(toast)
+                        .font(.footnote.weight(.semibold))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .luminaCapsuleGlass()
+                        .padding(.bottom, LuminaV2Theme.tabBarHeight + LuminaV2Theme.tabBarBottomInset + 56)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .onAppear {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
+                                withAnimation(LuminaV2Theme.spring(reduceMotion: reduceMotion)) {
+                                    store.toastMessage = nil
+                                }
+                            }
+                        }
+                }
+            }
         }
         .environment(store)
         .tint(LuminaV2Theme.accent)
         .preferredColorScheme(.dark)
-        .sheet(isPresented: $store.showSettings) {
-            SettingsSheetV2()
-                .environment(store)
-        }
-        .sheet(isPresented: $store.showResultsSheet) {
-            TestResultsSheet()
-                .environment(store)
+        .animation(LuminaV2Theme.spring(reduceMotion: reduceMotion), value: store.showResultsSheet)
+        .animation(LuminaV2Theme.spring(reduceMotion: reduceMotion), value: store.toastMessage)
+        .alert(
+            "Run \(store.pendingConfirmEntry?.id ?? "test")?",
+            isPresented: $store.showRunConfirm
+        ) {
+            Button("Run", role: .none) { store.confirmPendingRun() }
+            Button("Cancel", role: .cancel) { store.cancelPendingRun() }
+        } message: {
+            Text(store.pendingConfirmEntry.map { CatalogMetadata.meta(for: $0).displayName } ?? "Confirm before run is on.")
         }
         .sheet(isPresented: $store.showHourLogs) {
             HourLogGallery()
@@ -44,25 +95,9 @@ struct LuminaRootView: View {
         .fullScreenCover(isPresented: $store.showTerminal) {
             MainTerminalPane()
         }
-        .overlay(alignment: .bottom) {
-            if let toast = store.toastMessage {
-                Text(toast)
-                    .font(.footnote.weight(.semibold))
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .background(.ultraThinMaterial, in: Capsule())
-                    .padding(.bottom, 72)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .onAppear {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.4) {
-                            withAnimation(LuminaV2Theme.spring(reduceMotion: reduceMotion)) {
-                                store.toastMessage = nil
-                            }
-                        }
-                    }
-            }
+        .sheet(isPresented: $store.showShareSheet) {
+            SharePayloadSheet(text: store.shareText ?? "")
         }
-        .animation(LuminaV2Theme.spring(reduceMotion: reduceMotion), value: store.toastMessage)
     }
 }
 

@@ -10,20 +10,21 @@ struct TestsTabView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var knobEntryId: String?
     @State private var knobEntryName = ""
-    @State private var knubText = ""
+    @State private var knobText = ""
     @State private var showKnobAlert = false
 
     var body: some View {
         @Bindable var store = store
         NavigationStack {
-            ZStack(alignment: .bottom) {
-                LuminaV2Theme.canvas.ignoresSafeArea()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    Text("Tests")
+                        .font(.largeTitle.bold())
+                        .padding(.top, 8)
 
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        DeviceHeaderBar()
-                            .padding(.top, 4)
+                    DeviceHeaderBar()
 
+                    HStack(spacing: 10) {
                         HStack(spacing: 10) {
                             Image(systemName: "magnifyingglass")
                                 .foregroundStyle(.secondary)
@@ -31,44 +32,40 @@ struct TestsTabView: View {
                                 .textInputAutocapitalization(.never)
                                 .autocorrectionDisabled()
                         }
-                        .padding(12)
-                        .background(Color.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 12)
+                        .frame(minHeight: 44)
+                        .luminaCapsuleGlass(interactive: true)
 
-                        ForEach(store.groupedCatalog(matching: store.searchText), id: \.0) { group, entries in
-                            groupCard(group, entries: entries)
+                        Button {
+                            store.showSettings = true
+                        } label: {
+                            Image(systemName: "gearshape")
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(.primary)
+                                .frame(width: 44, height: 44)
                         }
+                        .buttonStyle(.plain)
+                        .luminaCapsuleGlass(interactive: true)
+                        .accessibilityLabel("Settings")
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, store.pinnedSummary == nil || store.showResultsSheet ? 24 : 100)
-                }
 
-                if let summary = store.pinnedSummary, !store.showResultsSheet {
-                    PinnedSummaryChip(summary: summary) {
-                        store.activeRunId = summary.catalogId
-                        store.activeRunName = summary.displayName
-                        store.showResultsSheet = true
+                    ForEach(store.groupedCatalog(matching: store.searchText), id: \.0) { group, entries in
+                        groupCard(group, entries: entries)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 8)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
+                .padding(.horizontal, 16)
+                .padding(.bottom, LuminaV2Theme.chipClearance + LuminaV2Theme.tabBarHeight)
             }
-            .navigationTitle("Tests")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        store.showSettings = true
-                    } label: {
-                        Image(systemName: "gearshape")
-                            .frame(width: 44, height: 44)
-                    }
-                    .accessibilityLabel("Settings")
-                }
+            .toolbar(store.showSettings ? .visible : .hidden, for: .navigationBar)
+            .navigationDestination(isPresented: $store.showSettings) {
+                SettingsSheetV2()
+                    .environment(store)
             }
             .alert("Knob — \(knobEntryName)", isPresented: $showKnobAlert) {
-                TextField("e.g. pid / resid / untagged", text: $knubText)
+                TextField("e.g. pid / resid / untagged", text: $knobText)
                 Button("Save") {
-                    if let id = knobEntryId { store.writeKnob(id: id, value: knubText) }
+                    if let id = knobEntryId { store.writeKnob(id: id, value: knobText) }
                 }
                 Button("Clear", role: .destructive) {
                     if let id = knobEntryId { store.writeKnob(id: id, value: "") }
@@ -82,7 +79,7 @@ struct TestsTabView: View {
                       let entry = store.catalogEntries.first(where: { $0.id == id }) else { return }
                 knobEntryId = id
                 knobEntryName = entry.name
-                knubText = store.knobValue(id)
+                knobText = store.knobValue(id)
                 showKnobAlert = true
             }
         }
@@ -112,6 +109,7 @@ struct TestsTabView: View {
                         .foregroundStyle(.secondary)
                 }
                 .padding(16)
+                .frame(minHeight: 44)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)

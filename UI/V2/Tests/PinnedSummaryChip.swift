@@ -25,7 +25,7 @@ struct PinnedSummaryChip: View {
                 Image(systemName: summary.status.symbol)
                     .font(.title3)
                     .foregroundStyle(statusColor)
-                    .symbolEffect(.bounce, value: summary.id)
+                    .modifier(BounceIfAllowed(value: summary.id, reduceMotion: reduceMotion))
                     .frame(width: 28)
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -47,9 +47,23 @@ struct PinnedSummaryChip: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 12)
-            .luminaChromeGlass(cornerRadius: 18)
+            .frame(minHeight: 44)
+            .luminaChromeGlass(cornerRadius: 18, interactive: true)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Pinned summary \(summary.catalogId) \(summary.status.rawValue), \(String(format: "%.2f seconds", summary.duration)). Double tap to expand.")
+    }
+}
+
+private struct BounceIfAllowed: ViewModifier {
+    let value: UUID
+    let reduceMotion: Bool
+
+    func body(content: Content) -> some View {
+        if reduceMotion {
+            content
+        } else {
+            content.symbolEffect(.bounce, value: value)
+        }
     }
 }

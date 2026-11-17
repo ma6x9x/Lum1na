@@ -1,18 +1,10 @@
-# Lum1na v2 UI shell
+# Lum1na v2 shell
 
-From-scratch SwiftUI chrome for the existing debugger app. Approved mockups live outside the repo (`lum1na-mockups/v2`).
+4-tab UI chrome on `redesign/lum1na-v2`:
 
-## Tabs
-- **Tests** — searchable grouped catalog (Probes / Taps / Chains / Kernel reads / Parked)
-- **Chains** — real sequencers only (`FULL CHAIN`, `KERNEL`, `pathtest`, `krw`, `lightsword`, `swordchain`, `p044chain`)
-- **Console** — CRT-first live `ExploitManager.lines`
-- **Tools** — wired utilities only (export, hour logs, peek, SKU, board JSON, recovery, terminal)
+- **Tests** — grouped catalog + honesty badges + glass search/gear; Settings pushed from Tests
+- **Chains** — live STEP/[chain] rung receipts, hold-to-reorder steps, violet Run pill
+- **Console** — CRT-only structured stream (time / level / process[pid] / subsystem / message)
+- **Tools** — wired utilities only; Export session shares
 
-## Hard rules
-- Does **not** rewrite `Exploit/*.m/.h` attack bodies
-- Views talk to `LuminaAppStore` → `ExploitManager` / board / LabLearn façades
-- Dummy UI remains in-tree but is no longer the entry chrome
-- AI model download is stubbed in Settings (follow-up)
-
-## Entry
-`App/ContentView.swift` → `LuminaRootView`
+Pinned summary chip lives on the **root** overlay (every tab). Results are an inset floating glass card. Exploit/*.m/.h untouched.

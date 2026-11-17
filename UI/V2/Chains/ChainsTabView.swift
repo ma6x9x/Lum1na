@@ -1,18 +1,19 @@
 //
 //  ChainsTabView.swift
-//  Lum1na — real sequencers only (no invented probe names).
+//  Lum1na — live STEP/[chain] rung receipts + hold-to-reorder steps.
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
-struct ChainDefinition: Identifiable {
+struct ChainDefinition: Identifiable, Equatable {
     let id: String
     let title: String
     let subtitle: String
-    let steps: [String]
+    var steps: [String]
     let run: RunKind
 
-    enum RunKind {
+    enum RunKind: Equatable {
         case stage(String)
         case catalog(String)
         case fullChain
@@ -20,7 +21,7 @@ struct ChainDefinition: Identifiable {
 }
 
 enum LuminaChainCatalog {
-    static let all: [ChainDefinition] = [
+    static let seed: [ChainDefinition] = [
         ChainDefinition(
             id: "full",
             title: "Full Chain",
@@ -76,38 +77,39 @@ enum LuminaChainCatalog {
 struct ChainsTabView: View {
     @Environment(LuminaAppStore.self) private var store
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var chains: [ChainDefinition] = LuminaChainCatalog.seed
+    @State private var draggingStep: String?
+    @State private var draggingChainId: String?
 
     var body: some View {
-        NavigationStack {
-            ZStack {
-                LuminaV2Theme.canvas.ignoresSafeArea()
-                ScrollView {
-                    VStack(spacing: 16) {
-                        ForEach(LuminaChainCatalog.all) { chain in
-                            chainCard(chain)
-                        }
-                    }
-                    .padding(16)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Chains")
+                    .font(.largeTitle.bold())
+                    .padding(.top, 8)
+
+                ForEach(Array(chains.enumerated()), id: \.element.id) { index, chain in
+                    chainCard(chain, index: index)
                 }
             }
-            .navigationTitle("Chains")
+            .padding(16)
+            .padding(.bottom, LuminaV2Theme.chipClearance + LuminaV2Theme.tabBarHeight)
         }
     }
 
-    private func chainCard(_ chain: ChainDefinition) -> some View {
-        let active = store.isRunning && (store.activeRunId == chain.id
-            || store.activeRunId == chain.title
-            || (chain.run.isCatalogId.map { store.activeRunId == $0 } ?? false)
-            || (chain.id == "full" && store.fullChainActive))
+    private func chainCard(_ chain: ChainDefinition, index: Int) -> some View {
+        let active = isActive(chain)
+        let states = store.rungStates(for: chain.steps, chainId: chain.id, active: active)
+        let progressLabel = store.rungProgressLabel(states: states)
 
         return VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(chain.title)
                         .font(.headline)
-                    Text(statusLine(for: chain, active: active))
+                    Text(statusLine(for: chain, active: active, progress: progressLabel, states: states))
                         .font(.caption.monospaced())
-                        .foregroundStyle(active ? LuminaV2Theme.accent : .secondary)
+                        .foregroundStyle(active ? LuminaV2Theme.accent : statusColor(states: states, active: active))
                 }
                 Spacer()
                 Button {
@@ -115,41 +117,85 @@ struct ChainsTabView: View {
                 } label: {
                     Label("Run chain", systemImage: "play.fill")
                         .font(.subheadline.weight(.semibold))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .frame(minHeight: 44)
+                        .background(Capsule(style: .continuous).fill(LuminaV2Theme.accent))
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(LuminaV2Theme.accent)
+                .buttonStyle(.plain)
                 .disabled(store.isRunning)
+                .opacity(store.isRunning ? 0.5 : 1)
                 .accessibilityLabel("Run \(chain.title)")
             }
 
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(chain.steps.enumerated()), id: \.offset) { idx, step in
-                    HStack(alignment: .top, spacing: 12) {
+                    let state = idx < states.count ? states[idx] : .pending
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: "line.3.horizontal")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 18, height: 44)
+                            .contentShape(Rectangle())
+                            .onLongPressGesture(minimumDuration: 0.25) {
+                                draggingStep = step
+                                draggingChainId = chain.id
+                            }
+
                         VStack(spacing: 0) {
-                            rungIcon(for: chain, index: idx, active: active)
+                            Image(systemName: state.symbol)
+                                .foregroundStyle(state.color)
+                                .font(.body)
                             if idx < chain.steps.count - 1 {
                                 Rectangle()
-                                    .fill(rungColor(for: chain, index: idx, active: active).opacity(0.5))
+                                    .fill(state.color.opacity(0.45))
                                     .frame(width: 2, height: 22)
                             }
                         }
                         .frame(width: 24)
+
                         Text(step)
                             .font(.subheadline.monospaced())
                             .foregroundStyle(.primary)
+                            .frame(minHeight: 44, alignment: .leading)
                         Spacer()
-                        Text(rungLabel(for: chain, index: idx, active: active))
+                        Text(state.label)
                             .font(.caption.weight(.semibold))
-                            .foregroundStyle(rungColor(for: chain, index: idx, active: active))
+                            .foregroundStyle(state.color)
                     }
-                    .padding(.vertical, 4)
+                    .padding(.vertical, 2)
+                    .opacity(draggingStep == step && draggingChainId == chain.id ? 0.55 : 1)
+                    .onDrop(of: [UTType.text], delegate: StepDropDelegate(
+                        chainId: chain.id,
+                        targetStep: step,
+                        chains: $chains,
+                        draggingStep: $draggingStep,
+                        draggingChainId: $draggingChainId
+                    ))
+                    .onDrag {
+                        draggingStep = step
+                        draggingChainId = chain.id
+                        return NSItemProvider(object: step as NSString)
+                    }
                 }
             }
+
+            Text("Hold a step to change the order")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
         }
         .padding(16)
         .luminaCard()
+    }
+
+    private func isActive(_ chain: ChainDefinition) -> Bool {
+        guard store.isRunning else { return false }
+        if store.activeRunId == chain.id || store.activeRunId == chain.title { return true }
+        if case .catalog(let id) = chain.run, store.activeRunId == id { return true }
+        if case .stage(let s) = chain.run, store.activeRunId == s { return true }
+        if chain.id == "full" && (store.fullChainActive || store.activeRunId == "FULL CHAIN") { return true }
+        return false
     }
 
     private func run(_ chain: ChainDefinition) {
@@ -164,51 +210,77 @@ struct ChainsTabView: View {
         }
     }
 
-    private func statusLine(for chain: ChainDefinition, active: Bool) -> String {
-        if active { return "running…" }
-        if let pinned = store.pinnedSummary, pinned.catalogId == chain.id || pinned.displayName == chain.title {
-            return String(format: "last · %@ · %.2fs", pinned.status.rawValue, pinned.duration)
+    private func statusLine(
+        for chain: ChainDefinition,
+        active: Bool,
+        progress: String,
+        states: [LuminaAppStore.RungUIState]
+    ) -> String {
+        if active { return "running… · \(progress)" }
+        if let pinned = store.pinnedSummary, matchesPinned(chain, pinned) {
+            return String(format: "last · %@ · %.2fs · %@", pinned.status.rawValue, pinned.duration, progress)
+        }
+        if states.contains(where: { $0 != .pending }) {
+            return "last · \(progress)"
         }
         return "last · not run yet"
     }
 
-    private func rungIcon(for chain: ChainDefinition, index: Int, active: Bool) -> some View {
-        let color = rungColor(for: chain, index: index, active: active)
-        let name: String
-        if active && index == 0 { name = "circle.fill" }
-        else if !active && store.pinnedSummary?.status == .ok && matchesPinned(chain) { name = "checkmark.circle.fill" }
-        else { name = "circle" }
-        return Image(systemName: name)
-            .foregroundStyle(color)
-            .font(.body)
+    private func statusColor(states: [LuminaAppStore.RungUIState], active: Bool) -> Color {
+        if active { return LuminaV2Theme.accent }
+        if states.contains(.gated) { return LuminaV2Theme.amber }
+        if states.contains(.failed) { return LuminaV2Theme.danger }
+        if !states.isEmpty && states.allSatisfy({ $0 == .ok }) { return LuminaV2Theme.ok }
+        return .secondary
     }
 
-    private func rungLabel(for chain: ChainDefinition, index: Int, active: Bool) -> String {
-        if active && index == 0 { return "running…" }
-        if matchesPinned(chain), store.pinnedSummary?.status == .ok { return "ok" }
-        if matchesPinned(chain), store.pinnedSummary?.status == .gated { return "ARM-GATED" }
-        return "pending"
-    }
-
-    private func rungColor(for chain: ChainDefinition, index: Int, active: Bool) -> Color {
-        if active && index == 0 { return LuminaV2Theme.accent }
-        if matchesPinned(chain), store.pinnedSummary?.status == .ok { return LuminaV2Theme.ok }
-        if matchesPinned(chain), store.pinnedSummary?.status == .gated { return LuminaV2Theme.amber }
-        return LuminaV2Theme.pending
-    }
-
-    private func matchesPinned(_ chain: ChainDefinition) -> Bool {
-        guard let p = store.pinnedSummary else { return false }
+    private func matchesPinned(_ chain: ChainDefinition, _ p: RunSummary) -> Bool {
         if p.catalogId == chain.id { return true }
         if case .catalog(let id) = chain.run, p.catalogId == id { return true }
+        if case .stage(let s) = chain.run, p.catalogId == s { return true }
         if chain.id == "full", p.catalogId == "FULL CHAIN" { return true }
         return false
     }
 }
 
-private extension ChainDefinition.RunKind {
-    var isCatalogId: String? {
-        if case .catalog(let id) = self { return id }
-        return nil
+private struct StepDropDelegate: DropDelegate {
+    let chainId: String
+    let targetStep: String
+    @Binding var chains: [ChainDefinition]
+    @Binding var draggingStep: String?
+    @Binding var draggingChainId: String?
+
+    func performDrop(info: DropInfo) -> Bool {
+        defer {
+            draggingStep = nil
+            draggingChainId = nil
+        }
+        guard draggingChainId == chainId,
+              let from = draggingStep,
+              let cIdx = chains.firstIndex(where: { $0.id == chainId }),
+              let fromIdx = chains[cIdx].steps.firstIndex(of: from),
+              let toIdx = chains[cIdx].steps.firstIndex(of: targetStep),
+              fromIdx != toIdx
+        else { return false }
+        var steps = chains[cIdx].steps
+        steps.move(fromOffsets: IndexSet(integer: fromIdx), toOffset: toIdx > fromIdx ? toIdx + 1 : toIdx)
+        chains[cIdx].steps = steps
+        return true
+    }
+
+    func dropEntered(info: DropInfo) {
+        guard draggingChainId == chainId,
+              let from = draggingStep,
+              let cIdx = chains.firstIndex(where: { $0.id == chainId }),
+              let fromIdx = chains[cIdx].steps.firstIndex(of: from),
+              let toIdx = chains[cIdx].steps.firstIndex(of: targetStep),
+              fromIdx != toIdx
+        else { return }
+        withAnimation(LuminaV2Theme.spring) {
+            var steps = chains[cIdx].steps
+            steps.move(fromOffsets: IndexSet(integer: fromIdx), toOffset: toIdx > fromIdx ? toIdx + 1 : toIdx)
+            chains[cIdx].steps = steps
+            draggingStep = targetStep
+        }
     }
 }

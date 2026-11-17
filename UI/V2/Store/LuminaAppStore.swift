@@ -37,10 +37,12 @@ final class LuminaAppStore {
 
     // MARK: UI session
     var searchText: String = ""
-    var expandedGroups: Set<TestGroup> = [.probes, .taps]
+    var expandedGroups: Set<TestGroup> = []
     var activeRunId: String?
     var activeRunName: String?
     var showResultsSheet: Bool = false
+    /// When set, results overlay shows this snapshot instead of the live buffer.
+    var viewingSummary: RunSummary? = nil
     var pinnedSummary: RunSummary?
     var expandPinned: Bool = false
     var showSettings: Bool = false
@@ -52,12 +54,17 @@ final class LuminaAppStore {
     var selectedTab: LuminaTab = .tests
     var runStartedAt: Date?
     var toastMessage: String?
+    var showRunConfirm: Bool = false
+    var pendingConfirmEntry: ExploitCatalogEntry?
+    var shareText: String?
+    var showShareSheet: Bool = false
 
     let settings = LuminaV2Settings()
 
     @ObservationIgnored private let manager = ExploitManager.shared
     @ObservationIgnored private var bag = Set<AnyCancellable>()
     @ObservationIgnored private var honestyTimer: Timer?
+    @ObservationIgnored private var collapseWorkItem: DispatchWorkItem?
 
     enum LuminaTab: Hashable {
         case tests, chains, console, tools
@@ -65,18 +72,30 @@ final class LuminaAppStore {
 
     enum ConsoleLevelFilter: String, CaseIterable, Identifiable {
         case all = "All levels"
-        case info = "info"
-        case warn = "warn"
+        case lum1na = "lum1na"
+        case kernel = "kernel"
+        case subsystem = "subsystem"
         case error = "Error+"
         var id: String { rawValue }
     }
 
     init() {
+        expandedGroups = [settings.defaultGroup, .taps]
         bind()
         refreshHonesty()
         honestyTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.refreshHonesty() }
         }
+        // Apply default console level preference as initial chip when Error-focused.
+        if settings.defaultLogLevel == .error {
+            consoleLevelFilter = .error
+        }
+    }
+
+    deinit {
+        honestyTimer?.invalidate()
+        honestyTimer = nil
+        collapseWorkItem?.cancel()
     }
 
     private func bind() {
@@ -85,7 +104,8 @@ final class LuminaAppStore {
             .sink { [weak self] value in
                 guard let self, !self.consolePaused || self.isRunning else { return }
                 if !self.consolePaused {
-                    self.lines = value
+                    let limit = max(self.settings.bufferSize, 500)
+                    self.lines = value.count > limit ? Array(value.suffix(limit)) : value
                 }
             }
             .store(in: &bag)
@@ -109,7 +129,6 @@ final class LuminaAppStore {
         manager.$lastRecoverySummary.receive(on: RunLoop.main).sink { [weak self] in self?.lastRecoverySummary = $0 }.store(in: &bag)
         manager.$lastRecoveryTranscript.receive(on: RunLoop.main).sink { [weak self] in self?.lastRecoveryTranscript = $0 }.store(in: &bag)
 
-        // Seed
         lines = manager.lines
         isRunning = manager.isRunning
         progress = manager.progress
@@ -152,20 +171,43 @@ final class LuminaAppStore {
 
     func badges(for entry: ExploitCatalogEntry) -> [(HonestyBadgeKind, Bool)] {
         let meta = CatalogMetadata.meta(for: entry)
-        var out: [(HonestyBadgeKind, Bool)] = [
-            (.reach, true), // catalog entry is wired = reachable in UI sense
-            (.window, meta.staticBadges.contains(.window) || entry.description.lowercased().contains("window")),
-            (.conversion, conversionConfirmed),
-            (.hasKread, hasKread),
-            (.after, hasKread && (entry.id == "afterkread" || entry.id == "krw")),
-        ]
-        if meta.staticBadges.contains(.armGated) || entry.description.lowercased().contains("hold until") {
-            out.append((.armGated, true))
+        let kinds = meta.staticBadges.isEmpty
+            ? [HonestyBadgeKind.reach, .window, .conversion]
+            : Array(meta.staticBadges.prefix(4))
+        return kinds.map { kind in (kind, isBadgeMet(kind, entry: entry, meta: meta)) }
+    }
+
+    private func isBadgeMet(_ kind: HonestyBadgeKind, entry: ExploitCatalogEntry, meta: CatalogUIMeta) -> Bool {
+        switch kind {
+        case .reach:
+            // Catalog entry is wired into the visible catalog.
+            return true
+        case .window:
+            // Met when last result for this id mentions window=open / window hit, or timing probe last ok.
+            if let pinned = pinnedSummary, pinned.catalogId == entry.id {
+                let blob = pinned.lineSnapshot.map(\.message).joined(separator: "\n").lowercased()
+                if blob.contains("window=open") || blob.contains("window open") { return true }
+                if pinned.status == .ok && (entry.id.contains("timing") || blob.contains("window")) { return true }
+            }
+            return false
+        case .conversion:
+            return conversionConfirmed
+        case .hasKread:
+            return hasKread || magicConfirmed
+        case .after:
+            // Met only after a real hasKread/magic honesty flip (never session-global guess alone).
+            guard hasKread || magicConfirmed else { return false }
+            return entry.id == "afterkread"
+                || entry.id.hasPrefix("krw")
+                || meta.staticBadges.contains(.after)
+                || (pinnedSummary?.catalogId == entry.id && pinnedSummary?.status == .ok)
+        case .armGated:
+            // Gate badge is informational when present; "met" means currently locked/gated.
+            if hasKread { return false }
+            return true
+        case .closed:
+            return true
         }
-        if meta.staticBadges.contains(.closed) {
-            out.append((.closed, true))
-        }
-        return out
     }
 
     func groupedCatalog(matching query: String) -> [(TestGroup, [ExploitCatalogEntry])] {
@@ -190,9 +232,23 @@ final class LuminaAppStore {
 
     func requestRun(_ entry: ExploitCatalogEntry) {
         if settings.confirmBeforeRun && !isRunning {
-            // Present results sheet immediately; confirmation is lightweight (sheet = commit).
+            pendingConfirmEntry = entry
+            showRunConfirm = true
+            return
         }
         startRun(entry)
+    }
+
+    func confirmPendingRun() {
+        guard let entry = pendingConfirmEntry else { return }
+        pendingConfirmEntry = nil
+        showRunConfirm = false
+        startRun(entry)
+    }
+
+    func cancelPendingRun() {
+        pendingConfirmEntry = nil
+        showRunConfirm = false
     }
 
     func startRun(_ entry: ExploitCatalogEntry) {
@@ -200,9 +256,11 @@ final class LuminaAppStore {
             toastMessage = "Already running"
             return
         }
+        collapseWorkItem?.cancel()
         activeRunId = entry.id
         activeRunName = CatalogMetadata.meta(for: entry).displayName
         runStartedAt = Date()
+        viewingSummary = nil
         showResultsSheet = true
         expandPinned = false
         Task { await manager.executeExploit(entry) }
@@ -213,9 +271,11 @@ final class LuminaAppStore {
             toastMessage = "Already running"
             return
         }
+        collapseWorkItem?.cancel()
         activeRunId = stage
         activeRunName = displayName
         runStartedAt = Date()
+        viewingSummary = nil
         showResultsSheet = true
         Task { await manager.executeStage(stage) }
     }
@@ -229,14 +289,32 @@ final class LuminaAppStore {
             toastMessage = "Unknown catalog id \(id)"
             return
         }
+        if settings.confirmBeforeRun && !isRunning {
+            pendingConfirmEntry = entry
+            showRunConfirm = true
+            return
+        }
         startRun(entry)
+    }
+
+    func reopenPinnedSummary() {
+        guard let summary = pinnedSummary else { return }
+        viewingSummary = summary
+        activeRunId = summary.catalogId
+        activeRunName = summary.displayName
+        showResultsSheet = true
+    }
+
+    func dismissResultsToChip() {
+        showResultsSheet = false
+        viewingSummary = nil
     }
 
     private func finishActiveRun() {
         guard let id = activeRunId else { return }
         let name = activeRunName ?? id
         let duration = Date().timeIntervalSince(runStartedAt ?? Date())
-        let snap = Array(lines.suffix(80))
+        let snap = Array(lines.suffix(max(80, min(settings.bufferSize, 400))))
         let status = deriveStatus(from: snap, result: lastResult)
         let keys = deriveKeyValues(from: snap)
         let summary = RunSummary(
@@ -249,9 +327,20 @@ final class LuminaAppStore {
         )
         if settings.pinLastSummary {
             pinnedSummary = summary
+            viewingSummary = summary
         }
-        // Keep sheet open briefly; user can dismiss. Collapse to chip when sheet dismissed.
         refreshHonesty()
+
+        // Short settle, then collapse sheet → pinned chip (visible on every tab).
+        collapseWorkItem?.cancel()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            withAnimation(LuminaV2Theme.spring) {
+                self.showResultsSheet = false
+            }
+        }
+        collapseWorkItem = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.85, execute: work)
     }
 
     private func deriveStatus(from lines: [ConsoleLine], result: ExploitResult) -> RunSummary.Status {
@@ -296,8 +385,163 @@ final class LuminaAppStore {
         return Array(keys.prefix(3))
     }
 
+    // MARK: Chain rung receipts
+
+    enum RungUIState: Equatable {
+        case pending
+        case running
+        case ok
+        case failed
+        case gated
+
+        var label: String {
+            switch self {
+            case .pending: return "pending"
+            case .running: return "running…"
+            case .ok: return "ok"
+            case .failed: return "failed"
+            case .gated: return "ARM-GATED"
+            }
+        }
+
+        var color: Color {
+            switch self {
+            case .pending: return LuminaV2Theme.pending
+            case .running: return LuminaV2Theme.accent
+            case .ok: return LuminaV2Theme.ok
+            case .failed: return LuminaV2Theme.danger
+            case .gated: return LuminaV2Theme.amber
+            }
+        }
+
+        var symbol: String {
+            switch self {
+            case .pending: return "circle"
+            case .running: return "circle.fill"
+            case .ok: return "checkmark.circle.fill"
+            case .failed: return "xmark.circle.fill"
+            case .gated: return "lock.fill"
+            }
+        }
+    }
+
+    func rungStates(for steps: [String], chainId: String, active: Bool) -> [RungUIState] {
+        let blob = lines.map(\.message).joined(separator: "\n")
+        let lower = blob.lowercased()
+        var states = Array(repeating: RungUIState.pending, count: steps.count)
+
+        func stepHit(_ step: String) -> Bool {
+            let s = step.lowercased()
+            if lower.contains("stage: \(s)") { return true }
+            if lower.contains("[chain] \(s)") { return true }
+            if lower.contains("step ") && lower.contains(s) { return true }
+            if lower.contains(s) && (lower.contains(" ok") || lower.contains("[+]") || lower.contains("done")) {
+                return true
+            }
+            return lower.contains(s)
+        }
+
+        func stepGated(_ step: String) -> Bool {
+            let s = step.lowercased()
+            return lower.contains(s) && (
+                lower.contains("arm-gated") || lower.contains("hold") || lower.contains("refuses")
+            )
+        }
+
+        func stepFailed(_ step: String) -> Bool {
+            let s = step.lowercased()
+            return lower.contains(s) && (lower.contains("[-]") || lower.contains("failed") || lower.contains("panic"))
+        }
+
+        // Progress-based fallback for FULL CHAIN / KERNEL sequencers.
+        let progressIndex: Int? = {
+            guard active, steps.count > 1 else { return nil }
+            let p = progress
+            if p <= 0 { return 0 }
+            let idx = min(steps.count - 1, max(0, Int(p * Double(steps.count))))
+            return idx
+        }()
+
+        var lastTouched = -1
+        for (i, step) in steps.enumerated() {
+            if stepGated(step) {
+                states[i] = .gated
+                lastTouched = i
+            } else if stepFailed(step) {
+                states[i] = .failed
+                lastTouched = i
+                if settings.stopOnFailure {
+                    // leave rest pending
+                    break
+                }
+            } else if stepHit(step) {
+                states[i] = .ok
+                lastTouched = i
+            }
+        }
+
+        if active {
+            let runningIdx = progressIndex ?? max(lastTouched, 0)
+            if runningIdx < states.count {
+                if states[runningIdx] == .pending || states[runningIdx] == .ok {
+                    states[runningIdx] = .running
+                }
+                for j in 0..<runningIdx {
+                    if states[j] == .pending { states[j] = .ok }
+                }
+            }
+        } else if let pinned = pinnedSummary, matchesChain(pinned, chainId: chainId) {
+            switch pinned.status {
+            case .ok:
+                states = states.map { $0 == .pending ? .ok : $0 }
+                // If nothing was parsed, paint all ok.
+                if states.allSatisfy({ $0 == .pending || $0 == .ok }) {
+                    states = Array(repeating: .ok, count: steps.count)
+                }
+            case .gated:
+                if let idx = states.lastIndex(where: { $0 != .pending }) {
+                    states[idx] = .gated
+                } else if !states.isEmpty {
+                    let mid = min(steps.count - 1, max(0, steps.count / 2))
+                    for j in 0..<mid { states[j] = .ok }
+                    states[mid] = .gated
+                }
+            case .failed:
+                if let idx = states.lastIndex(where: { $0 != .pending }) {
+                    states[idx] = .failed
+                } else if !states.isEmpty {
+                    states[0] = .failed
+                }
+            case .cancelled:
+                break
+            }
+        }
+
+        return states
+    }
+
+    func rungProgressLabel(states: [RungUIState]) -> String {
+        let done = states.filter { $0 == .ok || $0 == .gated || $0 == .failed }.count
+        return "\(done) of \(states.count)"
+    }
+
+    private func matchesChain(_ pinned: RunSummary, chainId: String) -> Bool {
+        if pinned.catalogId == chainId { return true }
+        if chainId == "full", pinned.catalogId == "FULL CHAIN" || pinned.displayName.lowercased().contains("full chain") {
+            return true
+        }
+        if chainId == "kernel", pinned.catalogId == "KERNEL" || pinned.displayName.lowercased().contains("kernel") {
+            return true
+        }
+        return pinned.catalogId == chainId
+    }
+
+    // MARK: Console helpers
+
     func syncLinesFromManager() {
-        lines = manager.lines
+        let limit = max(settings.bufferSize, 500)
+        let value = manager.lines
+        lines = value.count > limit ? Array(value.suffix(limit)) : value
     }
 
     func peekUITree() {
@@ -317,10 +561,29 @@ final class LuminaAppStore {
         manager.exportFullDebugLog()
     }
 
+    func resultsCopyText() -> String {
+        if let snap = viewingSummary ?? (showResultsSheet && !isRunning ? pinnedSummary : nil) {
+            return snap.snapshotText
+        }
+        if isRunning, let id = activeRunId {
+            // Live run — prefer lines since run start; fall back to recent buffer.
+            return lines.map(\.formatted).joined(separator: "\n")
+                + "\n/* activeRun=\(id) */\n"
+        }
+        return viewingSummary?.snapshotText ?? ""
+    }
+
+    func share(_ text: String) {
+        shareText = text
+        showShareSheet = true
+    }
+
     func resetSession() {
         manager.reset()
         pinnedSummary = nil
+        viewingSummary = nil
         activeRunId = nil
+        showResultsSheet = false
         refreshHonesty()
     }
 
@@ -349,4 +612,6 @@ final class LuminaAppStore {
         if hasKread { return LuminaV2Theme.ok }
         return LuminaV2Theme.ok
     }
+
+    var appPid: Int32 { ProcessInfo.processInfo.processIdentifier }
 }

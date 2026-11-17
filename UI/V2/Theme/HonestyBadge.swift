@@ -61,7 +61,7 @@ struct HonestyBadgeView: View {
     private var fill: Color {
         switch kind {
         case .armGated:
-            return LuminaV2Theme.amber.opacity(met || true ? 0.22 : 0.12)
+            return LuminaV2Theme.amber.opacity(met ? 0.28 : 0.16)
         case .closed:
             return LuminaV2Theme.danger.opacity(0.22)
         default:
@@ -88,9 +88,9 @@ struct HonestyBadgeView: View {
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: kind.symbol)
-                .font(.system(size: compact ? 9 : 10, weight: .semibold))
+                .font(.caption2.weight(.semibold))
             Text(kind.label)
-                .font(.system(size: compact ? 10 : 11, weight: .semibold, design: .rounded))
+                .font(compact ? .caption2.weight(.semibold) : .caption.weight(.semibold))
         }
         .foregroundStyle(foreground)
         .padding(.horizontal, compact ? 7 : 8)
@@ -101,7 +101,10 @@ struct HonestyBadgeView: View {
         )
         .overlay(
             Capsule(style: .continuous)
-                .strokeBorder(stroke.opacity(met || kind == .armGated || kind == .closed ? 0.9 : 0.45), lineWidth: 1)
+                .strokeBorder(
+                    stroke.opacity(met || kind == .armGated || kind == .closed ? 0.9 : 0.45),
+                    lineWidth: 1
+                )
         )
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(kind.accessibilityLabel + (met ? ", met" : ", not met"))
@@ -113,37 +116,76 @@ struct HonestyBadgeRow: View {
     var compact: Bool = false
 
     var body: some View {
-        FlowHonestyBadges(badges: badges, compact: compact)
-    }
-}
-
-/// Simple wrapping HStack without third-party deps.
-private struct FlowHonestyBadges: View {
-    let badges: [(HonestyBadgeKind, Bool)]
-    var compact: Bool
-
-    var body: some View {
         FlexibleBadgeWrap(badges: badges, compact: compact)
     }
 }
 
+/// Real wrapping layout (not two fixed HStacks).
 private struct FlexibleBadgeWrap: View {
     let badges: [(HonestyBadgeKind, Bool)]
     var compact: Bool
 
     var body: some View {
-        // Two-line wrap approximation: primary honesty first, gates last.
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 4) {
-                ForEach(badges.filter { $0.0 != .armGated && $0.0 != .closed }, id: \.0) { item in
-                    HonestyBadgeView(kind: item.0, met: item.1, compact: compact)
-                }
-            }
-            HStack(spacing: 4) {
-                ForEach(badges.filter { $0.0 == .armGated || $0.0 == .closed }, id: \.0) { item in
-                    HonestyBadgeView(kind: item.0, met: item.1, compact: compact)
-                }
+        BadgeFlowLayout(spacing: 4) {
+            ForEach(badges, id: \.0) { item in
+                HonestyBadgeView(kind: item.0, met: item.1, compact: compact)
             }
         }
+    }
+}
+
+private struct BadgeFlowLayout: Layout {
+    var spacing: CGFloat = 4
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let rows = computeRows(proposal: proposal, subviews: subviews)
+        let width = proposal.width ?? rows.map(\.width).max() ?? 0
+        let height = rows.reduce(0) { $0 + $1.height } + CGFloat(max(rows.count - 1, 0)) * spacing
+        return CGSize(width: width, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let rows = computeRows(proposal: ProposedViewSize(width: bounds.width, height: bounds.height), subviews: subviews)
+        var y = bounds.minY
+        var index = 0
+        for row in rows {
+            var x = bounds.minX
+            for _ in 0..<row.count {
+                let size = subviews[index].sizeThatFits(.unspecified)
+                subviews[index].place(
+                    at: CGPoint(x: x, y: y),
+                    proposal: ProposedViewSize(size)
+                )
+                x += size.width + spacing
+                index += 1
+            }
+            y += row.height + spacing
+        }
+    }
+
+    private struct Row {
+        var count: Int
+        var width: CGFloat
+        var height: CGFloat
+    }
+
+    private func computeRows(proposal: ProposedViewSize, subviews: Subviews) -> [Row] {
+        let maxWidth = proposal.width ?? .infinity
+        var rows: [Row] = []
+        var current = Row(count: 0, width: 0, height: 0)
+        for sub in subviews {
+            let size = sub.sizeThatFits(.unspecified)
+            let nextWidth = current.count == 0 ? size.width : current.width + spacing + size.width
+            if current.count > 0, nextWidth > maxWidth {
+                rows.append(current)
+                current = Row(count: 1, width: size.width, height: size.height)
+            } else {
+                current.count += 1
+                current.width = nextWidth
+                current.height = max(current.height, size.height)
+            }
+        }
+        if current.count > 0 { rows.append(current) }
+        return rows
     }
 }
