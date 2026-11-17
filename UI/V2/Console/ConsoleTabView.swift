@@ -29,7 +29,7 @@ struct StructuredConsoleLine: Identifiable {
 }
 
 enum StructuredConsole {
-    static func map(_ line: ConsoleLine, pid: Int32, settings: LuminaV2Settings) -> StructuredConsoleLine {
+    static func map(_ line: ConsoleLine, pid: Int32, timestampMode: TimestampMode, showMilliseconds: Bool) -> StructuredConsoleLine {
         let msg = line.message.trimmingCharacters(in: .whitespacesAndNewlines)
         let lower = msg.lowercased()
 
@@ -71,13 +71,13 @@ enum StructuredConsole {
         }()
 
         let time: String = {
-            switch settings.timestampMode {
+            switch timestampMode {
             case .off:
                 return ""
             case .seconds, .milliseconds:
                 let f = DateFormatter()
                 f.locale = Locale(identifier: "en_US_POSIX")
-                f.dateFormat = (settings.timestampMode == .milliseconds || settings.showMilliseconds)
+                f.dateFormat = (timestampMode == .milliseconds || showMilliseconds)
                     ? "HH:mm:ss.SSS" : "HH:mm:ss"
                 return f.string(from: line.timestamp)
             }
@@ -111,7 +111,7 @@ struct ConsoleTabView: View {
     private var crt: Color { store.settings.crtTint.color }
 
     private var structured: [StructuredConsoleLine] {
-        store.lines.map { StructuredConsole.map($0, pid: store.appPid, settings: store.settings) }
+        store.lines.map { StructuredConsole.map($0, pid: store.appPid, timestampMode: store.settings.timestampMode, showMilliseconds: store.settings.showMilliseconds) }
     }
 
     private var filtered: [StructuredConsoleLine] {
