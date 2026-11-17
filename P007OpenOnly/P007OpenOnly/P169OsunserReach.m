@@ -31,6 +31,8 @@
 #import <CoreFoundation/CoreFoundation.h>
 #import <mach/mach.h>
 #import <dlfcn.h>
+#import <fcntl.h>
+#import <unistd.h>
 #import <stdlib.h>
 #import <string.h>
 
@@ -103,6 +105,17 @@ static void p169_fillRequest(uint8_t *req, size_t rlen, uint64_t serializedPtr,
     /* serialized-properties pointer at +0x30, length +0x38 */
     memcpy(req + 0x30, &serializedPtr, sizeof(serializedPtr));
     memcpy(req + 0x38, &serializedLen, sizeof(serializedLen));
+}
+
+static void p169_disk_log(NSString *out) {
+    NSString *docs = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
+    int fd = open([docs stringByAppendingPathComponent:@"p169_osunser_log.txt"].fileSystemRepresentation,
+                  O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    if (fd >= 0) {
+        const char *c = out.UTF8String;
+        if (c) { write(fd, c, strlen(c)); fcntl(fd, F_FULLFSYNC); }
+        close(fd);
+    }
 }
 
 @implementation P169OsunserReach
@@ -194,6 +207,7 @@ static void p169_fillRequest(uint8_t *req, size_t rlen, uint64_t serializedPtr,
         if (svc && rel) rel(svc);
     }
     [o appendString:@"=== p169 done (one tap per force-quit) ===\n"];
+    p169_disk_log(o);
     return o;
 }
 

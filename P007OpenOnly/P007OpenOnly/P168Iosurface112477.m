@@ -28,6 +28,8 @@
 #import <CoreFoundation/CoreFoundation.h>
 #import <mach/mach.h>
 #import <dlfcn.h>
+#import <fcntl.h>
+#import <unistd.h>
 
 typedef mach_port_t       io_obj_t;
 
@@ -64,6 +66,17 @@ static BOOL p168_dangleArmed(void) {
                       firstObject];
     return [[NSFileManager defaultManager] fileExistsAtPath:
             [docs stringByAppendingPathComponent:@"p168_dangle_arm.txt"]];
+}
+
+static void p168_disk_log(NSString *out) {
+    NSString *docs = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
+    int fd = open([docs stringByAppendingPathComponent:@"p168_iosurf112477_log.txt"].fileSystemRepresentation,
+                  O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    if (fd >= 0) {
+        const char *c = out.UTF8String;
+        if (c) { write(fd, c, strlen(c)); fcntl(fd, F_FULLFSYNC); }
+        close(fd);
+    }
 }
 
 @implementation P168Iosurface112477
@@ -193,6 +206,7 @@ static BOOL p168_dangleArmed(void) {
     if (s1 && !armed) CFRelease(s1);
     if (sClose) sClose(conn);
     [o appendString:@"=== p168 done (one tap per boot) ===\n"];
+    p168_disk_log(o);
     return o;
 }
 

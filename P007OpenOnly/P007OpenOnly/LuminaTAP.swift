@@ -150,6 +150,7 @@ enum LuminaTAP {
         case "p167":        result = P167F1SliceWrap.tap()
         case "p168":        result = P168Iosurface112477.tap()
         case "p169":        result = P169OsunserReach.tap()
+        case "p170":        result = P170T8150Composite.tap()
         case "p162":        result = P162IOHIDReach.tap()
         case "p014ane", "p014b", "p015", "p017":
             result = "STOP \(id) intercepted — leftover. Use p017v2 for holder/install."
