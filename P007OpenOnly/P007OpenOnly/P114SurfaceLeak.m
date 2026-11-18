@@ -416,9 +416,20 @@ static void p114_hexdump(size_t maxn) {
             if (c && in64 == 0)
                 Lf(@"[cap %d/%d] GetID FAILED on the benign surface — zero in "
                    @"(honest)", c + 1, P114_CAPTURES);
+                        /* v6 law (contract hunt 2026-11-17): sel-8 = {u64 userVA}, NO out
+               struct — xnu externalMethod rejects >4096-byte out structs with
+               kIOReturnIPCError 0x2bf before the kext ever runs tonight's
+               64KB-zero artifact). The kernel writes the activity dump INTO
+               g_p114_out through an MD over the user VA: header +0x20, 0x7c
+               stride, rec+0x18 = the unauthenticated first-event qword. */
             size_t outLen = sizeof(g_p114_out);
             IOReturn kr = g_p114_callStruct(g_p114_conn, P114_SEL, &in64,
-                                            P114_IN_BYTES, g_p114_out, &outLen);
+                                            P114_IN_BYTES, NULL, NULL);
+            const size_t capBytes = 0x200ull * P114_REC_STRIDE + 0x20;
+            if (capBytes > sizeof(g_p114_out))
+                Lf(@"[v6] probe buffer too small for cap path (%zu < %zu)",
+                   sizeof(g_p114_out), capBytes);
+            outLen = capBytes;   /* the dump lives in OUR mem */
             Lf(@"[cap %d/%d] sel=8 in={%016llx} %d B ({u64} law) kr=0x%08x outLen=%zu",
                c + 1, P114_CAPTURES, (unsigned long long)in64,
                (int)P114_IN_BYTES, kr, outLen);
