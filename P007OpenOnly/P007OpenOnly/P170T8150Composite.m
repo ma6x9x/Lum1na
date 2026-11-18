@@ -114,6 +114,19 @@ static void p170_sighandler(int sig, siginfo_t *si, void *uctx) {
     @catch (NSException *e) { p170_line([NSString stringWithFormat:@"[-] P159 exception %@", e.name]); }
     p170_line(@"[2b done]");
 
+    /* 2c. P027 LAW APPLIED: the doors stay open (P114's M2Scaler conn + its
+       queue + p159's surface pairs persist in THIS process), so P110's
+       in-process pairing can consume the earlier records directly. Arm the
+       leakgate ON when and only when P114's verdict was green — the arm
+       preset is P110's own (4 = leakgate-on); no race body is modified. */
+    BOOL p114Green = [g_p170_out rangeOfString:@"captures ok=0" options:NSBackwardsSearch].location == NSNotFound;
+    p170_line([NSString stringWithFormat:
+        @"\n[2c P027 LAW] doors-open check: P114 verdict green=%@"
+        " — arming P110 leakgate-on preset 4 (same-process pairing leg)",
+        p114Green ? @"YES" : @"NO (held — the pairing arm stays off, honest)"]);
+    if (p114Green)
+        [P110SurfaceSwapClaim forceLeakgateArm];   /* P027 delayed-teardown law */
+
     /* 3. CLAIM (the 112477 swap-claim race; v2 pairs the leak itself) */
     p170_line(@"\n[3 CLAIM] P110SurfaceSwapClaim —");
     @try { p170_line([P110SurfaceSwapClaim tap]); }
