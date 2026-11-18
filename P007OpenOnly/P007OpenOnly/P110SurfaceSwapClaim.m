@@ -77,6 +77,7 @@
 //
 
 #import "P110SurfaceSwapClaim.h"
+#import <ucontext.h>
 #import "LabDeviceProfile.h"
 #import "LabIntelOffsets.h"
 #import "LabLocalTime.h"
@@ -359,6 +360,18 @@ static void p110_sigfault(int sig, siginfo_t *si, void *ctx) {
         "Re-tap law: one tap per force-quit. ===\n";
     if (fd >= 0) {
         (void)write(fd, msg1, sizeof(msg1) - 1);
+        /* far/pc capture (logging-only; the p170 .ips loses Mach codes) */
+        ucontext_t *uc = (ucontext_t *)ctx;
+        uint64_t pc = 0;
+#if defined(__arm64__) || defined(__aarch64__)
+        if (uc) pc = uc->uc_mcontext->__ss.__pc;
+#endif
+        uint64_t farv = si ? (uint64_t)si->si_addr : 0;
+        char b[160];
+        int n = snprintf(b, sizeof(b),
+            "[r in-flight] far=0x%016llx pc=0x%016llx (family-B capture, sig=%d)\n",
+            (unsigned long long)farv, (unsigned long long)pc, sig);
+        if (n > 0) (void)write(fd, b, (size_t)n);
         (void)write(fd, msg2, sizeof(msg2) - 1);
     }
     (void)signal(sig, SIG_DFL);

