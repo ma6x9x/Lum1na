@@ -123,6 +123,7 @@
 #import "Exploit/P170T8150Composite.h"
 #import "Exploit/P171StaleArrivalOracle.h"
 #import "Exploit/P172M2ContractSweep.h"
+#import "Exploit/P173KamuiEscape.h"
 
 #import "Exploit/P113DescForgeControl.h"
 #import "Exploit/P122SwordForge.h"
