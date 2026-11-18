@@ -3023,10 +3023,10 @@ static void *watch_worker(void *arg) {
              off->tag ? off->tag : "?", p044_req_in(), recs];
         } else if (off && off->ane_table_size && off->ane_table_size != 0x820u) {
             uint32_t cap = LabAneInBoundsRecords(off);
-            [out appendFormat:@"EXPECT-BAD %s ane_table_size=0x%x rec_off=0x%x in-bounds=%u (T8150 0x10b8, not A14 0x820). Probe still fires.\n",
+            [out appendFormat:@"EXPECT-BAD %s ane_table_size=0x%x rec_off=0x%x in-bounds=%u (T8150 MapAlloc, not A14 0x820). Probe still fires.\n",
              off->tag ? off->tag : "?", off->ane_table_size, off->ane_record_off, cap];
-            [out appendFormat:@"  T8150 geometry: records at +0x90, trailer +0x1080, 255 in-bounds. N+1=%u => OOB=%u. 254-in is in-bounds. Do not remaining-fire 256+ this TAP.\n",
-             recs, recs > cap ? recs - cap : 0u];
+            [out appendFormat:@"  T8150 geometry: records at +0x%x, table_size=0x%x, in-bounds=%u. N+1=%u => OOB=%u. Do not remaining-fire past in-bounds this TAP.\n",
+             off->ane_record_off, off->ane_table_size, cap, recs, recs > cap ? recs - cap : 0u];
         } else if (!off) {
             [out appendString:@"EXPECT-BAD LabOff NULL (iPhone18,1/18,3 unknown). Probe still fires.\n"];
         }
@@ -3400,8 +3400,10 @@ static void *watch_worker(void *arg) {
         uint32_t spill = (nRec > cap) ? (nRec - cap) : 0u;
         [out appendFormat:@">>> ids[] = OUR staged sids, inputs 0..%u + 1 output -> %u records vs capacity %u; OOB records=%u <<<\n",
             nIn ? nIn - 1u : 0u, nRec, cap, spill];
-        if (capOff && capOff->ane_table_size == 0x10b8u) {
-            [out appendString:@">>> T8150 CheckandPrewire: records at +0x90, trailer +0x1080, 255 in-bounds, alloc 0x10b8. 254-in is in-bounds. <<<\n"];
+        if (capOff && capOff->ane_table_size && capOff->ane_table_size != 0x820u) {
+            [out appendFormat:@">>> T8150 CheckandPrewire: records at +0x%x, alloc 0x%x, in-bounds=%u (LabOff %s). <<<\n",
+             capOff->ane_record_off, capOff->ane_table_size, cap,
+             capOff->tag ? capOff->tag : "?"];
         } else {
             [out appendString:@">>> CheckandPrewire: capacity 192, NO bound check, 16B stride INLINE in kalloc.3072 <<<\n"];
         }

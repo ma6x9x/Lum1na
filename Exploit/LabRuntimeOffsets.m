@@ -8,6 +8,7 @@
 #import "A14_23F77_LabOffsets.h"
 #import "A12X_23G71_LabOffsets.h"
 #import "T8150_24A435_LabOffsets.h"
+#import "T8150_24B156_LabOffsets.h"
 #import "LabRuntimeOffsets.h"
 #import "LabDeviceProfile.h"
 
@@ -350,7 +351,36 @@ static LabOffTab gT8150_24A435 = {
     .build_string = "24A435"
 };
 
-/* iPhone18,2 sibling 24A* — static_base only. ANE VAs stay 0. */
+/* T8150 iPhone18,2 24B156 — 17 Pro Max iOS 27.2.1. PROVEN pins from
+   laboff-hunt-24B156-pass4/5 + kernproc pass6. static_base same T8150 map.
+   ANE table 0x10b0 / records at +0xa0 / 255 LAYOUT_SEALED. IOGPU queue_leak
+   +0x520 and SysMemory MD +0x90 filled. kernproc PROVEN. allproc UNDERIVED. */
+static LabOffTab gT8150_24B156 = {
+    .tag = "T8150_24B156",
+    .static_base = T8150_24B156_STATIC_BASE,
+    .sysmem_md = T8150_24B156_IOGPU_SYSMEM_MD,
+    .queue_create_sel = T8150_24B156_IOGPU_QUEUECREATE_SEL,
+    .submit_sel = T8150_24B156_IOGPU_SUBMIT_SEL,
+    .queue_leak = T8150_24B156_IOGPU_QUEUE_LEAK,
+    .ane_checkandprewire = T8150_24B156_ANE_CHECKANDPREWIRE,
+    .ane_memorymap = T8150_24B156_ANE_MAPREQUEST,
+    .ane_memorymap_locked = T8150_24B156_ANE_MAPLOCKED,
+    .ane_alloc_type_desc = T8150_24B156_ANE_MAPALLOC,
+    .ane_table_size = T8150_24B156_ANE_ALLOC_SIZE,
+    .ane_table_entries = T8150_24B156_ANE_TABLE_ENTRIES,
+    .ane_record_off = T8150_24B156_ANE_RECORD_OFF,
+    .ane_fill_cap = 0,
+    .res_size = 0x4000,
+    .socket_usecount = 0x23c,               /* same darwin>=25.0 law as 24A435 row */
+    .amfi_sel_copy = 0,
+    .amfi_sel_manifest = 0,
+    .pmap_cs_allow_off = 0,
+    .owns_replaceable = 0,
+    .build_number = BUILD_24B156,
+    .build_string = "24B156"
+};
+
+/* iPhone18,2 sibling 24A*/24B* — static_base only. ANE VAs stay 0. */
 static LabOffTab gT8150_other = {
     .tag = "T8150_other",
     .static_base = T8150_24A435_STATIC_BASE,
@@ -359,7 +389,7 @@ static LabOffTab gT8150_other = {
     .pmap_cs_allow_off = 0,
     .owns_replaceable = 0,
     .build_number = "24A",
-    .build_string = "24A*"
+    .build_string = "24A*/24B*"
 };
 
 // MARK: - Runtime Slide Storage
@@ -395,6 +425,8 @@ const LabOffTab *LabOffForSku(LabSku sku) {
             return &gA13_19F77;
         case LabSkuT8150_24A435:
             return &gT8150_24A435;
+        case LabSkuT8150_24B156:
+            return &gT8150_24B156;
         case LabSkuT8150_other:
             return &gT8150_other;
         case LabSkuA13_other:
@@ -439,7 +471,9 @@ uint32_t LabAneInBoundsRecords(const LabOffTab *off) {
     if (off->ane_table_size == 0x820u)
         return off->ane_next_chunk_index ? off->ane_next_chunk_index : 192u;
     if (off->ane_table_size == 0x10b8u && off->ane_record_off == 0x90u)
-        return off->ane_table_entries ? off->ane_table_entries : 255u;
+        return off->ane_table_entries ? off->ane_table_entries : 255u; /* 24A435 */
+    if (off->ane_table_size == 0x10b0u && off->ane_record_off == 0xa0u)
+        return off->ane_table_entries ? off->ane_table_entries : 255u; /* 24B156 */
     return off->ane_table_entries;
 }
 

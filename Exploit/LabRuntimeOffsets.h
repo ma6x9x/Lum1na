@@ -23,7 +23,8 @@ typedef enum {
     LabSkuA13_19F77,     /* iPhone12,5 + 19F77 (15.5) — usbliter8 tethered rig (stock 15.5) */
     LabSkuA13_other,     /* iPhone12,* but not 18.x/19F77 */
     LabSkuT8150_24A435,  /* iPhone18,2 + 24A435 — 17 Pro Max iOS 27.0 */
-    LabSkuT8150_other,   /* iPhone18,2 + other 24A* — static_base only */
+    LabSkuT8150_24B156,  /* iPhone18,2 + 24B156 — 17 Pro Max iOS 27.2.1 */
+    LabSkuT8150_other,   /* iPhone18,2 + other 24A*/24B* — static_base only */
     LabSkuA12X_23H30     /* iPad8,* + 23H30 — iPadOS 26.7.1 FIELD# only; no 23G71 VA paste */
 } LabSku;
 
@@ -40,6 +41,7 @@ static inline int LabSkuIsA12X(LabSku sku) {
 #define BUILD_21D50    "21D50"
 #define BUILD_22H311   "22H311"
 #define BUILD_24A435   "24A435"
+#define BUILD_24B156   "24B156"
 #define BUILD_23H30    "23H30"
 
 // MARK: - Offset Table Structure
@@ -103,11 +105,11 @@ typedef struct {
     uint64_t ane_memorymap;
     uint64_t ane_memorymap_locked; /* T8150 MapLocked; 0 on T8101/T8020 until pinned */
     uint64_t ane_alloc_type_desc;
-    uint32_t ane_table_size;       /* 0x820 A14; 0x10b8 T8150 MapAlloc */
+    uint32_t ane_table_size;       /* 0x820 A14; 0x10b8 24A435; 0x10b0 24B156 */
     uint32_t ane_table_entries;
     uint32_t ane_trigger_inputs;
     uint32_t ane_next_chunk_index;
-    uint32_t ane_record_off;       /* T8150 records at object+0x90; 0 on A14 table+0 */
+    uint32_t ane_record_off;       /* T8150 table base: +0x90 24A435; +0xa0 24B156; 0 on A14 */
     uint32_t ane_fill_cap; /* 0 on 23F77 CheckandPrewire; 1 on 23G71 */
     
     // Build info - USE const char * NOT NSString *

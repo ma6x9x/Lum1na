@@ -45,6 +45,7 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
         case LabSkuA14_21D50:  return "A14_21D50";
         case LabSkuA14_other:  return "A14_other";
         case LabSkuT8150_24A435: return "T8150_24A435";
+        case LabSkuT8150_24B156: return "T8150_24B156";
         case LabSkuT8150_other:  return "T8150_other";
         default:               return "Unknown";
     }
@@ -76,6 +77,7 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
         case LabSkuA13_19F77:  return @"A13_19F77";
         case LabSkuA13_other: return @"A13_other";
         case LabSkuT8150_24A435: return @"T8150_24A435";
+        case LabSkuT8150_24B156: return @"T8150_24B156";
         case LabSkuT8150_other: return @"T8150_other";
         default: return @"Unknown";
     }
@@ -91,7 +93,8 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
     BOOL a13 = [m hasPrefix:@"iPhone12,"];
     BOOL i182 = [m isEqualToString:@"iPhone18,2"];
     if (i182 && [v isEqualToString:@"24A435"]) return LabSkuT8150_24A435;
-    if (i182 && [v hasPrefix:@"24A"]) return LabSkuT8150_other;
+    if (i182 && [v isEqualToString:@"24B156"]) return LabSkuT8150_24B156;
+    if (i182 && ([v hasPrefix:@"24A"] || [v hasPrefix:@"24B"])) return LabSkuT8150_other;
     if (a14 && [v isEqualToString:@"23F77"]) return LabSkuA14_23F77;
     if (a14 && [v hasPrefix:@"21D"]) return LabSkuA14_21D50; /* 17.3.x — 12 mini */
     if (a14) return LabSkuA14_other;
@@ -128,7 +131,8 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
         case LabSkuA13_19F77:     return @"iPhone12,5 A13 / 19F77 — usbliter8 tethered rig (15.5 stock)";
         case LabSkuA13_other:  return @"iPhone12,* A13 / not 18.x";
         case LabSkuT8150_24A435: return @"iPhone18,2 T8150 / 24A435 — 17 Pro Max iOS 27.0";
-        case LabSkuT8150_other:  return @"iPhone18,2 T8150 / 24A* sibling — static_base only";
+        case LabSkuT8150_24B156: return @"iPhone18,2 T8150 / 24B156 — 17 Pro Max iOS 27.2.1";
+        case LabSkuT8150_other:  return @"iPhone18,2 T8150 / 24A*/24B* sibling — static_base only";
         default:               return @"unknown";
     }
 }
@@ -331,8 +335,12 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
             [s appendString:@"  SKIPS T8101 0x820/254, CS2 hop-1, LightSword (IOGPU pins 0). SPTM.\n"];
             [s appendString:@"  TAP pathtest for the scorecard. Probe app fires every TAP. iPhone18,1/18,3 unknown.\n"];
             break;
+        case LabSkuT8150_24B156:
+            [s appendString:@"T8150 24B156 iPhone18,2 17 Pro Max iOS 27.2.1. static_base=0xfffffe0007004000. ANE table 0x10b0 record+0xa0. queue_leak+0x520 sysmem_md+0x90.\n"];
+            [s appendString:@"  Do not paste 24A435 VAs. kernproc PROVEN 0xFFFFFE0007F08FA8; allproc UNDERIVED. hasKread still NO.\n"];
+            break;
         case LabSkuT8150_other:
-            [s appendString:@"T8150_other iPhone18,2 24A* sibling. static_base only. Public Lum1na SKIPS T8101 geometry.\n"];
+            [s appendString:@"T8150_other iPhone18,2 24A*/24B* sibling. static_base only. Public Lum1na SKIPS T8101 geometry.\n"];
             break;
         default:
             [s appendString:@"Unknown SKU: Ident first. Public Lum1na STOPs kernel remaining-fire. Use Lum1na-Debug to probe.\n"];
@@ -409,6 +417,12 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
             break;
         case LabSkuT8150_24A435:
             [out appendString:@"TRACK: iPhone18,2 T8150 24A435 (17 Pro Max). KERNEL pair = P139 harvest + P114 sel-8 serializer + kread32. Home KERNEL pad / PATHS button. Isolated: p110 leak-on, p143 RocketDoor. Catalog p097 lock/unlock solo. Never paste T8101/T8027 VAs.\n"];
+            break;
+        case LabSkuT8150_24B156:
+            [out appendString:@"TRACK: iPhone18,2 T8150 24B156 (17 Pro Max iOS 27.2.1). LabOff PROVEN: ANE 0x10b0/+0xa0, queue_leak+0x520, sysmem_md+0x90, P152 sel4/5, kernproc 0xFFFFFE0007F08FA8. allproc UNDERIVED — hasKread still NO. Never paste 24A435 VAs.\n"];
+            break;
+        case LabSkuT8150_other:
+            [out appendString:@"TRACK: iPhone18,2 T8150 sibling 24A*/24B* — static_base only until re-derived.\n"];
             break;
         default:
             [out appendString:@"TRACK: unknown — paste Ident before panic tests.\n"];

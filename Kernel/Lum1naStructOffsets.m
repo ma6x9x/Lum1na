@@ -12,6 +12,7 @@
 
 #import "Lum1naStructOffsets.h"
 #import "../Exploit/LabRuntimeOffsets.h"
+#import "../Exploit/T8150_24B156_LabOffsets.h"
 #include <string.h>
 
 #define PROC_ROW(TAG, KERNPROC) { \
@@ -137,6 +138,9 @@ static const LabProcOffTab gProcOffTabs[] = {
        once libkrw kread is live on device, the backward le_prev walk from
        kernproc doubles as confirmation. */
     PROC_ROW_D23("A14_21D50", 0),
+    /* T8150 iPhone18,2 24B156 (iOS 27.2.1, darwin 25.x): D25 ladder;
+       kernproc PROVEN 0xFFFFFE0007F08FA8. allproc still UNDERIVED. */
+    PROC_ROW_D25("T8150_24B156", T8150_24B156_KERNPROC),
 };
 
 const LabProcOffTab *LabProcOff(void) {
