@@ -108,7 +108,7 @@ struct ChainsTabView: View {
                     Text(chain.title)
                         .font(.headline)
                     Text(statusLine(for: chain, active: active, progress: progressLabel, states: states))
-                        .font(.caption.monospaced())
+                        .font(.caption.monospacedDigit())
                         .foregroundStyle(active ? LuminaV2Theme.accent : statusColor(states: states, active: active))
                 }
                 Spacer()
@@ -123,7 +123,8 @@ struct ChainsTabView: View {
                         .frame(minHeight: 44)
                         .background(Capsule(style: .continuous).fill(LuminaV2Theme.accent))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableScaleButtonStyle(reduceMotion: reduceMotion, pressedScale: 0.96))
+                .sensoryFeedback(.impact(flexibility: .solid), trigger: store.activeRunId == chain.id)
                 .disabled(store.isRunning)
                 .opacity(store.isRunning ? 0.5 : 1)
                 .accessibilityLabel("Run \(chain.title)")
@@ -171,7 +172,8 @@ struct ChainsTabView: View {
                         targetStep: step,
                         chains: $chains,
                         draggingStep: $draggingStep,
-                        draggingChainId: $draggingChainId
+                        draggingChainId: $draggingChainId,
+                        reduceMotion: reduceMotion
                     ))
                     .onDrag {
                         draggingStep = step
@@ -249,6 +251,7 @@ private struct StepDropDelegate: DropDelegate {
     @Binding var chains: [ChainDefinition]
     @Binding var draggingStep: String?
     @Binding var draggingChainId: String?
+    var reduceMotion: Bool = false
 
     func performDrop(info: DropInfo) -> Bool {
         defer {
@@ -276,7 +279,7 @@ private struct StepDropDelegate: DropDelegate {
               let toIdx = chains[cIdx].steps.firstIndex(of: targetStep),
               fromIdx != toIdx
         else { return }
-        withAnimation(LuminaV2Theme.spring) {
+        withAnimation(LuminaV2Theme.spring(reduceMotion: reduceMotion)) {
             var steps = chains[cIdx].steps
             steps.move(fromOffsets: IndexSet(integer: fromIdx), toOffset: toIdx > fromIdx ? toIdx + 1 : toIdx)
             chains[cIdx].steps = steps

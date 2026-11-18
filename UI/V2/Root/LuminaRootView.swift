@@ -47,10 +47,13 @@ struct LuminaRootView: View {
             .animation(LuminaV2Theme.spring(reduceMotion: reduceMotion), value: store.pinnedSummary?.id)
             .animation(LuminaV2Theme.spring(reduceMotion: reduceMotion), value: store.showResultsSheet)
 
-            // Floating results card over dimmed content (no system nav chrome).
+            // Bottom-anchored results sheet; collapse moves toward the pinned chip.
             if store.showResultsSheet {
                 TestResultsSheet()
-                    .transition(.opacity.combined(with: .scale(scale: 0.98)))
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .bottom).combined(with: .opacity),
+                        removal: .move(edge: .bottom).combined(with: .opacity)
+                    ))
                     .zIndex(20)
             }
 

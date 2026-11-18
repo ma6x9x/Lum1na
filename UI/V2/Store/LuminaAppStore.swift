@@ -59,11 +59,17 @@ final class LuminaAppStore {
     var shareText: String?
     var showShareSheet: Bool = false
 
+    /// Own-process OSLogStore entries (never other processes).
+    var osLogEntries: [AppOSLogEntry] = []
+    /// True when OSLogStore returned empty after a refresh attempt (document gap in UI).
+    var osLogUnavailableNote: Bool = false
+
     var settings = LuminaV2Settings()
 
     @ObservationIgnored private let manager = ExploitManager.shared
     @ObservationIgnored private var bag = Set<AnyCancellable>()
     @ObservationIgnored private var honestyTimer: Timer?
+    @ObservationIgnored private var osLogTimer: Timer?
     @ObservationIgnored private var collapseWorkItem: DispatchWorkItem?
 
     enum LuminaTab: Hashable {
@@ -84,10 +90,20 @@ final class LuminaAppStore {
         boardConfig = LuminaAppStore.readBoardConfig()
         bind()
         refreshHonesty()
+        refreshOSLog()
         honestyTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.refreshHonesty() }
         }
-        // Apply default console level preference as initial chip when Error-focused.
+        osLogTimer = Timer.scheduledTimer(withTimeInterval: 2.5, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                guard !self.consolePaused, self.settings.liveStream else { return }
+                if self.selectedTab == .console || self.isRunning {
+                    self.refreshOSLog()
+                }
+            }
+        }
+        // Default level filters severity in ConsoleTabView; Error also selects Error+ chip.
         if settings.defaultLogLevel == .error {
             consoleLevelFilter = .error
         }
@@ -96,6 +112,8 @@ final class LuminaAppStore {
     deinit {
         honestyTimer?.invalidate()
         honestyTimer = nil
+        osLogTimer?.invalidate()
+        osLogTimer = nil
         collapseWorkItem?.cancel()
     }
 
@@ -174,7 +192,7 @@ final class LuminaAppStore {
         let meta = CatalogMetadata.meta(for: entry)
         let kinds = meta.staticBadges.isEmpty
             ? [HonestyBadgeKind.reach, .window, .conversion]
-            : Array(meta.staticBadges.prefix(4))
+            : Array(meta.staticBadges.prefix(3))
         return kinds.map { kind in (kind, isBadgeMet(kind, entry: entry, meta: meta)) }
     }
 
@@ -336,7 +354,8 @@ final class LuminaAppStore {
         collapseWorkItem?.cancel()
         let work = DispatchWorkItem { [weak self] in
             guard let self else { return }
-            withAnimation(LuminaV2Theme.spring) {
+            let reduce = UIAccessibility.isReduceMotionEnabled
+            withAnimation(LuminaV2Theme.spring(reduceMotion: reduce)) {
                 self.showResultsSheet = false
             }
         }
@@ -543,6 +562,14 @@ final class LuminaAppStore {
         let limit = max(settings.bufferSize, 500)
         let value = manager.lines
         lines = value.count > limit ? Array(value.suffix(limit)) : value
+    }
+
+    /// Refresh own-process OSLogStore entries. Never invents other processes.
+    func refreshOSLog() {
+        let fetched = AppOSLogBridge.recent(minutes: 10, limit: min(settings.bufferSize, 400), pid: appPid)
+        osLogEntries = fetched
+        // Note only when we got nothing *and* we're not mid-run flooding the run log alone.
+        osLogUnavailableNote = fetched.isEmpty
     }
 
     func peekUITree() {

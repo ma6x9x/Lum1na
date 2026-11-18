@@ -34,6 +34,16 @@ enum ConsoleDefaultLevel: String, CaseIterable, Identifiable {
     case debug = "Debug"
     case error = "Error"
     var id: String { rawValue }
+
+    /// Minimum StructuredConsoleLine.OSLevel.rank to keep (Default = no floor).
+    var minimumRank: Int {
+        switch self {
+        case .debug: return 0
+        case .info: return 1
+        case .default: return 0
+        case .error: return 3
+        }
+    }
 }
 
 @MainActor

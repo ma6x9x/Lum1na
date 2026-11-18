@@ -8,11 +8,14 @@ import SwiftUI
 struct TestRowView: View {
     let entry: ExploitCatalogEntry
     @Environment(LuminaAppStore.self) private var store
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var runTrigger = 0
 
     private var meta: CatalogUIMeta { CatalogMetadata.meta(for: entry) }
 
     var body: some View {
         Button {
+            runTrigger &+= 1
             store.requestRun(entry)
         } label: {
             HStack(alignment: .center, spacing: 12) {
@@ -41,7 +44,8 @@ struct TestRowView: View {
             }
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressableScaleButtonStyle(reduceMotion: reduceMotion, pressedScale: 0.97))
+        .sensoryFeedback(.impact(flexibility: .soft), trigger: runTrigger)
         .disabled(store.isRunning && store.activeRunId != entry.id)
         .contextMenu {
             Button {

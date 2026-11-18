@@ -31,7 +31,8 @@ struct SettingsSheetV2: View {
 
                 settingsCard("CHAINS") {
                     toggleRow("Stop on failure", isOn: $store.settings.stopOnFailure)
-                    toggleRow("Auto-advance steps", isOn: $store.settings.autoAdvanceSteps)
+                    // Auto-advance steps hidden until wired into sequencer advance
+                    // (executeStage is atomic; UI-only toggle would be a façade).
                 }
 
                 settingsCard("CONSOLE & LOGGING") {
@@ -55,6 +56,12 @@ struct SettingsSheetV2: View {
                     pickerRow("Default level", selection: $store.settings.defaultLogLevel) {
                         ForEach(ConsoleDefaultLevel.allCases) { m in
                             Text(m.rawValue).tag(m)
+                        }
+                    }
+                    .onChange(of: store.settings.defaultLogLevel) { _, level in
+                        // Severity floor always applies in Console; Error also selects Error+ chip.
+                        if level == .error {
+                            store.consoleLevelFilter = .error
                         }
                     }
                 }
@@ -104,9 +111,12 @@ struct SettingsSheetV2: View {
             .padding(16)
             .padding(.bottom, LuminaV2Theme.chipClearance + LuminaV2Theme.tabBarHeight)
         }
+        .scrollContentBackground(.hidden)
+        .background(Color.clear)
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.large)
         .navigationBarBackButtonHidden(true)
+        .toolbarBackground(.hidden, for: .navigationBar)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button {

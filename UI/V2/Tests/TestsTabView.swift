@@ -12,31 +12,17 @@ struct TestsTabView: View {
     @State private var knobEntryName = ""
     @State private var knobText = ""
     @State private var showKnobAlert = false
+    @State private var playTrigger = 0
 
     var body: some View {
         @Bindable var store = store
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("Tests")
-                        .font(.largeTitle.bold())
-                        .padding(.top, 8)
-
-                    DeviceHeaderBar()
-
-                    HStack(spacing: 10) {
-                        HStack(spacing: 10) {
-                            Image(systemName: "magnifyingglass")
-                                .foregroundStyle(.secondary)
-                            TextField("Search tests and probes", text: $store.searchText)
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 12)
-                        .frame(minHeight: 44)
-                        .luminaCapsuleGlass(interactive: true)
-
+                    HStack(alignment: .center) {
+                        Text("Tests")
+                            .font(.largeTitle.bold())
+                        Spacer()
                         Button {
                             store.showSettings = true
                         } label: {
@@ -45,10 +31,25 @@ struct TestsTabView: View {
                                 .foregroundStyle(.primary)
                                 .frame(width: 44, height: 44)
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(PressableScaleButtonStyle(reduceMotion: reduceMotion))
                         .luminaCapsuleGlass(interactive: true)
                         .accessibilityLabel("Settings")
                     }
+                    .padding(.top, 8)
+
+                    DeviceHeaderBar()
+
+                    HStack(spacing: 10) {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundStyle(.secondary)
+                        TextField("Search tests and probes", text: $store.searchText)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    .frame(minHeight: 44)
+                    .luminaCapsuleGlass(interactive: true)
 
                     ForEach(store.groupedCatalog(matching: store.searchText), id: \.0) { group, entries in
                         groupCard(group, entries: entries)
@@ -57,7 +58,10 @@ struct TestsTabView: View {
                 .padding(.horizontal, 16)
                 .padding(.bottom, LuminaV2Theme.chipClearance + LuminaV2Theme.tabBarHeight)
             }
+            .scrollContentBackground(.hidden)
+            .background(Color.clear)
             .toolbar(store.showSettings ? .visible : .hidden, for: .navigationBar)
+            .toolbarBackground(.hidden, for: .navigationBar)
             .navigationDestination(isPresented: $store.showSettings) {
                 SettingsSheetV2()
                     .environment(store)

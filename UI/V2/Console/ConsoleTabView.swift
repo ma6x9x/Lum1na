@@ -1,6 +1,7 @@
 //
 //  ConsoleTabView.swift
-//  Lum1na — CRT-only structured os_log-style stream + run log.
+//  Lum1na — CRT-only structured stream: own-process OSLog + run log.
+//  Never invents kernel[0] / syslogd[1] / other-process rows.
 //
 
 import SwiftUI
@@ -17,6 +18,17 @@ struct StructuredConsoleLine: Identifiable {
             case .FAULT: return Color(hex: "#D97706")
             }
         }
+
+        /// Ordering for Default-level filtering (lower = more verbose).
+        var rank: Int {
+            switch self {
+            case .DEBUG: return 0
+            case .INFO: return 1
+            case .DEFAULT: return 2
+            case .ERROR: return 3
+            case .FAULT: return 4
+            }
+        }
     }
 
     let id: UUID
@@ -25,13 +37,22 @@ struct StructuredConsoleLine: Identifiable {
     let process: String
     let subsystem: String
     let message: String
-    let raw: ConsoleLine
+    /// True when this line is genuinely kernel-tagged (app [KERN] / OSLog subsystem).
+    let isKernelTagged: Bool
+    let timestamp: Date
 }
 
 enum StructuredConsole {
-    static func map(_ line: ConsoleLine, pid: Int32, timestampMode: TimestampMode, showMilliseconds: Bool) -> StructuredConsoleLine {
+    /// Map a run-log ConsoleLine. Process is always lum1na[pid] — never another process.
+    static func mapRunLog(
+        _ line: ConsoleLine,
+        pid: Int32,
+        timestampMode: TimestampMode,
+        showMilliseconds: Bool
+    ) -> StructuredConsoleLine {
         let msg = line.message.trimmingCharacters(in: .whitespacesAndNewlines)
         let lower = msg.lowercased()
+        let kernTagged = msg.uppercased().contains("[KERN]")
 
         let level: StructuredConsoleLine.OSLevel = {
             switch line.level {
@@ -46,18 +67,10 @@ enum StructuredConsole {
             }
         }()
 
-        let process: String = {
-            if lower.contains("[kern]") || lower.hasPrefix("kernel") || lower.contains("kernel[") {
-                return "kernel[0]"
-            }
-            if lower.contains("syslog") {
-                return "syslogd[1]"
-            }
-            return "lum1na[\(pid)]"
-        }()
+        let process = "lum1na[\(pid)]"
 
         let subsystem: String = {
-            if process.hasPrefix("kernel") { return "kernel / mach" }
+            if kernTagged { return "com.lum1na.app / kern-tag" }
             if lower.contains("tap ") || lower.contains("probe") {
                 return "com.lum1na.tests / probe"
             }
@@ -70,18 +83,7 @@ enum StructuredConsole {
             return "com.lum1na.app / run"
         }()
 
-        let time: String = {
-            switch timestampMode {
-            case .off:
-                return ""
-            case .seconds, .milliseconds:
-                let f = DateFormatter()
-                f.locale = Locale(identifier: "en_US_POSIX")
-                f.dateFormat = (timestampMode == .milliseconds || showMilliseconds)
-                    ? "HH:mm:ss.SSS" : "HH:mm:ss"
-                return f.string(from: line.timestamp)
-            }
-        }()
+        let time = formatTime(line.timestamp, mode: timestampMode, showMilliseconds: showMilliseconds)
 
         let cleaned: String = {
             var m = msg
@@ -98,8 +100,39 @@ enum StructuredConsole {
             process: process,
             subsystem: subsystem,
             message: cleaned,
-            raw: line
+            isKernelTagged: kernTagged,
+            timestamp: line.timestamp
         )
+    }
+
+    static func mapOSLog(
+        _ entry: AppOSLogEntry,
+        timestampMode: TimestampMode,
+        showMilliseconds: Bool
+    ) -> StructuredConsoleLine {
+        StructuredConsoleLine(
+            id: entry.id,
+            time: formatTime(entry.date, mode: timestampMode, showMilliseconds: showMilliseconds),
+            level: entry.level,
+            process: entry.process,
+            subsystem: entry.subsystem,
+            message: entry.message,
+            isKernelTagged: entry.isKernelTagged,
+            timestamp: entry.date
+        )
+    }
+
+    private static func formatTime(_ date: Date, mode: TimestampMode, showMilliseconds: Bool) -> String {
+        switch mode {
+        case .off:
+            return ""
+        case .seconds, .milliseconds:
+            let f = DateFormatter()
+            f.locale = Locale(identifier: "en_US_POSIX")
+            f.dateFormat = (mode == .milliseconds || showMilliseconds)
+                ? "HH:mm:ss.SSS" : "HH:mm:ss"
+            return f.string(from: date)
+        }
     }
 }
 
@@ -110,12 +143,24 @@ struct ConsoleTabView: View {
 
     private var crt: Color { store.settings.crtTint.color }
 
+    /// Merged own-process OSLog + run log, sorted by time. No fabricated processes.
     private var structured: [StructuredConsoleLine] {
-        store.lines.map { StructuredConsole.map($0, pid: store.appPid, timestampMode: store.settings.timestampMode, showMilliseconds: store.settings.showMilliseconds) }
+        let pid = store.appPid
+        let mode = store.settings.timestampMode
+        let ms = store.settings.showMilliseconds
+        let runMapped = store.lines.map {
+            StructuredConsole.mapRunLog($0, pid: pid, timestampMode: mode, showMilliseconds: ms)
+        }
+        let osMapped = store.osLogEntries.map {
+            StructuredConsole.mapOSLog($0, timestampMode: mode, showMilliseconds: ms)
+        }
+        return (runMapped + osMapped).sorted { $0.timestamp < $1.timestamp }
     }
 
     private var filtered: [StructuredConsoleLine] {
-        structured.filter { line in
+        let minRank = store.settings.defaultLogLevel.minimumRank
+        return structured.filter { line in
+            if line.level.rank < minRank { return false }
             if !store.consoleQuery.isEmpty {
                 let q = store.consoleQuery.lowercased()
                 let hay = (line.message + " " + line.process + " " + line.subsystem + " " + line.level.rawValue).lowercased()
@@ -124,8 +169,8 @@ struct ConsoleTabView: View {
             switch store.consoleLevelFilter {
             case .all: return true
             case .lum1na: return line.process.lowercased().contains("lum1na")
-            case .kernel: return line.process.lowercased().contains("kernel") || line.raw.message.uppercased().contains("[KERN]")
-            case .subsystem: return line.subsystem.contains("com.lum1na") || line.subsystem.contains("kernel")
+            case .kernel: return line.isKernelTagged
+            case .subsystem: return line.subsystem.contains("com.lum1na")
             case .error: return line.level == .ERROR || line.level == .FAULT
             }
         }
@@ -134,7 +179,6 @@ struct ConsoleTabView: View {
     var body: some View {
         @Bindable var store = store
         ZStack {
-            // CRT scanline wash (settings-controlled)
             if store.settings.crtScanlines {
                 CRTScanlines(tint: crt)
                     .ignoresSafeArea()
@@ -157,13 +201,21 @@ struct ConsoleTabView: View {
                             Text(store.consolePaused ? "PAUSED" : "LIVE")
                                 .font(.caption.weight(.semibold).monospaced())
                                 .foregroundStyle(crt.opacity(0.85))
+                            if store.osLogUnavailableNote {
+                                Text("os_log: run-log only")
+                                    .font(.caption2.monospaced())
+                                    .foregroundStyle(crt.opacity(0.55))
+                            }
                         }
                     }
                     Spacer()
                     HStack(spacing: 8) {
                         iconButton(store.consolePaused ? "play.fill" : "pause.fill", label: store.consolePaused ? "Resume" : "Pause") {
                             store.consolePaused.toggle()
-                            if !store.consolePaused { store.syncLinesFromManager() }
+                            if !store.consolePaused {
+                                store.syncLinesFromManager()
+                                store.refreshOSLog()
+                            }
                         }
                         iconButton("doc.on.doc", label: "Copy console") {
                             store.copyToPasteboard(store.exportConsole())
@@ -245,10 +297,10 @@ struct ConsoleTabView: View {
                         )
                         .padding(.horizontal, 12)
                         .onChange(of: store.lines.count) { _, _ in
-                            guard stickToBottom, !store.consolePaused, store.settings.liveStream else { return }
-                            withAnimation(LuminaV2Theme.spring(reduceMotion: reduceMotion)) {
-                                proxy.scrollTo("console-bottom", anchor: .bottom)
-                            }
+                            scrollToLatest(proxy: proxy, animated: false)
+                        }
+                        .onChange(of: store.osLogEntries.count) { _, _ in
+                            scrollToLatest(proxy: proxy, animated: false)
                         }
 
                         if !stickToBottom {
@@ -274,6 +326,26 @@ struct ConsoleTabView: View {
                 .padding(.bottom, LuminaV2Theme.chipClearance)
             }
         }
+        .onAppear { store.refreshOSLog() }
+        .onChange(of: store.selectedTab) { _, tab in
+            if tab == .console { store.refreshOSLog() }
+        }
+    }
+
+    private func scrollToLatest(proxy: ScrollViewProxy, animated: Bool) {
+        guard stickToBottom, !store.consolePaused, store.settings.liveStream else { return }
+        // Snap while streaming — no spring per line.
+        if animated, !reduceMotion {
+            withAnimation(LuminaV2Theme.spring(reduceMotion: reduceMotion)) {
+                proxy.scrollTo("console-bottom", anchor: .bottom)
+            }
+        } else {
+            var transaction = Transaction()
+            transaction.disablesAnimations = true
+            withTransaction(transaction) {
+                proxy.scrollTo("console-bottom", anchor: .bottom)
+            }
+        }
     }
 
     private func iconButton(_ system: String, label: String, action: @escaping () -> Void) -> some View {
@@ -294,7 +366,7 @@ struct ConsoleTabView: View {
             HStack(spacing: 8) {
                 if !line.time.isEmpty {
                     Text(line.time)
-                        .font(.caption.monospaced())
+                        .font(.caption.monospacedDigit())
                         .foregroundStyle(crt.opacity(0.85))
                 }
                 Text(line.level.rawValue)

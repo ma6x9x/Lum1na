@@ -208,10 +208,11 @@ extension View {
     }
 }
 
-/// Floating ~64pt glass pill tab bar (selected tab filled violet).
+/// Floating ~64pt glass pill tab bar (selected = translucent wash, not solid fill).
 struct LuminaFloatingTabBar: View {
     @Binding var selection: LuminaAppStore.LuminaTab
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var pressTrigger = 0
 
     private let tabs: [(LuminaAppStore.LuminaTab, String, String)] = [
         (.tests, "Tests", "list.bullet.rectangle"),
@@ -225,6 +226,7 @@ struct LuminaFloatingTabBar: View {
             ForEach(tabs, id: \.0) { tab, title, icon in
                 let selected = selection == tab
                 Button {
+                    pressTrigger &+= 1
                     withAnimation(LuminaV2Theme.spring(reduceMotion: reduceMotion)) {
                         selection = tab
                     }
@@ -241,12 +243,13 @@ struct LuminaFloatingTabBar: View {
                     .background {
                         if selected {
                             Capsule(style: .continuous)
-                                .fill(LuminaV2Theme.accent)
+                                .fill(selectedWash(for: tab))
                         }
                     }
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressableScaleButtonStyle(reduceMotion: reduceMotion))
+                .sensoryFeedback(.selection, trigger: selection == tab ? pressTrigger : 0)
                 .accessibilityLabel(title)
                 .accessibilityAddTraits(selected ? .isSelected : [])
             }
@@ -257,6 +260,27 @@ struct LuminaFloatingTabBar: View {
         .luminaChromeGlass(cornerRadius: 32, interactive: false)
         .padding(.horizontal, 18)
         .padding(.bottom, LuminaV2Theme.tabBarBottomInset)
+    }
+
+    private func selectedWash(for tab: LuminaAppStore.LuminaTab) -> Color {
+        switch tab {
+        case .console:
+            return LuminaV2Theme.crtGreen.opacity(0.28)
+        default:
+            return LuminaV2Theme.accent.opacity(0.32)
+        }
+    }
+}
+
+/// Press scale 0.96–0.97; respects Reduce Motion.
+struct PressableScaleButtonStyle: ButtonStyle {
+    var reduceMotion: Bool
+    var pressedScale: CGFloat = 0.96
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed && !reduceMotion ? pressedScale : 1)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: configuration.isPressed)
     }
 }
 

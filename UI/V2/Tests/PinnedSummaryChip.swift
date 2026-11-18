@@ -39,7 +39,7 @@ struct PinnedSummaryChip: View {
                 }
                 Spacer(minLength: 4)
                 Text(String(format: "%.2fs", summary.duration))
-                    .font(.caption.weight(.semibold).monospaced())
+                    .font(.caption.weight(.semibold).monospacedDigit())
                     .foregroundStyle(statusColor)
                 Image(systemName: "chevron.up")
                     .font(.caption.weight(.bold))
