@@ -24,7 +24,7 @@ typedef enum {
     LabSkuA13_other,     /* iPhone12,* but not 18.x/19F77 */
     LabSkuT8150_24A435,  /* iPhone18,2 + 24A435 — 17 Pro Max iOS 27.0 */
     LabSkuT8150_24B156,  /* iPhone18,2 + 24B156 — 17 Pro Max iOS 27.2.1 */
-    LabSkuT8150_other,   /* iPhone18,2 + other 24A*/24B* — static_base only */
+    LabSkuT8150_other,   /* iPhone18,2 + other 24A/24B builds - static_base only */
     LabSkuA12X_23H30     /* iPad8,* + 23H30 — iPadOS 26.7.1 FIELD# only; no 23G71 VA paste */
 } LabSku;
 
