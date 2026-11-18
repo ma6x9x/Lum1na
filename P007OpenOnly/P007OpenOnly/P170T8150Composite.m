@@ -49,7 +49,10 @@ static void p170_line(NSString *s) {
 static void p170_sighandler(int sig, siginfo_t *si, void *uctx) {
     if (g_p170_fd >= 0) {
         ucontext_t *uc = (ucontext_t *)uctx;
-        uint64_t pc = uc->uc_mcontext->__ss.__pc;
+        uint64_t pc = 0;
+#if defined(__arm64__) || defined(__aarch64__)
+        pc = uc->uc_mcontext->__ss.__pc;
+#endif
         uint64_t far = (uint64_t)si->si_addr;
         char buf[192];
         int n = snprintf(buf, sizeof(buf),
