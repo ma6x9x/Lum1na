@@ -425,6 +425,13 @@ static void p114_hexdump(size_t maxn) {
             size_t outLen = sizeof(g_p114_out);
             IOReturn kr = g_p114_callStruct(g_p114_conn, P114_SEL, &in64,
                                             P114_IN_BYTES, NULL, NULL);
+            /* p114_v6_userVA fix (2026-11-18 receipts): the {u64} input is
+               THE USER VA of the dump buffer, NOT a surface sid. The prior
+               form passed a sid (withAddressRange over garbage -> 2c2 on
+               24B156 with zero records). Point it at g_p114_out. */
+            uint64_t dumpVA = (uint64_t)(uintptr_t)g_p114_out;
+            memcpy(&in64, &dumpVA, sizeof(in64));
+            memset(g_p114_out, 0, sizeof(g_p114_out));
             const size_t capBytes = 0x200ull * P114_REC_STRIDE + 0x20;
             if (capBytes > sizeof(g_p114_out))
                 Lf(@"[v6] probe buffer too small for cap path (%zu < %zu)",
