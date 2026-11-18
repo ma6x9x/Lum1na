@@ -380,7 +380,7 @@ static LabOffTab gT8150_24B156 = {
     .build_string = "24B156"
 };
 
-/* iPhone18,2 sibling 24A*/24B* — static_base only. ANE VAs stay 0. */
+/* iPhone18,2 sibling 24A/24B builds - static_base only. ANE VAs stay 0. */
 static LabOffTab gT8150_other = {
     .tag = "T8150_other",
     .static_base = T8150_24A435_STATIC_BASE,
@@ -389,7 +389,7 @@ static LabOffTab gT8150_other = {
     .pmap_cs_allow_off = 0,
     .owns_replaceable = 0,
     .build_number = "24A",
-    .build_string = "24A*/24B*"
+    .build_string = "24A/24B*"
 };
 
 // MARK: - Runtime Slide Storage

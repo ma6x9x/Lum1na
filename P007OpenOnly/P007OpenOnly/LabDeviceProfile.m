@@ -132,7 +132,7 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
         case LabSkuA13_other:  return @"iPhone12,* A13 / not 18.x";
         case LabSkuT8150_24A435: return @"iPhone18,2 T8150 / 24A435 — 17 Pro Max iOS 27.0";
         case LabSkuT8150_24B156: return @"iPhone18,2 T8150 / 24B156 — 17 Pro Max iOS 27.2.1";
-        case LabSkuT8150_other:  return @"iPhone18,2 T8150 / 24A*/24B* sibling — static_base only";
+        case LabSkuT8150_other:  return @"iPhone18,2 T8150 / 24A/24B* sibling — static_base only";
         default:               return @"unknown";
     }
 }
@@ -340,7 +340,7 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
             [s appendString:@"  Do not paste 24A435 VAs. kernproc PROVEN 0xFFFFFE0007F08FA8; allproc UNDERIVED. hasKread still NO.\n"];
             break;
         case LabSkuT8150_other:
-            [s appendString:@"T8150_other iPhone18,2 24A*/24B* sibling. static_base only. Public Lum1na SKIPS T8101 geometry.\n"];
+            [s appendString:@"T8150_other iPhone18,2 24A/24B* sibling. static_base only. Public Lum1na SKIPS T8101 geometry.\n"];
             break;
         default:
             [s appendString:@"Unknown SKU: Ident first. Public Lum1na STOPs kernel remaining-fire. Use Lum1na-Debug to probe.\n"];
@@ -422,7 +422,7 @@ const char *LabDeviceProfile_sku_string(LabSku sku) {
             [out appendString:@"TRACK: iPhone18,2 T8150 24B156 (17 Pro Max iOS 27.2.1). LabOff PROVEN: ANE 0x10b0/+0xa0, queue_leak+0x520, sysmem_md+0x90, P152 sel4/5, kernproc 0xFFFFFE0007F08FA8. allproc UNDERIVED — hasKread still NO. Never paste 24A435 VAs.\n"];
             break;
         case LabSkuT8150_other:
-            [out appendString:@"TRACK: iPhone18,2 T8150 sibling 24A*/24B* — static_base only until re-derived.\n"];
+            [out appendString:@"TRACK: iPhone18,2 T8150 sibling 24A/24B* — static_base only until re-derived.\n"];
             break;
         default:
             [out appendString:@"TRACK: unknown — paste Ident before panic tests.\n"];
