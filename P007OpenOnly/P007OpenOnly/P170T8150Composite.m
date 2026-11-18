@@ -24,6 +24,9 @@
 #import <fcntl.h>
 #import <unistd.h>
 #import <string.h>
+#import <signal.h>
+#define _XOPEN_SOURCE 1
+#import <ucontext.h>
 
 #define P170_BUILD @"p170-t8150-composite-v1"
 
@@ -39,6 +42,27 @@ static void p170_line(NSString *s) {
     }
 }
 
+
+/* family-B alias-path fault capture: SIGSEGV/SIGBUS handler writes far+pc
+   straight to the fsync log (async-signal-safe syscalls only), then
+   re-raises so the crash reporter sees the same death. */
+static void p170_sighandler(int sig, siginfo_t *si, void *uctx) {
+    if (g_p170_fd >= 0) {
+        ucontext_t *uc = (ucontext_t *)uctx;
+        uint64_t pc = uc->uc_mcontext->__ss.__pc;
+        uint64_t far = (uint64_t)si->si_addr;
+        char buf[192];
+        int n = snprintf(buf, sizeof(buf),
+            "[SIG %d] far=0x%016llx pc=0x%016llx (family-B alias capture)\n",
+            sig, (unsigned long long)far, (unsigned long long)pc);
+        if (n > 0) { write(g_p170_fd, buf, (size_t)n); fcntl(g_p170_fd, F_FULLFSYNC); }
+    }
+    struct sigaction d; memset(&d, 0, sizeof(d));
+    d.sa_handler = SIG_DFL;
+    sigaction(sig, &d, NULL);
+    raise(sig);
+}
+
 @implementation P170T8150Composite
 
 + (NSString *)tap {
@@ -46,6 +70,13 @@ static void p170_line(NSString *s) {
     g_p170_out = o;
     NSString *docs = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory,
                                                           NSUserDomainMask, YES) firstObject];
+    {
+        struct sigaction sa; memset(&sa, 0, sizeof(sa));
+        sa.sa_sigaction = p170_sighandler;
+        sa.sa_flags = SA_SIGINFO;
+        sigaction(SIGSEGV, &sa, NULL);
+        sigaction(SIGBUS, &sa, NULL);
+    }
     g_p170_fd = open([docs stringByAppendingPathComponent:@"p170_t8150_log.txt"].fileSystemRepresentation,
                      O_CREAT | O_WRONLY | O_TRUNC, 0644);
     p170_line([NSString stringWithFormat:@"=== p170 session %@ BUILD %@ ===",
