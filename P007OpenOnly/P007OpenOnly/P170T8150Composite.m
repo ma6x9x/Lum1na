@@ -26,8 +26,6 @@
 #import <unistd.h>
 #import <string.h>
 #import <signal.h>
-#define _XOPEN_SOURCE 1
-#import <ucontext.h>
 
 #define P170_BUILD @"p170-t8150-composite-v1"
 
@@ -48,17 +46,13 @@ static void p170_line(NSString *s) {
    straight to the fsync log (async-signal-safe syscalls only), then
    re-raises so the crash reporter sees the same death. */
 static void p170_sighandler(int sig, siginfo_t *si, void *uctx) {
+    (void)uctx;
     if (g_p170_fd >= 0) {
-        ucontext_t *uc = (ucontext_t *)uctx;
-        uint64_t pc = 0;
-#if defined(__arm64__) || defined(__aarch64__)
-        pc = uc->uc_mcontext->__ss.__pc;
-#endif
         uint64_t far = (uint64_t)si->si_addr;
-        char buf[192];
+        char buf[96];
         int n = snprintf(buf, sizeof(buf),
-            "[SIG %d] far=0x%016llx pc=0x%016llx (family-B alias capture)\n",
-            sig, (unsigned long long)far, (unsigned long long)pc);
+            "[SIG %d] far=0x%016llx (family-B alias capture)\n",
+            sig, (unsigned long long)far);
         if (n > 0) { write(g_p170_fd, buf, (size_t)n); fcntl(g_p170_fd, F_FULLFSYNC); }
     }
     struct sigaction d; memset(&d, 0, sizeof(d));
