@@ -146,8 +146,17 @@ static void p171_poll(int *fds, int n, uint16_t basePort, NSString *phase,
             struct sockaddr_in a;
             socklen_t al = sizeof(a);
             getsockname(fds[0], (struct sockaddr *)&a, &al);
+            /* FIX (void receipt law, 19:17 run): an INADDR_ANY bind makes
+               getsockname return 0.0.0.0 — sending there never delivers.
+               Substitute loopback, and log sendto's errno on failure. */
+            if (a.sin_addr.s_addr == INADDR_ANY)
+                a.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
             uint8_t mark[8] = {'P','1','7','1','S','E','L','F'};
-            sendto(snd, mark, 8, 0, (struct sockaddr *)&a, sizeof(a));
+            ssize_t sn = sendto(snd, mark, 8, 0, (struct sockaddr *)&a, sizeof(a));
+            if (sn < 0)
+                p171_line([NSString stringWithFormat:
+                    @"  [CTRL] sendto errno=%d (%s) — delivery channel broken\n",
+                    errno, strerror(errno)]);
             /* control recv is EXPECTED; mark as control not stale hit */
             struct pollfd pf = { .fd = fds[0], .events = POLLIN };
             int r = poll(&pf, 1, 500);
