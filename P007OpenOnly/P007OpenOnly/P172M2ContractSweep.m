@@ -70,9 +70,22 @@ static void Lf(NSString *fmt, ...) {
     io_obj_t svc = getsvc(mach_task_self(), md);
     /* md deliberately never released (door-never-closes law) */
     mach_port_t conn = 0;
-    kern_return_t kr = open_(svc, mach_task_self(), 0, &conn);
-    Lf(@"[*] open kr=0x%x conn=%d", kr, (int)(uintptr_t)conn);
-    if (kr != KERN_SUCCESS || !conn) { if (g_fd >= 0) close(g_fd); return o; }
+    kern_return_t kr = 0xe00002eb;
+    /* M2Scaler IOServiceOpen FLAP law (p114 v1.5+): 0x10000003 lands on tap
+       #1 of some boots — the 19:52:25 receipt stopped exactly here on the
+       un-retried build. 3x bounded retry. */
+    for (int attempt = 1; attempt <= 3; attempt++) {
+        kr = open_(svc, mach_task_self(), 0, &conn);
+        Lf(@"[*] open try %d kr=0x%x conn=%d", attempt, kr, (int)(uintptr_t)conn);
+        if (kr == KERN_SUCCESS && conn) break;
+        conn = 0;
+        usleep(200000);
+    }
+    if (kr != KERN_SUCCESS || !conn) {
+        Lf(@"[-] open flapped through 3 attempts - honest stop");
+        if (g_fd >= 0) close(g_fd);
+        return o;
+    }
 
     /* our live surfaces (the sids the contract wants are task-owned sids) */
     CFMutableDictionaryRef sp = CFDictionaryCreateMutable(

@@ -117,6 +117,13 @@
 #import "Exploit/P109AneSelSweep.h"
 #import "Exploit/P112CGShading.h"
 #import "Exploit/P114SurfaceLeak.h"
+#import "Exploit/P167F1SliceWrap.h"
+#import "Exploit/P168Iosurface112477.h"
+#import "Exploit/P169OsunserReach.h"
+#import "Exploit/P170T8150Composite.h"
+#import "Exploit/P171StaleArrivalOracle.h"
+#import "Exploit/P172M2ContractSweep.h"
+
 #import "Exploit/P113DescForgeControl.h"
 #import "Exploit/P122SwordForge.h"
 #import "Exploit/P123ShapeCensus.h"

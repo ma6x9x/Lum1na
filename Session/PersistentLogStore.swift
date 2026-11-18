@@ -34,6 +34,13 @@ public final class PersistentLogStore {
         "p110": "p110_swapclaim_log.txt",
         "p112": "p112_cgshading_log.txt",
         "p114": "p114_surfaceleak_log.txt",
+        "p167": "p167_f1_log.txt",
+        "p168": "p168_iosurf112477_log.txt",
+        "p169": "p169_osunser_log.txt",
+        "p170": "p170_t8150_log.txt",
+        "p171": "p171_oracle_log.txt",
+        "p172": "p172_m2_contract_log.txt",
+
         "p115": "p115_m2peek_log.txt",
         "p116": "p116_sandboxext_toctou_log.txt",
         "p164": "p164_mcm_census_log.txt",
