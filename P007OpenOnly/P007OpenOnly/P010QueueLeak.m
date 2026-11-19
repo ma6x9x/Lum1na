@@ -312,6 +312,19 @@ static NSString *p010_finish(void) {
                  [LabIOGPUQueue wordLooksLikeKptr:w1] ? "word1 KPTR-SHAPED" : "word1 not-kptr (expected)");
 
         if (r == 0) {
+            /* 2026-11-19 RE (Ghidra 24B156 IOGPUFamily): +0x520 is a PACKED
+               word: bits 32-63 = local_e0 = a kernel-derived upper VA
+               component; bits 16-31 = index/size; bit 0 = valid flag.
+               word1 (scalar[1]) = those upper 32 bits = the TRUNCATED
+               kernel heap VA the band-shift law measured. Record on the
+               board as leak-class (truncated, never a slide). */
+            if (w1 != 0) {
+                @try {
+                    [[P007Board shared] recordHeapLeak:w1 source:@"p010_truncated32"];
+                } @catch (__unused NSException *e) {}
+                p010_log(@"  [board] word1=0x%llx recorded as heap_truncated32 (upper-32 of the packed +0x520 kernel value)",
+                         (unsigned long long)w1);
+            }
             // Dump scalar outputs
             total_hits += p010_dump_scalars(outSc, outScCnt, "sel6-scalar");
             total_hits += p010_dump_and_scan(outSt, outStSz, "sel6-struct");

