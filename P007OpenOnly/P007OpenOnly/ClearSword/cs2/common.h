@@ -126,6 +126,10 @@ typedef struct pe_context {
        never a kernel disclosure. 0 / 0 = not armed (random-marker tags). */
     uint64_t heap_anchor;
     int      heap_anchor_armed;
+    /* 2026-11-19 multi-anchor: the full same-boot set (heap_anchor = [0]).
+       Every kptr-shape classifier skips ALL of them — cs2_own_anchor(). */
+    uint64_t heap_anchors[4];
+    int      heap_anchor_n;
     uint64_t wired_page_marker;
 
     cs2_free_shared_t* shared;
@@ -171,6 +175,16 @@ typedef struct pe_context {
     size_t mlock_surfaces_count;
 } cs2_context_t;
 extern cs2_context_t cs2_ctx;
+/* 2026-11-19: true if q is one of OUR same-boot anchor values (the whole
+   set). Every kptr-shape classifier calls this — own-fill, never a kptr. */
+static inline int cs2_own_anchor(uint64_t q) {
+    int i;
+    if (cs2_ctx.heap_anchor_armed && q == cs2_ctx.heap_anchor) return 1;
+    for (i = 0; i < cs2_ctx.heap_anchor_n && i < 4; i++)
+        if (q == cs2_ctx.heap_anchors[i]) return 1;
+    return 0;
+}
+
 
 /* LSWARM-TARGET (2026-11-15): the calib's PROVEN WRONG windows
    (lightsword_wrong.txt boot-learn list), filled by the ObjC runner before

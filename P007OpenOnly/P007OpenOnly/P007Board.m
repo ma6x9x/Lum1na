@@ -11,6 +11,7 @@
 //    - live hasKread always starts NO each process
 
 #import "P007Board.h"
+#import <sys/sysctl.h>   /* 2026-11-19: boot-uuid stamp */
 #import "LabDeviceProfile.h"
 #import "LabRuntimeOffsets.h"
 #import "LabLocalTime.h"
@@ -265,6 +266,14 @@ static void boardWriteFile(NSString *path, NSData *data) {
     [self recordCandidate:va kind:@"heap" source:source];
 }
 
+static NSString *P007BoardBootUUID(void) {
+    char buf[64];
+    size_t len = sizeof(buf) - 1;
+    if (sysctlbyname("kern.bootuuid", buf, &len, NULL, 0) != 0) return @"";
+    buf[len] = 0;
+    return [NSString stringWithFormat:@"%s", buf];
+}
+
 - (void)recordCandidate:(uint64_t)va kind:(NSString *)kind source:(NSString *)source {
     if (va < 0xffff000000000000ULL) return;
     @synchronized (self) {
@@ -308,6 +317,7 @@ static void boardWriteFile(NSString *path, NSData *data) {
             @"source": src,
             @"time": now,
             @"lastSeen": now,
+            @"boot_uuid": P007BoardBootUUID(),   /* 2026-11-19: bulletproof same-boot provenance */
             @"hits": @1
         }];
         if (leaks.count > 64) {

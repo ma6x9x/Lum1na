@@ -26,7 +26,7 @@
 #include <string.h>
 
 #define P159_BUILD @"p159-iosurface-adjacency-v3-harvest"
-#define P159_ROUNDS 4
+#define P159_ROUNDS 8   /* 2026-11-19: churn until deterministic — the sparse-17 receipt (calib arms only after the user taps p159 a few times) */
 #define P159_WANT_ANCHORS 4
 #define P159_MAX_ANCHORS 8
 

@@ -322,6 +322,7 @@ static int64_t LabBoardBootTime(void) {
             @"source": src,
             @"time": now,
             @"lastSeen": now,
+            @"boot_uuid": LabBoardBootUUID(),   /* 2026-11-19: bulletproof same-boot provenance */
             @"hits": @1
         }];
         if (leaks.count > 64) {

