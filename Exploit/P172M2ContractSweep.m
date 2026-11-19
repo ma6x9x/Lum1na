@@ -80,6 +80,12 @@ static uint32_t bankCount = 0;
         if (md) CFRelease(md), md = NULL;
         md = matching("AppleM2ScalerCSCDriver");
         svc = getsvc(mach_task_self(), md);
+        /* 2026-11-19 crash receipt (Lum1na-121128: EXC_BREAKPOINT in CFRelease
+           from this tap mid-chain): IOServiceGetMatchingService CONSUMES the
+           matching dict — the next loop iteration's CFRelease(md) released a
+           dead object. md is consumed here; NULL it. The door-never-closes
+           leak law is unchanged (nothing extra is freed). */
+        md = NULL;
         kr = open_(svc, mach_task_self(), 0, &conn);
         Lf(@"[*] open try %d (re-lookup) kr=0x%x conn=%d", attempt, kr, (int)(uintptr_t)conn);
         if (kr == KERN_SUCCESS && conn) break;
