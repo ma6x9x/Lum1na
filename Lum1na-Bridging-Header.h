@@ -83,7 +83,7 @@
 #import "Exploit/P056VTCompressionReach.h"
 #import "Kernel/Lum1naBoard.h"
 #import "Kernel/Lum1naAfterKread.h"
-#import "Exploit/LightSwordCalib.h"
+#import "Exploit/LSIDCalib.h"   /* 2026-11-19: the fixed v11 calib (LightSwordCalib retired) */
 #import "Exploit/APFS84523.h"
 #import "Exploit/P057WVEKReach.h"
 #import "Exploit/P058JPEGDriverReach.h"

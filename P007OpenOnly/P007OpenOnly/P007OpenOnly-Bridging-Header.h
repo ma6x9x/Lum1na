@@ -23,7 +23,7 @@
 #import "PlReqDrainProbe.h"
 #import "ClearSword/LuminaClearSword.h"
 #import "ClearSword/CS2Runner.h"
-#import "ClearSword/LightSwordCalib.h"
+#import "LSIDCalib.h"   /* 2026-11-19: cscali runs the fixed v11 calib (LightSwordCalib retired) */
 #import "P122SwordForge.h"
 #import "P123ShapeCensus.h"
 #import "P023VtExtremeProbe.h"

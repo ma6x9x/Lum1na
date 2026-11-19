@@ -117,7 +117,7 @@ enum LuminaTAP {
             result = "STOP t019 intercepted — XR leak class. Do not re-tap."
         case "t014a", "t014b", "t014c", "t014d", "t014e", "t014f":
             result = "STOP T014 intercepted — XR leftover. Use P040 dest ABI only."
-        case "cscali":      result = LightSwordCalib.runCalib()
+        case "cscali":      result = LSIDCalib.tap()   // 2026-11-19: the fixed v11 calib (LightSwordCalib fork deleted)
         case "swordforge": result = P122SwordForge.tap()
         case "shapecensus": result = P123ShapeCensus.tap()
         case "lswarm":
