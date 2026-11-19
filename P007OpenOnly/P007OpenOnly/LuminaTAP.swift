@@ -152,6 +152,9 @@ enum LuminaTAP {
         case "p169":        result = P169OsunserReach.tap()
         case "p170":        result = P170T8150Composite.tap()
         case "p171":        result = P171StaleArrivalOracle.tap()
+        case "p176":        result = P176F1SeedWindow.tap()
+        case "p173":        result = P173KamuiEscape.tap()
+        case "p154":        result = P154IOSurfaceF1Gate.tap()
         case "p172":        result = P172M2ContractSweep.tap()
         case "p162":        result = P162IOHIDReach.tap()
         case "p014ane", "p014b", "p015", "p017":

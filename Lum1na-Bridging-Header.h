@@ -124,6 +124,7 @@
 #import "Exploit/P171StaleArrivalOracle.h"
 #import "Exploit/P172M2ContractSweep.h"
 #import "Exploit/P173KamuiEscape.h"
+#import "Exploit/P154IOSurfaceF1Gate.h"
 #import "Exploit/P176F1SeedWindow.h"
 
 #import "Exploit/P113DescForgeControl.h"
