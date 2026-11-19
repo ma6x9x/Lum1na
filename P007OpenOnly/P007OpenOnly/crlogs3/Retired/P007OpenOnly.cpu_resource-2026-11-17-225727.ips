@@ -1,0 +1,277 @@
+{"app_name":"P007OpenOnly","timestamp":"2026-11-17 22:57:27.00 -0500","slice_uuid":"1F8BF4E7-AE69-30AE-BEFB-0839362DE04A","build_version":"218.1.3.200","bundleID":"com.apple.quicklook.thumbnail.NotificationExtension","duration_ms":"101081","share_with_app_devs":0,"is_first_party":1,"bug_type":"202","os_version":"iPhone OS 27.2.1 (24B156)","roots_installed":0,"name":"P007OpenOnly","incident_id":"F1A96FBA-5282-4A27-96D5-93959EE02B6E"}
+Date/Time:        2026-11-16 09:26:57.205 -0500
+End time:         2026-11-16 09:28:38.286 -0500
+OS Version:       iPhone OS 27.2.1 (Build 24B156)
+Architecture:     arm64e
+Report Version:   73
+Incident Identifier: F1A96FBA-5282-4A27-96D5-93959EE02B6E
+
+Data Source:      Microstackshots
+Shared Cache:     AA510C22-9325-3B1D-90CB-2A648ACAD7B8 slid base address 0x199afc000
+Shared Cache:     78B55CFF-20F4-3A39-81AF-B6530B7E9789 slid base address 0x192200000
+
+Command:          P007OpenOnly
+Path:             /System/Library/ExtensionKit/Extensions/Notification.appex/Notification
+Identifier:       com.apple.quicklook.thumbnail.NotificationExtension
+Version:          ??? (218.1.3.200)
+Resource Coalition: 791
+Architecture:     arm64
+PID:              562
+
+Event:            cpu usage
+Action taken:     none
+CPU:              90 seconds cpu time over 101 seconds (89% cpu average), exceeding limit of 50% cpu over 180 seconds
+CPU limit:        90s
+Limit duration:   180s
+CPU used:         90s
+CPU duration:     101s
+Duration:         101.08s
+Duration Sampled: 100.24s (event starts 0.33s before samples, event ends 0.52s after samples)
+Steps:            50 (10 gigacycles/step, 22 samples lost)
+
+Hardware model:   iPhone18,2
+Active cpus:      6
+Memory size:      11.42 GB
+HW page size:     16384
+VM page size:     16384
+Shared cache residency: 22.07% (1580.34 MB / 7160.03 MB)
+
+Time Since Wake:  n/a (machine hasn't slept)
+
+Advisory levels:  Battery -> 3, User -> 3, ThermalPressure -> 0, Combined -> 3
+Free disk space:  45.02 GB/237.82 GB, low space threshold 150 MB
+Low Power Mode:   Enabled
+Vnodes Available: 57.80% (16183/28000, 14000 allocated, 14000 soft limit)
+Models:           UNKNOWN
+
+Preferred User Language: en-US
+Country Code:     US
+Keyboards:        en_US QWERTY;ml=1
+OS Cryptex File Extents: 7908
+
+Heaviest stack for the target process:
+  37  ??? (libsystem_pthread.dylib + 2320) [0x19a036910]
+  37  ??? (libsystem_pthread.dylib + 4604) [0x19a0371fc]
+  37  ??? (libdispatch.dylib + 86244) [0x1c85ff0e4]
+  37  ??? (libdispatch.dylib + 84320) [0x1c85fe960]
+  37  ??? (libdispatch.dylib + 114612) [0x1c8605fb4]
+  37  ??? (libdispatch.dylib + 7372) [0x1c85ebccc]
+  37  ??? (Notification + 2079440) [0x104ba3ad0]
+  37  ??? (Notification + 2091108) [0x104ba6864]
+  37  ??? (Notification + 3198984) [0x104cb5008]
+  37  ??? (Notification + 1507516) [0x104b180bc]
+  37  ??? (Notification + 3139464) [0x104ca6788]
+  37  ??? (Notification + 3517936) [0x104d02df0]
+  32  ??? (Notification + 62516) [0x1049b7434]
+
+
+Powerstats for:   P007OpenOnly (Notification) [562]
+UUID:             1F8BF4E7-AE69-30AE-BEFB-0839362DE04A
+Path:             /System/Library/ExtensionKit/Extensions/Notification.appex/Notification
+Identifier:       com.apple.quicklook.thumbnail.NotificationExtension
+Version:          ??? (218.1.3.200)
+Shared Cache:     AA510C22-9325-3B1D-90CB-2A648ACAD7B8 slid base address 0x199afc000
+Resource Coalition: 37 samples 791
+Architecture:     arm64
+Footprint:        249.83 MB -> 283.75 MB (+33.92 MB) (max 298.77 MB )
+Pageins:          42 pages
+Start time:       2026-11-16 09:27:08.653 -0500
+End time:         2026-11-16 09:28:37.768 -0500
+Num samples:      37 (74%)
+Energy:           98.18 mWh
+Num threads:      1
+Primary state:    37 samples Frontmost App, Non-Suppressed, User mode, Effective Thread QoS User Initiated, Requested Thread QoS User Initiated, Override Thread QoS Unspecified, p-core
+User Activity:    0 samples Idle, 37 samples Active
+Power Source:     0 samples on Battery, 37 samples on AC
+  37  ??? (libsystem_pthread.dylib + 2320) [0x19a036910]
+    37  ??? (libsystem_pthread.dylib + 4604) [0x19a0371fc]
+      37  ??? (libdispatch.dylib + 86244) [0x1c85ff0e4]
+        37  ??? (libdispatch.dylib + 84320) [0x1c85fe960]
+          37  ??? (libdispatch.dylib + 114612) [0x1c8605fb4]
+            37  ??? (libdispatch.dylib + 7372) [0x1c85ebccc]
+              37  ??? (Notification + 2079440) [0x104ba3ad0]
+                37  ??? (Notification + 2091108) [0x104ba6864]
+                  37  ??? (Notification + 3198984) [0x104cb5008]
+                    37  ??? (Notification + 1507516) [0x104b180bc]
+                      37  ??? (Notification + 3139464) [0x104ca6788]
+                        37  ??? (Notification + 3517936) [0x104d02df0]
+                          32  ??? (Notification + 62516) [0x1049b7434]
+                          2   ??? (Notification + 62520) [0x1049b7438]
+                          2   ??? (Notification + 62512) [0x1049b7430]
+                          1   ??? (Notification + 62524) [0x1049b743c]
+
+  Binary Images:
+           0x1049a8000 -                ???  com.apple.quicklook.thumbnail.NotificationExtension (218.1.3.200) <1F8BF4E7-AE69-30AE-BEFB-0839362DE04A>  /System/Library/ExtensionKit/Extensions/Notification.appex/Notification
+           0x19a036000 -        0x19a042247  libsystem_pthread.dylib                                           <694C772A-A9F8-3AC0-9417-7C304043A771>  /usr/lib/system/libsystem_pthread.dylib
+           0x1c85ea000 -        0x1c8630d17  libdispatch.dylib                                                 <8CDF4610-F6A5-39CB-94BF-687FE349A4BE>  /usr/lib/system/libdispatch.dylib
+
+
+Powerstats for:   backboardd
+UUID:             BFD04CD7-A5F5-314C-9470-3494B9177E03
+Path:             /usr/libexec/backboardd
+Shared Cache:     AA510C22-9325-3B1D-90CB-2A648ACAD7B8 slid base address 0x199afc000
+Resource Coalition: 3 samples 91
+Architecture:     arm64
+Start time:       2026-11-16 09:27:16.928 -0500
+End time:         2026-11-16 09:28:28.247 -0500
+Num samples:      3 (6%)
+Energy:           429.51 uWh
+Primary state:    2 samples Non-Frontmost App, Non-Suppressed, User mode, Effective Thread QoS Unspecified, Requested Thread QoS Unspecified, Override Thread QoS Unspecified, e-core
+User Activity:    0 samples Idle, 3 samples Active
+Power Source:     0 samples on Battery, 3 samples on AC
+  2  ??? (libsystem_pthread.dylib + 2332) [0x19a03691c]
+    2  ??? (libsystem_pthread.dylib + 16440) [0x19a03a038]
+      2  ??? (QuartzCore + 3840416) [0x19e28c9a0]
+        2  ??? (QuartzCore + 3777120) [0x19e27d260]
+          2  ??? (CoreFoundation + 908712) [0x19a1d4da8]
+            2  ??? (CoreFoundation + 243700) [0x19a1327f4]
+              2  ??? (CoreFoundation + 239156) [0x19a131634]
+                2  ??? (CoreFoundation + 304220) [0x19a14145c]
+                  2  ??? (CoreFoundation + 303692) [0x19a14124c]
+                    2  ??? (CoreFoundation + 157644) [0x19a11d7cc]
+                      2  ??? (QuartzCore + 37928) [0x19deec428]
+                        1  ??? (QuartzCore + 41808) [0x19deed350]
+                          1  ??? (QuartzCore + 198740) [0x19df13854]
+                            1  ??? (QuartzCore + 460240) [0x19df535d0]
+                              1  ??? (QuartzCore + 459932) [0x19df5349c]
+                                1  ??? (QuartzCore + 438868) [0x19df4e254]
+                                  1  ??? (QuartzCore + 698396) [0x19df8d81c]
+                                    1  ??? (QuartzCore + 701212) [0x19df8e31c]
+                                      1  ??? (QuartzCore + 703516) [0x19df8ec1c]
+                                        1  ??? (QuartzCore + 698396) [0x19df8d81c]
+                                          1  ??? (QuartzCore + 701212) [0x19df8e31c]
+                                            1  ??? (QuartzCore + 703516) [0x19df8ec1c]
+                                              1  ??? (QuartzCore + 698396) [0x19df8d81c]
+                                                1  ??? (QuartzCore + 701212) [0x19df8e31c]
+                                                  1  ??? (QuartzCore + 703516) [0x19df8ec1c]
+                                                    1  ??? (QuartzCore + 698396) [0x19df8d81c]
+                                                      1  ??? (QuartzCore + 701212) [0x19df8e31c]
+                                                        1  ??? (QuartzCore + 703516) [0x19df8ec1c]
+                                                          1  ??? (QuartzCore + 698396) [0x19df8d81c]
+                                                            1  ??? (QuartzCore + 701212) [0x19df8e31c]
+                                                              1  ??? (QuartzCore + 703516) [0x19df8ec1c]
+                                                                1  ??? (QuartzCore + 698396) [0x19df8d81c]
+                                                                  1  ??? (QuartzCore + 701212) [0x19df8e31c]
+                                                                    1  ??? (QuartzCore + 703516) [0x19df8ec1c]
+                                                                      1  ??? (QuartzCore + 698396) [0x19df8d81c]
+                                                                        1  ??? (QuartzCore + 701212) [0x19df8e31c]
+                                                                          1  ??? (QuartzCore + 703516) [0x19df8ec1c]
+                                                                            1  ??? (QuartzCore + 698396) [0x19df8d81c]
+                                                                              1  ??? (QuartzCore + 701212) [0x19df8e31c]
+                                                                                1  ??? (QuartzCore + 703516) [0x19df8ec1c]
+                                                                                  1  ??? (QuartzCore + 698396) [0x19df8d81c]
+                                                                                    1  ??? (QuartzCore + 701212) [0x19df8e31c]
+                                                                                      1  ??? (QuartzCore + 703516) [0x19df8ec1c]
+                                                                                        1  ??? (QuartzCore + 698396) [0x19df8d81c]
+                                                                                          1  ??? (QuartzCore + 701212) [0x19df8e31c]
+                                                                                            1  ??? (QuartzCore + 703516) [0x19df8ec1c]
+                                                                                              1  ??? (QuartzCore + 698396) [0x19df8d81c]
+                                                                                                1  ??? (QuartzCore + 701212) [0x19df8e31c]
+                                                                                                  1  ??? (QuartzCore + 703516) [0x19df8ec1c]
+                                                                                                    1  ??? (QuartzCore + 698396) [0x19df8d81c]
+                                                                                                      1  ??? (QuartzCore + 701212) [0x19df8e31c]
+                                                                                                        1  ??? (QuartzCore + 703516) [0x19df8ec1c]
+                                                                                                          1  ??? (QuartzCore + 698396) [0x19df8d81c]
+                                                                                                            1  ??? (QuartzCore + 701212) [0x19df8e31c]
+                                                                                                              1  ??? (QuartzCore + 703516) [0x19df8ec1c]
+                                                                                                                1  ??? (QuartzCore + 698396) [0x19df8d81c]
+                                                                                                                  1  ??? (QuartzCore + 701212) [0x19df8e31c]
+                                                                                                                    1  ??? (QuartzCore + 703516) [0x19df8ec1c]
+                                                                                                                      1  ??? (QuartzCore + 698396) [0x19df8d81c]
+                                                                                                                        1  ??? (QuartzCore + 701212) [0x19df8e31c]
+                                                                                                                          1  ??? (QuartzCore + 703516) [0x19df8ec1c]
+                                                                                                                            1  ??? (QuartzCore + 698396) [0x19df8d81c]
+                                                                                                                              1  ??? (QuartzCore + 701212) [0x19df8e31c]
+                                                                                                                                1  ??? (QuartzCore + 703516) [0x19df8ec1c]
+                                                                                                                                  1  ??? (QuartzCore + 698396) [0x19df8d81c]
+                                                                                                                                    1  ??? (QuartzCore + 701212) [0x19df8e31c]
+                                                                                                                                      1  ??? (QuartzCore + 703516) [0x19df8ec1c]
+                                                                                                                                        1  ??? (QuartzCore + 698396) [0x19df8d81c]
+                                                                                                                                          1  ??? (QuartzCore + 701212) [0x19df8e31c]
+                                                                                                                                            1  ??? (QuartzCore + 703516) [0x19df8ec1c]
+                                                                                                                                              1  ??? (QuartzCore + 698396) [0x19df8d81c]
+                                                                                                                                                1  ??? (QuartzCore + 701212) [0x19df8e31c]
+                                                                                                                                                  1  ??? (QuartzCore + 703516) [0x19df8ec1c]
+                                                                                                                                                    1  ??? (QuartzCore + 698396) [0x19df8d81c]
+                                                                                                                                                      1  ??? (QuartzCore + 701212) [0x19df8e31c]
+                                                                                                                                                        1  ??? (QuartzCore + 703516) [0x19df8ec1c]
+                                                                                                                                                          1  ??? (QuartzCore + 698396) [0x19df8d81c]
+                                                                                                                                                            1  ??? (QuartzCore + 701212) [0x19df8e31c]
+                                                                                                                                                              1  ??? (QuartzCore + 703516) [0x19df8ec1c]
+                                                                                                                                                                1  ??? (QuartzCore + 698396) [0x19df8d81c]
+                                                                                                                                                                  1  ??? (QuartzCore + 701212) [0x19df8e31c]
+                                                                                                                                                                    1  ??? (QuartzCore + 703516) [0x19df8ec1c]
+                                                                                                                                                                      1  ??? (QuartzCore + 698396) [0x19df8d81c]
+                                                                                                                                                                        1  ??? (QuartzCore + 701212) [0x19df8e31c]
+                                                                                                                                                                          1  ??? (QuartzCore + 703516) [0x19df8ec1c]
+                                                                                                                                                                            1  ??? (QuartzCore + 698396) [0x19df8d81c]
+                                                                                                                                                                              1  ??? (QuartzCore + 701212) [0x19df8e31c]
+                                                                                                                                                                                1  ??? (QuartzCore + 703516) [0x19df8ec1c]
+                                                                                                                                                                                  1  ??? (QuartzCore + 698396) [0x19df8d81c]
+                                                                                                                                                                                    1  ??? (QuartzCore + 701212) [0x19df8e31c]
+                                                                                                                                                                                      1  ??? (QuartzCore + 702268) [0x19df8e73c]
+                                                                                                                                                                                        1  ??? (QuartzCore + 685392) [0x19df8a550]
+                                                                                                                                                                                          1  ??? (QuartzCore + 711652) [0x19df90be4]
+                                                                                                                                                                                            1  ??? (QuartzCore + 728012) [0x19df94bcc]
+                                                                                                                                                                                              1  ??? (QuartzCore + 730492) [0x19df9557c]
+                                                                                                                                                                                                1  ??? (QuartzCore + 642456) [0x19df7fd98]
+                                                                                                                                                                                                  1  ??? (QuartzCore + 755080) [0x19df9b588]
+                                                                                                                                                                                                    1  ??? (QuartzCore + 721000) [0x19df93068]
+                                                                                                                                                                                                      1  ??? (QuartzCore + 720448) [0x19df92e40]
+                                                                                                                                                                                                        1  ??? (QuartzCore + 674256) [0x19df879d0]
+                                                                                                                                                                                                          1  ??? (AGXMetalG18P + 5592900) [0x25d4cc744]
+                                                                                                                                                                                                            1  ??? (AGXMetalG18P + 5495732) [0x25d4b4bb4]
+                        1  ??? (QuartzCore + 41284) [0x19deed144]
+                          1  ??? (libsystem_pthread.dylib + 8264) [0x19a038048]
+  1  ??? (libsystem_pthread.dylib + 2312) [0x19a036908]
+    1  <Kernel mode>
+
+  Binary Images:
+           0x100470000 -                ???  backboardd              <BFD04CD7-A5F5-314C-9470-3494B9177E03>  /usr/libexec/backboardd
+           0x19a036000 -        0x19a042247  libsystem_pthread.dylib <694C772A-A9F8-3AC0-9417-7C304043A771>  /usr/lib/system/libsystem_pthread.dylib
+           0x19a0f7000 -        0x19a5d9777  CoreFoundation          <9426FC9A-B36C-3096-B836-D17D6744A75B>  /System/Library/Frameworks/CoreFoundation.framework/CoreFoundation
+           0x19dee3000 -        0x19e35531f  QuartzCore              <76CE2A6E-DBA4-335D-A5AC-77A1C1B286A6>  /System/Library/Frameworks/QuartzCore.framework/QuartzCore
+           0x25cf77000 -        0x25dbed5c3  AGXMetalG18P            <58B4207B-19A2-3DF9-826E-C35E6B136018>  /System/Library/Extensions/AGXMetalG18P.bundle/AGXMetalG18P
+
+
+Powerstats for:   kernel_task
+UUID:             A5A62616-FA9C-337E-9C97-41BB2D427C63
+Version:          Darwin Kernel Version 27.0.0: Thu Aug 13 21:41:35 PDT 2026; root:xnu-13432.2.10~2/RELEASE_ARM64_T8150
+Resource Coalition: 3 samples 1
+Architecture:     arm64
+Start time:       2026-11-16 09:27:00.277 -0500
+End time:         2026-11-16 09:28:07.607 -0500
+Num samples:      3 (6%)
+Energy:           301.60 uWh
+Primary state:    3 samples Non-Frontmost App, Non-Suppressed, Kernel mode, Effective Thread QoS Unspecified, Requested Thread QoS Unspecified, Override Thread QoS Unspecified, e-core
+User Activity:    0 samples Idle, 3 samples Active
+Power Source:     0 samples on Battery, 3 samples on AC
+ *2  ??? (<A5A62616-FA9C-337E-9C97-41BB2D427C63> + 750932) [0xfffffe000abfb554]
+   *1  ??? (<A5A62616-FA9C-337E-9C97-41BB2D427C63> + 750316) [0xfffffe000abfb2ec]
+      1  <p-core>
+   *1  ??? (<A5A62616-FA9C-337E-9C97-41BB2D427C63> + 750316) [0xfffffe000abfb2ec]
+     *1  ??? (<A5A62616-FA9C-337E-9C97-41BB2D427C63> + 2134580) [0xfffffe000ad4d234]
+ *1  ??? (apfs + 1322196) [0xfffffe000aa68534]
+   *1  ??? (apfs + 1329212) [0xfffffe000aa6a09c]
+     *1  ??? (apfs + 1319548) [0xfffffe000aa67adc]
+       *1  ??? (apfs + 149856) [0xfffffe000a94a1c0]
+         *1  ??? (<A5A62616-FA9C-337E-9C97-41BB2D427C63> + 2779328) [0xfffffe000adea8c0]
+           *1  ??? (<A5A62616-FA9C-337E-9C97-41BB2D427C63> + 2841128) [0xfffffe000adf9a28]
+             *1  ??? (IOStorageFamily + 84496) [0xfffffe000a31a020]
+               *1  ??? (apfs + 370652) [0xfffffe000a98003c]
+                 *1  ??? (IONVMeFamily + 249076) [0xfffffe000a1d4e54]
+                   *1  ??? (IONVMeFamily + 176864) [0xfffffe000a1c3440]
+                     *1  ??? (IONVMeFamily + 190276) [0xfffffe000a1c68a4]
+                       *1  ??? (IONVMeFamily + 211328) [0xfffffe000a1cbae0]
+                         *1  ??? (<A5A62616-FA9C-337E-9C97-41BB2D427C63> + 2296020) [0xfffffe000ad748d4]
+                           *1  ??? (<A5A62616-FA9C-337E-9C97-41BB2D427C63> + 9273472) [0xfffffe000b41c080]
+                             *1  ??? [0xfffffff0270a6314]
+                               *1  ??? [0xfffffff0270a64fc]
+                                 *1  ??? [0xfffffff0270ca460]
+                                   *1  ??? [0xfffffff0270df688]
+
+  Binary Images:
+   *0xfffffe000a198160 - 0xfffffe000a1f6c9b  IONVMeFamily    <F77B9A30-7A29-354A-B0CC-819CA50715F4>__TEXT_EXEC  /System/Library/Extensions/IONVMeFamily.kext/IONVMeFamily
+   *0xfffffe000a305610 - 0xfffffe000a321e93  IOStorageFamily <D03C679F-FC20-3354-B887-6E1D83FE115C>__TEXT_EXEC  /System/Library/Extensions/IOStorageFamily.kext/IOStorageFamily
+   *0xfffffe000a925860 - 0xfffffe000aa7b0c3  apfs            <52E81005-4FD8-3832-9338-BB6CC9BB9092>__TEXT_EXEC  /System/Library/Extensions/apfs.kext/apfs
+   *0xfffffe000ab44000 - 0xfffffe000b43ffff  ???             <A5A62616-FA9C-337E-9C97-41BB2D427C63>__TEXT_EXEC

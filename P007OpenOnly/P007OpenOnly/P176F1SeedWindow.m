@@ -108,7 +108,7 @@ static NSString * const kControlXML =
     /* 1. open IOSurfaceRoot (p018 door 1) */
     CFMutableDictionaryRef m = matching("IOSurfaceRoot");
     io_obj_t svc = getsvc(0, m);
-    if (m) CFRelease(m);
+/* the matching dict is CONSUMED by IOServiceGetMatchingService — no CFRelease (the 20:09 0x11d33-era receipt: CFRelease+84 trap) */
     mach_port_t conn = 0;
     kern_return_t kr = open_(svc, mach_task_self(), 0, &conn);
     Lf(@"[open] IOSurfaceRoot kr=0x%x conn=%d", kr, (int)(uintptr_t)conn);

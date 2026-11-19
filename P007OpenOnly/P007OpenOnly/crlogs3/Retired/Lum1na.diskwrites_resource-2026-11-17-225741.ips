@@ -1,0 +1,96 @@
+{"app_name":"Lum1na","timestamp":"2026-11-17 22:57:41.00 -0500","app_version":"1.0","slice_uuid":"26B9CFC6-3A94-35FF-BFD8-65E4EF3C90B1","build_version":"1","bundleID":"com.ma6x9x.Lum1na.GLVKP6RZ39","duration_ms":"433885","share_with_app_devs":0,"is_first_party":0,"bug_type":"145","os_version":"iPhone OS 27.2.1 (24B156)","roots_installed":0,"name":"Lum1na","incident_id":"45CB4DE5-CA4C-47D8-BC16-6343E8E0B042"}
+Date/Time:        2026-11-17 22:47:26.403 -0500
+End time:         2026-11-17 22:54:40.288 -0500
+OS Version:       iPhone OS 27.2.1 (Build 24B156)
+Architecture:     arm64e
+Report Version:   73
+Incident Identifier: 45CB4DE5-CA4C-47D8-BC16-6343E8E0B042
+
+Data Source:      Microstackshots
+Shared Cache:     78B55CFF-20F4-3A39-81AF-B6530B7E9789 slid base address 0x192200000
+
+Command:          Lum1na
+Path:             /private/var/containers/Bundle/Application/E3B825DD-4234-495D-A066-85F04BFE0296/Lum1na.app/Lum1na
+Identifier:       com.ma6x9x.Lum1na.GLVKP6RZ39
+Version:          1.0 (1)
+Is First Party:   No
+Beta Identifier:  1AE1C519-157C-419B-AF46-96A3D73B0920
+Resource Coalition: "com.ma6x9x.Lum1na.GLVKP6RZ39"(1122)
+Architecture:     arm64
+PID:              1021
+
+Event:            disk writes
+Action taken:     none
+Writes:           1073.76 MB of file backed memory dirtied over 434 seconds (2474.75 KB per second average), exceeding limit of 12.43 KB per second over 86400 seconds
+Writes limit:     1073.74 MB
+Limit duration:   86400s
+Writes caused:    1073.76 MB
+Writes duration:  434s
+Duration:         433.88s
+Duration Sampled: 1.62s (event starts 432.26s before samples)
+Steps:            76 (4 samples lost, 10.49 MB/step)
+
+Hardware model:   iPhone18,2
+Active cpus:      6
+Memory size:      11.42 GB
+HW page size:     16384
+VM page size:     16384
+Shared cache residency: 18.35% (1313.75 MB / 7160.03 MB)
+
+Time Since Boot:  2211s
+Time Awake Since Boot: 2211s
+Time Since Wake:  n/a (machine hasn't slept)
+
+Total CPU Time:   1.276s
+Advisory levels:  Battery -> 3, User -> 3, ThermalPressure -> 0, Combined -> 3
+Free disk space:  47.12 GB/237.82 GB, low space threshold 150 MB
+Vnodes Available: 56.67% (15868/28000, 14000 allocated, 14000 soft limit)
+Models:           none
+
+Preferred User Language: en-US
+Country Code:     US
+Keyboards:        en_US QWERTY;ml=1
+OS Cryptex File Extents: 7908
+
+Heaviest stack for the target process:
+  76  ??? (libswift_Concurrency.dylib + 30852) [0x193deb884]
+  76  ??? (Lum1na + 1073104) [0x100d69fd0]
+  76  ??? (Lum1na + 1066776) [0x100d68718]
+  76  ??? (Lum1na + 1073104) [0x100d69fd0]
+  76  ??? (Lum1na + 1059144) [0x100d66948]
+  76  ??? (Lum1na + 702312) [0x100d0f768]
+  73  ??? (libsystem_kernel.dylib + 86412) [0x24e75318c]
+
+
+Powerstats for:   Lum1na [1021]
+UUID:             26B9CFC6-3A94-35FF-BFD8-65E4EF3C90B1
+Path:             /private/var/containers/Bundle/Application/E3B825DD-4234-495D-A066-85F04BFE0296/Lum1na.app/Lum1na
+Identifier:       com.ma6x9x.Lum1na.GLVKP6RZ39
+Version:          1.0 (1)
+Is First Party:   No
+Beta Identifier:  1AE1C519-157C-419B-AF46-96A3D73B0920
+Resource Coalition: 76 samples "com.ma6x9x.Lum1na.GLVKP6RZ39"(1122)
+Architecture:     arm64
+Footprint:        638.34 MB -> 341.94 MB (-296.41 MB)
+Start time:       2026-11-17 22:54:38.662 -0500
+End time:         2026-11-17 22:54:40.279 -0500
+Num samples:      76 (100%)
+Energy:           2171.86 uWh
+Num threads:      1
+Primary state:    76 samples Frontmost App, Non-Suppressed, Kernel mode, Effective Thread QoS User Initiated, Requested Thread QoS User Initiated, Override Thread QoS Unspecified, p-core
+User Activity:    0 samples Idle, 76 samples Active
+Power Source:     76 samples on Battery, 0 samples on AC
+  76  ??? (libswift_Concurrency.dylib + 30852) [0x193deb884]
+    76  ??? (Lum1na + 1073104) [0x100d69fd0]
+      76  ??? (Lum1na + 1066776) [0x100d68718]
+        76  ??? (Lum1na + 1073104) [0x100d69fd0]
+          76  ??? (Lum1na + 1059144) [0x100d66948]
+            76  ??? (Lum1na + 702312) [0x100d0f768]
+              73  ??? (libsystem_kernel.dylib + 86412) [0x24e75318c]
+                7   <e-core>
+              3   ??? (libsystem_kernel.dylib + 28000) [0x24e744d60]
+
+  Binary Images:
+           0x100c64000 -                ???  com.ma6x9x.Lum1na.GLVKP6RZ39 1.0 (1) <26B9CFC6-3A94-35FF-BFD8-65E4EF3C90B1>  /private/var/containers/Bundle/Application/E3B825DD-4234-495D-A066-85F04BFE0296/Lum1na.app/Lum1na
+           0x193de4000 -        0x193e703df  libswift_Concurrency.dylib           <C1F170C0-B349-32B9-8F2D-079D53B04C77>  /usr/lib/swift/libswift_Concurrency.dylib
+           0x24e73e000 -        0x24e77b2db  libsystem_kernel.dylib               <26FFA906-5ACA-39BF-8F7C-94FE9AB8C657>  /usr/lib/system/libsystem_kernel.dylib

@@ -70,7 +70,7 @@ typedef struct { uint64_t a, b, c; } p154_in24_t;
     /* murk §5 dynamic group read — for the record: NOT used without the app group */
     CFMutableDictionaryRef md = sM("IOSurfaceRoot");
     io_obj_t svc = sG(0, md);
-    if (md) CFRelease(md);
+/* the matching dict is CONSUMED by IOServiceGetMatchingService — no CFRelease (the 20:09 0x11d33-era receipt: CFRelease+84 trap) */
     mach_port_t conn = 0;
     kern_return_t kr = svc ? sO(svc, mach_task_self(), 0, &conn) : 0xe00002eb;
     /* M2-style 3x open retry (flap law, p114 v1.5+) */

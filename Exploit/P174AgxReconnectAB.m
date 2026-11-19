@@ -110,7 +110,7 @@ static NSString * const kNormalXML =
     /* seed surface via IOSurfaceRoot sel 0 (in-band XML) */
     CFMutableDictionaryRef m = matching("IOSurfaceRoot");
     io_obj_t rootSvc = getsvc(0, m);
-    if (m) CFRelease(m);
+/* the matching dict is CONSUMED by IOServiceGetMatchingService — no CFRelease (the 20:09 0x11d33-era receipt: CFRelease+84 trap) */
     io_obj_t rootConn = 0;
     kern_return_t kr = opener(rootSvc, mach_task_self(), 0, &rootConn);
     if (kr != KERN_SUCCESS || !rootConn) { Lf(@"[%@] surface root closed — leg void", name); return; }

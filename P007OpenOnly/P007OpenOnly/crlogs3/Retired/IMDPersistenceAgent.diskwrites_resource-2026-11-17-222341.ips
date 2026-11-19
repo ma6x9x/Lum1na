@@ -1,0 +1,228 @@
+{"app_name":"IMDPersistenceAgent","timestamp":"2026-11-17 22:23:41.00 -0500","app_version":"10.0","slice_uuid":"BDE95B83-3E02-39DD-BE08-A6275BB21E2C","build_version":"1000","bundleID":"com.apple.imdpersistence.IMDPersistenceAgent","duration_ms":"26876","share_with_app_devs":0,"is_first_party":1,"bug_type":"145","os_version":"iPhone OS 27.2.1 (24B156)","roots_installed":0,"name":"IMDPersistenceAgent","incident_id":"F95D19CE-F9FD-441E-BFA5-D74DD76A6AF8"}
+Date/Time:        2026-11-17 22:18:09.874 -0500
+End time:         2026-11-17 22:18:36.750 -0500
+OS Version:       iPhone OS 27.2.1 (Build 24B156)
+Architecture:     arm64e
+Report Version:   73
+Incident Identifier: F95D19CE-F9FD-441E-BFA5-D74DD76A6AF8
+
+Data Source:      Microstackshots
+Shared Cache:     78B55CFF-20F4-3A39-81AF-B6530B7E9789 slid base address 0x192200000
+
+Command:          IMDPersistenceAgent
+Path:             /System/Library/PrivateFrameworks/IMDPersistence.framework/XPCServices/IMDPersistenceAgent.xpc/IMDPersistenceAgent
+Identifier:       com.apple.imdpersistence.IMDPersistenceAgent
+Version:          10.0 (1000)
+Resource Coalition: "com.apple.imdpersistence.IMDPersistenceAgent"(397)
+On Behalf Of:     104 samples UNKNOWN [89] (104 samples originated by UNKNOWN [89])
+Architecture:     arm64e
+Parent:           UNKNOWN [1]
+PID:              241
+
+Event:            disk writes
+Action taken:     none
+Writes:           1073.74 MB of file backed memory dirtied over 27 seconds (39.95 MB per second average), exceeding limit of 12.43 KB per second over 86400 seconds
+Writes limit:     1073.74 MB
+Limit duration:   86400s
+Writes caused:    1073.74 MB
+Writes duration:  27s
+Duration:         26.88s
+Duration Sampled: 21.23s (event starts 5.62s before samples)
+Steps:            127 (10.49 MB/step)
+
+Hardware model:   iPhone18,2
+Active cpus:      6
+Memory size:      11.42 GB
+HW page size:     16384
+VM page size:     16384
+Shared cache residency: 17.71% (1268.23 MB / 7160.03 MB)
+
+Time Since Boot:  28s
+Time Awake Since Boot: 28s
+Time Since Wake:  n/a (machine hasn't slept)
+
+Total CPU Time:   6.195s
+Advisory levels:  Battery -> 2, User -> 3, ThermalPressure -> 10, Combined -> 1
+Free disk space:  47.21 GB/237.82 GB, low space threshold 150 MB
+Vnodes Available: 63.50% (17781/28000, 14000 allocated, 14000 soft limit)
+Models:           none
+
+Preferred User Language: en-US
+Country Code:     US
+Keyboards:        en_US QWERTY;ml=1
+OS Cryptex File Extents: 7908
+
+Heaviest stack for the target process:
+  104  ??? (libsystem_pthread.dylib + 2320) [0x19273b910]
+  104  ??? (libsystem_pthread.dylib + 4664) [0x19273c238]
+  104  ??? (libdispatch.dylib + 87728) [0x1c11856b0]
+  104  ??? (libdispatch.dylib + 89228) [0x1c1185c8c]
+  104  ??? (libdispatch.dylib + 46192) [0x1c117b470]
+  104  ??? (libdispatch.dylib + 43132) [0x1c117a87c]
+  104  ??? (libdispatch.dylib + 114612) [0x1c118bfb4]
+  104  ??? (libdispatch.dylib + 72912) [0x1c1181cd0]
+  104  ??? (CoreSDB + 3604) [0x2745abe14]
+  104  ??? (libdispatch.dylib + 27956) [0x1c1176d34]
+  104  ??? (libdispatch.dylib + 114612) [0x1c118bfb4]
+  104  ??? (IMDPersistence + 1281488) [0x1d044ddd0]
+  104  ??? (IMDPersistence + 1203244) [0x1d043ac2c]
+  104  ??? (IMDPersistence + 160708) [0x1d033c3c4]
+  104  ??? (IMDPersistence + 103176) [0x1d032e308]
+  104  ??? (IMDPersistence + 104148) [0x1d032e6d4]
+  104  ??? (CoreSDB + 11452) [0x2745adcbc]
+  104  ??? (CoreSDB + 11604) [0x2745add54]
+  104  ??? (libdispatch.dylib + 74032) [0x1c1182130]
+  104  ??? (libdispatch.dylib + 114612) [0x1c118bfb4]
+  104  ??? (CoreSDB + 4504) [0x2745ac198]
+  104  ??? (CoreSDB + 5540) [0x2745ac5a4]
+  104  ??? (CoreSDB + 15172) [0x2745aeb44]
+  104  ??? (CoreSDB + 51568) [0x2745b7970]
+  102  ??? (IMDPersistence + 1024988) [0x1d040f3dc]
+  102  ??? (CoreSDB + 14040) [0x2745ae6d8]
+  102  ??? (CoreSDB + 4808) [0x2745ac2c8]
+  102  ??? (libsqlite3.dylib + 190500) [0x1b0632824]
+  102  ??? (libsqlite3.dylib + 198444) [0x1b063472c]
+  70   ??? (libsqlite3.dylib + 769820) [0x1b06bff1c]
+  70   ??? (libsqlite3.dylib + 804840) [0x1b06c87e8]
+  70   ??? (libsqlite3.dylib + 805108) [0x1b06c88f4]
+  70   ??? (libsqlite3.dylib + 805120) [0x1b06c8900]
+  70   ??? (libsqlite3.dylib + 190500) [0x1b0632824]
+  49   ??? (libsqlite3.dylib + 220348) [0x1b0639cbc]
+  49   ??? (libsqlite3.dylib + 328776) [0x1b0654448]
+  49   ??? (libsqlite3.dylib + 317632) [0x1b06518c0]
+  49   ??? (libsqlite3.dylib + 356940) [0x1b065b24c]
+  49   ??? (libsqlite3.dylib + 708376) [0x1b06b0f18]
+  49   ??? (libsqlite3.dylib + 778084) [0x1b06c1f64]
+  49   ??? (libsqlite3.dylib + 374116) [0x1b065f564]
+  49   ??? (libsqlite3.dylib + 332304) [0x1b0655210]
+  49   ??? (libsystem_kernel.dylib + 27740) [0x24e744c5c]
+
+
+Powerstats for:   IMDPersistenceAgent [241]
+UUID:             BDE95B83-3E02-39DD-BE08-A6275BB21E2C
+Path:             /System/Library/PrivateFrameworks/IMDPersistence.framework/XPCServices/IMDPersistenceAgent.xpc/IMDPersistenceAgent
+Identifier:       com.apple.imdpersistence.IMDPersistenceAgent
+Version:          10.0 (1000)
+Resource Coalition: 104 samples "com.apple.imdpersistence.IMDPersistenceAgent"(397)
+On Behalf Of:     104 samples UNKNOWN [89] (104 samples originated by UNKNOWN [89])
+Architecture:     arm64e
+Parent:           UNKNOWN [1]
+UID:              501
+Sudden Term:      Tracked (allows idle exit)
+Footprint:        4128 KB -> 24.81 MB (+20.78 MB)
+Pageins:          2 pages
+Start time:       2026-11-17 22:18:32.633 -0500
+End time:         2026-11-17 22:18:36.725 -0500
+Num samples:      104 (82%)
+Energy:           270.65 uWh
+Num threads:      1
+Primary state:    104 samples Non-Frontmost App, Non-Suppressed, Kernel mode, Effective Thread QoS User Initiated, Requested Thread QoS User Initiated, Override Thread QoS Unspecified, e-core
+User Activity:    0 samples Idle, 104 samples Active
+Power Source:     104 samples on Battery, 0 samples on AC
+  104  ??? (libsystem_pthread.dylib + 2320) [0x19273b910]
+    104  ??? (libsystem_pthread.dylib + 4664) [0x19273c238]
+      104  ??? (libdispatch.dylib + 87728) [0x1c11856b0]
+        104  ??? (libdispatch.dylib + 89228) [0x1c1185c8c]
+          104  ??? (libdispatch.dylib + 46192) [0x1c117b470]
+            104  ??? (libdispatch.dylib + 43132) [0x1c117a87c]
+              104  ??? (libdispatch.dylib + 114612) [0x1c118bfb4]
+                104  ??? (libdispatch.dylib + 72912) [0x1c1181cd0]
+                  104  ??? (CoreSDB + 3604) [0x2745abe14]
+                    104  ??? (libdispatch.dylib + 27956) [0x1c1176d34]
+                      104  ??? (libdispatch.dylib + 114612) [0x1c118bfb4]
+                        104  ??? (IMDPersistence + 1281488) [0x1d044ddd0]
+                          104  ??? (IMDPersistence + 1203244) [0x1d043ac2c]
+                            104  ??? (IMDPersistence + 160708) [0x1d033c3c4]
+                              104  ??? (IMDPersistence + 103176) [0x1d032e308]
+                                104  ??? (IMDPersistence + 104148) [0x1d032e6d4]
+                                  104  ??? (CoreSDB + 11452) [0x2745adcbc]
+                                    104  ??? (CoreSDB + 11604) [0x2745add54]
+                                      104  ??? (libdispatch.dylib + 74032) [0x1c1182130]
+                                        104  ??? (libdispatch.dylib + 114612) [0x1c118bfb4]
+                                          104  ??? (CoreSDB + 4504) [0x2745ac198]
+                                            104  ??? (CoreSDB + 5540) [0x2745ac5a4]
+                                              104  ??? (CoreSDB + 15172) [0x2745aeb44]
+                                                104  ??? (CoreSDB + 51568) [0x2745b7970]
+                                                  102  ??? (IMDPersistence + 1024988) [0x1d040f3dc]
+                                                    102  ??? (CoreSDB + 14040) [0x2745ae6d8]
+                                                      102  ??? (CoreSDB + 4808) [0x2745ac2c8]
+                                                        102  ??? (libsqlite3.dylib + 190500) [0x1b0632824]
+                                                          102  ??? (libsqlite3.dylib + 198444) [0x1b063472c]
+                                                            70   ??? (libsqlite3.dylib + 769820) [0x1b06bff1c]
+                                                              70   ??? (libsqlite3.dylib + 804840) [0x1b06c87e8]
+                                                                70   ??? (libsqlite3.dylib + 805108) [0x1b06c88f4]
+                                                                  70   ??? (libsqlite3.dylib + 805120) [0x1b06c8900]
+                                                                    70   ??? (libsqlite3.dylib + 190500) [0x1b0632824]
+                                                                      49   ??? (libsqlite3.dylib + 220348) [0x1b0639cbc]
+                                                                        49   ??? (libsqlite3.dylib + 328776) [0x1b0654448]
+                                                                          49   ??? (libsqlite3.dylib + 317632) [0x1b06518c0]
+                                                                            49   ??? (libsqlite3.dylib + 356940) [0x1b065b24c]
+                                                                              49   ??? (libsqlite3.dylib + 708376) [0x1b06b0f18]
+                                                                                49   ??? (libsqlite3.dylib + 778084) [0x1b06c1f64]
+                                                                                  49   ??? (libsqlite3.dylib + 374116) [0x1b065f564]
+                                                                                    49   ??? (libsqlite3.dylib + 332304) [0x1b0655210]
+                                                                                      49   ??? (libsystem_kernel.dylib + 27740) [0x24e744c5c]
+                                                                                        49   <on behalf of UNKNOWN [89] (originated by UNKNOWN [89])>
+                                                                      19   ??? (libsqlite3.dylib + 209500) [0x1b063725c]
+                                                                        19   ??? (libsqlite3.dylib + 328776) [0x1b0654448]
+                                                                          19   ??? (libsqlite3.dylib + 322900) [0x1b0652d54]
+                                                                            19   ??? (libsqlite3.dylib + 356940) [0x1b065b24c]
+                                                                              19   ??? (libsqlite3.dylib + 708376) [0x1b06b0f18]
+                                                                                19   ??? (libsqlite3.dylib + 778084) [0x1b06c1f64]
+                                                                                  19   ??? (libsqlite3.dylib + 374116) [0x1b065f564]
+                                                                                    19   ??? (libsqlite3.dylib + 332304) [0x1b0655210]
+                                                                                      19   ??? (libsystem_kernel.dylib + 27740) [0x24e744c5c]
+                                                                                        19   <on behalf of UNKNOWN [89] (originated by UNKNOWN [89])>
+                                                                      2    ??? (libsqlite3.dylib + 225736) [0x1b063b1c8]
+                                                                        2    ??? (libsqlite3.dylib + 356940) [0x1b065b24c]
+                                                                          2    ??? (libsqlite3.dylib + 708376) [0x1b06b0f18]
+                                                                            2    ??? (libsqlite3.dylib + 778084) [0x1b06c1f64]
+                                                                              2    ??? (libsqlite3.dylib + 374116) [0x1b065f564]
+                                                                                2    ??? (libsqlite3.dylib + 332304) [0x1b0655210]
+                                                                                  2    ??? (libsystem_kernel.dylib + 27740) [0x24e744c5c]
+                                                                                    2    <on behalf of UNKNOWN [89] (originated by UNKNOWN [89])>
+                                                            32   ??? (libsqlite3.dylib + 770088) [0x1b06c0028]
+                                                              32   ??? (libsqlite3.dylib + 806044) [0x1b06c8c9c]
+                                                                32   ??? (libsqlite3.dylib + 511848) [0x1b0680f68]
+                                                                  32   ??? (libsqlite3.dylib + 513640) [0x1b0681668]
+                                                                    32   ??? (libsqlite3.dylib + 708376) [0x1b06b0f18]
+                                                                      32   ??? (libsqlite3.dylib + 778108) [0x1b06c1f7c]
+                                                                        32   ??? (libsqlite3.dylib + 721256) [0x1b06b4168]
+                                                                          32   ??? (libsqlite3.dylib + 332304) [0x1b0655210]
+                                                                            32   ??? (libsystem_kernel.dylib + 27740) [0x24e744c5c]
+                                                                              32   <on behalf of UNKNOWN [89] (originated by UNKNOWN [89])>
+                                                  2    ??? (IMDPersistence + 1024968) [0x1d040f3c8]
+                                                    2    ??? (IMDPersistence + 445488) [0x1d0381c30]
+                                                      2    ??? (IMDPersistence + 444716) [0x1d038192c]
+                                                        2    ??? (IMDPersistence + 1033140) [0x1d04113b4]
+                                                          2    ??? (IMDPersistence + 145692) [0x1d033891c]
+                                                            2    ??? (IMDPersistence + 106956) [0x1d032f1cc]
+                                                              2    ??? (IMDPersistence + 107144) [0x1d032f288]
+                                                                2    ??? (CoreSDB + 4808) [0x2745ac2c8]
+                                                                  1    ??? (libsqlite3.dylib + 191272) [0x1b0632b28]
+                                                                    1    ??? (libsqlite3.dylib + 333324) [0x1b065560c]
+                                                                      1    ??? (libsqlite3.dylib + 572652) [0x1b068fcec]
+                                                                        1    ??? (libsqlite3.dylib + 1234092) [0x1b07314ac]
+                                                                          1    ??? (libsqlite3.dylib + 412936) [0x1b0668d08]
+                                                                            1    ??? (libsqlite3.dylib + 332304) [0x1b0655210]
+                                                                              1    ??? (libsystem_kernel.dylib + 27740) [0x24e744c5c]
+                                                                                1    <on behalf of UNKNOWN [89] (originated by UNKNOWN [89])>
+                                                                  1    ??? (libsqlite3.dylib + 190500) [0x1b0632824]
+                                                                    1    ??? (libsqlite3.dylib + 235444) [0x1b063d7b4]
+                                                                      1    ??? (libsqlite3.dylib + 93984) [0x1b061af20]
+                                                                        1    ??? (libsqlite3.dylib + 261988) [0x1b0643f64]
+                                                                          1    ??? (libsqlite3.dylib + 263088) [0x1b06443b0]
+                                                                            1    ??? (libsqlite3.dylib + 331400) [0x1b0654e88]
+                                                                              1    ??? (libsqlite3.dylib + 721256) [0x1b06b4168]
+                                                                                1    ??? (libsqlite3.dylib + 332304) [0x1b0655210]
+                                                                                  1    ??? (libsystem_kernel.dylib + 27740) [0x24e744c5c]
+                                                                                    1    <on behalf of UNKNOWN [89] (originated by UNKNOWN [89])>
+
+  Binary Images:
+           0x1028b0000 -                ???  com.apple.imdpersistence.IMDPersistenceAgent 10.0 (1000) <BDE95B83-3E02-39DD-BE08-A6275BB21E2C>  /System/Library/PrivateFrameworks/IMDPersistence.framework/XPCServices/IMDPersistenceAgent.xpc/IMDPersistenceAgent
+           0x19273b000 -        0x1927471e7  libsystem_pthread.dylib                                  <32E28303-2AAD-3166-9D11-70E8BCF8E076>  /usr/lib/system/libsystem_pthread.dylib
+           0x1b0604000 -        0x1b07bc74f  libsqlite3.dylib                                         <6145839A-8C5B-3186-8AF6-CEE4C1AFDBC8>  /usr/lib/libsqlite3.dylib
+           0x1c1170000 -        0x1c11b6dd7  libdispatch.dylib                                        <84B7E81D-B830-384F-A103-96323C6F5189>  /usr/lib/system/libdispatch.dylib
+           0x1d0315000 -        0x1d070314b  IMDPersistence                                           <31D20608-4E89-390E-BCDA-A4619C020445>  /System/Library/PrivateFrameworks/IMDPersistence.framework/IMDPersistence
+           0x24e73e000 -        0x24e77b2db  libsystem_kernel.dylib                                   <26FFA906-5ACA-39BF-8F7C-94FE9AB8C657>  /usr/lib/system/libsystem_kernel.dylib
+           0x2745ab000 -        0x2745bd807  CoreSDB                                                  <2271F5AF-F6DF-37D4-B2EE-7478021CEED1>  /System/Library/PrivateFrameworks/CoreSDB.framework/CoreSDB

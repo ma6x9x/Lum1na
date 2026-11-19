@@ -1,0 +1,144 @@
+{"app_name":"P007OpenOnly","timestamp":"2026-11-17 22:57:29.00 -0500","app_version":"1.0","slice_uuid":"BAEC5A45-A1F9-3F8F-AFA8-EBE657DB6BCE","build_version":"1","bundleID":"ma6x9x.P007OpenOnly.GLVKP6RZ39","duration_ms":"156133","share_with_app_devs":0,"is_first_party":0,"bug_type":"202","os_version":"iPhone OS 27.2.1 (24B156)","roots_installed":0,"name":"P007OpenOnly","incident_id":"469A1BD7-6F24-434B-991F-EEFF3E9574F7"}
+Date/Time:        2026-11-17 22:36:16.755 -0500
+End time:         2026-11-17 22:38:52.888 -0500
+OS Version:       iPhone OS 27.2.1 (Build 24B156)
+Architecture:     arm64e
+Report Version:   73
+Incident Identifier: 469A1BD7-6F24-434B-991F-EEFF3E9574F7
+
+Data Source:      Microstackshots
+Shared Cache:     78B55CFF-20F4-3A39-81AF-B6530B7E9789 slid base address 0x192200000
+
+Command:          P007OpenOnly
+Path:             /private/var/containers/Bundle/Application/0A9B2F3C-EB37-431C-83DA-A40CF43BD32A/P007OpenOnly.app/P007OpenOnly
+Identifier:       ma6x9x.P007OpenOnly.GLVKP6RZ39
+Version:          1.0 (1)
+Is First Party:   No
+Beta Identifier:  F6B96C97-3DAA-45C2-A349-1E449F57C06C
+Resource Coalition: "ma6x9x.P007OpenOnly.GLVKP6RZ39"(1103)
+Architecture:     arm64
+PID:              967
+
+Event:            cpu usage
+Action taken:     none
+CPU:              90 seconds cpu time over 156 seconds (58% cpu average), exceeding limit of 50% cpu over 180 seconds
+CPU limit:        90s
+Limit duration:   180s
+CPU used:         90s
+CPU duration:     156s
+Duration:         156.13s
+Duration Sampled: 89.24s (event starts 65.27s before samples, event ends 1.62s after samples)
+Steps:            41 (10 gigacycles/step, 51 samples lost)
+
+Hardware model:   iPhone18,2
+Active cpus:      6
+Memory size:      11.42 GB
+HW page size:     16384
+VM page size:     16384
+Shared cache residency: 19.00% (1360.45 MB / 7160.03 MB)
+
+Time Since Boot:  1174s
+Time Awake Since Boot: 1174s
+Time Since Wake:  n/a (machine hasn't slept)
+
+Total CPU Time:   91.957s
+Advisory levels:  Battery -> 3, User -> 3, ThermalPressure -> 0, Combined -> 3
+Free disk space:  45.02 GB/237.82 GB, low space threshold 150 MB
+Vnodes Available: 56.13% (15716/28000, 14000 allocated, 14000 soft limit)
+Models:           UNKNOWN
+
+Preferred User Language: en-US
+Country Code:     US
+Keyboards:        en_US QWERTY;ml=1
+OS Cryptex File Extents: 7908
+
+Heaviest stack for the target process:
+  40  ??? (libsystem_pthread.dylib + 2320) [0x19273b910]
+  40  ??? (libsystem_pthread.dylib + 4604) [0x19273c1fc]
+  40  ??? (libdispatch.dylib + 86244) [0x1c11850e4]
+  40  ??? (libdispatch.dylib + 84320) [0x1c1184960]
+  40  ??? (libdispatch.dylib + 114612) [0x1c118bfb4]
+  40  ??? (libdispatch.dylib + 7372) [0x1c1171ccc]
+  39  ??? (P007OpenOnly + 2088568) [0x104581e78]
+  39  ??? (P007OpenOnly + 2100236) [0x104584c0c]
+  39  ??? (P007OpenOnly + 3208992) [0x104693720]
+  39  ??? (P007OpenOnly + 1516644) [0x1044f6464]
+  39  ??? (P007OpenOnly + 3148592) [0x104684b30]
+  39  ??? (P007OpenOnly + 3527944) [0x1046e1508]
+  32  ??? (P007OpenOnly + 62516) [0x104393434]
+
+
+Powerstats for:   P007OpenOnly [967]
+UUID:             BAEC5A45-A1F9-3F8F-AFA8-EBE657DB6BCE
+Path:             /private/var/containers/Bundle/Application/0A9B2F3C-EB37-431C-83DA-A40CF43BD32A/P007OpenOnly.app/P007OpenOnly
+Identifier:       ma6x9x.P007OpenOnly.GLVKP6RZ39
+Version:          1.0 (1)
+Is First Party:   No
+Beta Identifier:  F6B96C97-3DAA-45C2-A349-1E449F57C06C
+Resource Coalition: 41 samples "ma6x9x.P007OpenOnly.GLVKP6RZ39"(1103)
+Architecture:     arm64
+Footprint:        237.81 MB -> 304.12 MB (+66.31 MB) (max 336.33 MB )
+Pageins:          209 pages
+Start time:       2026-11-17 22:37:22.029 -0500
+End time:         2026-11-17 22:38:51.268 -0500
+Num samples:      41 (100%)
+Energy:           105.80 mWh
+Num threads:      3
+Primary state:    37 samples Frontmost App, Non-Suppressed, User mode, Effective Thread QoS User Initiated, Requested Thread QoS User Initiated, Override Thread QoS Unspecified, p-core
+User Activity:    0 samples Idle, 41 samples Active
+Power Source:     41 samples on Battery, 0 samples on AC
+  40  ??? (libsystem_pthread.dylib + 2320) [0x19273b910]
+    40  ??? (libsystem_pthread.dylib + 4604) [0x19273c1fc]
+      40  ??? (libdispatch.dylib + 86244) [0x1c11850e4]
+        40  ??? (libdispatch.dylib + 84320) [0x1c1184960]
+          40  ??? (libdispatch.dylib + 114612) [0x1c118bfb4]
+            40  ??? (libdispatch.dylib + 7372) [0x1c1171ccc]
+              39  ??? (P007OpenOnly + 2088568) [0x104581e78]
+                39  ??? (P007OpenOnly + 2100236) [0x104584c0c]
+                  39  ??? (P007OpenOnly + 3208992) [0x104693720]
+                    39  ??? (P007OpenOnly + 1516644) [0x1044f6464]
+                      39  ??? (P007OpenOnly + 3148592) [0x104684b30]
+                        39  ??? (P007OpenOnly + 3527944) [0x1046e1508]
+                          32  ??? (P007OpenOnly + 62516) [0x104393434]
+                          3   ??? (P007OpenOnly + 62524) [0x10439343c]
+                          2   ??? (P007OpenOnly + 62520) [0x104393438]
+                          1   ??? (libsystem_kernel.dylib + 86412) [0x24e75318c]
+                            1   <Kernel mode>
+                          1   ??? (libsystem_kernel.dylib + 28000) [0x24e744d60]
+                            1   <Kernel mode>
+              1   ??? (P007OpenOnly + 1059264) [0x1044869c0]
+                1   ??? (P007OpenOnly + 1057212) [0x1044861bc]
+                  1   ??? (CoreML + 29024) [0x1a7d49160]
+                    1   ??? (CoreML + 277664) [0x1a7d85ca0]
+                      1   ??? (CoreML + 57936) [0x1a7d50250]
+                        1   ??? (CoreML + 289448) [0x1a7d88aa8]
+                          1   ??? (libdispatch.dylib + 74032) [0x1c1182130]
+                            1   ??? (libdispatch.dylib + 114612) [0x1c118bfb4]
+                              1   ??? (CoreML + 157192) [0x1a7d68608]
+                                1   ??? (CoreML + 289772) [0x1a7d88bec]
+                                  1   ??? (CoreML + 290828) [0x1a7d8900c]
+                                    1   ??? (libdispatch.dylib + 74032) [0x1c1182130]
+                                      1   ??? (libdispatch.dylib + 114612) [0x1c118bfb4]
+                                        1   ??? (CoreML + 153092) [0x1a7d67604]
+                                          1   ??? (CoreML + 280784) [0x1a7d868d0]
+                                            1   ??? (CoreML + 285028) [0x1a7d87964]
+                                              1   ??? (Espresso + 436896) [0x1a6ed2aa0]
+                                                1   ??? (Espresso + 84344) [0x1a6e7c978]
+                                                  1   ??? (Espresso + 130336) [0x1a6e87d20]
+                                                    1   ??? (Espresso + 433920) [0x1a6ed1f00]
+                                                      1   ??? (Espresso + 3985176) [0x1a7234f18]
+                                                        1   ??? (IOKit + 3864) [0x1a12f9f18]
+                                                          1   <Kernel mode>
+  1   ??? (libsystem_pthread.dylib + 2332) [0x19273b91c]
+    1   ??? (libsystem_pthread.dylib + 16412) [0x19273f01c]
+      1   ??? (libsystem_kernel.dylib + 4832) [0x24e73f2e0]
+        1   <Kernel mode, e-core>
+
+  Binary Images:
+           0x104384000 -                ???  ma6x9x.P007OpenOnly.GLVKP6RZ39 1.0 (1) <BAEC5A45-A1F9-3F8F-AFA8-EBE657DB6BCE>  /private/var/containers/Bundle/Application/0A9B2F3C-EB37-431C-83DA-A40CF43BD32A/P007OpenOnly.app/P007OpenOnly
+           0x19273b000 -        0x1927471e7  libsystem_pthread.dylib                <32E28303-2AAD-3166-9D11-70E8BCF8E076>  /usr/lib/system/libsystem_pthread.dylib
+           0x1a12f9000 -        0x1a13c146f  IOKit                                  <0F6D3E5D-B989-3436-A117-3AD7012463E5>  /System/Library/Frameworks/IOKit.framework/Versions/A/IOKit
+           0x1a6e68000 -        0x1a7d41e2f  Espresso                               <AB1A7CF2-BB47-3C58-929F-4632C7DBA693>  /System/Library/PrivateFrameworks/Espresso.framework/Espresso
+           0x1a7d42000 -        0x1a853da9b  CoreML                                 <9DB86739-477D-3C04-8645-2B265E5307A6>  /System/Library/Frameworks/CoreML.framework/CoreML
+           0x1c1170000 -        0x1c11b6dd7  libdispatch.dylib                      <84B7E81D-B830-384F-A103-96323C6F5189>  /usr/lib/system/libdispatch.dylib
+           0x24e73e000 -        0x24e77b2db  libsystem_kernel.dylib                 <26FFA906-5ACA-39BF-8F7C-94FE9AB8C657>  /usr/lib/system/libsystem_kernel.dylib

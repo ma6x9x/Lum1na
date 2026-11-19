@@ -1,0 +1,117 @@
+{"app_name":"STExtractionService","timestamp":"2026-11-17 23:55:08.00 -0500","app_version":"1.0","slice_uuid":"CEF9547E-B85D-38B0-A302-2755DBF6ECE4","build_version":"1","bundleID":"com.apple.STExtractionService","duration_ms":"555457","share_with_app_devs":0,"is_first_party":1,"bug_type":"145","os_version":"iPhone OS 27.2.1 (24B156)","roots_installed":0,"name":"STExtractionService","incident_id":"6D0EFB6A-1C57-4204-A782-2069F7192C26"}
+Date/Time:        2026-11-17 23:45:51.678 -0500
+End time:         2026-11-17 23:55:07.135 -0500
+OS Version:       iPhone OS 27.2.1 (Build 24B156)
+Architecture:     arm64e
+Report Version:   73
+Incident Identifier: 6D0EFB6A-1C57-4204-A782-2069F7192C26
+
+Data Source:      Microstackshots
+Shared Cache:     78B55CFF-20F4-3A39-81AF-B6530B7E9789 slid base address 0x1945d8000
+Shared Cache:     78B55CFF-20F4-3A39-81AF-B6530B7E9789 slid base address 0x19483c000
+
+Command:          STExtractionService
+Path:             /System/Library/PrivateFrameworks/StreamingExtractor.framework/XPCServices/STExtractionService.xpc/STExtractionService
+Identifier:       com.apple.STExtractionService
+Version:          1.0 (1)
+Resource Coalition: 319
+On Behalf Of:     403 samples UNKNOWN [198] (403 samples originated by UNKNOWN [198])
+Architecture:     arm64
+PID:              813
+
+Event:            disk writes
+Action taken:     none
+Writes:           4295.15 MB of file backed memory dirtied over 555 seconds (7732.64 KB per second average), exceeding limit of 49.71 KB per second over 86400 seconds
+Writes limit:     4294.97 MB
+Limit duration:   86400s
+Writes caused:    4295.15 MB
+Writes duration:  555s
+Duration:         555.46s
+Duration Sampled: 553.08s (event starts 1.38s before samples, event ends 1.00s after samples)
+Steps:            448 (10.49 MB/step)
+
+Hardware model:   iPhone18,2
+Active cpus:      6
+Memory size:      11.42 GB
+HW page size:     16384
+VM page size:     16384
+
+Models:           UNKNOWN
+
+OS Cryptex File Extents: 7908
+
+Heaviest stack for the target process:
+  403  ??? (libsystem_pthread.dylib + 2320) [0x194b13910]
+  403  ??? (libsystem_pthread.dylib + 4664) [0x194b14238]
+  403  ??? (libdispatch.dylib + 87728) [0x1c355d6b0]
+  403  ??? (libdispatch.dylib + 89228) [0x1c355dc8c]
+  403  ??? (libdispatch.dylib + 46192) [0x1c3553470]
+  403  ??? (libdispatch.dylib + 43132) [0x1c355287c]
+  403  ??? (libdispatch.dylib + 114612) [0x1c3563fb4]
+  403  ??? (libdispatch.dylib + 7372) [0x1c3549ccc]
+  403  ??? (STExtractionService + 11728) [0x104e42dd0]
+  403  ??? (<7D3EE4CD-6C84-3E11-9D70-3BC2791369CA> + 9672) [0x104f4e5c8]
+  403  ??? (Foundation + 187500) [0x1950e6c6c]
+  403  ??? (<7D3EE4CD-6C84-3E11-9D70-3BC2791369CA> + 10400) [0x104f4e8a0]
+  403  ??? (libAppleArchive.dylib + 76544) [0x2db6a1b00]
+  403  ??? (libAppleArchive.dylib + 355636) [0x2db6e5d34]
+  403  ??? (libAppleArchive.dylib + 67740) [0x2db69f89c]
+  403  ??? (libAppleArchive.dylib + 231780) [0x2db6c7964]
+  403  ??? (libAppleArchive.dylib + 68516) [0x2db69fba4]
+  403  ??? (libAppleArchive.dylib + 274512) [0x2db6d2050]
+  390  ??? (libAppleArchive.dylib + 12140) [0x2db691f6c]
+  390  ??? (libsystem_kernel.dylib + 28000) [0x250b1cd60]
+
+
+Powerstats for:   STExtractionService [813]
+UUID:             CEF9547E-B85D-38B0-A302-2755DBF6ECE4
+Path:             /System/Library/PrivateFrameworks/StreamingExtractor.framework/XPCServices/STExtractionService.xpc/STExtractionService
+Identifier:       com.apple.STExtractionService
+Version:          1.0 (1)
+Shared Cache:     78B55CFF-20F4-3A39-81AF-B6530B7E9789 slid base address 0x1945d8000
+Resource Coalition: 403 samples 319
+On Behalf Of:     403 samples UNKNOWN [198] (403 samples originated by UNKNOWN [198])
+Architecture:     arm64
+Sudden Term:      Tracked (allows idle exit)
+Footprint:        9456 KB -> 8576 KB (-880 KB) (max 10.56 MB )
+Start time:       2026-11-17 23:45:53.061 -0500
+End time:         2026-11-17 23:55:06.136 -0500
+Num samples:      403 (90%)
+Energy:           7223.74 uWh
+Num threads:      2
+Primary state:    403 samples Non-Frontmost App, Non-Suppressed, Kernel mode, Effective Thread QoS Background, Requested Thread QoS Background, Override Thread QoS Unspecified, e-core
+User Activity:    0 samples Idle, 403 samples Active
+Power Source:     403 samples on Battery, 0 samples on AC
+  403  ??? (libsystem_pthread.dylib + 2320) [0x194b13910]
+    403  ??? (libsystem_pthread.dylib + 4664) [0x194b14238]
+      403  ??? (libdispatch.dylib + 87728) [0x1c355d6b0]
+        403  ??? (libdispatch.dylib + 89228) [0x1c355dc8c]
+          403  ??? (libdispatch.dylib + 46192) [0x1c3553470]
+            403  ??? (libdispatch.dylib + 43132) [0x1c355287c]
+              403  ??? (libdispatch.dylib + 114612) [0x1c3563fb4]
+                403  ??? (libdispatch.dylib + 7372) [0x1c3549ccc]
+                  403  ??? (STExtractionService + 11728) [0x104e42dd0]
+                    403  ??? (<7D3EE4CD-6C84-3E11-9D70-3BC2791369CA> + 9672) [0x104f4e5c8]
+                      403  ??? (Foundation + 187500) [0x1950e6c6c]
+                        403  ??? (<7D3EE4CD-6C84-3E11-9D70-3BC2791369CA> + 10400) [0x104f4e8a0]
+                          403  ??? (libAppleArchive.dylib + 76544) [0x2db6a1b00]
+                            403  ??? (libAppleArchive.dylib + 355636) [0x2db6e5d34]
+                              403  ??? (libAppleArchive.dylib + 67740) [0x2db69f89c]
+                                403  ??? (libAppleArchive.dylib + 231780) [0x2db6c7964]
+                                  403  ??? (libAppleArchive.dylib + 68516) [0x2db69fba4]
+                                    403  ??? (libAppleArchive.dylib + 274512) [0x2db6d2050]
+                                      390  ??? (libAppleArchive.dylib + 12140) [0x2db691f6c]
+                                        390  ??? (libsystem_kernel.dylib + 28000) [0x250b1cd60]
+                                          390  <on behalf of UNKNOWN [198] (originated by UNKNOWN [198])>
+                                      13   ??? (libAppleArchive.dylib + 12436) [0x2db692094]
+                                        13   ??? (libsystem_kernel.dylib + 28000) [0x250b1cd60]
+                                          13   <on behalf of UNKNOWN [198] (originated by UNKNOWN [198])>
+
+  Binary Images:
+           0x104e40000 -                ???  com.apple.STExtractionService 1.0 (1) <CEF9547E-B85D-38B0-A302-2755DBF6ECE4>  /System/Library/PrivateFrameworks/StreamingExtractor.framework/XPCServices/STExtractionService.xpc/STExtractionService
+           0x104f4c000 -                ???  ???                                   <7D3EE4CD-6C84-3E11-9D70-3BC2791369CA>
+           0x194b13000 -        0x194b1f1e7  libsystem_pthread.dylib               <32E28303-2AAD-3166-9D11-70E8BCF8E076>  /usr/lib/system/libsystem_pthread.dylib
+           0x1950b9000 -        0x1961bba23  Foundation                            <E623EEBD-082F-32AF-BFC7-F1DC83AE62DD>  /System/Library/Frameworks/Foundation.framework/Foundation
+           0x1c3548000 -        0x1c358edd7  libdispatch.dylib                     <84B7E81D-B830-384F-A103-96323C6F5189>  /usr/lib/system/libdispatch.dylib
+           0x250b16000 -        0x250b532db  libsystem_kernel.dylib                <26FFA906-5ACA-39BF-8F7C-94FE9AB8C657>  /usr/lib/system/libsystem_kernel.dylib
+           0x2db68f000 -        0x2db7282d3  libAppleArchive.dylib                 <BF707B9C-32FE-34C7-9F0D-ECBB3D64A20A>  /usr/lib/libAppleArchive.dylib

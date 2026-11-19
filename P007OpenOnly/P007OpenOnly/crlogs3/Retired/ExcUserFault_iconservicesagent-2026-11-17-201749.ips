@@ -1,0 +1,90 @@
+{"is_simulated":1,"app_name":"iconservicesagent","timestamp":"2026-11-17 20:17:49.00 -0500","app_version":"","slice_uuid":"68f5b6ee-f93b-337b-89bd-0e3ef0154bc9","build_version":"","platform":2,"share_with_app_devs":0,"is_first_party":1,"bug_type":"308","os_version":"iPhone OS 27.0 (24A435)","roots_installed":0,"incident_id":"D10C7880-9DF9-486F-BDA3-4CA9F779E242","name":"iconservicesagent"}
+{
+  "uptime" : 1500,
+  "procRole" : "Unspecified",
+  "version" : 2,
+  "userID" : 276,
+  "deployVersion" : 210,
+  "modelCode" : "iPhone18,2",
+  "coalitionID" : 429,
+  "osVersion" : {
+    "isEmbedded" : true,
+    "train" : "iPhone OS 27.0",
+    "releaseType" : "User",
+    "build" : "24A435"
+  },
+  "captureTime" : "2026-11-17 20:17:49.2465 -0500",
+  "codeSigningMonitor" : 2,
+  "incident" : "D10C7880-9DF9-486F-BDA3-4CA9F779E242",
+  "pid" : 262,
+  "translated" : false,
+  "cpuType" : "ARM-64",
+  "procStartAbsTime" : 432661828,
+  "procName" : "iconservicesagent",
+  "procPath" : "\/System\/Library\/CoreServices\/iconservicesagent",
+  "parentPid" : 1,
+  "coalitionName" : "com.apple.iconservices.iconservicesagent",
+  "crashReporterKey" : "c51e37983164132b734b31f25ea225e057e1caed",
+  "chargingStatus" : {"externalSourceConnected":true},
+  "developerMode" : 1,
+  "bootProgressRegister" : "0x2000000c",
+  "wasUnlockedSinceBoot" : 1,
+  "isLocked" : 0,
+  "codeSigningValidationCategory" : 0,
+  "codeSigningTrustLevel" : 0,
+  "bootSessionUUID" : "CF2029E3-146B-4007-9B7E-D793CE43C1C7",
+  "basebandVersion" : "2.10.01",
+  "isLightWeightCorpse" : 1,
+  "exception" : {"codes":"0x6000000000000012, 0x0000000000000005","reason":5,"message":"namespc 18 reason_code 0x0000000000000005","subtype":"GUARD_TYPE_USER","type":"EXC_GUARD","rawCodes":[6917529027641081874,5],"namespc":18},
+  "termination" : {"flags":518,"code":5,"namespace":"LIBSYSTEM","indicator":"Application Triggered Fault"},
+  "os_fault" : {"subsystem":"com.apple.iconservices","process":"iconservicesagent","category":"default","format":"Node exceeds expected bounds, %p vs %p node expected size=%d"},
+  "faultingThread" : 0,
+  "threads" : [{"id":24823,"frames":[{"imageOffset":3085945220,"imageIndex":0},{"imageOffset":243889492,"imageIndex":0},{"imageOffset":243889832,"imageIndex":0},{"imageOffset":243935664,"imageIndex":0},{"imageOffset":1099114556,"imageIndex":0},{"imageOffset":1099216216,"imageIndex":0},{"imageOffset":1099208552,"imageIndex":0},{"imageOffset":19396,"imageIndex":1},{"imageOffset":23464,"imageIndex":1},{"imageOffset":783219916,"imageIndex":0},{"imageOffset":783327156,"imageIndex":0},{"imageOffset":783263088,"imageIndex":0},{"imageOffset":783301772,"imageIndex":0},{"imageOffset":783300272,"imageIndex":0},{"imageOffset":5485112,"imageIndex":0},{"imageOffset":5482768,"imageIndex":0}],"threadState":{"x":[{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0}],"flavor":"ARM_THREAD_STATE64","lr":{"value":0},"cpsr":{"value":0},"fp":{"value":0},"sp":{"value":0},"esr":{"value":0},"pc":{"value":0,"matchesCrashFrame":0},"far":{"value":0}}}],
+  "usedImages" : [
+  {
+    "size" : 5637148880,
+    "source" : "S",
+    "base" : 6442450944,
+    "uuid" : "aa510c22-9325-3b1d-90cb-2a648acad7b8"
+  },
+  {
+    "size" : 5767168,
+    "source" : "P",
+    "base" : 4336893952,
+    "uuid" : "68f5b6ee-f93b-337b-89bd-0e3ef0154bc9"
+  }
+],
+  "legacyInfo" : {
+  "threadTriggered" : {
+
+  }
+},
+  "roots_installed" : 0,
+  "bug_type" : "308",
+  "trialInfo" : {
+  "rollouts" : [
+    {
+      "rolloutId" : "6a51666818a3ab339a33e93c",
+      "factorPackIds" : [
+        "6a51685d654ed37dfa0a5f30",
+        "6a51689f18a3ab339a33e93f",
+        "6a5168260d9d987af019189b"
+      ],
+      "deploymentId" : 1
+    },
+    {
+      "rolloutId" : "69828b780c7cfd00b99b83ab",
+      "factorPackIds" : [
+        "6aac16707566122a4832d215"
+      ],
+      "deploymentId" : 240000030
+    }
+  ],
+  "experiments" : [
+
+  ]
+},
+  "reportNotes" : [
+  "PC register does not match crashing frame (0x0 vs 0x237EFC984)"
+]
+}

@@ -1,0 +1,25 @@
+=== p176 session 2026-11-18 20:07:23 EST BUILD p176-f1-seed-v1 ===
+=== IDENT 2026-11-18 20:07:23 EST ===
+machine        iPhone18,2
+osversion      24B156
+release        27.2.0
+sku            iPhone18,2 T8150 / 24B156 — 17 Pro Max iOS 27.2.1
+offset table   T8150_24B156
+QueueCreate    sel=6 size=0x0 leak=+0x520 destroy=0 submit=25 MD+0x90 sel36=0
+=== ARM (LabOff static_base + FIELD# + unslid VAs) ===
+sku=T8150_24B156 table=T8150_24B156
+static_base=0xfffffe0007004000 (link base; live kbase = static_base+slide after commitSlide)
+QueueCreate sel=6 size=0x0 leak=+0x520 destroy=0 submit=25 MD+0x90 sel36=0
+socket_usecount=+0x23c so_necp=0x0 icmp6filt=+0x148 (xnu FIELD#)
+pmap_cs_allow_off=+0x0 owns_replaceable=0 fill_cap=0 table_size=0x10b0
+unslid CheckandPrewire=0xfffffe0008cc7634 AMFI_loadtc=0x0 fn4=0x0 getter=0x0
+TRACK: iPhone18,2 T8150 24B156 (17 Pro Max iOS 27.2.1). LabOff PROVEN: ANE 0x10b0/+0xa0, queue_leak+0x520, sysmem_md+0x90, P152 sel4/5, kernproc 0xFFFFFE0007F08FA8. allproc UNDERIVED — hasKread still NO. Never paste 24A435 VAs.
+Runtime profile always wins.
+GAME_MODE_PLIST GCSupports=1 LSSupports=1 category=public.app-category.games
+GAME_MODE_NOTIFY com.apple.gamepolicyd.game-mode-enabled=0 com.apple.gamepolicyd.gamemode=0 com.apple.gamepolicy.gameMode=0 com.apple.gamepolicyd.gameModeDidChange=0 com.apple.runningboard.gameMode=0
+GAME_MODE_GROOM activity=1 idle=1 thermal=0 LPM=1 avail=8519596168 displaylink=1
+GAME_MODE_HOLD
+
+F1-seed confused-window calib on 24B156/27.2.1 (doors: p018 v3).
+Seed credit: murk-sus (F1OOB-PoC, MIT). Window conversion = LightSword lane.
+PANIC-POSSIBLE (kernel window confusion). ONE TAP. Hits = receipt-class only.

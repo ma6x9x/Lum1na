@@ -1,0 +1,254 @@
+{"app_name":"DoorDashNotificationServiceExtension","timestamp":"2026-11-18 18:13:13.00 -0500","app_version":"8.44.1","slice_uuid":"dcd4c55a-ee5c-3471-b3f3-4c1d1539d716","adam_id":"719972451","build_version":"789463","bundleID":"doordash.DoorDashConsumer.NotificationExtension","platform":2,"share_with_app_devs":0,"is_first_party":0,"bug_type":"309","os_version":"iPhone OS 27.2.1 (24B156)","roots_installed":0,"incident_id":"3CE960B4-EBDD-483D-BFCE-CDC75977283A","name":"DoorDashNotificationServiceExtension"}
+{
+  "uptime" : 5800,
+  "procRole" : "Unspecified",
+  "version" : 2,
+  "userID" : 501,
+  "deployVersion" : 210,
+  "modelCode" : "iPhone18,2",
+  "coalitionID" : 966,
+  "osVersion" : {
+    "isEmbedded" : true,
+    "train" : "iPhone OS 27.2.1",
+    "releaseType" : "User",
+    "build" : "24B156"
+  },
+  "captureTime" : "2026-11-18 18:13:12.5717 -0500",
+  "codeSigningMonitor" : 2,
+  "incident" : "3CE960B4-EBDD-483D-BFCE-CDC75977283A",
+  "pid" : 1001,
+  "translated" : false,
+  "cpuType" : "ARM-64",
+  "procLaunch" : "2026-11-18 18:13:12.3147 -0500",
+  "procStartAbsTime" : 141522128577,
+  "procExitAbsTime" : 141527828829,
+  "procName" : "DoorDashNotificationServiceExtension",
+  "procPath" : "\/private\/var\/containers\/Bundle\/Application\/1CE45ED8-07DC-4320-8DBC-B8FC5AF0257E\/DoorDash.app\/PlugIns\/DoorDashNotificationServiceExtension.appex\/DoorDashNotificationServiceExtension",
+  "bundleInfo" : {"CFBundleShortVersionString":"8.44.1","CFBundleVersion":"789463","CFBundleIdentifier":"doordash.DoorDashConsumer.NotificationExtension"},
+  "storeInfo" : {"itemID":"719972451","storeCohortMetadata":"10|date=1758418200000&sf=143441&pgtp=Search&pgid=SearchTopResults&prpg=SearchLanding_SearchLanding&ctxt=Search&issrch=1&vrntid=3fe43f0a-60a8-477d-97d4-541aec9104d0&expid=c63091d4-fea7-486e-8624-88a50167e490&imptyp=card&kind=iosSoftware&lngid=1","distributorID":"com.apple.AppStore","deviceIdentifierForVendor":"66F17F12-5DDE-4629-A14D-E94231938448","softwareVersionExternalIdentifier":"894862790","applicationVariant":"1:iPhone18,2:26","thirdParty":true},
+  "parentProc" : "launchd",
+  "parentPid" : 1,
+  "coalitionName" : "doordash.DoorDashConsumer.NotificationExtension",
+  "crashReporterKey" : "c51e37983164132b734b31f25ea225e057e1caed",
+  "lowPowerMode" : 1,
+  "developerMode" : 1,
+  "bootProgressRegister" : "0x2000000c",
+  "wasUnlockedSinceBoot" : 1,
+  "isLocked" : 1,
+  "throttleTimeout" : 10,
+  "codeSigningID" : "doordash.DoorDashConsumer.NotificationExtension",
+  "codeSigningTeamID" : "W44ZWC57TC",
+  "codeSigningFlags" : 570450689,
+  "codeSigningValidationCategory" : 4,
+  "codeSigningTrustLevel" : 5,
+  "codeSigningAuxiliaryInfo" : 0,
+  "instructionByteStream" : {"beforePC":"IAAg1IEF+LfpAwC54gMDquMDBKrkAwWq5QMGquYDB6rnAwiq2gEAlA==","atPC":"IAAg1IgSgFL\/EwC56AcA+UgAgFLoAwA5IBQA8ACQHZEjFADwY0AqkQ=="},
+  "bootSessionUUID" : "EDEF112E-834D-48CB-9598-82D16F8DC8BA",
+  "basebandVersion" : "2.20.04",
+  "exception" : {"codes":"0x0000000000000001, 0x00000001846d6328","rawCodes":[1,6516728616],"type":"EXC_BREAKPOINT","signal":"SIGTRAP"},
+  "termination" : {"flags":0,"code":5,"namespace":"SIGNAL","indicator":"Trace\/BPT trap: 5","byProc":"exc handler","byPid":1001},
+  "os_fault" : {"process":"DoorDashNotificationServiceExtension"},
+  "faultingThread" : 2,
+  "threads" : [{"id":95196,"threadState":{"x":[{"value":268451845},{"value":21592279046},{"value":8589934592},{"value":43993350012928},{"value":0},{"value":43993350012928},{"value":2},{"value":4294967295},{"value":0},{"value":0},{"value":2},{"value":0},{"value":0},{"value":10243},{"value":0},{"value":0},{"value":18446744073709551569},{"value":8128132952},{"value":0},{"value":4294967295},{"value":2},{"value":43993350012928},{"value":0},{"value":43993350012928},{"value":21592279046},{"value":6164913672},{"value":8589934592},{"value":18446744073709550527},{"value":10604298240,"symbolLocation":0,"symbol":"_libkernel_string_functions"}],"flavor":"ARM_THREAD_STATE64","lr":{"value":9644204808},"cpsr":{"value":0},"fp":{"value":6164913520},"sp":{"value":6164913440},"esr":{"value":1442840704,"description":"(Syscall)"},"pc":{"value":9644190932},"far":{"value":0}},"queue":"com.apple.main-thread","frames":[{"imageOffset":3284,"symbol":"mach_msg2_trap","symbolLocation":8,"imageIndex":4},{"imageOffset":17160,"symbol":"mach_msg2_internal","symbolLocation":76,"imageIndex":4},{"imageOffset":16936,"symbol":"mach_msg_overwrite","symbolLocation":424,"imageIndex":4},{"imageOffset":16500,"symbol":"mach_msg","symbolLocation":24,"imageIndex":4},{"imageOffset":242780,"symbol":"__CFRunLoopServiceMachPort","symbolLocation":136,"imageIndex":5},{"imageOffset":238632,"symbol":"__CFRunLoopRun","symbolLocation":596,"imageIndex":5},{"imageOffset":243684,"symbol":"_CFRunLoopRunSpecificWithOptions","symbolLocation":344,"imageIndex":5},{"imageOffset":138712,"symbol":"-[NSRunLoop(NSRunLoop) runMode:beforeDate:]","symbolLocation":212,"imageIndex":6},{"imageOffset":2110312,"symbol":"-[NSRunLoop(NSRunLoop) run]","symbolLocation":64,"imageIndex":6},{"imageOffset":176652,"symbol":"_xpc_objc_main","symbolLocation":484,"imageIndex":7},{"imageOffset":188296,"symbol":"_xpc_main","symbolLocation":60,"imageIndex":7},{"imageOffset":189052,"symbol":"xpc_main","symbolLocation":64,"imageIndex":7},{"imageOffset":2341660,"symbol":"-[NSXPCListener resume]","symbolLocation":308,"imageIndex":6},{"imageOffset":74928,"imageIndex":8},{"imageOffset":74556,"imageIndex":8},{"imageOffset":73916,"imageIndex":8},{"imageOffset":73384,"imageIndex":8},{"imageOffset":265756,"symbol":"EXExtensionMain(_:_:)","symbolLocation":3676,"imageIndex":9},{"imageOffset":3116708,"symbol":"NSExtensionMain","symbolLocation":200,"imageIndex":6},{"imageOffset":21796,"symbol":"start","symbolLocation":6488,"imageIndex":10}]},{"id":95209,"frames":[],"threadState":{"x":[{"value":6165475328},{"value":5123},{"value":6164938752},{"value":0},{"value":409604},{"value":18446744073709551615},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0}],"flavor":"ARM_THREAD_STATE64","lr":{"value":0},"cpsr":{"value":0},"fp":{"value":0},"sp":{"value":6165475328},"esr":{"value":1442840704,"description":"(Syscall)"},"pc":{"value":6490061064},"far":{"value":0}}},{"triggered":true,"id":95210,"threadState":{"x":[{"value":9223372041168796528},{"value":4330738888},{"value":6166037448},{"value":1},{"value":0},{"value":19},{"value":32},{"value":0},{"value":0},{"value":4330738896},{"value":140741825709504},{"value":0},{"value":17592186046463},{"value":4297728},{"value":0},{"value":17592186044416},{"value":75},{"value":8128131624},{"value":0},{"value":4315597256},{"value":4315597296},{"value":0},{"value":4310216748},{"value":8130472504,"symbolLocation":0,"symbol":"value witness table for Builtin.NativeObject"},{"value":4348648480},{"value":4348648512},{"value":4316805912},{"value":4316848992},{"value":6166038112}],"flavor":"ARM_THREAD_STATE64","lr":{"value":6516728616},"cpsr":{"value":1610612736},"fp":{"value":6166038000},"sp":{"value":6166037856},"esr":{"value":4060086273,"description":"(Breakpoint) brk 1"},"pc":{"value":6516728616,"matchesCrashFrame":1},"far":{"value":0}},"queue":"com.doordash.telemetry","frames":[{"imageOffset":2331432,"symbol":"_assertionFailure(_:_:file:line:flags:)","symbolLocation":172,"imageIndex":12},{"imageOffset":8250496,"imageIndex":0},{"imageOffset":9550964,"imageIndex":0},{"imageOffset":9563116,"imageIndex":0},{"imageOffset":110212,"symbol":"TaskLocal.withValue<A>(_:operation:file:line:)","symbolLocation":232,"imageIndex":13},{"imageOffset":9783924,"imageIndex":0},{"imageOffset":9542912,"imageIndex":0},{"imageOffset":9526988,"imageIndex":0},{"imageOffset":8692928,"imageIndex":0},{"imageOffset":579840,"symbol":"KeyPath._projectReadOnly(from:)","symbolLocation":544,"imageIndex":12},{"imageOffset":579284,"symbol":"swift_getAtKeyPath","symbolLocation":24,"imageIndex":12},{"imageOffset":9523292,"imageIndex":0},{"imageOffset":9524456,"imageIndex":0},{"imageOffset":110212,"symbol":"TaskLocal.withValue<A>(_:operation:file:line:)","symbolLocation":232,"imageIndex":13},{"imageOffset":9523040,"imageIndex":0},{"imageOffset":8692396,"imageIndex":0},{"imageOffset":195760,"imageIndex":0},{"imageOffset":193972,"imageIndex":0},{"imageOffset":9550964,"imageIndex":0},{"imageOffset":9563116,"imageIndex":0},{"imageOffset":110212,"symbol":"TaskLocal.withValue<A>(_:operation:file:line:)","symbolLocation":232,"imageIndex":13},{"imageOffset":9783924,"imageIndex":0},{"imageOffset":9542912,"imageIndex":0},{"imageOffset":9526988,"imageIndex":0},{"imageOffset":8101628,"imageIndex":0},{"imageOffset":579840,"symbol":"KeyPath._projectReadOnly(from:)","symbolLocation":544,"imageIndex":12},{"imageOffset":579284,"symbol":"swift_getAtKeyPath","symbolLocation":24,"imageIndex":12},{"imageOffset":9523292,"imageIndex":0},{"imageOffset":9524456,"imageIndex":0},{"imageOffset":110212,"symbol":"TaskLocal.withValue<A>(_:operation:file:line:)","symbolLocation":232,"imageIndex":13},{"imageOffset":9523040,"imageIndex":0},{"imageOffset":5644648,"imageIndex":0},{"imageOffset":7543456,"imageIndex":0},{"imageOffset":9268156,"imageIndex":0},{"imageOffset":9267292,"imageIndex":0},{"imageOffset":9276140,"imageIndex":0},{"imageOffset":1784888,"imageIndex":0},{"imageOffset":7372,"symbol":"_dispatch_call_block_and_release","symbolLocation":32,"imageIndex":14},{"imageOffset":114612,"symbol":"_dispatch_client_callout","symbolLocation":16,"imageIndex":14},{"imageOffset":43132,"symbol":"_dispatch_lane_serial_drain","symbolLocation":644,"imageIndex":14},{"imageOffset":46192,"symbol":"_dispatch_lane_invoke","symbolLocation":312,"imageIndex":14},{"imageOffset":89228,"symbol":"_dispatch_root_queue_drain_deferred_wlh","symbolLocation":248,"imageIndex":14},{"imageOffset":87728,"symbol":"_dispatch_workloop_worker_thread","symbolLocation":640,"imageIndex":14},{"imageOffset":4664,"symbol":"_pthread_wqthread","symbolLocation":292,"imageIndex":15},{"imageOffset":2320,"symbol":"start_wqthread","symbolLocation":8,"imageIndex":15}]},{"id":95214,"threadState":{"x":[{"value":0},{"value":0},{"value":6166615048},{"value":1},{"value":3},{"value":0},{"value":420},{"value":4192256},{"value":9644221268,"symbolLocation":0,"symbol":"ftruncate"},{"value":6166615048},{"value":15},{"value":2},{"value":2093470145446912},{"value":0},{"value":0},{"value":0},{"value":201},{"value":9644211208,"symbolLocation":56,"symbol":"fcntl"},{"value":0},{"value":4347434624},{"value":4348812736},{"value":14},{"value":8351064064,"symbolLocation":312,"symbol":"OBJC_METACLASS_$_WKTextExtractionIFrameItem"},{"value":4348812736},{"value":4348834208},{"value":4347434624},{"value":32768},{"value":3},{"value":16384}],"flavor":"ARM_THREAD_STATE64","lr":{"value":6992791412},"cpsr":{"value":0},"fp":{"value":6166615248},"sp":{"value":6166615168},"esr":{"value":1442840704,"description":"(Syscall)"},"pc":{"value":9644221276},"far":{"value":0}},"queue":"com.doordash.experiments.exposure.sqlite","frames":[{"imageOffset":33628,"symbol":"ftruncate","symbolLocation":8,"imageIndex":4},{"imageOffset":690036,"imageIndex":16},{"imageOffset":108172,"imageIndex":16},{"imageOffset":709728,"imageIndex":16},{"imageOffset":102512,"imageIndex":16},{"imageOffset":100172,"imageIndex":16},{"imageOffset":95940,"imageIndex":16},{"imageOffset":703920,"imageIndex":16},{"imageOffset":76268,"imageIndex":16},{"imageOffset":813988,"imageIndex":16},{"imageOffset":53896,"imageIndex":16},{"imageOffset":48028,"imageIndex":16},{"imageOffset":37372,"imageIndex":16},{"imageOffset":35080,"imageIndex":16},{"imageOffset":34140,"imageIndex":16},{"imageOffset":32952,"symbol":"sqlite3_exec","symbolLocation":324,"imageIndex":16},{"imageOffset":8296968,"imageIndex":0},{"imageOffset":8293560,"imageIndex":0},{"imageOffset":8286696,"imageIndex":0},{"imageOffset":8286320,"imageIndex":0},{"imageOffset":1784888,"imageIndex":0},{"imageOffset":7372,"symbol":"_dispatch_call_block_and_release","symbolLocation":32,"imageIndex":14},{"imageOffset":114612,"symbol":"_dispatch_client_callout","symbolLocation":16,"imageIndex":14},{"imageOffset":43132,"symbol":"_dispatch_lane_serial_drain","symbolLocation":644,"imageIndex":14},{"imageOffset":46192,"symbol":"_dispatch_lane_invoke","symbolLocation":312,"imageIndex":14},{"imageOffset":89228,"symbol":"_dispatch_root_queue_drain_deferred_wlh","symbolLocation":248,"imageIndex":14},{"imageOffset":87728,"symbol":"_dispatch_workloop_worker_thread","symbolLocation":640,"imageIndex":14},{"imageOffset":4664,"symbol":"_pthread_wqthread","symbolLocation":292,"imageIndex":15},{"imageOffset":2320,"symbol":"start_wqthread","symbolLocation":8,"imageIndex":15}]},{"id":95215,"frames":[],"threadState":{"x":[{"value":6167195648},{"value":18435},{"value":6166659072},{"value":0},{"value":409604},{"value":18446744073709551615},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0}],"flavor":"ARM_THREAD_STATE64","lr":{"value":0},"cpsr":{"value":0},"fp":{"value":0},"sp":{"value":6167195648},"esr":{"value":1442840704,"description":"(Syscall)"},"pc":{"value":6490061064},"far":{"value":0}}},{"id":95223,"frames":[],"threadState":{"x":[{"value":6167769088},{"value":32003},{"value":6167232512},{"value":0},{"value":409604},{"value":18446744073709551615},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0},{"value":0}],"flavor":"ARM_THREAD_STATE64","lr":{"value":0},"cpsr":{"value":0},"fp":{"value":0},"sp":{"value":6167769088},"esr":{"value":1442840704,"description":"(Syscall)"},"pc":{"value":6490061064},"far":{"value":0}}}],
+  "usedImages" : [
+  {
+    "source" : "P",
+    "arch" : "arm64",
+    "base" : 4301963264,
+    "size" : 12763136,
+    "uuid" : "dcd4c55a-ee5c-3471-b3f3-4c1d1539d716",
+    "path" : "\/private\/var\/containers\/Bundle\/Application\/1CE45ED8-07DC-4320-8DBC-B8FC5AF0257E\/DoorDash.app\/PlugIns\/DoorDashNotificationServiceExtension.appex\/DoorDashNotificationServiceExtension",
+    "name" : "DoorDashNotificationServiceExtension"
+  },
+  {
+    "source" : "P",
+    "arch" : "arm64",
+    "base" : 4323901440,
+    "size" : 1851392,
+    "uuid" : "2ecf7de0-dba9-379d-8ba2-5605c4261587",
+    "path" : "\/private\/var\/containers\/Bundle\/Application\/1CE45ED8-07DC-4320-8DBC-B8FC5AF0257E\/DoorDash.app\/Frameworks\/Lottie.framework\/Lottie",
+    "name" : "Lottie"
+  },
+  {
+    "source" : "P",
+    "arch" : "arm64",
+    "base" : 4326277120,
+    "size" : 1343488,
+    "uuid" : "736a2a00-82ab-31ad-bed1-110ffc6bd5fd",
+    "path" : "\/private\/var\/containers\/Bundle\/Application\/1CE45ED8-07DC-4320-8DBC-B8FC5AF0257E\/DoorDash.app\/Frameworks\/SendBirdSDK.framework\/SendBirdSDK",
+    "name" : "SendBirdSDK"
+  },
+  {
+    "source" : "P",
+    "arch" : "arm64e",
+    "base" : 4319641600,
+    "size" : 49152,
+    "uuid" : "d3d14282-bd22-3f3b-a201-46a300aeef3e",
+    "path" : "\/private\/preboot\/Cryptexes\/OS\/usr\/lib\/libobjc-trampolines.dylib",
+    "name" : "libobjc-trampolines.dylib"
+  },
+  {
+    "source" : "P",
+    "arch" : "arm64e",
+    "base" : 9644187648,
+    "size" : 250588,
+    "uuid" : "26ffa906-5aca-39bf-8f7c-94fe9ab8c657",
+    "path" : "\/usr\/lib\/system\/libsystem_kernel.dylib",
+    "name" : "libsystem_kernel.dylib"
+  },
+  {
+    "source" : "P",
+    "arch" : "arm64e",
+    "base" : 6490849280,
+    "size" : 5129000,
+    "uuid" : "d79f14d9-f948-3cd8-b0d1-eb66b9b8cf94",
+    "path" : "\/System\/Library\/Frameworks\/CoreFoundation.framework\/CoreFoundation",
+    "name" : "CoreFoundation"
+  },
+  {
+    "source" : "P",
+    "arch" : "arm64e",
+    "base" : 6495981568,
+    "size" : 17836580,
+    "uuid" : "e623eebd-082f-32af-bfc7-f1dc83ae62dd",
+    "path" : "\/System\/Library\/Frameworks\/Foundation.framework\/Foundation",
+    "name" : "Foundation"
+  },
+  {
+    "source" : "P",
+    "arch" : "arm64e",
+    "base" : 6490447872,
+    "size" : 398512,
+    "uuid" : "9ba91df0-39a5-3c28-b96e-be2463c5c793",
+    "path" : "\/usr\/lib\/system\/libxpc.dylib",
+    "name" : "libxpc.dylib"
+  },
+  {
+    "source" : "P",
+    "arch" : "arm64e",
+    "base" : 7417556992,
+    "size" : 185288,
+    "uuid" : "ff2fd93b-e354-351f-b5a2-abf50630b80b",
+    "path" : "\/System\/Library\/PrivateFrameworks\/PlugInKit.framework\/PlugInKit",
+    "name" : "PlugInKit"
+  },
+  {
+    "source" : "P",
+    "arch" : "arm64e",
+    "base" : 6601179136,
+    "size" : 1337552,
+    "uuid" : "f76205b5-0fed-3efa-abb8-4ec0c46f5a0b",
+    "path" : "\/System\/Library\/Frameworks\/ExtensionFoundation.framework\/ExtensionFoundation",
+    "name" : "ExtensionFoundation"
+  },
+  {
+    "source" : "P",
+    "arch" : "arm64e",
+    "base" : 6489305088,
+    "size" : 751832,
+    "uuid" : "17f02809-e0e1-32f4-862e-facde862b8de",
+    "path" : "\/usr\/lib\/dyld",
+    "name" : "dyld"
+  },
+  {
+    "size" : 0,
+    "source" : "A",
+    "base" : 0,
+    "uuid" : "00000000-0000-0000-0000-000000000000"
+  },
+  {
+    "source" : "P",
+    "arch" : "arm64e",
+    "base" : 6514397184,
+    "size" : 5982648,
+    "uuid" : "59ea1982-04e7-34f5-b851-dbf8db5edebd",
+    "path" : "\/usr\/lib\/swift\/libswiftCore.dylib",
+    "name" : "libswiftCore.dylib"
+  },
+  {
+    "source" : "P",
+    "arch" : "arm64e",
+    "base" : 6513819648,
+    "size" : 574432,
+    "uuid" : "c1f170c0-b349-32b9-8f2d-079d53b04c77",
+    "path" : "\/usr\/lib\/swift\/libswift_Concurrency.dylib",
+    "name" : "libswift_Concurrency.dylib"
+  },
+  {
+    "source" : "P",
+    "arch" : "arm64e",
+    "base" : 7272513536,
+    "size" : 290264,
+    "uuid" : "84b7e81d-b830-384f-a103-96323c6f5189",
+    "path" : "\/usr\/lib\/system\/libdispatch.dylib",
+    "name" : "libdispatch.dylib"
+  },
+  {
+    "source" : "P",
+    "arch" : "arm64e",
+    "base" : 6490058752,
+    "size" : 49640,
+    "uuid" : "32e28303-2aad-3166-9d11-70e8bcf8e076",
+    "path" : "\/usr\/lib\/system\/libsystem_pthread.dylib",
+    "name" : "libsystem_pthread.dylib"
+  },
+  {
+    "source" : "P",
+    "arch" : "arm64e",
+    "base" : 6992101376,
+    "size" : 1804112,
+    "uuid" : "6145839a-8c5b-3186-8af6-cee4c1afdbc8",
+    "path" : "\/usr\/lib\/libsqlite3.dylib",
+    "name" : "libsqlite3.dylib"
+  }
+],
+  "sharedCache" : {
+  "base" : 6484574208,
+  "size" : 6710722560,
+  "uuid" : "78b55cff-20f4-3a39-81af-b6530b7e9789"
+},
+  "vmSummary" : "ReadOnly portion of Libraries: Total=2.0G resident=0K(0%) swapped_out_or_unallocated=2.0G(100%)\nWritable regions: Total=32.4M written=434K(1%) resident=434K(1%) swapped_out=0K(0%) unallocated=31.9M(99%)\n\n                                VIRTUAL   REGION \nREGION TYPE                        SIZE    COUNT (non-coalesced) \n===========                     =======  ======= \nActivity Tracing                   256K        1 \nCoreAnimation                       48K        3 \nDispatch Continuations            6144K        1 \nFoundation                          16K        1 \nGuard                            385.0G        1 \nMalloc                            21.2M       10 \nMalloc Guard Page                 3936K        4 \nOS Alloc Once                       32K        1 \nSQLite Page Cache                  256K        2 \nStack                             3728K        6 \nStack Guard                         96K        6 \n__AUTH                            5431K      382 \n__AUTH_CONST                      93.8M      963 \n__CTF                               824        1 \n__DATA                            39.2M      930 \n__DATA_CONST                      35.5M     1017 \n__DATA_DIRTY                      17.4M      959 \n__FONT_DATA                        2352        1 \n__LINKEDIT                       666.8M        5 \n__OBJC_RO                        131.4M        1 \n__OBJC_RW                         3372K        1 \n__TEXT                             1.4G     1057 \n__TPRO_CONST                       132K        4 \nmapped file                       35.6M        7 \npage table in kernel               434K        1 \nshared memory                       96K        4 \n===========                     =======  ======= \nTOTAL                            387.4G     5369 \n",
+  "legacyInfo" : {
+  "threadTriggered" : {
+    "queue" : "com.doordash.telemetry"
+  }
+},
+  "logWritingSignature" : "bf45d0e8b0744899f7dbfd0368a28ab4da4a34bd",
+  "roots_installed" : 0,
+  "bug_type" : "309",
+  "trmStatus" : 1,
+  "sandboxProfileName" : "container",
+  "spawnFlags" : 17420,
+  "lockStateDuration" : 191,
+  "voucherInfos" : [{"originatorName":"apsd","proximateName":"SpringBoard","thread_id":95210},{"originatorName":"apsd","proximateName":"SpringBoard","thread_id":95214}],
+  "trialInfo" : {
+  "rollouts" : [
+    {
+      "rolloutId" : "645eb1d0417dab722a215927",
+      "factorPackIds" : [
+        "645eb2f7417dab722a215928"
+      ],
+      "deploymentId" : 240000005
+    },
+    {
+      "rolloutId" : "654439cdafbf5b61207873a9",
+      "factorPackIds" : [
+        "65443a1cf764584e3e121675"
+      ],
+      "deploymentId" : 240000004
+    }
+  ],
+  "experiments" : [
+    {
+      "treatmentId" : "108a69bc-c52e-473a-a37b-b4156fe0b3f6",
+      "experimentId" : "6ae3cb5654d24f00509a65a1",
+      "deploymentId" : 1
+    },
+    {
+      "treatmentId" : "56159d34-16b7-4634-9712-deb7f2c88663",
+      "experimentId" : "6ae3ce1854d24f00509a65a6",
+      "deploymentId" : 1
+    }
+  ]
+}
+}

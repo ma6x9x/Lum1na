@@ -1,0 +1,419 @@
+{"app_name":"SpringBoard","timestamp":"2026-11-18 19:31:43.00 -0500","app_version":"1.0","slice_uuid":"5C0A8B8A-D2E0-3411-8EBA-6F13CB6C9664","build_version":"50","bundleID":"com.apple.springboard","duration_ms":"98471","share_with_app_devs":0,"is_first_party":1,"bug_type":"145","os_version":"iPhone OS 27.2.1 (24B156)","roots_installed":0,"name":"SpringBoard","incident_id":"3C7DFC68-66AA-4121-8A3F-E05200BD577A"}
+Date/Time:        2026-11-18 19:30:01.411 -0500
+End time:         2026-11-18 19:31:39.882 -0500
+OS Version:       iPhone OS 27.2.1 (Build 24B156)
+Architecture:     arm64e
+Report Version:   73
+Incident Identifier: 3C7DFC68-66AA-4121-8A3F-E05200BD577A
+
+Data Source:      Microstackshots
+Shared Cache:     78B55CFF-20F4-3A39-81AF-B6530B7E9789 slid base address 0x193158000
+
+Command:          SpringBoard
+Path:             /System/Library/CoreServices/SpringBoard.app/SpringBoard
+Identifier:       com.apple.springboard
+Version:          1.0 (50)
+Is First Party:   Yes
+Beta Identifier:  E29470ED-4BF6-49D9-B5C3-C6D778D0BA80
+Resource Coalition: "com.apple.springboard"(11)
+Architecture:     arm64e
+Parent:           launchd [1]
+PID:              37
+
+Event:            disk writes
+Action taken:     none
+Writes:           1073.94 MB of file backed memory dirtied over 98 seconds (10.91 MB per second average), exceeding limit of 12.43 KB per second over 86400 seconds
+Writes limit:     1073.74 MB
+Limit duration:   86400s
+Writes caused:    1073.94 MB
+Writes duration:  98s
+Duration:         98.47s
+Duration Sampled: 32.44s (event starts 65.84s before samples)
+Steps:            70 (10.49 MB/step)
+
+Hardware model:   iPhone18,2
+Active cpus:      6
+Memory size:      11.42 GB
+HW page size:     16384
+VM page size:     16384
+Shared cache residency: 18.23% (1304.97 MB / 7160.03 MB)
+
+Time Since Boot:  81s
+Time Awake Since Boot: 81s
+Time Since Wake:  n/a (machine hasn't slept)
+
+Total CPU Time:   34.999s
+Advisory levels:  Battery -> 2, User -> 3, ThermalPressure -> 0, Combined -> 2
+Free disk space:  35.82 GB/237.82 GB, low space threshold 150 MB
+Low Power Mode:   Enabled
+Vnodes Available: 66.03% (18488/28000, 14000 allocated, 14000 soft limit)
+Model:            com.apple.fm.language.instruct_3b.tokenizer?variant=generic_sparse
+  Loaded:         62s - 64s, requested by token-generation-inference
+  Loaded:         81s - 84s, requested by token-generation-inference
+  Loaded:         95s - N/A, requested by token-generation-inference
+Model:            com.apple.gm.safety_deny.output.summarization.cu_summary.proactive-com.apple.gm.safety_deny.output.foundation_models_framework.api-com.apple.GenerativeFunctions.GenerativeExperiencesRuntime
+  Loaded:         ??? - N/A, requested by UNKNOWN
+Model:            com.apple.gm.safety_deny.input.summarization.cu_summary.proactive-com.apple.gm.safety_deny.input.foundation_models_framework.api-com.apple.GenerativeFunctions.GenerativeExperiencesRuntime
+  Loaded:         ??? - N/A, requested by UNKNOWN
+Model:            com.apple.fm.language.instruct_3b.shared_experts_cost_placeholder_2b?variant=generic_sparse
+  Loaded:         81s - 84s, requested by token-generation-inference
+  Loaded:         95s - N/A, requested by token-generation-inference
+Model:            com.apple.fm.language.instruct_3b.summarization?variant=generic_sparse
+  Loaded:         82s - 84s, requested by token-generation-inference
+  Loaded:         95s - N/A, requested by token-generation-inference
+Model:            com.apple.fm.language.instruct_3b.summarization.draft?variant=generic_sparse
+  Loaded:         81s - 84s, requested by token-generation-inference
+  Loaded:         95s - N/A, requested by token-generation-inference
+Model:            com.apple.fm.language.instruct_3b.base?variant=generic_sparse
+  Loaded:         62s - 64s, requested by token-generation-inference
+  Loaded:         81s - 84s, requested by token-generation-inference
+  Loaded:         95s - N/A, requested by token-generation-inference
+Model:            com.apple.gm.safety_embedding_deny.all
+  Loaded:         96s - N/A, requested by generative-experiences-safety-inference-provider
+Model:            com.apple.fm.language.instruct_3b.urgency_classification?language=en
+  Executing:      62s - 64s, requested by [261] use case classification.classifyUserNotification
+  Executing:      62s - 64s, requested by [261] use case classification.classifyUserNotification
+  Executing:      62s - 64s, requested by [261] use case classification.classifyMailMessage
+  Executing:      62s - 64s, requested by [261] use case classification.classifyMailMessage
+Model:            com.apple.fm.language.instruct_3b.shared_experts_cost_placeholder_3b?variant=generic_sparse
+  Loaded:         62s - 64s, requested by token-generation-inference
+Model:            com.apple.fm.language.instruct_3b.urgency_classification?variant=generic_sparse
+  Loaded:         62s - 64s, requested by token-generation-inference
+Model:            com.apple.fm.language.instruct_3b.summarization?language=en
+  Executing:      81s - 81s, requested by [261] use case summarization.summarizeMailMessage
+  Executing:      81s - 81s, requested by [261] use case summarization.summarizeMailMessage
+  Executing:      81s - 84s, requested by [261] use case summarization.summarizeMailMessage
+  Executing:      95s - 95s, requested by [261] use case summarization.summarizeTextMessageThread
+  Executing:      95s - 95s, requested by [261] use case summarization.summarizeTextMessageThread
+  Executing:      95s - 96s, requested by [261] use case summarization.summarizeTextMessageThread
+  Executing:      96s - 96s, requested by [261] use case summarization.summarizeTextMessageThread
+  Executing:      96s - 96s, requested by [261] use case summarization.summarizeTextMessageThread
+  Executing:      96s - 96s, requested by [261] use case summarization.summarizeTextMessageThread
+  Executing:      96s - 96s, requested by [261] use case summarization.summarizeTextMessageThread
+  Executing:      96s - 97s, requested by [261] use case summarization.summarizeTextMessageThread
+  Executing:      97s - 97s, requested by [261] use case summarization.summarizeTextMessageThread
+  Executing:      97s - 97s, requested by [261] use case summarization.summarizeTextMessageThread
+  Executing:      97s - 97s, requested by [261] use case summarization.summarizeTextMessageThread
+  Executing:      97s - 97s, requested by [261] use case summarization.summarizeTextMessageThread
+  Executing:      97s - 97s, requested by [261] use case summarization.summarizeTextMessageThread
+  Executing:      97s - 99s, requested by [261] use case summarization.summarizeTextMessageThread
+Model:            com.apple.tokeninputdenylist.template
+  Executing:      96s - 96s, requested by [261] use case summarization.summarizeTextMessageThread
+Model:            com.apple.gm.safety_deny.input.foundation_models_framework.api
+  Loaded:         96s - N/A, requested by generative-experiences-safety-inference-provider
+
+Preferred User Language: en-US
+Country Code:     US
+Keyboards:        en_US QWERTY;ml=1, emoji Emoji
+OS Cryptex File Extents: 7908
+
+Heaviest stack for the target process:
+  30  ??? (libsystem_pthread.dylib + 2320) [0x193693910]
+  30  ??? (libsystem_pthread.dylib + 4664) [0x193694238]
+  30  ??? (libdispatch.dylib + 87728) [0x1c20dd6b0]
+  30  ??? (libdispatch.dylib + 89228) [0x1c20ddc8c]
+  30  ??? (libdispatch.dylib + 50544) [0x1c20d4570]
+  30  ??? (libdispatch.dylib + 114612) [0x1c20e3fb4]
+  30  ??? (libdispatch.dylib + 72912) [0x1c20d9cd0]
+  30  ??? (SpringBoardHome + 172648) [0x1d8b1e268]
+  30  ??? (SpringBoardHome + 3741364) [0x1d8e856b4]
+  30  ??? (SpringBoardHome + 681472) [0x1d8b9a600]
+  30  ??? (SpringBoardFoundation + 301280) [0x1ceec48e0]
+  30  ??? (AppSupport + 176168) [0x1a7dae028]
+  30  ??? (libsystem_kernel.dylib + 28000) [0x24f69cd60]
+
+
+Powerstats for:   SpringBoard [37]
+UUID:             5C0A8B8A-D2E0-3411-8EBA-6F13CB6C9664
+Path:             /System/Library/CoreServices/SpringBoard.app/SpringBoard
+Identifier:       com.apple.springboard
+Version:          1.0 (50)
+Is First Party:   Yes
+Beta Identifier:  E29470ED-4BF6-49D9-B5C3-C6D778D0BA80
+Resource Coalition: 30 samples "com.apple.springboard"(11)
+Architecture:     arm64e
+Parent:           launchd [1]
+UID:              501
+Sudden Term:      Tracked
+Footprint:        162.11 MB -> 220.80 MB (+58.69 MB)
+Pageins:          12788 pages
+Start time:       2026-11-18 19:31:07.251 -0500
+End time:         2026-11-18 19:31:39.691 -0500
+Num samples:      30 (43%)
+Energy:           632.09 uWh
+Num threads:      1
+Primary state:    20 samples Frontmost App, Non-Suppressed, Kernel mode, Effective Thread QoS Background, Requested Thread QoS Background, Override Thread QoS Unspecified, e-core
+User Activity:    30 samples Idle, 0 samples Active
+Power Source:     30 samples on Battery, 0 samples on AC
+  30  ??? (libsystem_pthread.dylib + 2320) [0x193693910]
+    30  ??? (libsystem_pthread.dylib + 4664) [0x193694238]
+      30  ??? (libdispatch.dylib + 87728) [0x1c20dd6b0]
+        30  ??? (libdispatch.dylib + 89228) [0x1c20ddc8c]
+          30  ??? (libdispatch.dylib + 50544) [0x1c20d4570]
+            30  ??? (libdispatch.dylib + 114612) [0x1c20e3fb4]
+              30  ??? (libdispatch.dylib + 72912) [0x1c20d9cd0]
+                30  ??? (SpringBoardHome + 172648) [0x1d8b1e268]
+                  30  ??? (SpringBoardHome + 3741364) [0x1d8e856b4]
+                    30  ??? (SpringBoardHome + 681472) [0x1d8b9a600]
+                      30  ??? (SpringBoardFoundation + 301280) [0x1ceec48e0]
+                        30  ??? (AppSupport + 176168) [0x1a7dae028]
+                          30  ??? (libsystem_kernel.dylib + 28000) [0x24f69cd60]
+                            10  <Effective Thread QoS Utility, Requested Thread QoS Utility>
+                            7   <p-core>
+
+  Binary Images:
+           0x102a10000 -                ???  com.apple.springboard 1.0 (50) <5C0A8B8A-D2E0-3411-8EBA-6F13CB6C9664>  /System/Library/CoreServices/SpringBoard.app/SpringBoard
+           0x193693000 -        0x19369f1e7  libsystem_pthread.dylib        <32E28303-2AAD-3166-9D11-70E8BCF8E076>  /usr/lib/system/libsystem_pthread.dylib
+           0x1a7d83000 -        0x1a7dbf2a7  AppSupport                     <63F584D4-A4B8-30D4-93EB-467860075DAC>  /System/Library/PrivateFrameworks/AppSupport.framework/AppSupport
+           0x1c20c8000 -        0x1c210edd7  libdispatch.dylib              <84B7E81D-B830-384F-A103-96323C6F5189>  /usr/lib/system/libdispatch.dylib
+           0x1cee7b000 -        0x1cef5a6f3  SpringBoardFoundation          <9D9CEEBA-9631-30DC-882A-BF2EDF1A7F14>  /System/Library/PrivateFrameworks/SpringBoardFoundation.framework/SpringBoardFoundation
+           0x1d8af4000 -        0x1d8f1e007  SpringBoardHome                <CA13E8A7-187B-3F0E-8C7D-ABBAD53C999E>  /System/Library/PrivateFrameworks/SpringBoardHome.framework/SpringBoardHome
+           0x24f696000 -        0x24f6d32db  libsystem_kernel.dylib         <26FFA906-5ACA-39BF-8F7C-94FE9AB8C657>  /usr/lib/system/libsystem_kernel.dylib
+
+
+Powerstats for:   audiomxd
+UUID:             92959860-7B17-3003-9066-F850CFE9C0F8
+Path:             /usr/libexec/audiomxd
+Resource Coalition: 11 samples "com.apple.audiomxd"(179)
+Architecture:     arm64e
+Pageins:          11454 pages
+Start time:       2026-11-18 19:31:18.880 -0500
+End time:         2026-11-18 19:31:31.515 -0500
+Num samples:      11 (16%)
+Energy:           146.22 uWh
+Primary state:    11 samples Non-Frontmost App, Non-Suppressed, Kernel mode, Effective Thread QoS Background, Requested Thread QoS Background, Override Thread QoS Unspecified, e-core
+User Activity:    11 samples Idle, 0 samples Active
+Power Source:     11 samples on Battery, 0 samples on AC
+  11  ??? (libsystem_pthread.dylib + 2320) [0x193693910]
+    11  ??? (libsystem_pthread.dylib + 4604) [0x1936941fc]
+      11  ??? (libdispatch.dylib + 86244) [0x1c20dd0e4]
+        11  ??? (libdispatch.dylib + 84320) [0x1c20dc960]
+          11  ??? (libdispatch.dylib + 114612) [0x1c20e3fb4]
+            11  ??? (libdispatch.dylib + 7372) [0x1c20c9ccc]
+              11  ??? (libAudioDSP.dylib + 31280) [0x219adea30]
+                11  ??? (libBNNS.dylib + 4565752) [0x25c476af8]
+                  11  ??? (libBNNS.dylib + 3869352) [0x25c3ccaa8]
+                    11  ??? (libBNNS.dylib + 3868576) [0x25c3cc7a0]
+                      11  ??? (libBNNS.dylib + 1235848) [0x25c149b88]
+                        10  ??? (libBNNS.dylib + 2749796) [0x25c2bb564]
+                          10  ??? (libBNNS.dylib + 4950920) [0x25c4d4b88]
+                            8   ??? (libBNNS.dylib + 4944824) [0x25c4d33b8]
+                              8   ??? (libBNNS.dylib + 3897612) [0x25c3d390c]
+                                7   ??? (libBNNS.dylib + 9246724) [0x25c8ed804]
+                                  7   ??? (libBNNS.dylib + 10702592) [0x25ca50f00]
+                                    7   ??? (libBNNS.dylib + 6532652) [0x25c656e2c]
+                                      7   ??? (libBNNS.dylib + 6523280) [0x25c654990]
+                                        7   ??? (libBNNS.dylib + 6243208) [0x25c610388]
+                                          7   ??? (libBNNS.dylib + 47788) [0x25c027aac]
+                                            7   ??? (libBNNS.dylib + 2188068) [0x25c232324]
+                                              7   ??? (libBNNS.dylib + 2328160) [0x25c254660]
+                                                2   ??? (libBNNS.dylib + 11615992) [0x25cb2fef8]
+                                                1   ??? (libBNNS.dylib + 11616312) [0x25cb30038]
+                                                1   ??? (libBNNS.dylib + 11616204) [0x25cb2ffcc]
+                                                1   ??? (libBNNS.dylib + 11616092) [0x25cb2ff5c]
+                                                1   ??? (libBNNS.dylib + 11616088) [0x25cb2ff58]
+                                                1   ??? (libBNNS.dylib + 11615700) [0x25cb2fdd4]
+                                1   ??? (libBNNS.dylib + 10012504) [0x25c9a8758]
+                                  1   ??? (libBNNS.dylib + 9619812) [0x25c948964]
+                                    1   ??? (libBNNS.dylib + 2844320) [0x25c2d26a0]
+                            1   ??? (libBNNS.dylib + 4941800) [0x25c4d27e8]
+                            1   ??? (libsystem_platform.dylib + 4088) [0x19f4f5ff8]
+                        1   ??? (libBNNS.dylib + 2748488) [0x25c2bb048]
+                          1   ??? (libBNNS.dylib + 2759392) [0x25c2bdae0]
+                            1   ??? (libBNNS.dylib + 2757272) [0x25c2bd298]
+                              1   ??? (libsystem_kernel.dylib + 23944) [0x24f69bd88]
+
+  Binary Images:
+           0x1045fc000 -                ???  audiomxd                 <92959860-7B17-3003-9066-F850CFE9C0F8>  /usr/libexec/audiomxd
+           0x193693000 -        0x19369f1e7  libsystem_pthread.dylib  <32E28303-2AAD-3166-9D11-70E8BCF8E076>  /usr/lib/system/libsystem_pthread.dylib
+           0x19f4f5000 -        0x19f4fd67f  libsystem_platform.dylib <BE97AAD8-FA2C-35F4-9EA7-E2C41DB756AB>  /usr/lib/system/libsystem_platform.dylib
+           0x1c20c8000 -        0x1c210edd7  libdispatch.dylib        <84B7E81D-B830-384F-A103-96323C6F5189>  /usr/lib/system/libdispatch.dylib
+           0x219ad7000 -        0x21a10a06f  libAudioDSP.dylib        <517EE7A9-4233-360A-ABFA-6794F2A6FB65>  /System/Library/Frameworks/AudioToolbox.framework/libAudioDSP.dylib
+           0x24f696000 -        0x24f6d32db  libsystem_kernel.dylib   <26FFA906-5ACA-39BF-8F7C-94FE9AB8C657>  /usr/lib/system/libsystem_kernel.dylib
+           0x25c01c000 -        0x25d29bea7  libBNNS.dylib            <2924BD80-5E9D-36A9-818D-8D3330E54A3F>  /System/Library/Frameworks/Accelerate.framework/Frameworks/vecLib.framework/libBNNS.dylib
+
+
+Powerstats for:   cloudd
+UUID:             A9F149B8-716E-3ABC-A20D-ACCA2CCA3754
+Path:             /System/Library/PrivateFrameworks/CloudKitDaemon.framework/Support/cloudd
+Resource Coalition: 10 samples "com.apple.cloudd"(247)
+On Behalf Of:     10 samples cloudd [157] (10 samples originated by cloudd [157])
+Architecture:     arm64e
+Pageins:          26 pages
+Start time:       2026-11-18 19:31:23.431 -0500
+End time:         2026-11-18 19:31:31.749 -0500
+Num samples:      10 (14%)
+Energy:           97.16 uWh
+Primary state:    10 samples Non-Frontmost App, Non-Suppressed, Kernel mode, Effective Thread QoS Background, Requested Thread QoS Background, Override Thread QoS Unspecified, e-core
+User Activity:    10 samples Idle, 0 samples Active
+Power Source:     10 samples on Battery, 0 samples on AC
+  10  ??? (libsystem_pthread.dylib + 2320) [0x193693910]
+    10  ??? (libsystem_pthread.dylib + 4664) [0x193694238]
+      10  ??? (libdispatch.dylib + 87728) [0x1c20dd6b0]
+        10  ??? (libdispatch.dylib + 89228) [0x1c20ddc8c]
+          10  ??? (libdispatch.dylib + 46192) [0x1c20d3470]
+            10  ??? (libdispatch.dylib + 43132) [0x1c20d287c]
+              10  ??? (libdispatch.dylib + 114612) [0x1c20e3fb4]
+                10  ??? (libdispatch.dylib + 72912) [0x1c20d9cd0]
+                  10  ??? (CacheDelete + 46580) [0x21b0d85f4]
+                    10  ??? (cloudd + 23432) [0x10410db88]
+                      10  ??? (cloudd + 23344) [0x10410db30]
+                        10  ??? (libswiftDispatch.dylib + 4968) [0x1a29b2368]
+                          10  ??? (libswiftDispatch.dylib + 5116) [0x1a29b23fc]
+                            10  ??? (libswiftDispatch.dylib + 5560) [0x1a29b25b8]
+                              10  ??? (libswiftDispatch.dylib + 5920) [0x1a29b2720]
+                                10  ??? (libswiftDispatch.dylib + 6156) [0x1a29b280c]
+                                  10  ??? (libdispatch.dylib + 74032) [0x1c20da130]
+                                    10  ??? (libdispatch.dylib + 114612) [0x1c20e3fb4]
+                                      10  ??? (libswiftDispatch.dylib + 6700) [0x1a29b2a2c]
+                                        10  ??? (libswiftDispatch.dylib + 5956) [0x1a29b2744]
+                                          10  ??? (libswiftDispatch.dylib + 6448) [0x1a29b2930]
+                                            10  ??? (libswiftDispatch.dylib + 6592) [0x1a29b29c0]
+                                              10  ??? (libswiftDispatch.dylib + 6660) [0x1a29b2a04]
+                                                10  ??? (cloudd + 40792) [0x104111f58]
+                                                  10  ??? (cloudd + 21812) [0x10410d534]
+                                                    10  ??? (cloudd + 12848) [0x10410b230]
+                                                      10  ??? (cloudd + 21300) [0x10410d334]
+                                                        10  ??? (CloudKitDaemon + 910736) [0x240b82590]
+                                                          10  ??? (CoreFoundation + 20964) [0x1937591e4]
+                                                            10  ??? (CoreFoundation + 20684) [0x1937590cc]
+                                                              10  ??? (CloudKitDaemon + 201716) [0x240ad53f4]
+                                                                10  ??? (CloudKit + 198804) [0x1ab7a3894]
+                                                                  10  ??? (CloudKit + 198688) [0x1ab7a3820]
+                                                                    10  ??? (CloudCoreInternal + 17372) [0x1e6aa53dc]
+                                                                      10  ??? (CloudCoreInternal + 17332) [0x1e6aa53b4]
+                                                                        10  ??? (CloudCoreInternal + 17212) [0x1e6aa533c]
+                                                                          10  ??? (CloudKit + 198868) [0x1ab7a38d4]
+                                                                            10  ??? (CloudKit + 92040) [0x1ab789788]
+                                                                              10  ??? (cloudd + 9892) [0x10410a6a4]
+                                                                                10  ??? (cloudd + 9960) [0x10410a6e8]
+                                                                                  10  ??? (cloudd + 9384) [0x10410a4a8]
+                                                                                    10  ??? (cloudd + 7908) [0x104109ee4]
+                                                                                      10  ??? (CloudKitDaemon + 194164) [0x240ad3674]
+                                                                                        10  ??? (CloudKitDaemon + 588316) [0x240b33a1c]
+                                                                                          10  ??? (libdispatch.dylib + 74032) [0x1c20da130]
+                                                                                            10  ??? (libdispatch.dylib + 114612) [0x1c20e3fb4]
+                                                                                              10  ??? (CloudKitDaemon + 574044) [0x240b3025c]
+                                                                                                10  ??? (CloudKitDaemon + 682856) [0x240b4ab68]
+                                                                                                  10  ??? (libdispatch.dylib + 74032) [0x1c20da130]
+                                                                                                    10  ??? (libdispatch.dylib + 114612) [0x1c20e3fb4]
+                                                                                                      10  ??? (CloudKitDaemon + 575524) [0x240b30824]
+                                                                                                        9   ??? (CloudKitDaemon + 683776) [0x240b4af00]
+                                                                                                          9   ??? (CloudKit + 519780) [0x1ab7f1e64]
+                                                                                                            9   ??? (CloudKit + 378168) [0x1ab7cf538]
+                                                                                                              9   ??? (CloudKit + 517888) [0x1ab7f1700]
+                                                                                                                9   ??? (libsqlite3.dylib + 33000) [0x1b15640e8]
+                                                                                                                  5   ??? (libsqlite3.dylib + 190500) [0x1b158a824]
+                                                                                                                    5   ??? (libsqlite3.dylib + 235504) [0x1b15957f0]
+                                                                                                                      5   ??? (libsqlite3.dylib + 93984) [0x1b1572f20]
+                                                                                                                        5   ??? (libsqlite3.dylib + 261988) [0x1b159bf64]
+                                                                                                                          5   ??? (libsqlite3.dylib + 263088) [0x1b159c3b0]
+                                                                                                                            5   ??? (libsqlite3.dylib + 331400) [0x1b15ace88]
+                                                                                                                              5   ??? (libsqlite3.dylib + 721256) [0x1b160c168]
+                                                                                                                                5   ??? (libsqlite3.dylib + 332304) [0x1b15ad210]
+                                                                                                                                  5   ??? (libsystem_kernel.dylib + 27740) [0x24f69cc5c]
+                                                                                                                                    5   <on behalf of cloudd [157] (originated by cloudd [157])>
+                                                                                                                  4   ??? (libsqlite3.dylib + 191272) [0x1b158ab28]
+                                                                                                                    4   ??? (libsqlite3.dylib + 333324) [0x1b15ad60c]
+                                                                                                                      4   ??? (libsqlite3.dylib + 572652) [0x1b15e7cec]
+                                                                                                                        4   ??? (libsqlite3.dylib + 1234092) [0x1b16894ac]
+                                                                                                                          4   ??? (libsqlite3.dylib + 412936) [0x1b15c0d08]
+                                                                                                                            4   ??? (libsqlite3.dylib + 332304) [0x1b15ad210]
+                                                                                                                              4   ??? (libsystem_kernel.dylib + 27740) [0x24f69cc5c]
+                                                                                                                                4   <on behalf of cloudd [157] (originated by cloudd [157])>
+                                                                                                        1   ??? (CloudKitDaemon + 683344) [0x240b4ad50]
+                                                                                                          1   ??? (CloudKit + 223732) [0x1ab7a99f4]
+                                                                                                            1   ??? (Foundation + 2081804) [0x193e3540c]
+                                                                                                              1   ??? (Foundation + 3883316) [0x193fed134]
+                                                                                                                1   ??? (Foundation + 843192) [0x193d06db8]
+                                                                                                                  1   ??? (Foundation + 843396) [0x193d06e84]
+                                                                                                                    1   ??? (libremovefile.dylib + 2744) [0x2de403ab8]
+                                                                                                                      1   ??? (libremovefile.dylib + 4244) [0x2de404094]
+                                                                                                                        1   ??? (libsystem_kernel.dylib + 23380) [0x24f69bb54]
+                                                                                                                          1   <on behalf of cloudd [157] (originated by cloudd [157])>
+
+  Binary Images:
+           0x104108000 -                ???  cloudd                  <A9F149B8-716E-3ABC-A20D-ACCA2CCA3754>  /System/Library/PrivateFrameworks/CloudKitDaemon.framework/Support/cloudd
+           0x193693000 -        0x19369f1e7  libsystem_pthread.dylib <32E28303-2AAD-3166-9D11-70E8BCF8E076>  /usr/lib/system/libsystem_pthread.dylib
+           0x193754000 -        0x193c38327  CoreFoundation          <D79F14D9-F948-3CD8-B0D1-EB66B9B8CF94>  /System/Library/Frameworks/CoreFoundation.framework/CoreFoundation
+           0x193c39000 -        0x194d3ba23  Foundation              <E623EEBD-082F-32AF-BFC7-F1DC83AE62DD>  /System/Library/Frameworks/Foundation.framework/Foundation
+           0x1a29b1000 -        0x1a29c6d4f  libswiftDispatch.dylib  <DE41FCC2-201D-3D9D-942D-5BC28493D498>  /usr/lib/swift/libswiftDispatch.dylib
+           0x1ab773000 -        0x1abb88e2b  CloudKit                <21D53173-9191-3C56-AFB9-889E7D43C7C9>  /System/Library/Frameworks/CloudKit.framework/CloudKit
+           0x1b155c000 -        0x1b171474f  libsqlite3.dylib        <6145839A-8C5B-3186-8AF6-CEE4C1AFDBC8>  /usr/lib/libsqlite3.dylib
+           0x1c20c8000 -        0x1c210edd7  libdispatch.dylib       <84B7E81D-B830-384F-A103-96323C6F5189>  /usr/lib/system/libdispatch.dylib
+           0x1e6aa1000 -        0x1e6b3bc1f  CloudCoreInternal       <112569E0-3A92-39F2-8E3F-A6B9B95957A9>  /System/Library/PrivateFrameworks/CloudCoreInternal.framework/CloudCoreInternal
+           0x21b0cd000 -        0x21b1106df  CacheDelete             <83EF7F35-AE44-3224-99A1-7A0EFC3FD933>  /System/Library/PrivateFrameworks/CacheDelete.framework/CacheDelete
+           0x240aa4000 -        0x240f4f2d7  CloudKitDaemon          <377C78FE-12BB-32FA-8CAA-77AC0B8F2F52>  /System/Library/PrivateFrameworks/CloudKitDaemon.framework/CloudKitDaemon
+           0x24f696000 -        0x24f6d32db  libsystem_kernel.dylib  <26FFA906-5ACA-39BF-8F7C-94FE9AB8C657>  /usr/lib/system/libsystem_kernel.dylib
+           0x2de403000 -        0x2de4058e7  libremovefile.dylib     <0E51D5B9-9F1F-3781-B382-F8D93227F6EB>  /usr/lib/system/libremovefile.dylib
+
+
+Powerstats for:   searchd
+UUID:             65826564-BE73-3B39-929D-222EAFEA3EEB
+Path:             /System/Library/PrivateFrameworks/Search.framework/searchd
+Resource Coalition: 5 samples "com.apple.searchd"(359)
+Architecture:     arm64e
+Pageins:          1460 pages
+Start time:       2026-11-18 19:31:18.352 -0500
+End time:         2026-11-18 19:31:33.380 -0500
+Num samples:      5 (7%)
+Energy:           196.22 uWh
+Primary state:    3 samples Non-Frontmost App, Non-Suppressed, Kernel mode, Effective Thread QoS Background, Requested Thread QoS Background, Override Thread QoS Unspecified, e-core
+User Activity:    5 samples Idle, 0 samples Active
+Power Source:     5 samples on Battery, 0 samples on AC
+  5  ??? (libsystem_pthread.dylib + 2320) [0x193693910]
+    5  ??? (libsystem_pthread.dylib + 4604) [0x1936941fc]
+      5  ??? (libdispatch.dylib + 86244) [0x1c20dd0e4]
+        5  ??? (libdispatch.dylib + 84472) [0x1c20dc9f8]
+          5  ??? (libdispatch.dylib + 23996) [0x1c20cddbc]
+            5  ??? (libdispatch.dylib + 26608) [0x1c20ce7f0]
+              5  ??? (libdispatch.dylib + 46192) [0x1c20d3470]
+                5  ??? (libdispatch.dylib + 42768) [0x1c20d2710]
+                  5  ??? (libdispatch.dylib + 46192) [0x1c20d3470]
+                    5  ??? (libdispatch.dylib + 43132) [0x1c20d287c]
+                      5  ??? (libdispatch.dylib + 114612) [0x1c20e3fb4]
+                        5  ??? (libdispatch.dylib + 72912) [0x1c20d9cd0]
+                          4  ??? (SpotlightIndex + 6940) [0x1eb55db1c]
+                            4  ??? (SpotlightIndex + 7088) [0x1eb55dbb0]
+                              4  ??? (SpotlightIndex + 7920) [0x1eb55def0]
+                                4  ??? (SpotlightIndex + 914952) [0x1eb63b608]
+                                  4  ??? (SpotlightIndex + 444004) [0x1eb5c8664]
+                                    2  ??? (SpotlightIndex + 927076) [0x1eb63e564]
+                                      2  ??? (SpotlightIndex + 1232444) [0x1eb688e3c]
+                                        2  ??? (SpotlightIndex + 1220460) [0x1eb685f6c]
+                                          2  ??? (MetadataUtilities + 12484) [0x1cb0aa0c4]
+                                            2  ??? (libsystem_kernel.dylib + 27740) [0x24f69cc5c]
+                                              1  <Effective Thread QoS Default, Override Thread QoS Default>
+                                              1  <Effective Thread QoS User Initiated, Override Thread QoS User Initiated>
+                                    2  ??? (SpotlightIndex + 926480) [0x1eb63e310]
+                                      1  ??? (SpotlightIndex + 930120) [0x1eb63f148]
+                                        1  ??? (SpotlightIndex + 932836) [0x1eb63fbe4]
+                                          1  ??? (SpotlightIndex + 521580) [0x1eb5db56c]
+                                            1  ??? (MetadataUtilities + 27752) [0x1cb0adc68]
+                                              1  ??? (libsystem_kernel.dylib + 33388) [0x24f69e26c]
+                                      1  ??? (SpotlightIndex + 929828) [0x1eb63f024]
+                                        1  ??? (SpotlightIndex + 931544) [0x1eb63f6d8]
+                                          1  ??? (SpotlightIndex + 1202800) [0x1eb681a70]
+                                            1  ??? (SpotlightIndex + 1266748) [0x1eb69143c]
+                          1  ??? (SpotlightIndex + 6796) [0x1eb55da8c]
+                            1  ??? (SpotlightIndex + 7088) [0x1eb55dbb0]
+                              1  ??? (SpotlightIndex + 7920) [0x1eb55def0]
+                                1  ??? (SpotlightIndex + 914952) [0x1eb63b608]
+                                  1  ??? (SpotlightIndex + 444004) [0x1eb5c8664]
+                                    1  ??? (SpotlightIndex + 926480) [0x1eb63e310]
+                                      1  ??? (SpotlightIndex + 930404) [0x1eb63f264]
+                                        1  ??? (SpotlightIndex + 1337112) [0x1eb6a2718]
+                                          1  ??? (SpotlightIndex + 1246136) [0x1eb68c3b8]
+                                            1  ??? (SpotlightIndex + 1292516) [0x1eb6978e4]
+                                              1  ??? (SpotlightIndex + 1292760) [0x1eb6979d8]
+                                                1  ??? (SpotlightIndex + 1304868) [0x1eb69a924]
+                                                  1  ??? (MetadataUtilities + 12484) [0x1cb0aa0c4]
+                                                    1  ??? (libsystem_kernel.dylib + 27740) [0x24f69cc5c]
+
+  Binary Images:
+           0x100578000 -                ???  searchd                 <65826564-BE73-3B39-929D-222EAFEA3EEB>  /System/Library/PrivateFrameworks/Search.framework/searchd
+           0x193693000 -        0x19369f1e7  libsystem_pthread.dylib <32E28303-2AAD-3166-9D11-70E8BCF8E076>  /usr/lib/system/libsystem_pthread.dylib
+           0x1c20c8000 -        0x1c210edd7  libdispatch.dylib       <84B7E81D-B830-384F-A103-96323C6F5189>  /usr/lib/system/libdispatch.dylib
+           0x1cb0a7000 -        0x1cb12d67f  MetadataUtilities       <D33BFE6F-7273-3F86-8CC7-54E7606F8B38>  /System/Library/PrivateFrameworks/MetadataUtilities.framework/MetadataUtilities
+           0x1eb55c000 -        0x1eba419a7  SpotlightIndex          <4B457176-20E1-3722-A9CE-9F2178CB2D80>  /System/Library/PrivateFrameworks/SpotlightIndex.framework/SpotlightIndex
+           0x24f696000 -        0x24f6d32db  libsystem_kernel.dylib  <26FFA906-5ACA-39BF-8F7C-94FE9AB8C657>  /usr/lib/system/libsystem_kernel.dylib
