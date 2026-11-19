@@ -42,6 +42,7 @@ public final class PersistentLogStore {
         "p172": "p172_m2_contract_log.txt",
         "p173": "p173_kamui_log.txt",
         "p174": "p174_agx_ab_log.txt",
+        "p177": "p177_conductor_log.txt",
         "p175": "p175_kamui_census_log.txt",
         "p176": "p176_f1seed_log.txt",
 

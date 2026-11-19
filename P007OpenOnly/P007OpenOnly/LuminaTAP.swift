@@ -155,6 +155,7 @@ enum LuminaTAP {
         case "p176":        result = P176F1SeedWindow.tap()
         case "p174":        result = P174AgxReconnectAB.tap()
         case "p175":        result = P175KamuiCensus.tap()
+        case "p177":        result = P177RaceConductor.tap()
         case "p173":        result = P173KamuiEscape.tap()
         case "p154":        result = P154IOSurfaceF1Gate.tap()
         case "p172":        result = P172M2ContractSweep.tap()

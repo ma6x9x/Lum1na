@@ -128,6 +128,7 @@
 #import "Exploit/P174AgxReconnectAB.h"
 #import "Exploit/P175KamuiCensus.h"
 #import "Exploit/P176F1SeedWindow.h"
+#import "Exploit/P177RaceConductor.h"
 
 #import "Exploit/P113DescForgeControl.h"
 #import "Exploit/P122SwordForge.h"

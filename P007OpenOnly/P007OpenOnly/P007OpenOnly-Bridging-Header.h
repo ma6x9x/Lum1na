@@ -174,5 +174,6 @@
 #import "P174AgxReconnectAB.h"
 #import "P175KamuiCensus.h"
 #import "P176F1SeedWindow.h"
+#import "P177RaceConductor.h"
 #import "P162IOHIDReach.h"
 #import "SandboxRead.h"
