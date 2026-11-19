@@ -8,10 +8,15 @@
 NS_ASSUME_NONNULL_BEGIN
 
 @interface P168Iosurface112477 : NSObject
-/// Ladder (classification, not an exploit):
+/// V2 (2026-11-19, Rust505/Kimi cross-ref fusion):
 ///   1. open IOSurfaceRootUserClient (type 0), create 2 surfaces (framework).
-///   2. sel-17 register: struct variants, dup-check (expect 2c9 on repeat),
-///      sel-18 dereg (expect 0 then 2c2-class when gone).
+///   2. [A] calling-contract calib: sel17 is ASYNC-ONLY (sync = 2c2 forever).
+///      [B] sticky ladder: reg -> dup(2c9) -> dereg -> re-reg (2D8 = the
+///      27.2-era sticky gate LIVE receipt; 0 = pre-27.2 shape).
+///      [E] SIBLING stale-read oracle: reg->dereg frees the node, async
+///      groom (256 kernel-held buffers, sz sweep 24..96) recycles the slot,
+///      a fresh SIBLING connection's reg reads the groomed bytes
+///      (dup 2c9 -> not-2c9 = STALE-READ). Behavior codes only.
 ///   3. ARM-GATED dangle stage (Documents/p168_dangle_arm.txt must exist):
 ///      register -> IOServiceClose BEFORE CFRelease -> drop last ref of the
 ///      OTHER surface -> the 0x9869984 fan-out derefs the freed client at
