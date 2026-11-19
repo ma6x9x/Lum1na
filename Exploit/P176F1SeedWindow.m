@@ -154,6 +154,19 @@ static NSString * const kControlXML =
         }
     }
 
+    /* 5. WINDOW LOOP PARKED (sync review 2026-11-18): p176 as written calls
+       sel36 on the IOSurfaceRoot connection — but sel36 is the IOGPU
+       device-UC {rid,0,len} law; the window conversion needs the GPU-side
+       UC (murk/A-coldforge cf_device_conn) and the murk A/B control first
+       (p174). Arm: Documents/p176_arm.txt. */
+    NSString *armDoc = [docs stringByAppendingPathComponent:@"p176_arm.txt"];
+    if (![[NSFileManager defaultManager] fileExistsAtPath:armDoc]) {
+        Lf(@"[-] WINDOW LOOP PARKED — Documents/p176_arm.txt absent (review 2026-11-18: wrong UC + wrong I/O shape as written).");
+        Lf(@"=== p176 done (parked) ===");
+        if (g_fd >= 0) { fcntl(g_fd, F_FULLFSYNC); close(g_fd); g_fd = -1; }
+        return o;
+    }
+    Lf(@"[*] WINDOW LOOP ARMED (p176_arm.txt present)");
     /* 5. the confused-window read over the F1 sid: 16 windows at increasing offsets
           PAST the 64 KiB alloc. A non-marker qword at >0x10000 = kernel-side OOB read
           receipt (the 4 GiB logical/64 KiB backing law; cluster_write_contig unfixed on 24C5049d). */

