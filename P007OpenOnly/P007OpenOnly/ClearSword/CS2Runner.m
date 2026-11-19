@@ -248,7 +248,11 @@ static BOOL lsword_arm_licensed(int *windows, BOOL *explicit_arm) {
        leaks[] becomes the fil-tag fill. Zero = honest random-marker
        fallback. Excluded from every kptr-shape classifier in the core. */
     {
+        /* auto-supply: thin board set -> one bounded P159 harvest tap first */
+        int nAvail = LabHeapAnchorHarvestIfThin(2);
         uint64_t anchor = LabHeapAnchorSameBoot();
+        cs2_log("[anchor] same-boot anchor set: %d distinct%s", nAvail,
+                nAvail ? "" : " (harvest produced none this boot)");
         if (anchor) {
             cs2_ctx.heap_anchor = anchor;
             cs2_ctx.heap_anchor_armed = 1;

