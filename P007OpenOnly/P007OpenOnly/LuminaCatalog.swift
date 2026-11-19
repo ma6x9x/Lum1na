@@ -1,445 +1,159 @@
-//
-//  LuminaCatalog.swift — Lum1na TAP ids as Lab ExploitModules.
-//  Lab catalog run closures call LuminaTAP.execute so Console and Lab share one dispatcher.
-//
+#ifndef Lum1na_Bridging_Header_h
+#define Lum1na_Bridging_Header_h
 
-import Foundation
+#import <Foundation/Foundation.h>
+#import <UIKit/UIKit.h>
 
-extension Catalog {
-    static func lum(_ id: String, _ title: String, _ cve: String, _ component: String,
-                    _ prim: PrimitiveKind, _ reach: Reach, _ tier: Int,
-                    _ summary: String) -> ExploitModule {
-        ExploitModule(
-            id: id,
-            titleZh: title,
-            cve: cve,
-            component: component,
-            primitive: prim,
-            reach: reach,
-            tier: tier,
-            summaryZh: summary,
-            notesZh: "Lum1na-Debugger TAP \(id). One TAP per force-quit. hasKread only after kread32(kbase)==0xfeedfacf.",
-            run: { ctx in
-                ctx.arm(id, "lumina tap")
-                let body = LuminaTAP.execute(id)
-                let head = body.split(whereSeparator: \.isNewline).first.map(String.init) ?? "ran"
-                ctx.disarm(id, String(head.prefix(160)))
-                var out = ModuleOutcome(headline: String(head.prefix(120)), detail: body)
-                if body.contains("hasKread=YES") {
-                    out.headline = "hasKread=YES"
-                }
-                return out
-            })
-    }
+// iOS-compatible Mach headers
+#import <mach/mach.h>
+#import <mach/vm_map.h>
+#import <mach/vm_region.h>
+#import <mach/message.h>
+#import <mach/port.h>
+#import <mach/task.h>
 
-    static let luminaKRW: [ExploitModule] = [
-            lum("p127", "P127. FENCE-LIST PRESSURE + KRW SELF-TEST: IOSurface-backed Metal blit churn on OUR sids + perio", "—", "Lum1na TAP", .oobWrite, .kernel, 1,
-                "P127. FENCE-LIST PRESSURE + KRW SELF-TEST: IOSurface-backed Metal blit churn on OUR sids + periodic surface recycle (drain walker + the twice-aborted fence-append range checks 0x984fcc8 in the hot path), then the honest kread32(kbase)==0xfeedfacf self-test via the lane pickers…"),
-            lum("p128", "P128. CO-DRIVER RACE (fence × queue): p127 proved fence churn ALONE is clean (3×~21k commits); t", "—", "IOGPU", .uaf, .kernel, 1,
-                "P128. CO-DRIVER RACE (fence × queue): p127 proved fence churn ALONE is clean (3×~21k commits); the 2/2 aborts had allocator churn concurrent — thread A = IOSurface Metal blit churn + surface recycle, thread B = full-rate IOGPU QueueCreate/destroy ping-pong, 12s bounded race. P…"),
-            lum("p129", "P129. LAST CO-DRIVER CELL (fence × FILL): thread A = p127 fence churn racing thread B = the REAL", "—", "Lum1na TAP", .oobWrite, .kernel, 1,
-                "P129. LAST CO-DRIVER CELL (fence × FILL): thread A = p127 fence churn racing thread B = the REAL P044 fill battery (mlmodel compile + ember rounds, serialized). The 2/2 fence-append aborts carried fill-staging sids in x5 — this pair is what was actually live. PANIC-POSSIBLE; o…"),
-            lum("p130", "P130. THE FUSION (fence × p073 LANDING ENGINE): p127/p128/p129 falsified every reproducible pair", "—", "Lum1na TAP", .oobWrite, .kernel, 1,
-                "P130. THE FUSION (fence × p073 LANDING ENGINE): p127/p128/p129 falsified every reproducible pair; only p073 produces record LANDINGS (positioned 0x820 prefill, 254-in post-marshal, translation bar on 23H30). Thread A = fence churn racing thread B = [P073 tap] — the historical …"),
-            lum("p132", "P132. THE CHAIN FRAME (anchor→fence→write→landing→gate): the receipts interlock, so the frame ru", "—", "Lum1na TAP", .oobWrite, .kernel, 1,
-                "P132. THE CHAIN FRAME (anchor→fence→write→landing→gate): the receipts interlock, so the frame runs them in ONE session — aio anchor, fence churn live for the whole session (the 20:20 delayed-abort condition), p112 chosen-write receipt UNDER that churn, p073 landing flag-gated …"),
-            lum("p133", "P133. THE READ FRAME (p010 WHERE → p114 WHAT → echo-classified candidates → gate): the queue-obj", "—", "Lum1na TAP", .probe, .kernel, 1,
-                "P133. THE READ FRAME (p010 WHERE → p114 WHAT → echo-classified candidates → gate): the queue-object KVA names where; the sel-8 serializer pull is the content pull — rec 0 = our echo calibration row, later records = kernel-refilled = the relative-read receipt. Echo law separate…"),
-            lum("p134", "P134 ROUTE A. ENGINE-ARMED K2K FILL DISCLOSURE: sel-6's ARMED branch (UC+0x154) writes kernel re", "—", "Lum1na TAP", .infoLeak, .kernel, 1,
-                "P134 ROUTE A. ENGINE-ARMED K2K FILL DISCLOSURE: sel-6's ARMED branch (UC+0x154) writes kernel results INTO the caller's 0xfa8 struct (count +0, record ptrs +0x608..+0x614). VT encode battery BETWEEN two row-6 sends on the SAME conn; KVA-CAND scan on every response. PANIC-POSSI…"),
-            lum("p135", "P135 ROUTE B. TAMING THE NQ NULL-CTX WINDOW (our ×5 bug): groom the freed-ctx zone with 0x42-cla", "—", "Lum1na TAP", .oobWrite, .kernel, 1,
-                "P135 ROUTE B. TAMING THE NQ NULL-CTX WINDOW (our ×5 bug): groom the freed-ctx zone with 0x42-class pattern, then the p027 trap ×2 — far 0x10 again = window NULL (law); far in 0x42-class = THE NULL TAMED = kernel read at a chosen slot. PANIC-POSSIBLE BY DESIGN; one tap"),
-            lum("p136", "P136 ROUTE C. FENCE CHURN × STALE-GVA RECLAIM KICK: the b1b2 engine (map → unmap+spray → latched", "—", "Lum1na TAP", .oobWrite, .kernel, 1,
-                "P136 ROUTE C. FENCE CHURN × STALE-GVA RECLAIM KICK: the b1b2 engine (map → unmap+spray → latched kick → verify reclaim) with the p127 fence thread LIVE all session — the aimable-write state; phase4 non-own reclaim = the candidate. PANIC-POSSIBLE; one tap"),
-            lum("p137", "P137 ROUTE C-LATCH. THE REAL LATCHED KICK: held-blit UAF by the b1b2 laws — encode 0xBB fill → H", "—", "Lum1na TAP", .uaf, .kernel, 1,
-                "P137 ROUTE C-LATCH. THE REAL LATCHED KICK: held-blit UAF by the b1b2 laws — encode 0xBB fill → HOLD commit → drop the buffer (pages live by the noop-deallocator law) → 0xCC spray → COMMIT the held command → verdict by where 0xBB lands (our old pages = stale GVA survived; spray…"),
-            lum("p138", "P138 ROUTE D. IOMD dmaref RETAIN-WRAP RUNNER (corpus-complete, zero entitlement walls): IOSurfac", "—", "Lum1na TAP", .probe, .kernel, 1,
-                "P138 ROUTE D. IOMD dmaref RETAIN-WRAP RUNNER (corpus-complete, zero entitlement walls): IOSurfaceCreateMachPort arm (P069-proven hop) → op-channel census (the w1=op<<24|subsel dispatcher law) → the op-2 ORACLE ([md+0x98] kernel-counter readback) → the op-3 retain ladder to the…"),
-            lum("p139", "P139 BOOT INTEL COLLATOR (the Learner layer, one tap): the aio KVA family (+0xC0 law) + the cons", "—", "Lum1na TAP", .infoLeak, .kernel, 1,
-                "P139 BOOT INTEL COLLATOR (the Learner layer, one tap): the aio KVA family (+0xC0 law) + the console-sec leak + the p010 cursor+band + the ipc rows + the IOMD op-2 oracle — one dossier (p139_boot_intel.txt) with the slide-TRIANGULATION checks. Feeds every lane's boot-1 aim; nev…"),
-            lum("p142", "P142 AVE2 TEMPORAL-KNOB (CVE-2026-112705, PUBLIC VECTOR, credited MMdAS/Calif): VT compression s", "CVE-2026-112705", "AppleAVE2", .oobWrite, .kernel, 1,
-                "P142 AVE2 TEMPORAL-KNOB (CVE-2026-112705, PUBLIC VECTOR, credited MMdAS/Calif): VT compression session with NumberOfTemporalLayers=16463 (16462 survives) then ONE encode — the AVE2 kernel OOB write at +0xDA78 with the count-scaled fault word = the lab's fill-store geometry wit…"),
-            lum("p145", "P145 COMPOSITION (the composition row): 64 held IOSurface-backed Metal buffers painted 0x41 + a ", "—", "AppleAVE2", .oobWrite, .kernel, 1,
-                "P145 COMPOSITION (the composition row): 64 held IOSurface-backed Metal buffers painted 0x41 + a 16-surface 0x53 marker group, then the p142 stage9 AVE2 fill session (EncoderUsage=1, RCMode-20, RealTime=FALSE, HEVC 1280x720) composed INSIDE the live spray on a second thread, th…"),
-            lum("p147", "P147 LIFECYCLE (the STALE-SLOT UAF teardown battery): 64 held 0x41 IOSurface-backed Metal buffer", "—", "Lum1na TAP", .uaf, .kernel, 1,
-                "P147 LIFECYCLE (the STALE-SLOT UAF teardown battery): 64 held 0x41 IOSurface-backed Metal buffers + a 16-surface 0x53 marker group, then N FAST VTCompressionSession create→prepare→encode→complete→invalidate cycles (HEVC 1280x720, the stage9 property pack VERBATIM) on a worker …"),
-            lum("p148", "P148 AVE2 BLOB INTAKE (the params-blob decode, VERBATIM +0x55c = sGOP.iNumOfTemporalLayer, cfg+0", "—", "AppleAVE2", .probe, .kernel, 1,
-                "P148 AVE2 BLOB INTAKE (the params-blob decode, VERBATIM +0x55c = sGOP.iNumOfTemporalLayer, cfg+0x55c == structIn+0x55c NO remap): direct-UC open census -> row0 IO_Open -> row2 IO_Config zero-shape -> row3 IO_Prepare ladder {0,2,4,8} + p148_gop.txt knob IF in [0,8] — a ZEROED 0…"),
-            lum("p149", "P149 T8150 KRW CONVERSION (the 17 door): kernel pipe spray (96 held + 48 catch, 16KB unique mark", "—", "Lum1na TAP", .oobWrite, .kernel, 1,
-                "P149 T8150 KRW CONVERSION (the 17 door): kernel pipe spray (96 held + 48 catch, 16KB unique markers) → VT Prepare N=8 → encode >=1 frame (heap this at ctx+0x147b0) → Set NumberOfTemporalLayers=16463 (re-init live pool) → encode → invalidate (dtor queue_init this+0x58 then kfre…"),
-            lum("p147x60", "P147 LADDER x60 (the no-push ladder arm; the row preset 60 OVERRIDES the knob file — consume-onc", "—", "Lum1na TAP", .oobWrite, .kernel, 1,
-                "P147 LADDER x60 (the no-push ladder arm; the row preset 60 OVERRIDES the knob file — consume-once — the teardown chase's first climb; PANIC-POSSIBLE)"),
-            lum("p147x120", "P147 LADDER x120 (the row preset 120; the second climb)", "—", "Lum1na TAP", .oobWrite, .kernel, 1,
-                "P147 LADDER x120 (the row preset 120; the second climb)"),
-            lum("p147x200", "P147 LADDER x200 (the row preset 200 = the CAP; the top climb)", "—", "Lum1na TAP", .oobWrite, .kernel, 1,
-                "P147 LADDER x200 (the row preset 200 = the CAP; the top climb)"),
-            lum("p110xleak", "P110 LEAK-ON PAIRING (the targeted-sampling row: the row preset FORCES the leakgate-on arm for t", "—", "Lum1na TAP", .infoLeak, .kernel, 1,
-                "P110 LEAK-ON PAIRING (the targeted-sampling row: the row preset FORCES the leakgate-on arm for this one tap — the sel-8 KVA-disclosure capture per round + the claim-window DIFF = the corruption observable; kernel-range KVs in OUR output buffer = disclosure class, NEVER kread)"),
-            lum("p140", "P140 MINI GROUND-TRUTH VERIFIER (21-D50 cross-ref rig): mach_port_kobject = the SKU-free port→ka", "—", "Lum1na TAP", .probe, .kernel, 1,
-                "P140 MINI GROUND-TRUTH VERIFIER (21-D50 cross-ref rig): mach_port_kobject = the SKU-free port→kaddr locator, then — lane live — DIRECT kread of the p138 oracle slots ([+0x98] gate, [+0x34] dmaref, [+0x80] the 21-D50 MD twin slot): the 2c2 op-channel census answered by kernel R…"),
-            lum("p114", "P114. M2ScalerCSC sel-8 leak tap — SOLO leak law validation (p110 v2 pairing gate; {u64} 8B in, ", "—", "M2ScalerCSC", .infoLeak, .kernel, 1,
-                "P114. M2ScalerCSC sel-8 leak tap — SOLO leak law validation (p110 v2 pairing gate; {u64} 8B in, serializer records stride 0x7c, rec+0x18 raw KV; N=8 captures + KV table + honest KVA-disclosure class; READ-ONLY; no race)"),
-            lum("p110", "P110. IOSurface swap-claim probe (270 design; sibling-client reclaim after owner death, prefill(", "—", "Lum1na TAP", .oobWrite, .kernel, 1,
-                "P110. IOSurface swap-claim probe (270 design; sibling-client reclaim after owner death, prefill(6)+2 same-CPU pop, 64 rounds; three-outcome honest verdicts; T8101 23F77 + T8150 24A435; STANDALONE — Family-B is a target outcome)"),
-            lum("p088", "P088. 43748 forged OUTPUT-record write hop v8 (prewire OOB confirmed at the pc: entry 192 = +0xC", "—", "AppleH11ANEInterface", .probe, .kernel, 1,
-                "P088. 43748 forged OUTPUT-record write hop v8 (prewire OOB confirmed at the pc: entry 192 = +0xC00; err=-1 = downstream reject, content check is the signal; ourBand census per D2 hit; bandit 4-arm volley)"),
-            lum("p099", "P099. 43748 ANE prewire GROOMED (espresso/CoreML primary, 254-in addchain; STANDALONE ONLY — rea", "—", "AppleH11ANEInterface", .oobWrite, .kernel, 1,
-                "P099. 43748 ANE prewire GROOMED (espresso/CoreML primary, 254-in addchain; STANDALONE ONLY — real OOB, never in chain)"),
-            lum("cs2", "CS2. VERBATIM Dopamine core (A13 22G100 KRW — one tap)", "—", "Lum1na TAP", .oobWrite, .kernel, 1,
-                "CS2. VERBATIM Dopamine core (A13 22G100 KRW — one tap)"),
-            lum("lswarm", "LSWORD ARM. calib-licensed cs2 on patched trains (toggle arm file)", "—", "Lum1na TAP", .oobWrite, .kernel, 1,
-                "LSWORD ARM. calib-licensed cs2 on patched trains (toggle arm file)"),
-            lum("cskrw", "CS KRW. mapped theory (runKRW, 23F77 offsets)", "—", "Lum1na TAP", .oobWrite, .kernel, 1,
-                "CS KRW. mapped theory (runKRW, 23F77 offsets)"),
-            lum("cscali", "CS calib. phys_oob race only (not KRW)", "—", "Lum1na TAP", .uaf, .kernel, 1,
-                "CS calib. phys_oob race only (not KRW)"),
-            lum("swordforge", "P122 SwordForge. combined 64788 KRW test (freer→reclaim→read)", "—", "IOGPU", .oobWrite, .kernel, 1,
-                "P122 SwordForge. combined 64788 KRW test (freer→reclaim→read)"),
-            lum("shapecensus", "P123 ShapeCensus. kalloc.3072 victims with KRW vision (mini/libkrw)", "—", "Lum1na TAP", .probe, .kernel, 1,
-                "P123 ShapeCensus. kalloc.3072 victims with KRW vision (mini/libkrw)"),
-            lum("krw", "KERNEL. T1 sequencer (t8150-krw-3): P139 (no lock wait) + hunt P044 / 17 P114 then P149 conversi", "—", "Lum1na TAP", .oobWrite, .kernel, 1,
-                "KERNEL. T1 sequencer (t8150-krw-3): P139 (no lock wait) + hunt P044 / 17 P114 then P149 conversion (encode N=8 then Set 16463, kernel pipes, PANIC-POSSIBLE) + kread32. Occupancy / PIPE-HIT is not hasKread."),
-            lum("pathtest", "PATHS. Per-path scorecard + READ-ONLY tests. Hunt: P139+kread. 17: P139+P114+kread (P149 stays K", "—", "Lum1na TAP", .probe, .kernel, 1,
-                "PATHS. Per-path scorecard + READ-ONLY tests. Hunt: P139+kread. 17: P139+P114+kread (P149 stays KERNEL/catalog). Occupancy stays P044/KERNEL solo. P110/P143 isolated."),
-            lum("kreadtest", "KREAD. commitSlide kread32(kbase)==MH_MAGIC_64", "—", "Lum1na TAP", .oobWrite, .kernel, 1,
-                "KREAD. commitSlide kread32(kbase)==MH_MAGIC_64"),
-            lum("p070", "P070 five-door chain census + persist HOLD", "—", "Lum1na TAP", .probe, .kernel, 1,
-                "P070 five-door chain census + persist HOLD"),
-            lum("p113", "P113. DescForge CONTROL (KRW krw hand-forged desc -> recv oracle; A13 rig)", "—", "Lum1na TAP", .oobWrite, .kernel, 1,
-                "P113. DescForge CONTROL (KRW krw hand-forged desc -> recv oracle; A13 rig)"),
-            lum("p044", "P044. 43748 v61 addchain-191 B1 (on-device ANECCompile of the handwritten 191-in MIL, count=192 ", "—", "AppleH11ANEInterface", .probe, .kernel, 1,
-                "P044. 43748 v61 addchain-191 B1 (on-device ANECCompile of the handwritten 191-in MIL, count=192 exactly in-bounds; OUTPUT-SID lane + census stillness + out-entry scan; override file p044_model.txt = model NAME, p044_req_in.txt = N inputs — one file = one deliberate fire; notes…"),
-            lum("p075", "P075. 43748 KRW v2 SAFE (pre-load sid_C groom; read+write doors)", "—", "AppleH11ANEInterface", .oobWrite, .kernel, 1,
-                "P075. 43748 KRW v2 SAFE (pre-load sid_C groom; read+write doors)"),
-            lum("conv", "CONV. P073 43748 second-table conversion bar (not hasKread)", "—", "AppleH11ANEInterface", .oobWrite, .kernel, 1,
-                "CONV. P073 43748 second-table conversion bar (not hasKread)"),
-            lum("p073", "P073 v15. 43748 second-table + desc-smash body/copy scan", "—", "AppleH11ANEInterface", .oobWrite, .kernel, 1,
-                "P073. 43748 second-table conversion (v46 parity + detectors)"),
-            lum("luminakrw", "Luminakrw. mapped theory (runKRW)", "—", "Lum1na TAP", .oobWrite, .kernel, 1,
-                "Luminakrw. mapped theory (runKRW)"),
-    ]
+// iOS-compatible Mach-O
+#import <mach-o/dyld.h>
+#import <mach-o/loader.h>
 
-    static let luminaLive: [ExploitModule] = [
-            lum("p150", "P150 ANE UC REACH — IOServiceOpen type 0-2 on the ANE services (safe: no kernel method). Type 1 = direct evaluate client; 23F77 init skips com.apple.ane.iokit-user-access there. An OPEN unlocks the ProgramCreate probe.", "—", "AppleH11ANEInterface", .probe, .entitlementGated, 3,
-                "P150 ANE UC REACH: match AppleH11ANEInterface/H11ANEIn/ANE* and IOServiceOpen type 0-2; report service, registry class and kr per type; presence of the private framework classes. Nothing fires. 23F77 newUserClient: type 1 = direct evaluate client (init does NOT check com.apple.ane.iokit-user-access; only allow-dataChaining), type 0 = program loading client (checks it). OPEN = the ANE kernel paths are app-reachable."),
-            lum("p151", "P151 ANE DIRECTPATH DEVICEOPEN — open type 1, then selector 0 (0x68 in/out) with a real pid at 0x00/0x0c/0x10/0x54. No send request, nothing fires. kr=0 = the pid was accepted (DirectPath live); 0xe00002f0 = pid unresolved; 0xe00002c2 = size.", "—", "AppleH11ANEInterface", .probe, .entitlementGated, 3,
-                "P151 ANE DIRECTPATH DEVICEOPEN: the 23F77 dispatch table (sel0 DeviceOpen 0x68/0x68, sel2 ProgramSendRequest 1 scalar + 0x948/0x28 async, sel4 ProgramPrepare 0x38/0x38). Uses the pasteboard p151_pid=<n> handoff or getpid. Stage-B law: the kernel resolves the request-supplied pid and validates THAT task's entitlements — a borrowed pid is the next fire. Safe: no ProgramSendRequest."),
-            lum("p152", "P152 IOSURFACE GLOBAL GATE — own create/lookup baseline, then a foreign ID window + READ-ONLY lock; no contents copied. Foreign hit + lockRO=0 = the global lookup/ownerless lock door is live for this install.", "—", "IOSurface", .probe, .inProcess, 3,
-                "P152 IOSURFACE GLOBAL GATE: create 64x64 BGRA, lookup own ID, resolve IDs around it via IOSurfaceLookup, read alloc size/useCount and take a read-only lock. Receipts: own ok = IOSurfaceRoot reachable; foreign hits + lockRO=0 = the global-insecure path our ANE/AVE/AVD kernel clients use is live; zero hits = gated."),
-            lum("p153", "P153 ANE SELECTOR — class-ID type 1/4 by sel7 shape, then optional async sel2 reach (zero counts), MemoryMapRequest, ProgramCreate; DeviceOpen re-check after. Default is safe (no send/map/create).", "—", "AppleH11ANEInterface", .probe, .entitlementGated, 3,
-                "P153 ANE SELECTOR: static 23F77 map = H11ANEInUserClient table1 (ProgramCreate/Prepare/Unprepare/Destroy/GetStatus, 17 sels) and H11ANEInDirectPathClient table2 (OutputSetEnqueue/InputsReady/MemoryMapRequest/UnMap/SessionHint, 9 sels). Class ID: sel7 UC shape in 0/out 0x20 vs DP shape in 0x10/out 0x18; wrong shape = 2c2. Knobs in Documents/p153_knobs.txt: p153_send=1 (ONE async sel2 with zero-count 0x948, cannot OOB), p153_map=1, p153_create=1, counts/offsets. PANIC-POSSIBLE only when enabled; one tap per force-quit."),
-            lum("ident", "0. Device identity + prove matrix", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "0. Device identity + prove matrix"),
-            lum("board", "Board JSON + hasKread (p007_board.json)", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "Board JSON + hasKread (p007_board.json)"),
-            lum("p118", "P118. BOOT-LEARNER — one tap = one training event (per-boot offsets.json via p090's resolver + t", "—", "Lum1na TAP", .probe, .kernel, 2,
-                "P118. BOOT-LEARNER — one tap = one training event (per-boot offsets.json via p090's resolver + the entitlement map + the LabBandit ledger's bootId attribution; READ-ONLY; the auto-port pipeline's input pair)"),
-            lum("p117", "P117. Entitlement ECHO — what the KERNEL sees of the rig's plist (SecTaskCopyValueForEntitlement", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P117. Entitlement ECHO — what the KERNEL sees of the rig's plist (SecTaskCopyValueForEntitlement, type+value per key; NIL = stripped by free-profile AMFI); gates every kernel-side entitlement experiment"),
-            lum("intel", "INTEL. merged offset DB + ladder cross-check (read-only)", "—", "Lum1na TAP", .probe, .kernel, 2,
-                "INTEL. merged offset DB + ladder cross-check (read-only)"),
-            lum("p090", "P090. momentarius census v1 (offsets DB vs live kernel + kbase sanity + allproc scan, READ-ONLY,", "—", "Lum1na TAP", .probe, .kernel, 2,
-                "P090. momentarius census v1 (offsets DB vs live kernel + kbase sanity + allproc scan, READ-ONLY, rig)"),
-            lum("p100", "P100. AutoLearn (READ-ONLY learner — unknown devices, chip tag + door census + LEARN PACKET)", "—", "Lum1na TAP", .probe, .kernel, 2,
-                "P100. AutoLearn (READ-ONLY learner — unknown devices, chip tag + door census + LEARN PACKET)"),
-            lum("ht149041", "HT149041. 26.7 chain map (print only)", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "HT149041. 26.7 chain map (print only)"),
-            lum("p119", "P119. T020 STALE-UPL port (new-build reopen of the wire×replace lane): stage0 calibrate → stage1", "—", "Lum1na TAP", .uaf, .kernel, 2,
-                "P119. T020 STALE-UPL port (new-build reopen of the wire×replace lane): stage0 calibrate → stage1 re-ordered race (detach-idle → wirer commit → replace) → stage2 staging oracle (paints 0x41/0x11/0x43 vs FOREIGN) → stage3 reclaim-spray 0xE0 read-through. PANIC-POSSIBLE — one tap…"),
-            lum("p121", "P121. iogpu_close × merge REOPEN (new build vs the P040-ABI): create(sel6)/destroy(sel7) calibra", "—", "Lum1na TAP", .uaf, .kernel, 2,
-                "P121. iogpu_close × merge REOPEN (new build vs the P040-ABI): create(sel6)/destroy(sel7) calibrate on THIS device, then the close-vs-merge race (destroy ping-pong × Metal blit commits, 10s). PANIC-POSSIBLE"),
-            lum("p125", "P125. kern.ipc REQUEST-TABLE race (CVE-2026-112507 port, Lum27): 4-thread mach-namespace allo", "CVE-2026-112507", "Lum1na TAP", .uaf, .kernel, 2,
-                "P125. kern.ipc REQUEST-TABLE race (CVE-2026-112507 port, Lum27): 4-thread mach-namespace alloc/notify/teardown interleave, bounded 5s/6000; 27.2 ships the fix = pre-fix live on 26.5/27.0; refused-notifications = the stale-index candidate signal. PANIC-POSSIBLE"),
-            lum("p126", "P126. decmpfs KERNEL HEAP DISCLOSURE (CVE-2026-113910 port): crafted com.apple.decmpfs chunked-z", "CVE-2026-113910", "Lum1na TAP", .probe, .kernel, 2,
-                "P126. decmpfs KERNEL HEAP DISCLOSURE (CVE-2026-113910 port): crafted com.apple.decmpfs chunked-zlib xattr under-produces vs its chunk table; read-back scan for kernel pointers (>= 0xFFFFFFE000000000). READ-ONLY; hits = a kernel-content READ from a free app (the read prong rece…"),
-            lum("p131", "P131. QUICKLOOK DETOUR (calif chain stage 2): the 86950 trigger PDF through the quicklookd hando", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P131. QUICKLOOK DETOUR (calif chain stage 2): the 86950 trigger PDF through the quicklookd handoff (QLThumbnailGenerator) — the daemon receipts land in crash logs, not in-app. Stage control = benign PDF QL + in-process ImageIO replica. PANIC-POSSIBLE; one tap per force-quit"),
-            lum("p141", "P141 USB/STOCKHOLM REACHABILITY ORACLE (SKU-free): the USB device-mode family (IOUSBDeviceInterf", "—", "Lum1na TAP", .probe, .kernel, 2,
-                "P141 USB/STOCKHOLM REACHABILITY ORACLE (SKU-free): the USB device-mode family (IOUSBDeviceInterface match+open+census — the mini law: match OK in-app, open=2e2 owner-held) + the Stockholm/hammerfest control UC (the nfc.disableentitlements PEBL switch = the kext's OWN gate-void…"),
-            lum("p143", "P143 ROCKET SUBMIT DOOR (the 17, 24A435; the state-band DERIVED: record array {ptr,+8 u32,+0x10 ", "—", "IOGPU", .probe, .kernel, 2,
-                "P143 ROCKET SUBMIT DOOR (the 17, 24A435; the state-band DERIVED: record array {ptr,+8 u32,+0x10 valid} @0x18 at PP+0x48, owner UC+0x120, the 0xcda1 fleet PAC law — static chain CLOSED): the IOGPU UC open + the sel-0x24 submit-row census with the real-resource law. PANIC-POSSIB…"),
-            lum("p144", "P144 AVE2 IO_Config MASK INTAKE (the agent-named knob, 24A435): row 2 = IO_Config (structIn 0x38", "—", "AppleAVE2", .probe, .inProcess, 2,
-                "P144 AVE2 IO_Config MASK INTAKE (the agent-named knob, 24A435): row 2 = IO_Config (structIn 0x38; the u64 at +0x30 = the RAW mask, unvalidated store) after IO_Open; the mask consumer = the encode-loop map step to the boundless write-through mapper. State-machine rows; PANIC-PO…"),
-            lum("p146", "P146 KNOB SETTER v3 (the afc-bypass law; line-per-knob): p146_set.txt line1 → p142_layers.txt (d", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P146 KNOB SETTER v3 (the afc-bypass law; line-per-knob): p146_set.txt line1 → p142_layers.txt (default 16463), line2 → p147_cycles.txt (default 24), line3 → p148_gop.txt (default 2), line4 → p142_pre.txt (default 8) — each with its readback VERIFY row + the composition flags s…"),
-            lum("p115", "P115. M2Scaler framework-path PEEK (the tpeek law): bounded CSC battery (IOSurface control + one", "—", "M2ScalerCSC", .probe, .kernel, 2,
-                "P115. M2Scaler framework-path PEEK (the tpeek law): bounded CSC battery (IOSurface control + one VT 720p encode), diff the task's SEND ports after each op, fingerprint new ports for the M2Scaler sel-8 no-queue signature (2bf). A framework-opened UC owns a REAL queue — no Queue…"),
-            lum("p164", "P164. MCM container census — classes 2/7/10/12/13/15 (metadata-only) + system-group probe leases (installcoordinationd, mobilegestaltcache, eligibilityd, geod pivots). READ-ONLY listing, tokens never logged, no writes, no kernel claims.", "—", "MCM", .probe, .inProcess, 2,
-                "P164. MCM census + system-group lease probes (worse_query / jbjflab filza27.2 proofs). Read-only; the geod bypass rows are the P160-EPERM answer. hasKread stays NO."),
-            lum("p159", "P159 v2. IOSurface adjacency probe (SurfHeist technique, MIT) — 50 x 16 KB surfaces, 0x4000 delta pair, read-only scan past surface B. Leak-class receipts tracked on board + learn; heap VAs never derive a slide.", "—", "IOSurface", .infoLeak, .inProcess, 2,
-                "P159 v2. IOSurface adjacency probe (SurfHeist technique, MIT). Read-only scan of the 0x4000-adjacent window; kptr rows are kernel-band LEAK receipts for grooming anchors, NOT kbase. Tracked on board + learn. hasKread stays NO."),
-            lum("p166", "P166. CVE-2026-111497 Brotli BlockSwitch fingerprint — decodes Documents/brotli_first.bin (64 KiB chunks) + brotli_second.bin via libcompression; -17 = PATCHED, stage2 accepted = VULNERABLE window. Userspace only, PANIC-FREE.", "CVE-2026-111497", "libcompression", .probe, .inProcess, 2,
-                "P166. Brotli BlockSwitch fingerprint (technique: MchinaMd57764/CVE-2026-111497-PoC, MIT). Push the trigger pair with tools/brotli_trigger.sh then TAP. Userspace heap only — NO kernel interface touched, no panic risk. hasKread stays NO."),
-            lum("p167", "P167. F1 compressed-plane BytesPerSlice 32-bit WRAP device-confirmation — IOSurfaceCreate ladder: control uncompressed -> shape hunt -> unwrapped-overshoot (bounds must REJECT) -> wrap pair ((Data+Header)*Slice wraps mod 2^32, true total ~268 MB). Create accepted after rejection = the check BYPASSED. NO render/NO Metal.", "F1 / IOSurface", "IOSurface", .oobWrite, .inProcess, 3,
-                "P167. F1 device confirmation (static base: check fn 0x985146c UNCHANGED bytes 26.5->27.2 T8101, fix-twin test). IOSurfaceCreate only (framework dlsym) — the wrap sites are 0x98529a4/0x98529ac/0x9852a5c (w-mul, 32-bit). READ-BACK via IOSurfaceGetAllocSize. PANIC-POSSIBLE (kernel parse/alloc on crafted plane shapes). One tap per force-quit. hasKread stays NO."),
-            lum("p168", "P168. 112477 sel-17/18 registration classification — IOSurfaceRoot UC: register ladder (24-B struct variants) -> dup-check (2c9 = node+0x58 owner HIT) -> sel-18 dereg (0 then 2c2-class). ARM-GATED dangle stage (Documents/p168_dangle_arm.txt): register -> IOServiceClose BEFORE CFRelease -> destroy the OTHER surface = the 0x9869984 fan-out derefs the freed owner at +0xd8.", "CVE-2026-112477", "IOSurface", .uaf, .kernel, 3,
-                "P168. 112477 classification (static: register 0x986978c / dereg 0x986988c / fan-out 0x9869984 -> owner_deref 0x98722dc; teardown gate = client+0xf0 bit0; +0xf1 flags ABSENT on 23F77). Kernel writes: NONE (codes only). The dangle stage PANICS — explicit arm file required, one tap per boot, fresh-boot law. hasKread stays NO."),
-            lum("p169", "P169. OSUnserializeBinary APP-BYTES reach confirmation — createSurface sel 0 called with a RAW 0xD3-magic binary stream at req+0x30 (kernel reads our vm bytes directly): kr=0 + nonzero result qword = the parser consumed app bytes the framework never built. S-B malformed type-id (0x3f) ARM-GATED behind Documents/p169_arm.txt (PRE-26.7 body has no type-id bound).", "OSUnserialize / 28969-class", "IOKit", .uaf, .kernel, 3,
-                "P169. Reach confirmation (static: OSUnserializeBinary 0xa4799c4 PRE-FIX body; dispatcher 0xa478da4; createSurface sMethod 0x986c358 = sel 0, table 0x7f33888, structIn VARIABLE). Well-formed stream only unless armed; PANIC-POSSIBLE in the armed stage. One tap per force-quit. hasKread stays NO."),            lum("p170", "P170. THE 17 COMPOSITE BOOT (T8150-only): P139 boot-learn -> P114 sel-8 leak -> P159 adjacency pairs (read-only pre-groom + anchor bank) -> P110 112477 swap-claim (leak-gate PAIRED) -> P142 AVE2 write ONLY with Documents/p142_layers.txt (16463 = the 112705 panic attestation, 16462 survives) -> board kread32 honesty gate. P143 stays solo.", "PLAN-B-271", "T8150 composite", .probe, .kernel, 3,
-                "P170. The 17's KRW chain in ONE boot (P159 adds the adjacency pre-groom so the claim window reuses shaped zone history) (note 271 PLAN B): leak+learn+claim sequenced with a per-line FFSYNC log (Documents/p170_t8150_log.txt, panic-surviving). Sub-taps unchanged (race bodies untouched). PANIC-POSSIBLE at P110, and at P142 only with the knob file. hasKread flips ONLY via kread32(kbase)."),
-            lum("p171", "P171. STALE-ARRIVAL ORACLE (read-only, PANIC-FREE): never-sent UDP listener batches + a self-dgram control + a UDP create/close churn phase — a foreign dgram on a never-sent listener = slot carryover receipt for the cs2 reclaim-shape question. Borrow: Tims --sockprec/--sockmix (109-hit law).", "cs2 reclaim-shape", "socket", .probe, .inProcess, 1,
-                "P171. Stale-arrival oracle (borrows the Tims-Cooked harness concept, NOT the socket_uaf_krw.c offsets which are do-not-port cross-SKU). Phases: control (self-dgram must arrive) -> 12 s no-churn -> 12 s churn. Hit classification (stale carryover vs foreign prober) is logged honestly, NOT disambiguated. hasKread stays NO."),            lum("p172", "P172. M2ScalerCSC 24A435 QUEUE-CONTRACT CENSUS (p170 blocker: QueueCreate 2c2 / sel-8 2bf on the 17): sel 5-6 × sizes {8,16,0x408,0x410,0xfa8} × word0 {count,0x3e8} -> kr/outLen matrix; then sel 7-8 readers with {8,16}-B inputs + full-buffer kernel-range census. Finds the live 27.0 contract.", "PLAN-B pairing", "M2Scaler", .probe, .kernel, 2,
-                "P172. The 24A435 contract sweep — the v5 contract was attested on 23F77/24A5390f only; the 17 refused it (p170 receipts). PANIC-POSSIBLE (real contract attempts); one tap; log p172_m2_contract_log.txt (F_FULLFSYNC). hasKread stays NO."),            lum("p173", "P173. KAMUI containermanagerd part-symlink escape (murk-sus, MIT — credit murk-sus) LIVE on 27.2.1: dynamic app-group read -> symlink <group>/Library/Caches -> class-7 query flags 0x8100000000 -> extension_consume -> MobileGestalt cache reach; fallbacks 13/12. PANIC-FREE.", "KAMUI", "Sandbox", .oobRead, .inProcess, 2,
-                "P173. KAMUI port (technique credit murk-sus, MIT): MCM validates partDomain but never the PART DIRECTORY; app-group part dir is the one writable symlink base. Receipts: token consume + Gestalt cache readable. Log p173_kamui_log.txt (F_FULLFSYNC). Not kernel, never hasKread."),
-            lum("p116", "P116 v2. sandbox_extension NOFOLLOW TOCTOU (file read/write escape; path/dir/rw knobs; tokens never logged; default read-only)", "—", "Sandbox", .probe, .kernel, 2,
-                "P116. sandbox_extension NOFOLLOW TOCTOU (CVE-class file-read escape; deterministic, live on 23F77..24B119; port of speedyfriend433/sandbox_extension-TOCTOU-bug): control in-container read + 7 bounded out-of-container targets (/etc + prefs); tokens never logged; READ-ONLY"),
-            lum("p094", "P094. kernproc derive + ucred ladder (READ-ONLY, sysctl anchor + allproc walk; v3 fold runs P095", "—", "Lum1na TAP", .probe, .kernel, 2,
-                "P094. kernproc derive + ucred ladder (READ-ONLY, sysctl anchor + allproc walk; v3 fold runs P095's ladder in the same tap — one boot, unlocks elevate)"),
-            lum("p095", "P095. ucred ladder standalone (READ-ONLY; also runs inside P094 since v3 — use for a ladder re-c", "—", "Lum1na TAP", .probe, .kernel, 2,
-                "P095. ucred ladder standalone (READ-ONLY; also runs inside P094 since v3 — use for a ladder re-check without re-deriving)"),
-            lum("ave47vt", "AVE47VT. CVE-2026-64747 via VT (raw UC open is 2e2 — VT is the app path): control 720p encode + ", "CVE-2026-64747", "AppleAVE2", .oobWrite, .kernel, 2,
-                "AVE47VT. CVE-2026-64747 via VT (raw UC open is 2e2 — VT is the app path): control 720p encode + wrap-dims Create/Prepare + tiny 64x64 encodes; LIVE on 12/23F77 (fixed 26.6); panic = kernel attestation — DO NOT re-tap"),
-            lum("ave47vtw", "AVE47VTW. 64747 TRUE 32-bit CalcBufSize wrap (align32(w)*(h>>5) >= 2^32) Create+Prepare ONLY, no", "—", "AppleAVE2", .oobWrite, .kernel, 2,
-                "AVE47VTW. 64747 TRUE 32-bit CalcBufSize wrap (align32(w)*(h>>5) >= 2^32) Create+Prepare ONLY, no encode — SAFE ceiling inventory before ave47vt"),
-            lum("ave47map", "AVE47MAP. 64747 raw-UC MAP (raw open = 2e2 on-device; kept for re-check)", "—", "AppleAVE2", .probe, .inProcess, 2,
-                "AVE47MAP. 64747 raw-UC MAP (raw open = 2e2 on-device; kept for re-check)"),
-            lum("ave47ctl", "AVE47CTL. 64747 raw-UC CONTROL (control battery only)", "—", "AppleAVE2", .probe, .inProcess, 2,
-                "AVE47CTL. 64747 raw-UC CONTROL (control battery only)"),
-            lum("p112", "P112. cgshading — CG Type-5 shading OOB oracle (112611 port; in-process oracle PDF built at-tap ", "—", "Lum1na TAP", .oobWrite, .kernel, 2,
-                "P112. cgshading — CG Type-5 shading OOB oracle (112611 port; in-process oracle PDF built at-tap + CGPDFDocument render; chosen-double value-control sweep 1.0/2.0/4.0/8.0; honest 3-outcome; far = chosen-bits + structural offset; one sweep per tap)"),
-            lum("p076", "P076. 86950 glyph trigger (CVE-2026-86950, userspace OOB, NOT KRW)", "CVE-2026-86950", "Lum1na TAP", .oobWrite, .kernel, 2,
-                "P076. 86950 glyph trigger (CVE-2026-86950, userspace OOB, NOT KRW)"),
-            lum("p076c", "P076c. control-only (no trigger — display-crash discriminator)", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P076c. control-only (no trigger — display-crash discriminator)"),
-            lum("p022GC", "P022GC v34. Game Center path oracle (not KRW)", "—", "Lum1na TAP", .oobWrite, .kernel, 2,
-                "P022GC v34. Game Center path oracle (not KRW)"),
-            lum("p097", "P097. console-sec gRegistryRoot leak (CVE-2026-65371, READ-ONLY — lock/unlock once while it wait", "CVE-2026-65371", "Lum1na TAP", .infoLeak, .kernel, 2,
-                "P097. console-sec gRegistryRoot leak (CVE-2026-65371, READ-ONLY — lock/unlock once while it waits)"),
-            lum("p065", "P065 Facet A 64788 oracle (0xe00002be, not kread)", "—", "IOGPU", .probe, .inProcess, 2,
-                "P065 Facet A 64788 oracle (0xe00002be, not kread)"),
-            lum("p067", "P067 AppleAVD reach (65407, no bitstream fire)", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P067 AppleAVD reach (65407, no bitstream fire)"),
-            lum("p084", "P084 v7. pmap-tte PUAF port (65,537-map refcount wrap, 64 dangling PTEs, A14 untested; surface-reclaim signature knob)", "—", "Lum1na TAP", .uaf, .kernel, 2,
-                "P084. pmap-tte PUAF port (65,537-map refcount wrap, 64 dangling PTEs, A14 untested)"),
-            lum("p085", "P085. 84607 Close-vs-async racer (UNPARKED — kernel gap, videocodecd)", "—", "AppleAVE2", .uaf, .kernel, 2,
-                "P085. 84607 Close-vs-async racer (UNPARKED — kernel gap, videocodecd)"),
-            lum("p087", "P087. 84607 reclaim observer (race -> refill -> attributed drain)", "—", "AppleAVE2", .uaf, .kernel, 2,
-                "P087. 84607 reclaim observer (race -> refill -> attributed drain)"),
-            lum("p083", "P083. ANE staging hunt + injection + y attribution", "—", "AppleH11ANEInterface", .probe, .inProcess, 2,
-                "P083. ANE staging hunt + injection + y attribution"),
-            lum("p082", "P082. copyout dump of fetched sids (x_i=sid, OUR output; IOMD leak vs value echo)", "—", "Lum1na TAP", .infoLeak, .kernel, 2,
-                "P082. copyout dump of fetched sids (x_i=sid, OUR output; IOMD leak vs value echo)"),
-            lum("p081", "P081. ANE foreign-sid probe (bias isolation + cross-process fetch gate)", "—", "AppleH11ANEInterface", .probe, .inProcess, 2,
-                "P081. ANE foreign-sid probe (bias isolation + cross-process fetch gate)"),
-            lum("p080", "P080. 43748 y-craft 127-in LIVE sids (input loop passes; read+write doors)", "—", "AppleH11ANEInterface", .probe, .inProcess, 2,
-                "P080. 43748 y-craft 127-in LIVE sids (input loop passes; read+write doors)"),
-            lum("p079", "P079. 43748 y-craft pad (3in/126ops ANE-scheduled + engagement gate)", "—", "AppleH11ANEInterface", .probe, .inProcess, 2,
-                "P079. 43748 y-craft pad (3in/126ops ANE-scheduled + engagement gate)"),
-            lum("p078", "P078. 43748 y-craft 3-in (all-valid records reach output; write door)", "—", "AppleH11ANEInterface", .probe, .inProcess, 2,
-                "P078. 43748 y-craft 3-in (all-valid records reach output; write door)"),
-            lum("p077", "P077. 43748 y-craft (crafted y = output record sid; write door)", "—", "AppleH11ANEInterface", .probe, .inProcess, 2,
-                "P077. 43748 y-craft (crafted y = output record sid; write door)"),
-            lum("p074", "P074. 43748 consume (count-gate pass, no overflow, not hasKread)", "—", "AppleH11ANEInterface", .oobWrite, .kernel, 2,
-                "P074. 43748 consume (count-gate pass, no overflow, not hasKread)"),
-            lum("p086", "P086. 43684 dmaCommand fingerprint sweep (3 UCs, no fires)", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P086. 43684 dmaCommand fingerprint sweep (3 UCs, no fires)"),
-            lum("p101", "P101. 43684 dmaCommand FIRE (bounded reuse IOMD+0x68; one setup + one reuse; isolate from T7)", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P101. 43684 dmaCommand FIRE (bounded reuse IOMD+0x68; one setup + one reuse; isolate from T7)"),
-            lum("p102", "P102. Titan write TEST (MapMemory IORVBAR look-for + CacheMode canary; SKIPs MMIO without window", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P102. Titan write TEST (MapMemory IORVBAR look-for + CacheMode canary; SKIPs MMIO without window; no titan.m ROP)"),
-            lum("p010qleak", "P010 qleak. Queue leak word1=+0x558 (K− only)", "—", "Lum1na TAP", .infoLeak, .kernel, 2,
-                "P010 qleak. Queue leak word1=+0x558 (K− only)"),
-            lum("p109", "P109 v4. ANE sel sweep w/ Stage-B oracle — 23F77 + T8150/27.x (H16 names + types 0..4, sels 0..2", "—", "AppleH11ANEInterface", .probe, .inProcess, 2,
-                "P109 v4. ANE sel sweep w/ Stage-B oracle — 23F77 + T8150/27.x (H16 names + types 0..4, sels 0..213; the direct-UC reachability answer for 43748-out-of-framework + 112696/84494)"),
-            lum("p103", "P103. M2Scaler user_* census (opens-only; sel 8/11 semantics + boundary denials; NO transforms)", "—", "M2ScalerCSC", .probe, .kernel, 2,
-                "P103. M2Scaler user_* census (opens-only; sel 8/11 semantics + boundary denials; NO transforms)"),
-            lum("p098", "P098. M2ScalerCSC iosaDiag census (sel 8, honest input shape, READ-ONLY)", "—", "M2ScalerCSC", .probe, .kernel, 2,
-                "P098. M2ScalerCSC iosaDiag census (sel 8, honest input shape, READ-ONLY)"),
-            lum("p106", "P106. JPEG teardown ORACLE (sel5 +0x30=0 two-call; JpegRequest view ktflag 0x64; 2 requests NO f", "—", "AppleJPEG", .probe, .inProcess, 2,
-                "P106. JPEG teardown ORACLE (sel5 +0x30=0 two-call; JpegRequest view ktflag 0x64; 2 requests NO fuzz)"),
-            lum("p107", "P107. AVE2 wrap-dims create/prepare-ONLY (v1's encode is p035-law FORBIDDEN; kext +0xdc cite = s", "—", "AppleAVE2", .oobWrite, .kernel, 2,
-                "P107. AVE2 wrap-dims create/prepare-ONLY (v1's encode is p035-law FORBIDDEN; kext +0xdc cite = static; p035 already swept this ceiling)"),
-            lum("p105", "P105. IOSurface gates census (framework-level; global-warn/lookup/protection-bits/pool oracle; N", "—", "Lum1na TAP", .probe, .kernel, 2,
-                "P105. IOSurface gates census (framework-level; global-warn/lookup/protection-bits/pool oracle; NO iopl — 64749 closed)"),
-            lum("p104", "P104. AppleSEPKeyStore census (163-sel; sels 7/17/31 handle-0 gate expect 0xfffffffa; benign sha", "—", "Lum1na TAP", .probe, .kernel, 2,
-                "P104. AppleSEPKeyStore census (163-sel; sels 7/17/31 handle-0 gate expect 0xfffffffa; benign shapes; watch aks klog lines)"),
-            lum("p161", "P161 v2. AppleSEPKeyStore test-UC type sweep (types 0-32; v1 stopped after type 23; child registry-ID diff, connClass; flags any Test class; NO selectors)", "—", "Lum1na TAP", .probe, .kernel, 2,
-                "P161 v2. AppleSEPKeyStore test-UC type sweep (types 0-32; v1 stopped after type 23; child registry-ID diff, connClass; flags any Test class; NO selectors, NO writes; PANIC-POSSIBLE)"),
-            lum("p163", "P163. DPC translation oracle (forge one port descriptor type to OOL; control/low/kernel-low pad; no kw, no writes, no selectors)", "—", "Lum1na TAP", .probe, .kernel, 2,
-                "P163. DPC translation oracle (forge one port descriptor type to OOL; control/low/kernel-low pad; no kw, no writes, no selectors; PANIC-POSSIBLE)"),
-            lum("p108", "P108. DiskImages kernel-backed census (AppleDiskImages2 / IOHDIXHDDriveInKernel / KDIDiskImageNu", "—", "Lum1na TAP", .probe, .kernel, 2,
-                "P108. DiskImages kernel-backed census (AppleDiskImages2 / IOHDIXHDDriveInKernel / KDIDiskImageNubUserClient opens + sels 0..24; 84552 attach doors; notes 255)"),
-            lum("p032", "71. P032 ANE OPEN only", "—", "AppleH11ANEInterface", .probe, .inProcess, 2,
-                "71. P032 ANE OPEN only"),
-            lum("p033", "72. P033 CoreML 1-in/1-out", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "72. P033 CoreML 1-in/1-out"),
-            lum("p034", "73. P034 kmsg 0x820 occupancy", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "73. P034 kmsg 0x820 occupancy"),
-            lum("p038", "W− 83. P038 W-hunt OPEN only", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "W− 83. P038 W-hunt OPEN only"),
-            lum("p040", "D  84. P040 ns dest create/destroy", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "D  84. P040 ns dest create/destroy"),
-            lum("p041", "P041. 43724 dest MAP only (no #536)", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P041. 43724 dest MAP only (no #536)"),
-            lum("p042", "P042. IOGPU type1 sel kptr scan (not #536)", "—", "IOGPU", .probe, .inProcess, 2,
-                "P042. IOGPU type1 sel kptr scan (not #536)"),
-            lum("p043", "P043. write-class dests + ANE reach", "—", "AppleH11ANEInterface", .probe, .inProcess, 2,
-                "P043. write-class dests + ANE reach"),
-            lum("p045", "P045. APFS VNOP coverage census v16 (not kread)", "—", "APFS", .probe, .kernel, 2,
-                "P045. APFS VNOP coverage census v16 (not kread)"),
-            lum("p062", "P062 NEON exception-state self-test (not KRW, not hasKread)", "—", "Lum1na TAP", .oobWrite, .kernel, 2,
-                "P062 NEON exception-state self-test (not KRW, not hasKread)"),
-            lum("p057", "P057 AKS 65343 sel16 feeder (not 163-sel, not hasKread)", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P057 AKS 65343 sel16 feeder (not 163-sel, not hasKread)"),
-            lum("p050", "P050 buflet UAF v3 (not 65349)", "—", "Lum1na TAP", .uaf, .kernel, 2,
-                "P050 buflet UAF v3 (not 65349)"),
-            lum("p051", "P051 gamed census v6 (in-cache only, no WVEK/TrollRestore)", "—", "Lum1na TAP", .probe, .kernel, 2,
-                "P051 gamed census v6 (in-cache only, no WVEK/TrollRestore)"),
-            lum("p052", "P052 nstream extend — CLOSED (EFBIG)", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P052 nstream extend — CLOSED (EFBIG)"),
-            lum("p053", "P053 NECP connect×close v2", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P053 NECP connect×close v2"),
-            lum("p054", "P054 APFS reap list", "—", "APFS", .probe, .inProcess, 2,
-                "P054 APFS reap list"),
-            lum("p055", "P055 IOSurface UPL (43684 MAP)", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P055 IOSurface UPL (43684 MAP)"),
-            lum("aio84530", "P063 aio84530 kn_sdata HEAP leak (not kslide, not hasKread)", "—", "Lum1na TAP", .infoLeak, .kernel, 2,
-                "P063 aio84530 kn_sdata HEAP leak (not kslide, not hasKread)"),
-            lum("p066", "P066 EncType/AVE MAP (one VT session, no Close-vs-async)", "—", "AppleAVE2", .probe, .inProcess, 2,
-                "P066 EncType/AVE MAP (one VT session, no Close-vs-async)"),
-            lum("p068", "P068 chroot/seteuid MAP (43689, errno only)", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P068 chroot/seteuid MAP (43689, errno only)"),
-            lum("p069", "P069 dmaCommand MAP (43684, one map)", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P069 dmaCommand MAP (43684, one map)"),
-            lum("p019", "P019 64749 iopl MAP (size mismatch, not 65349)", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P019 64749 iopl MAP (size mismatch, not 65349)"),
-            lum("p071", "P071 65408 ANE overflow MAP (DeviceOpen only, not 43748)", "—", "AppleH11ANEInterface", .oobWrite, .kernel, 2,
-                "P071 65408 ANE overflow MAP (DeviceOpen only, not 43748)"),
-            lum("p072", "P072 file-parser census (dlopen + 1x1 PNG, not ACE)", "—", "Lum1na TAP", .probe, .kernel, 2,
-                "P072 file-parser census (dlopen + 1x1 PNG, not ACE)"),
-            lum("p009pathb", "F  82. P009 PathB detach+replace", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "F  82. P009 PathB detach+replace"),
-            lum("p009detach", "F½ 4. P009 detach only (no OOL)", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "F½ 4. P009 detach only (no OOL)"),
-            lum("p009ranges", "80. P009 ranges 0x82", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "80. P009 ranges 0x82"),
-            lum("p009types", "81. P009 types inventory", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "81. P009 types inventory"),
-            lum("p017v2", "H  64. p017v2 holder/install", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "H  64. p017v2 holder/install"),
-            lum("p013ave", "P013. A14 AVE dim ladder", "—", "AppleAVE2", .probe, .inProcess, 2,
-                "P013. A14 AVE dim ladder"),
-            lum("p001a13vt", "P001. A13 VT ladder (A13 rig)", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P001. A13 VT ladder (A13 rig)"),
-            lum("p001dim", "P001 dim. dim probe", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P001 dim. dim probe"),
-            lum("p001proc", "P001 proc. process probe", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P001 proc. process probe"),
-            lum("p001cap", "P001 cap. cap boundary", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P001 cap. cap boundary"),
-            lum("p001ladder", "P001 ladder. full ladder", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P001 ladder. full ladder"),
-            lum("p001conn", "P001 conn. VT conn hunt", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P001 conn. VT conn hunt"),
-            lum("p001xref", "P001 xref. cross-ref", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P001 xref. cross-ref"),
-            lum("p001ports", "P001 ports. new-port sweep", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P001 ports. new-port sweep"),
-            lum("p001t3", "P001 T3. lying-backing SENTINEL (4096 over 1MB + sentinel pages): encode 1 frame, decode it back", "—", "Lum1na TAP", .oobWrite, .kernel, 2,
-                "P001 T3. lying-backing SENTINEL (4096 over 1MB + sentinel pages): encode 1 frame, decode it back, scan for the constants. Zero = encoder clamps (law closed). Hits = OOB READ disclosure with walk shape. PANIC-POSSIBLE; one tap"),
-            lum("vt_smoke", "VT SMOKE. AVE open smoke", "—", "AppleAVE2", .probe, .inProcess, 2,
-                "VT SMOKE. AVE open smoke"),
-            lum("spawnattrs", "SPAWNATTRS. spawn attribute map (not KRW)", "—", "Lum1na TAP", .oobWrite, .kernel, 2,
-                "SPAWNATTRS. spawn attribute map (not KRW)"),
-            lum("jpeg_dest", "JPEG DEST. dest+timeout oracle (framework-side)", "—", "AppleJPEG", .probe, .inProcess, 2,
-                "JPEG DEST. dest+timeout oracle (framework-side)"),
-            lum("jpeg_fw", "JPEG FW. framework decode smoke", "—", "AppleJPEG", .probe, .inProcess, 2,
-                "JPEG FW. framework decode smoke"),
-            lum("p016", "P016. sout dest unlock", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P016. sout dest unlock"),
-            lum("p018", "P018. sout mach port", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P018. sout mach port"),
-            lum("p020", "P020. magazine-aware reclaim", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P020. magazine-aware reclaim"),
-            lum("p020v2", "P020v2. magazine drain", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P020v2. magazine drain"),
-            lum("p021", "P021. AGX stage mask", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P021. AGX stage mask"),
-            lum("p022", "P022. cpu0 drain delay", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P022. cpu0 drain delay"),
-            lum("p023", "P023. VT extreme", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P023. VT extreme"),
-            lum("p025", "P025. NECP string spray", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P025. NECP string spray"),
-            lum("p026", "P026. Metal NQ cite", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P026. Metal NQ cite"),
-            lum("p027", "P027. Metal callback", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P027. Metal callback"),
-            lum("p028", "P028. reentry A", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P028. reentry A"),
-            lum("p029", "P029. hammer", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P029. hammer"),
-            lum("p030", "P030. two queue", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P030. two queue"),
-            lum("p031", "P031. reclaim hit", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P031. reclaim hit"),
-            lum("iopl", "IOPL. 64749-class leak (CLOSED — re-check only)", "—", "Lum1na TAP", .infoLeak, .kernel, 2,
-                "IOPL. 64749-class leak (CLOSED — re-check only)"),
-            lum("aio", "AIO. aio UAF", "—", "Lum1na TAP", .uaf, .kernel, 2,
-                "AIO. aio UAF"),
-            lum("t018", "T018. COW trunc race", "—", "Lum1na TAP", .uaf, .kernel, 2,
-                "T018. COW trunc race"),
-            lum("t018shadow", "T018 shadow. shadow race", "—", "Lum1na TAP", .uaf, .kernel, 2,
-                "T018 shadow. shadow race"),
-            lum("t018ver", "T018 ver. version race", "—", "Lum1na TAP", .uaf, .kernel, 2,
-                "T018 ver. version race"),
-            lum("p010qspray", "P010 qspray. queue spray", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P010 qspray. queue spray"),
-            lum("p010remain", "P010 remain. remaining-fire", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "P010 remain. remaining-fire"),
-            lum("p010leak", "P010 leak. queue leak", "—", "Lum1na TAP", .infoLeak, .kernel, 2,
-                "P010 leak. queue leak"),
-            lum("b1p1", "B1P1. map + latch", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "B1P1. map + latch"),
-            lum("b1p2", "B1P2. unmap + reclaim", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "B1P2. unmap + reclaim"),
-            lum("b1p3", "B1P3. latched kick", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "B1P3. latched kick"),
-            lum("b1p4", "B1P4. verify reclaim", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "B1P4. verify reclaim"),
-            lum("p039", "79. P039 AVE (sandbox wall)", "—", "AppleAVE2", .probe, .inProcess, 2,
-                "79. P039 AVE (sandbox wall)"),
-            lum("p035", "35. P035 AVE wrap", "—", "AppleAVE2", .oobWrite, .kernel, 2,
-                "35. P035 AVE wrap"),
-            lum("p024", "18. P024 NECP (socket lock)", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "18. P024 NECP (socket lock)"),
-            lum("p005", "31. P005 JIT disclose", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "31. P005 JIT disclose"),
-            lum("iogpu_close", "40. IOGPU close (XR sel) — REOPENED as p121", "—", "IOGPU", .probe, .inProcess, 2,
-                "40. IOGPU close (XR sel) — REOPENED as p121"),
-            lum("t014a", "54. T014 serial (XR)", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "54. T014 serial (XR)"),
-            lum("p014close", "61. P014 close (XR)", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "61. P014 close (XR)"),
-            lum("p010obj", "1. P010obj last-ref SURVIVED", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "1. P010obj last-ref SURVIVED"),
-            lum("t019", "53. T019 Lookup-nil SURVIVED", "—", "Lum1na TAP", .probe, .inProcess, 2,
-                "53. T019 Lookup-nil SURVIVED"),
-    ]
+// System
+#import <sys/mman.h>
+#import <sys/types.h>
+#import <sys/sysctl.h>
+#import <dlfcn.h>
+#import <os/log.h>
 
-    static let luminaParked: [ExploitModule] = [
-            lum("p120", "P120. 64788 new-resource DOOR (23F77 sel-map byte-verified on-disk: sel8 var-struct newRes / sel", "—", "IOGPU", .probe, .inProcess, 3,
-                "P120. 64788 new-resource DOOR (23F77 sel-map byte-verified on-disk: sel8 var-struct newRes / sel9 delete / sel36 fn4 / naked +0x90 getter) — resType-0 calibrate, then the oversized create-fail-after-insert ladder + post-fail leftover-id sweep. PANIC-POSSIBLE"),
-            lum("p046", "P046. leftover MAP v2 (43722/24, G71 caps, no fire)", "—", "Lum1na TAP", .probe, .inProcess, 3,
-                "P046. leftover MAP v2 (43722/24, G71 caps, no fire)"),
-            lum("p009iopl", "p009iopl leftover (STOP)", "—", "Lum1na TAP", .probe, .inProcess, 3,
-                "p009iopl leftover (STOP)"),
-            lum("p011v3", "p011v3 leftover wire race (STOP — reopened as p119)", "—", "Lum1na TAP", .uaf, .kernel, 3,
-                "p011v3 leftover wire race (STOP — reopened as p119)"),
-            lum("p011v10", "p011v10 leftover wire race (STOP)", "—", "Lum1na TAP", .uaf, .kernel, 3,
-                "p011v10 leftover wire race (STOP)"),
-            lum("p012ctx", "p012ctx leftover (STOP)", "—", "Lum1na TAP", .probe, .inProcess, 3,
-                "p012ctx leftover (STOP)"),
-            lum("p010krwv2", "p010krwv2 leftover UAF (STOP)", "—", "Lum1na TAP", .uaf, .kernel, 3,
-                "p010krwv2 leftover UAF (STOP)"),
-            lum("p010twoconn", "p010twoconn leftover UAF (STOP)", "—", "Lum1na TAP", .uaf, .kernel, 3,
-                "p010twoconn leftover UAF (STOP)"),
-            lum("p014ane", "p014ane leftover (STOP)", "—", "Lum1na TAP", .probe, .inProcess, 3,
-                "p014ane leftover (STOP)"),
-            lum("p015", "p015 leftover (STOP)", "—", "Lum1na TAP", .probe, .inProcess, 3,
-                "p015 leftover (STOP)"),
-            lum("p017", "p017 legacy conf-deputy (STOP)", "—", "Lum1na TAP", .probe, .inProcess, 3,
-                "p017 legacy conf-deputy (STOP)"),
-    ]
+// IOKit (iOS subset - NO IOBSD.h)
+#import <IOKit/IOKitLib.h>
 
-}
+// CoreML
+#import <CoreML/CoreML.h>
+
+// VideoToolbox for P035
+#import <VideoToolbox/VideoToolbox.h>
+#import <CoreMedia/CoreMedia.h>
+
+// Your exploit headers - UPDATED
+#import "Exploit/KRWBridge.h"
+#import "Exploit/Lum1naCS2Core.h"
+#import "Exploit/Lum1naCS2CoreController.h"
+#import "Exploit/P044ExploitController.h"
+#import "Exploit/ANE254InputController.h"
+#import "Exploit/P027MetalCallback.h"
+#import "Exploit/AKSExploitController.h"
+#import "Exploit/P051APFSXattr.h"
+#import "Exploit/P054APFSReapList.h"
+#import "Exploit/LabRuntimeOffsets.h"
+#import "Exploit/LabDeviceProfile.h"
+#import "Exploit/LabBanditAdvisor.h"   // v3 individual-test advisor (LabBandit itself stays C-only)
+#import "Exploit/LabKnob.h"            // generic per-test knob store (UI writes, probes read)
+#import "Exploit/LabPanicSig.h"        // panic-PC ingest drain (tools/panic_pc.sh pushes the rows)
+#import "Exploit/A14_23F77_LabOffsets.h"
+#import "Exploit/A12X_23G71_LabOffsets.h"
+#import "Exploit/DeviceIdentProbe.h"
+#import "Exploit/LabIOGPUQueue.h"
+#import "Exploit/GPUStalePageProbe.h"
+#import "BadQueryProbe.h"
+#import "LabProbeGuard.h"
+#import "Exploit/P010QueueLeak.h"
+#import "Exploit/P017ConfusedDeputy.h"
+#import "Exploit/P032ANEOpenSmoke.h"
+#import "Lum1naLogBridge.h"
+#import "Exploit/P033CoreML1in1out.h"
+#import "Exploit/P034Kmsg3072Occupancy.h"
+#import "Exploit/P040NamespaceDestSmoke.h"
+#import "Exploit/IOGPUStaleEntryProbe.h"
+#import "Exploit/IOGPUReplaceRaceProbe.h"
+#import "Exploit/P041SlideDestMap.h"
+#import "Exploit/LightSword.h"
+#import "Exploit/P042ReachabilityProbe.h"
+#import "Exploit/P046F77PatchOracle.h"
+#import "Exploit/P050GetattrlistOOB.h"
+#import "Exploit/P053NECPDoubleFree.h"
+#import "Exploit/P055IOSurfaceUPL.h"
+#import "Exploit/P009ReplaceBackingSmoke.h"
+#import "Exploit/P038WHuntSmoke.h"
+#import "Exploit/P043WriteClassMap.h"
+#import "Exploit/P045HybridMap.h"
+#import "Exploit/P052APFSNstream.h"
+#import "Exploit/CSKRW.h"
+#import "Exploit/P005JIT.h"
+#import "Exploit/Lockdownd/LockdowndFullChain.h"
+#import "Exploit/CVE_2026_84530_KASLR.h"
+#import "Exploit/P056VTCompressionReach.h"
+#import "Kernel/Lum1naBoard.h"
+#import "Kernel/Lum1naAfterKread.h"
+#import "Exploit/LightSwordCalib.h"
+#import "Exploit/APFS84523.h"
+#import "Exploit/P057WVEKReach.h"
+#import "Exploit/P058JPEGDriverReach.h"
+#import "Exploit/P061AVEEncTypeReach.h"
+#import "Exploit/Lum1naSocketKRW.h"
+#import "Exploit/ANEDirectIn.h"
+#import "Exploit/P064AVE84607Racer.h"
+#import "Exploit/P064Ht149041ChainMap.h"
+#import "Exploit/P091DarkSwordChainMap.h"
+#import "Exploit/P092Liter8PatchMap.h"
+#import "Exploit/P093IntelCrossCheck.h"
+#import "Exploit/P094KernprocDerive.h"
+#import "Exploit/P095UcredLadder.h"
+#import "Exploit/P097ConsoleSecLeak.h"
+#import "Exploit/P098M2ScalerDiag.h"
+#import "Exploit/P065FacetAOracle.h"
+#import "Exploit/P066AveEncTypeMap.h"
+#import "Exploit/P067AvdReach.h"
+#import "Exploit/P068ChrootPrivMap.h"
+#import "Exploit/P069DmaCommandMap.h"
+#import "Exploit/P101DmaCommandFire.h"
+#import "Exploit/P102TitanWriteTest.h"
+#import "Exploit/P103M2ScalerCensus.h"
+#import "Exploit/P106JPEGTeardownOracle.h"
+#import "Exploit/P107AveWrapDims.h"
+#import "Exploit/P104SepksCensus.h"
+#import "Exploit/P161SEPKeyStoreTestUC.h"
+#import "Exploit/P163DescOOLOracle.h"
+#import "Exploit/P105IosurfaceGates.h"
+#import "Exploit/P108DiskImagesCensus.h"
+#import "Exploit/P109AneSelSweep.h"
+#import "Exploit/P112CGShading.h"
+#import "Exploit/P114SurfaceLeak.h"
+#import "Exploit/P167F1SliceWrap.h"
+#import "Exploit/P168Iosurface112477.h"
+#import "Exploit/P169OsunserReach.h"
+#import "Exploit/P170T8150Composite.h"
+#import "Exploit/P171StaleArrivalOracle.h"
+#import "Exploit/P172M2ContractSweep.h"
+#import "Exploit/P173KamuiEscape.h"
+#import "Exploit/P176F1SeedWindow.h"
+
+#import "Exploit/P113DescForgeControl.h"
+#import "Exploit/P122SwordForge.h"
+#import "Exploit/P123ShapeCensus.h"
+#import "Exploit/P070ChainSequencer.h"
+#import "Exploit/P071AneOverflowMap.h"
+#import "Exploit/P072FileParserMap.h"
+#import "Exploit/P073KCacheAnalyze.h"
+#import "Exploit/P074KernelDump.h"
+#import "Exploit/Lum1naKreadTest.h"
+#import "Exploit/P06xLog.h"
+#import "Exploit/ColdForge.h"
+#import "Exploit/Rapier.h"
+#import "Exploit/Anvil.h"
+#import "Exploit/LightSwordABC.h"
+#import "Exploit/DopamineCompat.h"
+#import "Exploit/ANE254ChainController.h"
+#import "Exploit/KRWChainController.h"
+#import "Exploit/LabPathTest.h"
+#import "Exploit/LabLearn.h"
+#import "Exploit/P044AksKaslrReach.h"
+#import "Exploit/P100AutoLearn.h"
+#import "Exploit/P139BootIntel.h"
+#import "Exploit/KRWTheoryChains.h"
+#import "Exploit/DopaminePrimitives.h"
+#import "Exploit/lumina_core.h"
+#import "Exploit/Lum1naLibkrw.h"
+
+
+#endif
+            lum("p176", "P176. F1-SEED confused-window calib on 27.2.1 (LightSword conversion; seed credit murk-sus, MIT): sel 0 in-band XML (murk recipe, 4GiB-wrap) -> field readback -> 16 windows past the 64 KiB backing -> non-marker qword at >0x10000 = kernel-side OOB read receipt (cluster_write_contig unfixed per 24C5049d carve). PANIC-POSSIBLE.", "LightSword 27.2.1", "IOSurface", .oobRead, .kernel, 3,
+                "P176. F1-seed window (doors: p018 v3 — IOSurfaceRoot opens, sel36 kr=0). Receipts receipt-class; hasKread law intact. One tap per force-quit, fresh boot."),
