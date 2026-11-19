@@ -41,6 +41,8 @@ public final class PersistentLogStore {
         "p171": "p171_oracle_log.txt",
         "p172": "p172_m2_contract_log.txt",
         "p173": "p173_kamui_log.txt",
+        "p174": "p174_agx_ab_log.txt",
+        "p175": "p175_kamui_census_log.txt",
         "p176": "p176_f1seed_log.txt",
 
         "p115": "p115_m2peek_log.txt",
