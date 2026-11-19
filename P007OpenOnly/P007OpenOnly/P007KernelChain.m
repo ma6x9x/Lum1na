@@ -11,6 +11,10 @@
 #import "P139BootIntel.h"
 #import "P044AksKaslrReach.h"
 #import "P114SurfaceLeak.h"
+#import "P172M2ContractSweep.h"
+#import "P176F1SeedWindow.h"
+#import "P159IOSurfaceAdjacency.h"
+#import "P154IOSurfaceF1Gate.h"
 #import "P149T8150Krw.h"
 #import "P007Board.h"
 #import "P007KreadLane.h"
@@ -112,6 +116,24 @@
         NSString *r114 = [LabPathTest scoreLog:p114 forPath:@"p114"];
         [LabLearn recordPath:@"p114" result:r114 evidence:@"KERNEL P114"];
         L([NSString stringWithFormat:@"PATH_TEST id=p114 class=disclosure result=%@", r114]);
+        /* STEP 3a-prime - the 24B156 REAL CHAIN (p172 census -> p176 F1 window ->
+           p159 anchors -> p154 gate; P027 law: doors persist in-process). */
+        if (sku == LabSkuT8150_24B156) {
+            NSString *r172 = nil, *r176 = nil, *r159 = nil, *r154 = nil;
+            @try { r172 = [P172M2ContractSweep tap]; }
+            @catch (NSException *e) { L([NSString stringWithFormat:@"[-] p172 exception %@", e.name]); }
+            NSString *s172 = [LabPathTest scoreLog:r172 forPath:@"p172"];
+            [LabLearn recordPath:@"p172" result:s172 evidence:@"KERNEL P172"];
+            @try { r176 = [P176F1SeedWindow tap]; }
+            @catch (NSException *e) { L([NSString stringWithFormat:@"[-] p176 exception %@", e.name]); }
+            NSString *s176 = [LabPathTest scoreLog:r176 forPath:@"p176"];
+            [LabLearn recordPath:@"p176" result:s176 evidence:@"KERNEL P176"];
+            @try { r159 = [P159IOSurfaceAdjacency tap]; }
+            @catch (NSException *e) { L([NSString stringWithFormat:@"[-] p159 exception %@", e.name]); }
+            @try { r154 = [P154IOSurfaceF1Gate tap]; }
+            @catch (NSException *e) { L([NSString stringWithFormat:@"[-] p154 exception %@", e.name]); }
+            L(@"[STEP 3a-prime done] P027 doors live; p114 dump + queue persist in-process for the P149 pairing.");
+        }
         L(@"[STEP 3b] P149 17 conversion (encode N=8 then Set 16463, kernel pipes). PANIC-POSSIBLE.");
         NSString *p149 = nil;
         @try { p149 = [P149T8150Krw tap]; }
