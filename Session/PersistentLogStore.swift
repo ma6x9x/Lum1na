@@ -90,10 +90,11 @@ public final class PersistentLogStore {
         "krw7": "p06x_krw7_log.txt",
         "aio84530": "p84530_aio_kqueue_log.txt",
         "p063kq": "p84530_aio_kqueue_log.txt",
-        "p035": "p035_ave_wrap_log.txt",
-        "p036": "p036_ave_paint_log.txt",
-        "p037": "p037_ave_paint_log.txt",
         "p090": "p090_momentarius_log.txt",
+        /* p035/p036/p037 already present below — DUPLICATE KEYS in a Swift
+           dictionary literal TRAP AT RUNTIME (the 15:27 launch-crash
+           receipt: EXC_BREAKPOINT in Dictionary.init(dictionaryLiteral:)
+           during probeLogFiles' one-time init). Never re-add them here. */
         "p063": "p84530_aio_kqueue_log.txt",
         "p065": "p065_facet_a_log.txt",
         "p066": "p066_ave_enctype_log.txt",

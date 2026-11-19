@@ -41,11 +41,18 @@ int LabHeapAnchorsSameBoot(int max, uint64_t *out) {
     NSMutableArray<NSDictionary *> *cands = [NSMutableArray array];
     for (NSString *name in @[@"lum1na_board.json", @"p007_board.json"]) {
         NSString *path = [dir stringByAppendingPathComponent:name];
-        NSDictionary *board = [NSJSONSerialization JSONObjectWithData:
-                                [NSData dataWithContentsOfFile:path]
+        /* 2026-11-19 crash receipt (P007OpenOnly-152718, EXC via
+           objc_exception_throw inside JSONObjectWithData): a MISSING board
+           file yields nil data and Foundation THROWS on nil — the debug
+           app has no lum1na_board.json and crashed on EVERY cscali tap.
+           Guard the data fetch AND wrap the parse. */
+        @try {
+            NSData *jd = [NSData dataWithContentsOfFile:path];
+            if (!jd) continue;
+            NSDictionary *board = [NSJSONSerialization JSONObjectWithData:jd
                                 options:0 error:nil];
-        if (![board isKindOfClass:[NSDictionary class]]) continue;
-        for (NSDictionary *e in (board[@"leaks"] ?: @[])) {
+            if (![board isKindOfClass:[NSDictionary class]]) continue;
+            for (NSDictionary *e in (board[@"leaks"] ?: @[])) {
             if (![e isKindOfClass:[NSDictionary class]]) continue;
             if (![e[@"kind"] isKindOfClass:[NSString class]] ||
                 ![[e valueForKey:@"kind"] isEqualToString:@"heap"]) continue;
@@ -61,7 +68,8 @@ int LabHeapAnchorsSameBoot(int max, uint64_t *out) {
             if (!t) continue;
             if ([t timeIntervalSince1970] < (NSTimeInterval)boot - 1) continue;  /* clock skew slack */
             [cands addObject:@{ @"va": @(va), @"t": t }];
-        }
+            }
+        } @catch (__unused NSException *e) { continue; }
     }
     /* freshest first, distinct values only */
     [cands sortUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) {
