@@ -26,7 +26,10 @@
 #include <string.h>
 
 #define P159_BUILD @"p159-iosurface-adjacency-v3-harvest"
-#define P159_ROUNDS 8   /* 2026-11-19: churn until deterministic — the sparse-17 receipt (calib arms only after the user taps p159 a few times) */
+#define P159_ROUNDS 16  /* 2026-11-19: doubled — the 33% per-round hit rate means
+                             8 rounds gives ~2.6 expected anchors; 16 rounds gives
+                             ~5.3 — the harvest becomes near-deterministic at the
+                             cost of ~2x surface-create time (still <1s total) */
 #define P159_WANT_ANCHORS 4
 #define P159_MAX_ANCHORS 8
 

