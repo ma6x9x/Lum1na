@@ -303,11 +303,25 @@ verdict:
                 break;
             }
         }
-        /* honest teardown of the witness's own submission */
-        aio_cancel(rfd, &cb);
-        for (int i = 0; i < 100000; i++)
+        /* THE 2026-11-20 v5 HANG FIX: the original tap completes its read
+           by WRITING through the fifo BEFORE aio_return; my witness skipped
+           that — on a silent fifo aio_cancel can return NOTCANCELED and
+           aio_return BLOCKS FOREVER on the in-progress request (the "v5
+           hangs forever does nothing" receipt: the E1 witness runs before
+           the first log line, so a hang there is a silent tap). Law now:
+           unblock bytes -> bounded wait -> cancel -> return ONLY if not
+           in progress; close(rfd) below reaps the rest. Never block. */
+        char unblock[16];
+        memset(unblock, 'Z', sizeof(unblock));
+        (void)write(wfd, unblock, sizeof(unblock));
+        for (int i = 0; i < 100000; i++) {
             if (aio_error(&cb) != EINPROGRESS) break;
-        aio_return(&cb);
+            usleep(10);
+        }
+        (void)aio_cancel(rfd, &cb);
+        if (aio_error(&cb) != EINPROGRESS)
+            (void)aio_return(&cb);
+        /* still EINPROGRESS after 1s + cancel: leave it — close(rfd) reaps */
         close(kq);
     }
     close(rfd); close(wfd);

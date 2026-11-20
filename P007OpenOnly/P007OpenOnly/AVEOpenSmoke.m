@@ -11367,7 +11367,10 @@ static void aio_v5_ave_churn(int bursts) {
             for (int f = 0; f < 8; f++)
                 VTCompressionSessionEncodeFrame(s, pb, CMTimeMake(f, 30), kCMTimeInvalid, NULL, NULL, NULL);
         }
-        VTCompressionSessionCompleteFrames(s, kCMTimeInvalid);
+        /* never kCMTimeInvalid here — that waits for ALL frames and can
+           stall on a slow/failing encoder (the defensive bound: complete
+           only up to the last submitted timestamp) */
+        VTCompressionSessionCompleteFrames(s, CMTimeMake(8, 30));
         if (pb) CVBufferRelease(pb);
         VTCompressionSessionInvalidate(s);
         CFRelease(s);
