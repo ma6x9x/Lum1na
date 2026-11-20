@@ -73,9 +73,10 @@ enum ArmGate {
     @discardableResult
     static func set(_ file: String, armed: Bool) -> Bool {
         let p = path(file)
+        let pNS = p as NSString    /* fileSystemRepresentation is NSString-side on the 16.4 SDK */
         if armed {
             let body = "armed \(stamp()) — raised in-app (ARMORY)\n"
-            let fd = open(p.fileSystemRepresentation, O_CREAT | O_WRONLY | O_TRUNC, 0o644)
+            let fd = open(pNS.fileSystemRepresentation, O_CREAT | O_WRONLY | O_TRUNC, 0o644)
             guard fd >= 0 else { return false }
             defer { close(fd) }
             let bytes = Array(body.utf8)
@@ -85,7 +86,7 @@ enum ArmGate {
             if n != bytes.count { return false }
             fcntl(fd, F_FULLFSYNC)   // the PersistentLogStore durability law
         } else {
-            unlink(p.fileSystemRepresentation)
+            unlink(pNS.fileSystemRepresentation)
         }
         return armed ? isSet(file) : !isSet(file)
     }
