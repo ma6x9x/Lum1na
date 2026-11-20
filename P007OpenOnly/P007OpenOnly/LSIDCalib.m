@@ -192,15 +192,27 @@ static void *rc_surf_churn_thread(void *arg) {
     pthread_set_qos_class_self_np(QOS_CLASS_UTILITY, 0);
     rc_surf_create_t pCr = (rc_surf_create_t)dlsym(RTLD_DEFAULT, "IOSurfaceCreate");
     if (!pCr) { rc_log("[v14] IOSurface churn: dlsym failed — thread idle"); return NULL; }
+    /* 2026-11-20 17:49 receipt (P007OpenOnly-174926: MTLReportFailure <-
+       _mtlValidateStrideTextureParameters <- IOGPUMetalTexture initWithDevice):
+       the blit churn's texture creation asserted because the dict lacked
+       IOSurfaceBytesPerRow — IOSurfaceCreate picked a padded row stride and
+       Metal's stride validation rejected it. The p130 law: set BytesPerRow
+       (w*bpe) AND AllocSize (w*h*bpe) explicitly so the surface's stride
+       matches the texture descriptor's expectation. */
     int32_t w = 64, h = 64, bpe = 4;
+    int32_t bpr = 64 * 4, asz = 64 * 64 * 4;
     CFNumberRef nw = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &w);
     CFNumberRef nh = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &h);
     CFNumberRef nb = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &bpe);
-    const void *ck[3] = { CFSTR("IOSurfaceWidth"), CFSTR("IOSurfaceHeight"), CFSTR("IOSurfaceBytesPerElement") };
-    const void *cv[3] = { nw, nh, nb };
-    CFDictionaryRef props = CFDictionaryCreate(kCFAllocatorDefault, ck, cv, 3,
+    CFNumberRef nr = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &bpr);
+    CFNumberRef na = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &asz);
+    const void *ck[5] = { CFSTR("IOSurfaceWidth"), CFSTR("IOSurfaceHeight"),
+                          CFSTR("IOSurfaceBytesPerElement"),
+                          CFSTR("IOSurfaceBytesPerRow"), CFSTR("IOSurfaceAllocSize") };
+    const void *cv[5] = { nw, nh, nb, nr, na };
+    CFDictionaryRef props = CFDictionaryCreate(kCFAllocatorDefault, ck, cv, 5,
         &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
-    CFRelease(nw); CFRelease(nh); CFRelease(nb);
+    CFRelease(nw); CFRelease(nh); CFRelease(nb); CFRelease(nr); CFRelease(na);
     /* v15 (2026-11-20): the FENCE-STYLE blit churn — the LightSword
        connection. Pure create/release cycles churn the IOSurface zone but
        generate NO kernel-side records; a Metal blit per surface generates
