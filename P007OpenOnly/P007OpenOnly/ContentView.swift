@@ -11,6 +11,7 @@ struct ContentView: View {
     @State private var showHour = false
     @State private var showSettings = false
     @State private var showLogs = false
+    @State private var showArmory = false
     @State private var kreadSignal = P007Board.shared().kreadSignal
     // v3 knob editor state (long-press a tile to edit that test's input)
     @State private var knobId = ""
@@ -94,6 +95,7 @@ struct ContentView: View {
                         toolButton("doc.text.magnifyingglass", "Recover") { showRecoveredLog() }
                         toolButton("folder", "Logs") { showLogs = true }
                         toolButton("gearshape", "Settings") { showSettings = true }
+                        toolButton("shield", "Armory") { showArmory = true }
                     }
                     .luminaGlass(Capsule(), interactive: false)
                     .padding(.horizontal, 16)
@@ -124,6 +126,7 @@ struct ContentView: View {
                 showLogs = false
             }
         }
+        .sheet(isPresented: $showArmory) { ArmorySheet() }
         // v3 knob editor: long-press any tile to set that test's input value.
         .alert("Knob — \(knobId)", isPresented: $showKnobAlert) {
             TextField("e.g. resid / pid / untagged", text: $knobText)
@@ -778,5 +781,41 @@ struct LogListSheet: View {
             for url in urls { consider(url, label: "lum1na/\(url.lastPathComponent)") }
         }
         return out.sorted { $0.date > $1.date }
+    }
+}
+
+
+private struct ArmorySheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section(header: Text("ARMORY - ARM FILE GATES"),
+                        footer: Text("Marker files in Documents. Presence-only; gates persist across boots. PANIC-POSSIBLE stages: one tap per fresh boot.")) {
+                    ForEach(ArmGate.gates) { gate in
+                        Toggle(isOn: Binding(
+                            get: { ArmGate.isSet(gate.file) },
+                            set: { ArmGate.set(gate.file, armed: $0) }
+                        )) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(gate.title)
+                                    .font(.system(.subheadline, weight: .semibold))
+                                Text(gate.file + " - " + gate.note)
+                                    .font(.system(.caption, design: .rounded))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Armory")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") { dismiss() }
+                }
+            }
+        }
     }
 }

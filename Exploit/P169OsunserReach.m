@@ -187,7 +187,7 @@ static void p169_disk_log(NSString *out) {
     /* S-B: malformed type-id (ARM-GATED) */
     if (!p169_armPresent()) {
         [o appendString:@"  [S-B] p169_arm.txt ABSENT — malformed-type stage SKIPPED\n"
-                         "[*] arm = create Documents/p169_arm.txt + fresh boot + ONE tap\n"];
+                         "[*] arm = ARMORY toggle (or create Documents/p169_arm.txt) + fresh boot + ONE tap\n"];
     } else {
         NSMutableData *bad = [NSMutableData data];
         p169_buildBadStream(bad);

@@ -349,7 +349,7 @@ static void p168_groom_free(mach_port_t *ports, int n) {
     BOOL armed = p168_dangleArmed();
     if (!armed) {
         [o appendString:@"  [arm] p168_dangle_arm.txt ABSENT — dangle stage SKIPPED\n"
-                         "[*] arm = create Documents/p168_dangle_arm.txt, fresh boot, ONE tap\n"];
+                         "[*] arm = ARMORY toggle (or create Documents/p168_dangle_arm.txt), fresh boot, ONE tap\n"];
     } else if (!s2) {
         [o appendString:@"  [arm] missing prereq — skipped\n"];
     } else {

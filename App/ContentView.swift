@@ -46,6 +46,24 @@ struct AllExploitsSheet: View {
     var body: some View {
         NavigationView {
             List {
+                Section(header: Text("ARMORY - ARM FILE GATES (PERSIST ACROSS BOOTS)"),
+                        footer: Text("Marker files in Documents. Presence-only law - readers never parse content. Gates survive reboots; PANIC-POSSIBLE stages want one tap per fresh boot.")) {
+                    ForEach(ArmGate.gates) { gate in
+                        Toggle(isOn: Binding(
+                            get: { ArmGate.isSet(gate.file) },
+                            set: { ArmGate.set(gate.file, armed: $0) }
+                        )) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(gate.title)
+                                    .font(.system(.subheadline, weight: .semibold))
+                                    .foregroundColor(.primary)
+                                Text(gate.file + " - " + gate.note)
+                                    .font(.system(.caption, design: .rounded))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                }
                 Section(header: Text("EXPLOIT CATALOG - TAP TO RUN INDIVIDUALLY")) {
                     ForEach(ExploitManager.catalog) { entry in
                         Button {

