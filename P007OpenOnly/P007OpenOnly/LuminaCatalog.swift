@@ -243,7 +243,7 @@ extension Catalog {
                 "P074. 43748 consume (count-gate pass, no overflow, not hasKread)"),
             lum("p086", "P086. 43684 dmaCommand fingerprint sweep (3 UCs, no fires)", "—", "Lum1na TAP", .probe, .inProcess, 2,
                 "P086. 43684 dmaCommand fingerprint sweep (3 UCs, no fires)"),
-            lum("p101", "P101. 43684 dmaCommand FIRE (bounded reuse IOMD+0x68; one setup + one reuse; isolate from T7)", "—", "Lum1na TAP", .probe, .inProcess, 2,
+            lum("p101", "P101. 43684 dmaCommand FIRE (bounded reuse IOMD+0x68; one setup + one reuse; isolate from T7)", "P101. 43684 IOMD dmaref chain: sel-2 gate oracle + 65,537-retain u16 wrap (md+0x34) + [+0x98]-gated release-skip. T8150-ready (IOMD offsets are platform-independent; DART validation is the unknown). Service list includes AppleT8110DART + mapper nubs. Isolate from T7.", "Lum1na TAP", .probe, .inProcess, 2,
                 "P101. 43684 dmaCommand FIRE (bounded reuse IOMD+0x68; one setup + one reuse; isolate from T7)"),
             lum("p102", "P102. Titan write TEST (MapMemory IORVBAR look-for + CacheMode canary; SKIPs MMIO without window", "—", "Lum1na TAP", .probe, .inProcess, 2,
                 "P102. Titan write TEST (MapMemory IORVBAR look-for + CacheMode canary; SKIPs MMIO without window; no titan.m ROP)"),

