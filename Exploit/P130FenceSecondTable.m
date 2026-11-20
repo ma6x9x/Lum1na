@@ -34,6 +34,7 @@
 #import <pthread.h>
 #import <sys/socket.h>
 #import <sys/errno.h>
+#import <IOKit/IOKitLib.h>   /* the v2 pre-stage property path: io_service_t/IOObjectRelease/kIOReturnSuccess (CI-2625 fix — the Mac SDK resolved these locally, the device SDK does not without the import) */
 #import <stdatomic.h>
 #import <stdint.h>
 #import <stdio.h>
