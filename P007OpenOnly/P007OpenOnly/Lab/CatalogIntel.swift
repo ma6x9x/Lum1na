@@ -197,7 +197,7 @@ extension Catalog {
                     for (k, v) in obj.prefix(20) {
                         lines.append("   \(k) = \(v)")
                     }
-                    _ = ctx.write("overrides_\(target.lastPathComponent)", data)
+                    _ = ctx.write("overrides_\((target as NSString).lastPathComponent)", data)
                 } else {
                     lines.append("[overrides] \(target) — \(r.verdict == .bypassed ? "bypassed" : "direct") but no bytes (\(r.bytes))")
                 }
