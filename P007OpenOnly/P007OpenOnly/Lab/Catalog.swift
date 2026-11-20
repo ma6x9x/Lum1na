@@ -433,6 +433,7 @@ extension Catalog {
             ("kext / IOKit", kext),
             (tl("应用与系统进程"), userspace),
             (tl("工具链自检"), tooling),
+            ("Same-boot intel", kernFiles + intel),
             (tl("可达性探测"), probes),
         ]
         let buckets = Dictionary(grouping: tapDirectory, by: \.component)
