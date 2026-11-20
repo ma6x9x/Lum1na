@@ -144,7 +144,10 @@ static void p169_disk_log(NSString *out) {
 
     CFMutableDictionaryRef m = sServiceMatching(kRoot);
     io_obj_t svc = sGetService(0, m);
-    if (m) CFRelease(m);
+    /* 2026-11-20 crash receipt (P007OpenOnly-203826: EXC_BREAKPOINT in CFRelease
+       from this tap): same double-release as P168/P172 — IOServiceGetMatchingService
+       CONSUMES the dict. Fix: m = NULL after the consume. */
+    m = NULL;   /* consumed by sGetService above */
     mach_port_t conn = 0;
     kern_return_t kr = svc ? sOpen(svc, mach_task_self(), 0, &conn) : 0xe00002eb;
     [o appendFormat:@"  [open] svc=%#x open=%#x conn=%#x\n",

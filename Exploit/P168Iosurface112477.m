@@ -191,7 +191,11 @@ static void p168_groom_free(mach_port_t *ports, int n) {
 
     CFMutableDictionaryRef m = sServiceMatching(p168_kIosurfaceRoot);
     io_obj_t svc = sGetService(0, m);
-    if (m) CFRelease(m);
+    /* 2026-11-20 crash receipt (P007OpenOnly-203913: EXC_BREAKPOINT in CFRelease
+       from this tap): IOServiceGetMatchingService CONSUMES the matching dict —
+       the CFRelease(m) after it was a DOUBLE-RELEASE of a dead object. Same
+       bug as P172 (fixed 2cdae50). The leak law is unchanged (nothing freed). */
+    m = NULL;   /* consumed by sGetService above */
     io_obj_t conn = 0;
     kern_return_t kr = svc ? sOpen(svc, mach_task_self(), 0, &conn) : 0xe00002eb;
     [o appendFormat:@"  [open] svc=%#x open=%#x conn=%#x\n",
