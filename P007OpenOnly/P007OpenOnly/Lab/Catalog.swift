@@ -5,7 +5,7 @@ import ImageIO
 enum Catalog {
 
     static var base: [ExploitModule] {
-        luminaKRW + luminaLive + luminaParked + coreGraphics + imageIO + imageIO2 + archive + archive2 + coreMedia + crossSandbox + kernel + audio + audio2 + video + fonts + font2 + kext + userspace + tooling + probes
+        luminaKRW + luminaLive + luminaParked + coreGraphics + imageIO + imageIO2 + archive + archive2 + coreMedia + crossSandbox + kernel + audio + audio2 + video + fonts + font2 + kext + userspace + tooling + kernFiles + probes
     }
 
     /// Every dispatcher id that does not already carry a rich module, so no
