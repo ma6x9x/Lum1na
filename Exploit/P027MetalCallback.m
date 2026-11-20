@@ -289,6 +289,17 @@ static void p027_callback(void *ctx)
 
     /* ── Metal device/queue setup (same as p026/p021) ── */
     p027_log(@"=== SETUP: Metal device + queue ===");
+    /* 2026-11-20 15:22 receipt (P007OpenOnly-152212): the crash is the
+       QUEUE WRAPPER teardown, not the ctx page — the local cmdQueue strong
+       ref dies when this method returns, the MTLCommandQueue deallocs, and
+       the IOGPUNotificationQueue wrapper is torn down WHILE the forged
+       sel=25 entry stays armed in the kernel queue; the dispatcher fires
+       later and derefs the dead wrapper ([obj+0x10], obj==NULL — the same
+       frame as the 11-19 pair). Door-never-closes at the WRAPPER level:
+       the device + queue are retained for PROCESS LIFETIME so the wrapper
+       (the dispatcher's object) never deallocs under an armed entry. */
+    static id<MTLDevice> p027_keep_dev = nil;
+    static id<MTLCommandQueue> p027_keep_queue = nil;
     id<MTLDevice> dev = MTLCreateSystemDefaultDevice();
     if (!dev) {
         p027_log(@"[mtl] STOP no device");
@@ -301,6 +312,8 @@ static void p027_callback(void *ctx)
         p027_log(@"[mtl] STOP no queue");
         return [self finish:@"no queue"];
     }
+    p027_keep_dev = dev;          /* process-lifetime (door-never-closes) */
+    p027_keep_queue = cmdQueue;   /* the wrapper never deallocs under armed entries */
 
     /* ── Unwrap Metal objects to get internal refs (from p021) ── */
     id mtlDev = p027_unwrap(dev);
