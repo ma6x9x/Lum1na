@@ -46,11 +46,6 @@
 #define kIOMapReadOnly 0x00001000
 #endif
 
-/* IORegistryEntryCopyCFProperty — trimmed from the iOS IOKitLib header.
-   Local prototype (the P069 mach_vm_map law); the symbol links from IOKit. */
-extern CFTypeRef IORegistryEntryCopyCFProperty(io_registry_entry_t entry,
-    CFStringRef key, CFAllocatorRef allocator, uint32_t options);
-
 typedef kern_return_t (*p102_map64_t)(io_connect_t, uint32_t, task_port_t,
                                       uint64_t *, uint64_t *, uint32_t);
 typedef kern_return_t (*p102_unmap64_t)(io_connect_t, uint32_t, task_port_t,
@@ -121,9 +116,20 @@ typedef void (*p102_dev_release_t)(void *);
        (A12X, AGXG11G 320.63, IOGPU 130.16.4) was NEVER TESTED — the older
        IOGPU/DART generation may not enforce the block. */
     {
-        CFTypeRef cls = gpu ? IORegistryEntryCopyCFProperty(gpu, CFSTR("IOClass"), kCFAllocatorDefault, 0) : NULL;
+        /* CI-1621 link law: IORegistryEntryCopyCFProperty is NOT exported by
+           the iOS IOKit library (the extern prototype was an undefined
+           symbol). dlsym with an honest NULL row on iOS if absent. */
+        static CFTypeRef (*pRegCopy)(io_registry_entry_t, CFStringRef,
+                                     CFAllocatorRef, uint32_t);
+        if (!pRegCopy) {
+            void *iok = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_LAZY);
+            pRegCopy = iok ? (CFTypeRef (*)(io_registry_entry_t, CFStringRef,
+                                            CFAllocatorRef, uint32_t))
+                        dlsym(iok, "IORegistryEntryCopyCFProperty") : NULL;
+        }
+        CFTypeRef cls = (pRegCopy && gpu) ? pRegCopy(gpu, CFSTR("IOClass"), kCFAllocatorDefault, 0) : NULL;
         L([NSString stringWithFormat:@"[*] GPU IOClass=%@ — G11G(A12X)=never-tested door; G13P_B0/G18P=the ok=0 law",
-           cls ? (__bridge NSString *)cls : @"(no IOGPU service)"]);
+           cls ? (__bridge NSString *)cls : (gpu ? @"(registry API absent)" : @"(no IOGPU service)")]);
         if (cls) CFRelease(cls);
         io_service_t agx = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AGXG11G"));
         if (agx) {
