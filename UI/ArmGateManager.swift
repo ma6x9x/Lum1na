@@ -57,6 +57,13 @@ enum ArmGate {
               title: "P116 rw probe (WRITE escape)",
               note: "VALUE gate — arms the p116 read-write test with the safe /var/mobile target; the next p116 tap tests the WRITE class",
               value: "/var/mobile/Library/p116_rw_probe.txt"),
+        .init(file: "p073_victim.txt",
+              title: "P073 victim class = INPCB",
+              note: "VALUE gate (v7h dial) — switches the p073 hole band to LIVE UDP sockets: a smashed inpcb is adopted directly by SocketKRW (the ANE lane's conversion door)",
+              value: "inpcb"),
+        .init(file: "p132_land.txt",
+              title: "P132 landing stage",
+              note: "presence gate — arms the p073 landing stage inside the P132 chain frame"),
     ]
 
     static var documents: String {
