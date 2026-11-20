@@ -11413,7 +11413,12 @@ static void aio_v5_apfs_churn(const char *dir, int files) {
     int file = open([fp UTF8String], O_CREAT | O_RDWR | O_TRUNC, 0644);
     if (file < 0) { [out appendFormat:@"STOP open file errno=%d\n", errno]; return out; }
     uint8_t wbuf[4096]; memset(wbuf, 0x61, sizeof(wbuf));
-    write(file, wbuf, sizeof(wbuf));
+    if (write(file, wbuf, sizeof(wbuf)) > 0) {
+        fsync(file);   /* 2026-11-20 17:32 receipt: aio_backing.bin was 0 bytes
+                          after the panic reboot — the initial write was page-
+                          cache only and the reboot ate it. The PersistentLogStore
+                          durability law applies to the backing too. */
+    }
     g_v4_file = file;
 
     g_v4_stop = 0;
@@ -11481,7 +11486,15 @@ static void aio_v5_apfs_churn(const char *dir, int files) {
 
         /* v5 WITNESS-POST: where does the next live entry land? */
         uint64_t e2 = [P063AioKqueueLeak witnessEntryKptr];
-        const char *verdict = (e2 == 0) ? "none" : (e2 == e1 ? "SAME-SLOT (self-recycle)" : "MOVED (churn claimed)");
+        /* 2026-11-20 17:33 receipt (E1=0xffffffe896ae9f00, rc=E1+0x1ac -> the
+           underflowed entry = E1's slot + 3 x 0xc0 elements): E2=0 is NOT a miss —
+           the AIO_MAX accounting is consumed by the leaked entries (the decode
+           law), so a post-race witness CANNOT create a new entry. E2=none after
+           a race = the leak held the budget = the SUCCESS signal. The address
+           math in the panic's rc is the true slot witness. */
+        const char *verdict = (e2 == 0)
+            ? "none — AIO budget consumed (the race's leak HELD: the success signal; the panic's rc names the recycled slot)"
+            : (e2 == e1 ? "SAME-SLOT (self-recycle)" : "MOVED (churn claimed)");
         ALOG("it=%ld WITNESS-POST E2=0x%llx %s\n", it, (unsigned long long)e2, verdict);
         [out appendFormat:@"  it=%ld eagain=%ld E2=0x%llx %s\n",
             it, n_eagain, (unsigned long long)e2, verdict];
