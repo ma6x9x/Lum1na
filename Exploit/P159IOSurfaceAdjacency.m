@@ -26,10 +26,12 @@
 #include <string.h>
 
 #define P159_BUILD @"p159-iosurface-adjacency-v3-harvest"
-#define P159_ROUNDS 16  /* 2026-11-19: doubled — the 33% per-round hit rate means
-                             8 rounds gives ~2.6 expected anchors; 16 rounds gives
-                             ~5.3 — the harvest becomes near-deterministic at the
-                             cost of ~2x surface-create time (still <1s total) */
+#define P159_ROUNDS 32  /* 2026-11-20: doubled again (16 -> 32, the receipt law:
+                             "the 159 is not churning enough") — the 33% per-round
+                             hit rate gives ~10.6 expected anchors at 32 rounds,
+                             which fills the full 8-slot anchor set in ONE tap
+                             instead of stopping at 2 (the want=2 bug, also fixed
+                             tonight). Still <2s total surface-create time. */
 #define P159_WANT_ANCHORS 4
 #define P159_MAX_ANCHORS 8
 

@@ -290,7 +290,7 @@ static void *cs2_surf_churn_thread(void *arg) {
        fallback. Excluded from every kptr-shape classifier in the core. */
     {
         /* auto-supply: thin board set -> one bounded P159 harvest tap first */
-        int nAvail = LabHeapAnchorHarvestIfThin(2);
+        int nAvail = LabHeapAnchorHarvestIfThin(8);   /* 2026-11-20: the full 8-set (was 2 — the "only 2 anchored" receipt) */
         uint64_t anchor = LabHeapAnchorSameBoot();
         cs2_log("[anchor] same-boot anchor set: %d distinct%s", nAvail,
                 nAvail ? "" : " (harvest produced none this boot)");

@@ -84,7 +84,7 @@ static void *p177_racer2(void *arg) {
     Lf(@"%@", head); [o appendString:head];
 
     /* ---- STEP 1: anchor auto-supply + fil-tag arm ---- */
-    int nAnchors = LabHeapAnchorHarvestIfThin(2);
+    int nAnchors = LabHeapAnchorHarvestIfThin(8);   /* 2026-11-20: the full 8-set (was 2) */
     uint64_t anchor = LabHeapAnchorSameBoot();
     Lf(@"[*] same-boot anchor set: %d distinct%@", nAnchors,
        nAnchors ? @"" : @" (harvest produced none — tags stay random-marker)");

