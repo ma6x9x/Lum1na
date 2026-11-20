@@ -52,6 +52,21 @@
 #define A14_23F77_KHEAP_DATA         0xFFFFFFF007B6E890ULL
 #define A14_23F77_KFREE_DATA         0xFFFFFFF009E1900CULL
 #define A14_23F77_KALLOC_DATA        0xFFFFFFF009E18728ULL
+
+/* 2026-11-19 full-chain Ghidra verification (23F77 research + release KCs —
+   findings: ios-xnu-hunt/findings/2026-11-19_23f77_cs2_chain_offset_verify.md):
+   every cs2-chain pin CONFIRMED, zero corrections — ipi_zone 0x68 (holds a
+   kalloc_type_view*, zv_name @ view+0x10, kt_size @ +0x2c = 0x400); protosw
+   .pr_input 0x28; so_proto 0x20 / so_pcb 0x18 / so_family 0x08 / so_usecount
+   0x23c (exactly 330 __text refs); inpcb le_next 0x20 / le_prev 0x28 /
+   pcbinfo 0x38 / socket 0x40 (one STP @ 0xfffffff00a15b570) / gencnt 0x78 /
+   icmp6filt 0x148 (NECP strings 0x178..0x198, never confuse); __TEXT base
+   0xFFFFFFF007004000 identical in research and release. Caution: the
+   function at 0xfffffff00a15a6d4 (renamed inpcb_init) is the thread-call
+   init, NOT in_pcbinfo_init — the ipi_zone store lives in udp_init
+   0xfffffff00a1b60dc. */
+#define A14_23F77_KERNPROC           0xFFFFFFF007B6EB30ULL  /* Ghidra PROVEN 2026-11-19 */
+#define A14_23F77_PIDHASH            0xFFFFFFF007B0DD58ULL  /* Ghidra PROVEN 2026-11-19; allproc still UNDERIVED */
 // MARK: - ANE 43748 Constants (A14 23F77)
 #define A14_23F77_ANE_CHECKANDPREWIRE     0xFFFFFFF00874C070ULL
 #define A14_23F77_ANE_MEMORYMAP           0xFFFFFFF00874C7F4ULL
