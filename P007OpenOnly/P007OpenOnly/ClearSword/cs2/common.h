@@ -128,7 +128,14 @@ typedef struct pe_context {
     int      heap_anchor_armed;
     /* 2026-11-19 multi-anchor: the full same-boot set (heap_anchor = [0]).
        Every kptr-shape classifier skips ALL of them — cs2_own_anchor(). */
-    uint64_t heap_anchors[4];
+/* 2026-11-20 receipt cs2_krw_log 5 (the 12, 23F77): the board held SEVEN
+   distinct same-boot anchors but the set held four — and the installed
+   build predated 687a673's classifier exclusions, so the run's OWN fil
+   tag came back as 480 KERNEL-POINTER qwords (a false cls=KERNEL). The
+   set now holds EIGHT: every anchor candidate that any same-boot run
+   (cs2, p177, earlier taps) could have filled with is excluded, and the
+   glues log a self-test proving the exclusion in the running binary. */
+    uint64_t heap_anchors[8];
     int      heap_anchor_n;
     uint64_t wired_page_marker;
 
@@ -180,7 +187,7 @@ extern cs2_context_t cs2_ctx;
 static inline int cs2_own_anchor(uint64_t q) {
     int i;
     if (cs2_ctx.heap_anchor_armed && q == cs2_ctx.heap_anchor) return 1;
-    for (i = 0; i < cs2_ctx.heap_anchor_n && i < 4; i++)
+    for (i = 0; i < cs2_ctx.heap_anchor_n && i < 8; i++)
         if (q == cs2_ctx.heap_anchors[i]) return 1;
     return 0;
 }

