@@ -24,10 +24,16 @@ enum ArmGate {
         let file: String
         let title: String
         let note: String
+        /// VALUE gate: when set, the marker body is this value (e.g. a path
+        /// knob a probe reads as content) instead of a provenance stamp.
+        /// Presence law unchanged — readers that only check existence are
+        /// unaffected; readers that parse content get the intended value.
+        var value: String? = nil
         var id: String { file }
     }
 
     /// Every presence gate in the tree (readers check existence only).
+    /// VALUE gates carry the content their reader parses.
     static let gates: [Gate] = [
         .init(file: "cscalib_v12_arm.txt",
               title: "LSIDCalib v12 / v12.2",
@@ -47,6 +53,10 @@ enum ArmGate {
         .init(file: "p176_arm.txt",
               title: "P176 window loop",
               note: "PANIC-POSSIBLE (reviewed 2026-11-18: parked)"),
+        .init(file: "p116_rw_path.txt",
+              title: "P116 rw probe (WRITE escape)",
+              note: "VALUE gate — arms the p116 read-write test with the safe /var/mobile target; the next p116 tap tests the WRITE class",
+              value: "/var/mobile/Library/p116_rw_probe.txt"),
     ]
 
     static var documents: String {
@@ -75,7 +85,14 @@ enum ArmGate {
         let p = path(file)
         let pNS = p as NSString    /* fileSystemRepresentation is NSString-side on the 16.4 SDK */
         if armed {
-            let body = "armed \(stamp()) — raised in-app (ARMORY)\n"
+            /* VALUE gates carry the content their reader parses (the p116 rw
+               target path); everything else gets the provenance stamp. */
+            let body: String
+            if let v = Self.gates.first(where: { $0.file == file })?.value {
+                body = v + "\n"
+            } else {
+                body = "armed \(stamp()) — raised in-app (ARMORY)\n"
+            }
             let fd = open(pNS.fileSystemRepresentation, O_CREAT | O_WRONLY | O_TRUNC, 0o644)
             guard fd >= 0 else { return false }
             defer { close(fd) }

@@ -35,7 +35,7 @@ extension Catalog {
             tier: 1,
             summaryZh: "枚举本 boot 写出的可读文件（CrashReporter / diagnostics / Stackshots / var/logs），只保留 mtime ≥ kern.boottime 的同 boot 文件，扫 8 字节对齐 qword 里的内核范围地址，用 23F77 已证明的静态 VA 表推候选 slide（多对一致才算数），并做 board anchor 交叉核对（哪些 anchor 指向持久内核对象、哪些是 boot 噪声）。诚实边界：slide 不是 hasKread，门槛仍是 kread32(kbase)==0xfeedfacf。",
             notesZh: "被拒绝的目录只报 verdict，不猜文件名。一次 TAP；纯读，不写任何容器外路径。",
-            run: kernBootleakRun)
+            run: kernBootLeakRun)
         return [m]
     }
 
@@ -163,8 +163,8 @@ extension Catalog {
         // ---- anchor cross-check (which board anchors are persistent kernel objects?) ----
         var anchors = [UInt64](repeating: 0, count: 8)
         let anchorN = LabHeapAnchorsSameBoot(8, &anchors)
-        lines.append("[anchor] same-boot board anchors: \(anchorN) distinct")
-        for i in 0..<min(anchorN, 8) where anchors[i] != 0 {
+        lines.append("[anchor] same-boot board anchors: \(Int(anchorN)) distinct")
+        for i in 0..<min(Int(anchorN), 8) where anchors[i] != 0 {
             let a = anchors[i]
             let inKernel = isKernelRange(a)
             let inFiles = kqCounts[a] ?? 0
