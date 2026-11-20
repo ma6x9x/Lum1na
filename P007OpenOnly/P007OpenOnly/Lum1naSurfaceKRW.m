@@ -25,7 +25,7 @@
 #import "Lum1naSurfaceKRW.h"
 #import "LabDeviceProfile.h"
 #import "LabLocalTime.h"
-#import "Lum1naBoard.h"
+#import "P007Board.h"
 
 #import <Foundation/Foundation.h>
 #import <IOKit/IOKitLib.h>
