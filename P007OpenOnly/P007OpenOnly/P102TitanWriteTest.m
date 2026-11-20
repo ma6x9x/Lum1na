@@ -34,7 +34,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P102_BUILD @"p102-titan-write-test-v1"
+#define P102_BUILD @"p102-titan-write-test-v2-g11g"
 #define P102_IORVBAR 0x206050000ULL
 #define T102_CPU_A14  0x1B588BB3u
 #define T102_CPU_T8150 0xAB345F09u
@@ -45,6 +45,11 @@
 #ifndef kIOMapReadOnly
 #define kIOMapReadOnly 0x00001000
 #endif
+
+/* IORegistryEntryCopyCFProperty — trimmed from the iOS IOKitLib header.
+   Local prototype (the P069 mach_vm_map law); the symbol links from IOKit. */
+extern CFTypeRef IORegistryEntryCopyCFProperty(io_registry_entry_t entry,
+    CFStringRef key, CFAllocatorRef allocator, uint32_t options);
 
 typedef kern_return_t (*p102_map64_t)(io_connect_t, uint32_t, task_port_t,
                                       uint64_t *, uint64_t *, uint32_t);
@@ -86,7 +91,15 @@ typedef void (*p102_dev_release_t)(void *);
     } else if (isA14) {
         L(@"[*] A14 needle IORVBAR=0x206050000 (Titan T8101 FIRESTORM)");
     } else {
-        L(@"[*] A12X/other: momentarius uses 0x206050000 after kread. This TAP does not kmap.");
+        /* 2026-11-20 momentarius audit (findings:
+           2026-11-20_momentarius_train_audit.md): the A12X's gfx-asc RVBAR
+           IS this exact PA (DeviceTree-confirmed on 23H30) — the GPU ASC
+           is the PPL-writing coprocessor on A12-class silicon. The port
+           builds its gfx-firmware alias via IOSurface withCacheMode
+           (kwrite-based, post-KRW); the IOGPU MapMemory door below is only
+           the CHEAPER alternative kmap. A G11G sweep miss is not port-fatal. */
+        L(@"[*] A12X: gfx-asc RVBAR=0x206050000 (momentarius-audit confirmed). Sweep = the cheaper kmap door;");
+        L(@"[*] the port's primary path is the IOSurface withCacheMode alias (post-KRW). Miss != port-fatal.");
         needle = P102_IORVBAR;
     }
 
@@ -103,6 +116,21 @@ typedef void (*p102_dev_release_t)(void *);
     p102_dev_release_t pDevRelease = iogpu ? (p102_dev_release_t)dlsym(iogpu, "IOGPUDeviceRelease") : NULL;
 
     io_service_t gpu = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("IOGPU"));
+    /* v2: the GPU-GEN row — the sweep's meaning depends on it. G13P_B0 and
+       G18P receipts: MapMemory types 0..15 all ok=0 (the T7 law). G11G
+       (A12X, AGXG11G 320.63, IOGPU 130.16.4) was NEVER TESTED — the older
+       IOGPU/DART generation may not enforce the block. */
+    {
+        CFTypeRef cls = gpu ? IORegistryEntryCopyCFProperty(gpu, CFSTR("IOClass"), kCFAllocatorDefault, 0) : NULL;
+        L([NSString stringWithFormat:@"[*] GPU IOClass=%@ — G11G(A12X)=never-tested door; G13P_B0/G18P=the ok=0 law",
+           cls ? (__bridge NSString *)cls : @"(no IOGPU service)"]);
+        if (cls) CFRelease(cls);
+        io_service_t agx = IOServiceGetMatchingService(kIOMainPortDefault, IOServiceMatching("AGXG11G"));
+        if (agx) {
+            L(@"[*] AGXG11G service present — this IS the A12X GPU generation (the momentarius target class)");
+            IOObjectRelease(agx);
+        }
+    }
     void *dev = NULL;
     io_connect_t conn = 0;
     if (gpu && pDevCreate) {
@@ -183,9 +211,12 @@ typedef void (*p102_dev_release_t)(void *);
         L(@"[-] P102 SKIP MMIO store — titan.m GPU ROP / PTE plant not copied. Window kept read-only.");
         L(@"[*] Next after hasKread: kmap 0x206050000 then Titan/momentarius. T6 AfterKread HOLD.");
     } else {
-        L(@"[-] P102 SKIP — no IORVBAR window (T7 MapMemory still ok=0).");
-        L([NSString stringWithFormat:@"[*] CacheMode canary=%@ is userspace PurpleGfxMem. Writing it is not Titan.",
+        L(@"[-] P102 SKIP — no IORVBAR window (the MapMemory door is closed on this GPU gen).");
+        L([NSString stringWithFormat:@"[*] CacheMode canary=%@ — the PurpleGfxMem region machinery (the",
            canary_ok ? @"MATCH" : @"MISS"]);
+        L(@"    momentarius alias-surface family) works on this device; writing it is not Titan.");
+        L(@"[*] On the A12X a sweep miss is NOT port-fatal: the momentarius port's primary gfx-firmware");
+        L(@"    alias goes through IOSurface withCacheMode (kwrite-built, post-KRW), not this door.");
     }
     L([NSString stringWithFormat:@"[*] hasKread=%@ unchanged. +0x34/IOMD+0x68 fire is P101.",
        [P007Board shared].hasKread ? @"YES" : @"NO"]);
