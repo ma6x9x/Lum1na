@@ -315,6 +315,26 @@ static void *t8_closer(void *arg) {
     }
     t8_log("STEP3 t8_race_arm.txt PRESENT — the armed race. PANIC-POSSIBLE.");
     t8_log("      ONE TAP PER FRESH BOOT. The second put fires at the teardown.");
+    /* v2.1 the TRAIN gate: the aio close-race mechanics + the NECP ABI were
+       decoded on the xnu-12377 family (23F77 / 23H30). The 21.x trains (12
+       mini 21D50, A13 22G100) and the 13432 train (the 17) have NOT been
+       decoded for this lane — the armed race HOLDs there (the race body's
+       aio_workq_entry layout +0x2c and the NECP action numbering are
+       train-specific). The dry lane (PANIC-FREE) still runs anywhere. */
+    {
+        LabSku sk = [LabDeviceProfile sku];
+        if (!(sk == LabSkuA14_23F77 || LabSkuIsA12X(sk))) {
+            t8_log("STEP3 TRAIN GATE: this SKU is not a decoded 12377-family "
+                   "lane — the armed race HOLDs (the dry lane receipts above "
+                   "still stand; decode the train first).");
+            close(t8_nfd); t8_nfd = -1;
+            t8_log("=== T8 HOLD (train gate) — the dry lane is the receipt ===");
+            [out appendString:@"T8 HOLD (train gate — undecoded train)"];
+            if (t8_logfd >= 0) close(t8_logfd);
+            t8_logfd = -1;
+            return out;
+        }
+    }
 
     /* STEP 4 — the race */
     bp = [docs stringByAppendingPathComponent:@"t8_aio_backing.bin"];
@@ -394,12 +414,22 @@ static void *t8_closer(void *arg) {
                fallback ? "main" : "closer",
                window ? "" : " — window missed, the flows allocate fresh");
 
-    /* STEP 5 — the witness + the verdict (the 17:33 budget law) */
+    /* STEP 5 — the witness + the verdict (the 17:33 budget law). v2.1 the
+       dead-witness guard: the 84530 leak is FIXED on the 26.7+/27 trains
+       (p84530 header law) — on 23H30 the witness returns 0 because the
+       CHANNEL is dead, not because the budget held. Do not misclassify. */
     uint64_t e2 = [P063AioKqueueLeak witnessEntryKptr];
-    const char *verdict =
-        (e2 == 0) ? "none — AIO budget consumed (the 17:33 law: the leak HELD = the success signal; the panic's rc names the claimant slot)" :
-        (e2 == e1) ? "SAME-SLOT — an aio entry self-recycled (the v5 result; the battery lost the LIFO)" :
-                     "MOVED — a non-aio object claimed the neighborhood (the battery candidate)";
+    const char *verdict;
+    if (e1 == 0 && e2 == 0) {
+        verdict = "WITNESS DEAD on this SKU (the 84530 fix train) — the panic "
+                  "rc math is the ONLY placement proof here";
+    } else if (e2 == 0) {
+        verdict = "none — AIO budget consumed (the 17:33 law: the leak HELD = the success signal; the panic's rc names the claimant slot)";
+    } else if (e2 == e1) {
+        verdict = "SAME-SLOT — an aio entry self-recycled (the v5 result; the battery lost the LIFO)";
+    } else {
+        verdict = "MOVED — a non-aio object claimed the neighborhood (the battery candidate)";
+    }
     t8_log("STEP5 E2=0x%llx verdict: %s", (unsigned long long)e2, verdict);
     t8_log("STEP5 flows_ok=%d — if >0 and the budget held, a necp_client_flow (0xb0)");
     t8_log("      is the leading claimant of the freed 0xc0 slot.");
