@@ -924,6 +924,17 @@ static void ak_tryInstallPkgman(NSMutableString *s) {
         [s appendString:@"  pmap_load_trust_cache          (cstring absent — not pinned)\n"];
         [s appendFormat:@"  aks_wvek                       0x%llx\n", off->aks_wvek_overflow];
         [s appendString:@"  owns_replaceable               present (twin 23G71)\n"];
+    } else if (off->tag && strcmp(off->tag, "A12X_23H30") == 0) {
+        /* 2026-11-22 the audit's finding 3: the generic else printed
+           "23F77 pins" here — mislabeling the iPad's FIELD#-only row as
+           unslid-VA pins it does not have. The honest row: */
+        [s appendString:@"A12X 23H30 = FIELD# only. The 23G71 unslid VAs do NOT\n"];
+        [s appendString:@"transfer (never paste another SKU's addresses). AMFI/pmap\n"];
+        [s appendString:@"pins HOLD on this SKU until the 23H30 decode lands.\n"];
+        [s appendFormat:@"tag %s — the pipeline's per-SKU gate fields apply\n"
+                        @"(fill_cap=%u table_size=0x%x sel=%u):\n",
+         tag, (unsigned)off->ane_fill_cap, off->ane_table_size,
+         off->amfi_sel_copy];
     } else {
         [s appendString:@"A14 = PPL. pmap_cs_allow_invalid + AMFI UC sel 2/7 from the same process.\n"];
         [s appendFormat:@"23F77 pins (unslid) tag %s Ghidra 2026-09-29:\n", tag];
