@@ -656,7 +656,19 @@ finish:
     for (int i = 0; i < 1000; i++)
         *(uint32_t *)(void *)(qBuf + 4 + i * 4) = sids[i];
     qBuf[0xFA4] = 0x01;
-    kern_return_t krQ = g_p114_callStruct(conn, 6, qBuf, 0xFA8, NULL, NULL);
+    /* 2026-11-22 the 03:06 receipt (inside p130's load): the QueueCreate
+       returns 0xe00002e2 (NotPermitted) under the co-driver pressure — the
+       solo taps work. Retry x3 with backoff (the driver-busy class, the
+       v1.12 open-flake law's sibling). */
+    kern_return_t krQ = KERN_FAILURE;
+    for (int qTry = 0; qTry < 3; qTry++) {
+        krQ = g_p114_callStruct(conn, 6, qBuf, 0xFA8, NULL, NULL);
+        if (krQ == KERN_SUCCESS) break;
+        if (lg) lg([NSString stringWithFormat:
+            @"[rdb] QueueCreate try %d kr=0x%x (the under-load class — retrying)",
+            qTry + 1, krQ]);
+        usleep(250000);
+    }
     for (int i = 0; i < nb && bank[i]; i++)
         if (g_p114_surfRel) g_p114_surfRel(bank[i]);   /* the kext holds refs */
     if (krQ != KERN_SUCCESS) {

@@ -193,6 +193,20 @@ static void p130_bandit(const char *outcome) {
     }
     p130_law_dict();
 
+    /* v3.1 (2026-11-22, the 03:06 receipt): the PRE readback runs BEFORE
+       the GROW stage — the 200-held-surface pressure was part of what
+       walled the QueueCreate (0xe00002e2). The pressure-free window. */
+    static uint64_t p130_pre[64]; static int p130_pre_n = 0;
+    p130_pre_n = 0;
+    {
+        NSMutableString *rl = [NSMutableString string];
+        BOOL ok = [P114SurfaceLeak diagReadback:p130_pre outN:&p130_pre_n max:64
+                                         logLine:^(NSString *l) { L(l); }];
+        Lf(@"[v3-PRE] the readback baseline (pre-GROW): %@ (%d kvas)",
+           ok ? @"captured" : @"no-readback (honest — the lane proceeds blind)",
+           p130_pre_n);
+        (void)rl;
+    }
     /* ══ v2 PRE-STAGE: the 3072 clean-write experiment ══
        (Rank 1 of the recipe — findings/2026-11-20_3072_activity_write_recipe.md)
        GROW: 200 surfaces held — the registry map crosses the 192-cap
@@ -293,16 +307,6 @@ static void p130_bandit(const char *outcome) {
        passthrough). PRE baseline here, POST read after the engine joins —
        the diff = the receipt (a new/weird KVA surfacing through the event
        channel = the corrupted root-map entry). Read-only, PANIC-FREE. */
-    static uint64_t p130_pre[64]; static int p130_pre_n = 0;
-    {
-        NSMutableString *rl = [NSMutableString string];
-        BOOL ok = [P114SurfaceLeak diagReadback:p130_pre outN:&p130_pre_n max:64
-                                         logLine:^(NSString *l) { L(l); }];
-        Lf(@"[v3-PRE] the readback baseline: %@ (%d kvas)",
-           ok ? @"captured" : @"no-readback (honest — the lane proceeds blind)",
-           p130_pre_n);
-        (void)rl;
-    }
     pthread_create(&ta, NULL, p130_fencer, NULL);
     /* thread B: the landing engine, serialized to one call */
     NSString *p073log = [P073AneSecondTable tap];

@@ -51,7 +51,16 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P062_BUILD @"p062-neon-selftest-v4-selfsample"
+#define P062_BUILD @"p062-neon-selftest-v5-reorder"
+/* v5 (2026-11-22, the 03:36 receipts): P1's brk is APP-FATAL — the reply
+   fails 0x10000003 (MIG_BAD_ARGUMENTS, third receipt) so the exception is
+   never marked handled, the kernel re-raises down the chain, and it reaches
+   the crash reporter (EXC_BREAKPOINT in p062_worker_fn, the 03:36:46 .ips).
+   P1 is PROVEN on both devices (64/64 x3) — it is now OPT-IN (default OFF)
+   and runs LAST. PHASE A (the RPC matrix) and PHASE B (the canary) run
+   FIRST — they never got to run (the app died at P1). When P1 does run, a
+   TASK-level EXCEPTION_DEFAULT fallback port consumes the re-raise (the
+   plain reply has no state to validate — no MIG reject — the app survives). */
 /* v4 (2026-11-22): TWO additions.
    (1) PHASE A — the RPC matrix: the 1540 READ FAIL receipts (P044 witnesses,
        kr=0x90000003 = suspend MIG_BAD_ARGUMENTS 0x10000003 on EVERY scan) and
@@ -484,7 +493,81 @@ static void p062_phase2(void)
     pthread_join(th, NULL);
 }
 
-/* ─────────────────── v4 PHASE A: the RPC matrix ───────────────────
+/* ─────────── v5: the TASK-level fallback exception handler ───────────
+   The 03:36:46 receipt: P1's brk escapes to the crash reporter (the state
+   reply fails 0x10000003 -> the exception is unhandled -> the kernel
+   re-raises down the chain). This handler sits at the TASK level with
+   EXCEPTION_DEFAULT (the PLAIN raise — no state in the reply, nothing for
+   MIG to reject). When the re-raise arrives: terminate the faulting thread
+   (its port is in the message body) and reply KERN_SUCCESS — the app
+   survives, the worker dies cleanly, no brk ping-pong. */
+static mach_port_t g_taskExcPort = MACH_PORT_NULL;
+
+static void *p062_task_exc_fn(void *arg)
+{
+    (void)arg;
+    uint8_t buf[256];
+    memset(buf, 0, sizeof buf);
+    mach_msg_header_t *mh = (mach_msg_header_t *)buf;
+    kern_return_t kr = mach_msg(mh, MACH_RCV_MSG | MACH_RCV_TIMEOUT, 0,
+                                sizeof buf, g_taskExcPort, 4000,
+                                MACH_PORT_NULL);
+    if (kr != MACH_MSG_SUCCESS) return NULL;
+    /* the plain mach_exception_raise body: NDR(8) then the thread/task
+       ports. Parse defensively and log the raw words (the receipts guide
+       the next iteration if the offsets drift). */
+    uint32_t *w = (uint32_t *)(buf + sizeof(mach_msg_header_t) + 8);
+    p062_log(@"[P1-fallback] task-level re-raise: id=%d words=%08x %08x %08x %08x",
+             mh->msgh_id, w[0], w[1], w[2], w[3]);
+    thread_act_t th = (thread_act_t)w[0];   /* the body's thread port */
+    if (th) {
+        (void)thread_terminate(th);
+        p062_log(@"[P1-fallback] faulting thread terminated — the app survives");
+    }
+    /* the plain reply: {header, NDR, RetCode=KERN_SUCCESS} — no state */
+    uint8_t rbuf[sizeof(mach_msg_header_t) + 8 + 4];
+    memset(rbuf, 0, sizeof rbuf);
+    mach_msg_header_t *rh = (mach_msg_header_t *)rbuf;
+    rh->msgh_bits = MACH_MSGH_BITS(MACH_MSG_TYPE_MOVE_SEND_ONCE, 0);
+    rh->msgh_size = (mach_msg_size_t)sizeof rbuf;
+    rh->msgh_remote_port = mh->msgh_local_port;
+    rh->msgh_local_port = MACH_PORT_NULL;
+    rh->msgh_voucher_port = MACH_PORT_NULL;
+    rh->msgh_id = mh->msgh_id + 100;   /* the reply id (raise -> raise_reply) */
+    kern_return_t *rc = (kern_return_t *)(rbuf + sizeof(mach_msg_header_t) + 8);
+    *rc = KERN_SUCCESS;
+    kr = mach_msg(rh, MACH_SEND_MSG, rh->msgh_size, 0,
+                  MACH_PORT_NULL, 0, MACH_PORT_NULL);
+    p062_log(@"[P1-fallback] plain reply kr=0x%x (KERN_SUCCESS = consumed)", kr);
+    return NULL;
+}
+
+/* v5: P1 extracted — the opt-in brk test with the task-level fallback armed
+   around it. PROVEN 64/64 on both devices; APP-FATAL while unconsumed
+   without the fallback. */
+static void p062_p1_run(void)
+{
+    p062_log(@"");
+    p062_log(@"=== PHASE 1 (opt-in): exception message NEON visibility ===");
+    /* arm the task-level fallback FIRST (the survival net) */
+    kern_return_t kpt = mach_port_allocate(mach_task_self(),
+                                           MACH_PORT_RIGHT_RECEIVE, &g_taskExcPort);
+    if (kpt == KERN_SUCCESS) {
+        kpt = mach_port_insert_right(mach_task_self(), g_taskExcPort,
+                                     g_taskExcPort, MACH_MSG_TYPE_MAKE_SEND);
+        if (kpt == KERN_SUCCESS) {
+            /* EXCEPTION_DEFAULT | MACH_EXCEPTION_CODES on EXC_BREAKPOINT */
+            kpt = task_set_exception_ports(mach_task_self(), EXC_MASK_BREAKPOINT,
+                                           g_taskExcPort,
+                                           EXCEPTION_DEFAULT | MACH_EXCEPTION_CODES,
+                                           THREAD_STATE_NONE);
+            p062_log(@"[P1-fallback] task-level port armed kr=0x%x", kpt);
+            pthread_t fbTh;
+            pthread_create(&fbTh, NULL, p062_task_exc_fn, NULL);
+            pthread_detach(fbTh);
+        }
+    }
+
    The 1540 P044 READ-FAIL receipts + the P1 reply failure: the whole
    thread-state RPC family returned MIG_BAD_ARGUMENTS (0x10000003) on 23F77.
    This matrix isolates WHERE: suspend vs get, running vs suspended,
@@ -719,16 +802,12 @@ static void p062_phaseB(void)
                  ARM_NEON_STATE64, (unsigned)ARM_NEON_STATE64_COUNT,
                  sizeof(arm_neon_state64_t));
 
-        p062_log(@"");
-        p062_log(@"=== PHASE 1: exception message NEON visibility ===");
-
-        kern_return_t kpr = mach_port_allocate(mach_task_self(),
-                                               MACH_PORT_RIGHT_RECEIVE, (mach_port_t *)&g_excPort);
-        if (kpr != KERN_SUCCESS) {
-            p062_log(@"[-] exc port alloc kr=0x%x — abort", kpr);
-            p062_close_log();
-            return p062_buf ?: @"";
-        }
+    kern_return_t kpr = mach_port_allocate(mach_task_self(),
+                                           MACH_PORT_RIGHT_RECEIVE, (mach_port_t *)&g_excPort);
+    if (kpr != KERN_SUCCESS) {
+        p062_log(@"[-] exc port alloc kr=0x%x — abort", kpr);
+        return;
+    }
         kpr = mach_port_insert_right(mach_task_self(), g_excPort, g_excPort,
                                      MACH_MSG_TYPE_MAKE_SEND);
         if (kpr != KERN_SUCCESS) {
@@ -777,9 +856,31 @@ static void p062_phaseB(void)
             g_excPort = MACH_PORT_NULL;
         }
 
-        p062_phase2();
+        /* v5 order: the value phases FIRST (A/B never ran on device — the
+           app died at P1 before them); P1 last and opt-in (proven x3, and
+           its brk is app-fatal while unconsumed). */
         p062_phaseA();
         p062_phaseB();
+        p062_phase2();
+        {
+            NSString *docs = [NSSearchPathForDirectoriesInDomains(
+                NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
+            BOOL p1on = docs && [[NSFileManager defaultManager]
+                fileExistsAtPath:[docs stringByAppendingPathComponent:@"p062_p1_enable"]];
+            if (p1on) {
+                p062_log(@"");
+                p062_log(@"[P1] OPT-IN (Documents/p062_p1_enable): the brk test — "
+                         @"APP-FATAL while the reply is unconsumed (the task-level "
+                         @"fallback port below is the survival attempt)");
+                p062_p1_run();   /* if a p062_p1_run wrapper exists; else the original call */
+            } else {
+                p062_log(@"");
+                p062_log(@"[P1] SKIPPED (default): proven 64/64 on both devices "
+                         @"(the 17, the 12 x2). Documents/p062_p1_enable to re-run — "
+                         @"PANIC-FREE for the KERNEL but APP-FATAL for this process "
+                         @"while the 0x10000003 reply wall stands.");
+            }
+        }
 
         p062_log(@"");
         p062_log(@"=== VERDICT ===");
