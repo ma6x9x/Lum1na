@@ -1009,3 +1009,40 @@ Device log + `panic-full-2026-10-15-172914.0002.ips` (SHA-256 589fa3f1…, kept 
 - P073 v13b: T8150 row (0x10b8) selects 300-in when the bundle carries it,
   257-in fallback; in-count still follows the loaded model description.
   A14/23F77, LabIntelOffsets, P099 unchanged.
+
+### 2026-11-21 (cont.) — the NECP client-flow reclaim path + T8 (krw8)
+
+- The 192-class convergence decoded (findings
+  `ios-xnu-hunt/findings/2026-11-21_necp_client_flow_reclaim_path.md`):
+  `necp_client_flow` (kalloc_type 0xb0) shares the kalloc.192 bucket with
+  `aio_workq_entry` (0xb8) — the board's 36 aio kptr receipts' non-0xc0
+  deltas (0x240/0x300) are these neighbors. The flow path is plain-app
+  reachable with NO entitlement: `necp_open(463)` →
+  `necp_client_action(464, ADD=1, params≥0x801)` → `ADD_FLOW=0x11` (req
+  ≥0xf1, unique sockaddr at +0x10 = the dedup law, flags 0x40). Action
+  switch @ 0xfffffff00a0c0530, add_flow @ 0xfffffff00a0c2ad0, alloc sites
+  0xfffffff00a0b6c00 / 0xfffffff00a0c82e8 (23F77).
+- P179 (both trees): the spray primitive — PANIC-FREE, 8 clients × 64
+  flows, the shape matrix is the first-tap receipt.
+- T8 / krw8 (`KRWChainT8Controller`, both trees): the composite — aio
+  anchor (84530 E1) → the armed race (ONE per fresh boot, gated by
+  ARMORY `t8_race_arm.txt`; unarmed = the PANIC-FREE dry lane) → **the
+  closer thread fires the ADD_FLOW battery on ITS OWN CPU right after
+  close() returns** — the structural fix for the v5 verdict (the AVE2
+  churn ran on the main thread's affinity tag and could not see the
+  freeing CPU's zone-magazine LIFO; that's why external churn lost to
+  self-recycle). E2 witness + the 17:33 budget law → the honest teardown
+  (close(keep) = the second put, PANIC-POSSIBLE; close(nfd) = the
+  corrupted-flow cleanup receipt). hasKread untouched — T8 is a receipt
+  collector; the panic rc math (E1+k×0xc0) is the placement proof.
+- The two deep hunts landed: 23F77 (findings `2026-11-21_23f77_deep_hunt.md`
+  — the AVE2 pre-fix sites named: the 84607 race window + the 65410
+  unchecked-size family; JPEG +0x2c0 released-never-cleared = a two-build
+  no-CVE card) and 23H30 (findings `2026-11-21_23h30_deep_hunt.md` — the
+  112477 owner-dangle is LIVE on 26.7.1, the cross-hunt's "fixed in
+  26.7/27" was wrong for the iPad; the fleet-unique IOACIPC surface is
+  entitlement-gated fail-closed).
+- Next taps (fresh boot, the 12): P177 → cscali → **T8 dry lane** (PANIC-
+  FREE — the NECP lane proof) → **T8 armed** (raise `t8_race_arm.txt`) →
+  the receipt decides the v6 shape. p018 on the 17 + P130 v2 solo stay
+  queued ahead of it.
