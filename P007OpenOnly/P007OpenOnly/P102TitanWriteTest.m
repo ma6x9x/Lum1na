@@ -149,7 +149,16 @@ typedef void (*p102_dev_release_t)(void *);
         for (uint32_t ty = 0; ty < 16; ty++) {
             uint64_t addr = 0, sz = 0;
             kern_return_t kr = pMap(conn, ty, mach_task_self(), &addr, &sz, opts_ro);
-            if (kr != KERN_SUCCESS) continue;
+            /* v3 (the G11G decode's confirming receipt): record the per-type
+               error — the decode (findings 2026-11-22_agxg11g_mapmemory_door)
+               predicts 0xe00002c7 on EVERY type (the clientMemoryForType
+               +0x590 stub); anything else contradicts it and comes back. */
+            if (kr != KERN_SUCCESS) {
+                L([NSString stringWithFormat:@"[-] MAP type=%u kr=0x%x%s", ty, kr,
+                   kr == 0xe00002c7 ? " (the unimplemented-stub code — the decode CONFIRMED)" :
+                   " (NOT the predicted 2c7 — contradicts the G11G decode!)"]);
+                continue;
+            }
             maps_ok++;
             uint64_t first = 0;
             if (addr && sz >= 8) first = *(volatile uint64_t *)(uintptr_t)addr;
