@@ -69,3 +69,9 @@ int necp179_add_flow_req(int fd, const uint8_t cid[16], const uint8_t *req,
 /* ADD_FLOW (action 0x11) with an inline-built request (the shape matrix). */
 int necp179_add_flow(int fd, const uint8_t cid[16], const uint8_t sa[16],
                      uint16_t flags);
+
+/* COPY_RESULT (action 3): the client's result/flow-state dump. The buffer
+   must be >= 5 bytes (the kernel's flow-divert TLV gate); a larger buffer
+   gets the full result build. Returns the syscall rc; the dumped bytes land
+   in buf. T8's readback channel — diff across clients after the put. */
+int necp179_copy_result(int fd, const uint8_t cid[16], uint8_t *buf, size_t len);

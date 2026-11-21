@@ -88,6 +88,15 @@ int necp179_add_flow_req(int fd, const uint8_t cid[16], const uint8_t *req,
     return (int)rc;
 }
 
+int necp179_copy_result(int fd, const uint8_t cid[16], uint8_t *buf, size_t len) {
+    memset(buf, 0, len);
+    long rc = syscall(SYS_necp_client_action, fd,
+                      (uint64_t)3u,                    /* COPY_RESULT */
+                      (const void *)cid, (size_t)0x10,
+                      (void *)buf, len);
+    return (int)rc;
+}
+
 int necp179_add_flow(int fd, const uint8_t cid[16], const uint8_t sa[16],
                      uint16_t flags) {
     uint8_t req[NECP179_FLOW_REQ_SIZE];
