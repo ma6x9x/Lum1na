@@ -107,6 +107,10 @@ int necp179_add_flow(int fd, const uint8_t cid[16], const uint8_t sa[16],
                      O_CREAT | O_WRONLY | O_TRUNC, 0644);
 #define NLOG(...) do { \
         char _lb[512]; int _n = snprintf(_lb, sizeof _lb, __VA_ARGS__); \
+        /* the truncation law (the 22:12 receipt: the multiline identBlock blew \
+           past 512 and write(_lb, _n) dumped STACK GARBAGE into the log): \
+           snprintf returns the WOULD-BE length — cap it at the buffer. */ \
+        if (_n < 0) _n = 0; else if (_n >= (int)sizeof _lb) _n = (int)sizeof _lb - 1; \
         fprintf(stderr, "%s\n", _lb); \
         if (logfd >= 0) { \
             if (_n > 0) write(logfd, _lb, (size_t)_n); \

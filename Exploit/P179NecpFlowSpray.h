@@ -18,7 +18,10 @@
 #import <stddef.h>
 
 #define NECP179_FLOW_REQ_SIZE 0xf1u   /* the default_add_request (the 0xf1 law) */
-#define NECP179_ADD_PARAMS_SIZE 0x900u /* >= the 0x801 ADD minimum */
+#define NECP179_ADD_PARAMS_SIZE 0x800u /* the ADD accept window [1, 0x800] — the
+                                        * 22:12 receipt: 0x900 -> EINVAL at the gate
+                                        * (the >=0x801 direction in findings §4 was
+                                        * backwards; the unsigned-compare trap). */
 
 @interface P179NecpFlowSpray : NSObject
 + (NSString *)tap NS_SWIFT_NAME(tap());

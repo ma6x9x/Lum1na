@@ -11404,7 +11404,7 @@ static void aio_v5_apfs_churn(const char *dir, int files) {
     NSString *docs = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
     NSString *lp = [docs stringByAppendingPathComponent:@"aio_uaf_log.txt"];
     int logfd = open([lp UTF8String], O_CREAT | O_TRUNC | O_WRONLY, 0644);
-    #define ALOG(...) do { if (logfd >= 0) { char _lb[320]; int _n = snprintf(_lb, sizeof(_lb), __VA_ARGS__); write(logfd, _lb, _n); fcntl(logfd, F_FULLFSYNC); } } while (0)
+    #define ALOG(...) do { if (logfd >= 0) { char _lb[320]; int _n = snprintf(_lb, sizeof(_lb), __VA_ARGS__); if (_n < 0) _n = 0; else if (_n >= (int)sizeof _lb) _n = (int)sizeof _lb - 1; write(logfd, _lb, _n); fcntl(logfd, F_FULLFSYNC); } } while (0)
     [out appendFormat:@"logfile: %s (fd=%d)\n", [lp UTF8String], logfd];
     /* 2026-11-21 the banner law (the user's receipt: "doesn't show ident and
        date"): every aio_uaf_log.txt must carry the session stamp + the SKU —
@@ -12190,7 +12190,7 @@ static int iopl_sel8_80(IOConnectCallMethod_t pCall, io_connect_t conn,
     NSString *docs = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
     NSString *lp = [docs stringByAppendingPathComponent:@"necp_probe_log.txt"];
     int logfd = open([lp UTF8String], O_CREAT | O_TRUNC | O_WRONLY, 0644);
-    #define NLOG(...) do { if (logfd >= 0) { char _lb[256]; int _n = snprintf(_lb, sizeof(_lb), __VA_ARGS__); write(logfd, _lb, _n); fcntl(logfd, F_FULLFSYNC); } } while (0)
+    #define NLOG(...) do { if (logfd >= 0) { char _lb[256]; int _n = snprintf(_lb, sizeof(_lb), __VA_ARGS__); if (_n < 0) _n = 0; else if (_n >= (int)sizeof _lb) _n = (int)sizeof _lb - 1; write(logfd, _lb, _n); fcntl(logfd, F_FULLFSYNC); } } while (0)
     [out appendFormat:@"logfile: %s (fd=%d)\n\n", [lp UTF8String], logfd];
     NLOG("START necp-probe\n");
 
@@ -12397,7 +12397,7 @@ static void *necp_racer(void *arg) {
     NSString *docs = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
     NSString *lp = [docs stringByAppendingPathComponent:@"necp_race_log.txt"];
     int logfd = open([lp UTF8String], O_CREAT | O_TRUNC | O_WRONLY, 0644);
-    #define NRLOG(...) do { if (logfd >= 0) { char _lb[220]; int _n = snprintf(_lb, sizeof(_lb), __VA_ARGS__); write(logfd, _lb, _n); fcntl(logfd, F_FULLFSYNC); } } while (0)
+    #define NRLOG(...) do { if (logfd >= 0) { char _lb[220]; int _n = snprintf(_lb, sizeof(_lb), __VA_ARGS__); if (_n < 0) _n = 0; else if (_n >= (int)sizeof _lb) _n = (int)sizeof _lb - 1; write(logfd, _lb, _n); fcntl(logfd, F_FULLFSYNC); } } while (0)
     [out appendFormat:@"logfile: %s (fd=%d)\n\n", [lp UTF8String], logfd];
     NRLOG("START necp-race v8 qos-invert\n");
 
@@ -12656,7 +12656,7 @@ static void p005_try_mementry(NSMutableString *out, int logfd, mach_port_t selft
     NSString *docs = [NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, YES) firstObject];
     NSString *lp = [docs stringByAppendingPathComponent:@"p005_probe_log.txt"];
     int logfd = open([lp UTF8String], O_CREAT | O_TRUNC | O_WRONLY, 0644);
-    #define P005LOG(...) do { if (logfd >= 0) { char _lb[256]; int _n = snprintf(_lb, sizeof(_lb), __VA_ARGS__); write(logfd, _lb, _n); fcntl(logfd, F_FULLFSYNC); } } while (0)
+    #define P005LOG(...) do { if (logfd >= 0) { char _lb[256]; int _n = snprintf(_lb, sizeof(_lb), __VA_ARGS__); if (_n < 0) _n = 0; else if (_n >= (int)sizeof _lb) _n = (int)sizeof _lb - 1; write(logfd, _lb, _n); fcntl(logfd, F_FULLFSYNC); } } while (0)
     [out appendFormat:@"logfile: %s (fd=%d)\n\n", [lp UTF8String], logfd];
     P005LOG("START p005-probe-v4 A14\n");
 
