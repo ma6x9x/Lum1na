@@ -568,6 +568,62 @@ static void p062_p1_run(void)
         }
     }
 
+    /* the P1 flow (the thread-level STATE port — moved from the tap) */
+    kern_return_t kpr = mach_port_allocate(mach_task_self(),
+                                           MACH_PORT_RIGHT_RECEIVE, (mach_port_t *)&g_excPort);
+    if (kpr != KERN_SUCCESS) {
+        p062_log(@"[-] exc port alloc kr=0x%x — abort", kpr);
+        return;
+    }
+    kpr = mach_port_insert_right(mach_task_self(), g_excPort, g_excPort,
+                                 MACH_MSG_TYPE_MAKE_SEND);
+    if (kpr != KERN_SUCCESS) {
+        p062_log(@"[-] exc port insert send right kr=0x%x — abort", kpr);
+        mach_port_destroy(mach_task_self(), g_excPort);
+        g_excPort = MACH_PORT_NULL;
+        return;
+    }
+
+    pthread_t excTh, wTh;
+    pthread_create(&excTh, NULL, p062_exc_handler_fn, NULL);
+    usleep(50000);
+
+    if (pthread_create(&wTh, NULL, p062_worker_fn, NULL) == 0) {
+        /* Worker sits in brk #0 until the exception reply. Joining it
+         * hangs the TAP (recover stops after handler terminate). */
+        pthread_detach(wTh);
+    }
+
+    for (int i = 0; i < 100 && !g_excReceived; i++)
+        usleep(50000);
+
+    if (g_workerThread != MACH_PORT_NULL) {
+        (void)thread_abort(g_workerThread);
+        (void)thread_terminate(g_workerThread);
+    }
+
+    if (!g_excReceived && g_excPort != MACH_PORT_NULL) {
+        mach_port_destroy(mach_task_self(), g_excPort);
+        g_excPort = MACH_PORT_NULL;
+    }
+    pthread_join(excTh, NULL);
+    p062_log(@"[P1] handler joined; brk worker detached (no pthread_join)");
+
+    p062_log(@"[P1] summary: excReceived=%d neonFlavorSeen=%d count=%u magicMatch=%d/%d",
+             g_excReceived, g_neonFlavorSeen, g_neonCountSeen,
+             g_neonMatchCount, P062_NEON_QWORDS);
+
+    if (g_workerThread != MACH_PORT_NULL) {
+        mach_port_deallocate(mach_task_self(), g_workerThread);
+        g_workerThread = MACH_PORT_NULL;
+    }
+    if (g_excPort != MACH_PORT_NULL) {
+        mach_port_destroy(mach_task_self(), g_excPort);
+        g_excPort = MACH_PORT_NULL;
+    }
+}
+
+/* ─────────────────── v4 PHASE A: the RPC matrix ───────────────────
    The 1540 P044 READ-FAIL receipts + the P1 reply failure: the whole
    thread-state RPC family returned MIG_BAD_ARGUMENTS (0x10000003) on 23F77.
    This matrix isolates WHERE: suspend vs get, running vs suspended,
@@ -802,61 +858,7 @@ static void p062_phaseB(void)
                  ARM_NEON_STATE64, (unsigned)ARM_NEON_STATE64_COUNT,
                  sizeof(arm_neon_state64_t));
 
-    kern_return_t kpr = mach_port_allocate(mach_task_self(),
-                                           MACH_PORT_RIGHT_RECEIVE, (mach_port_t *)&g_excPort);
-    if (kpr != KERN_SUCCESS) {
-        p062_log(@"[-] exc port alloc kr=0x%x — abort", kpr);
-        return;
-    }
-        kpr = mach_port_insert_right(mach_task_self(), g_excPort, g_excPort,
-                                     MACH_MSG_TYPE_MAKE_SEND);
-        if (kpr != KERN_SUCCESS) {
-            p062_log(@"[-] exc port insert send right kr=0x%x — abort", kpr);
-            mach_port_destroy(mach_task_self(), g_excPort);
-            g_excPort = MACH_PORT_NULL;
-            p062_close_log();
-            return p062_buf ?: @"";
-        }
-
-        pthread_t excTh, wTh;
-        pthread_create(&excTh, NULL, p062_exc_handler_fn, NULL);
-        usleep(50000);
-
-        if (pthread_create(&wTh, NULL, p062_worker_fn, NULL) == 0) {
-            /* Worker sits in brk #0 until the exception reply. Joining it
-             * hangs the TAP (recover stops after handler terminate). */
-            pthread_detach(wTh);
-        }
-
-        for (int i = 0; i < 100 && !g_excReceived; i++)
-            usleep(50000);
-
-        if (g_workerThread != MACH_PORT_NULL) {
-            (void)thread_abort(g_workerThread);
-            (void)thread_terminate(g_workerThread);
-        }
-
-        if (!g_excReceived && g_excPort != MACH_PORT_NULL) {
-            mach_port_destroy(mach_task_self(), g_excPort);
-            g_excPort = MACH_PORT_NULL;
-        }
-        pthread_join(excTh, NULL);
-        p062_log(@"[P1] handler joined; brk worker detached (no pthread_join)");
-
-        p062_log(@"[P1] summary: excReceived=%d neonFlavorSeen=%d count=%u magicMatch=%d/%d",
-                 g_excReceived, g_neonFlavorSeen, g_neonCountSeen,
-                 g_neonMatchCount, P062_NEON_QWORDS);
-
-        if (g_workerThread != MACH_PORT_NULL) {
-            mach_port_deallocate(mach_task_self(), g_workerThread);
-            g_workerThread = MACH_PORT_NULL;
-        }
-        if (g_excPort != MACH_PORT_NULL) {
-            mach_port_destroy(mach_task_self(), g_excPort);
-            g_excPort = MACH_PORT_NULL;
-        }
-
-        /* v5 order: the value phases FIRST (A/B never ran on device — the
+    /* v5 order: the value phases FIRST (A/B never ran on device — the
            app died at P1 before them); P1 last and opt-in (proven x3, and
            its brk is app-fatal while unconsumed). */
         p062_phaseA();
