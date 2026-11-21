@@ -8,8 +8,11 @@
 //  opainject launchdhook -> dpkg -i Sileo then Zebra -> jbctl respring.
 //
 //  Honesty contract (AGENTS.md): everything below the gate fires ONLY on
-//  a passing self-test (kread32(kbase)==MH_MAGIC_64 and kbase+0x1c is a
-//  kernel VA). There is no simulated path. HOLD means HOLD.
+//  a passing self-test — the CODED gate (Lum1naAfterKread.m:747-803) is the
+//  stronger magic+cputype+typeinfo triple: kread32(kbase)==MH_MAGIC_64,
+//  the cputype matches, and kbase+8 is the kernel typeinfo. There is no
+//  simulated path. HOLD means HOLD. (The old "kbase+0x1c is a kernel VA"
+//  phrasing was the stale pre-typeinfo gate — audit F-1, 2026-11-22.)
 //  Post-respring state is detected from the filesystem: a jbroot dpkg
 //  binary and Sileo/Zebra app bundles either exist or they do not.
 //
