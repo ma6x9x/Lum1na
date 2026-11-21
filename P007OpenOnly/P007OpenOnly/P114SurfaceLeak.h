@@ -32,6 +32,15 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface P114SurfaceLeak : NSObject
 + (NSString *)tap;   // returns the log body
+
+/* 2026-11-22 the READBACK (the P130->P114 pair): the sel-8 activity-dump
+   cycle as a callable — the 3072-write lane's observation step. Opens its
+   own M2Scaler connection, banks its own 1000 distinct surfaces (the v5
+   contract), creates the queue, runs 2 captures, parses up to max raw
+   rec+0x18 values into kvas (kernel-range only, board-recorded). Read-only;
+   returns YES if any capture completed. */
++ (BOOL)diagReadback:(uint64_t *)kvas outN:(int *)outN max:(int)max
+             logLine:(void (^)(NSString *line))lg;
 @end
 
 NS_ASSUME_NONNULL_END

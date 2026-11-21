@@ -34,7 +34,8 @@
 #import <pthread.h>
 #import <sys/socket.h>
 #import <sys/errno.h>
-#import <IOKit/IOKitLib.h>   /* the v2 pre-stage property path: io_service_t/IOObjectRelease/kIOReturnSuccess (CI-2625 fix — the Mac SDK resolved these locally, the device SDK does not without the import) */
+#import <IOKit/IOKitLib.h>
+#import "P114SurfaceLeak.h"   /* v3: the readback pair */   /* the v2 pre-stage property path: io_service_t/IOObjectRelease/kIOReturnSuccess (CI-2625 fix — the Mac SDK resolved these locally, the device SDK does not without the import) */
 #import <stdatomic.h>
 #import <stdint.h>
 #import <stdio.h>
@@ -286,11 +287,58 @@ static void p130_bandit(const char *outcome) {
     unsigned long c0 = atomic_load(&ga_commits), r0 = atomic_load(&ga_rounds);
     atomic_store(&g_stop, 0);
     pthread_t ta;
+    /* v3 (2026-11-22) — the READBACK PAIR (the P130->P114 door): the M2Scaler
+       diag reader mirrors the 3072 neighborhood state (the ring writer
+       0xfffffff008a01360's events serialize with the raw rec+0x18
+       passthrough). PRE baseline here, POST read after the engine joins —
+       the diff = the receipt (a new/weird KVA surfacing through the event
+       channel = the corrupted root-map entry). Read-only, PANIC-FREE. */
+    static uint64_t p130_pre[64]; static int p130_pre_n = 0;
+    {
+        NSMutableString *rl = [NSMutableString string];
+        BOOL ok = [P114SurfaceLeak diagReadback:p130_pre outN:&p130_pre_n max:64
+                                         logLine:^(NSString *l) { L(l); }];
+        Lf(@"[v3-PRE] the readback baseline: %@ (%d kvas)",
+           ok ? @"captured" : @"no-readback (honest — the lane proceeds blind)",
+           p130_pre_n);
+        (void)rl;
+    }
     pthread_create(&ta, NULL, p130_fencer, NULL);
     /* thread B: the landing engine, serialized to one call */
     NSString *p073log = [P073AneSecondTable tap];
     atomic_store(&g_stop, 1);
     pthread_join(ta, NULL);
+
+    /* v3-POST: the readback after the write — the diff vs the baseline */
+    {
+        static uint64_t post[64]; static int post_n = 0;
+        BOOL ok = [P114SurfaceLeak diagReadback:post outN:&post_n max:64
+                                         logLine:^(NSString *l) { L(l); }];
+        Lf(@"[v3-POST] the readback after the write: %@ (%d kvas)",
+           ok ? @"captured" : @"no-readback (honest)", post_n);
+        int fresh = 0, gone = 0;
+        for (int i = 0; i < post_n; i++) {
+            BOOL seen = NO;
+            for (int j = 0; j < p130_pre_n; j++)
+                if (post[i] == p130_pre[j]) { seen = YES; break; }
+            if (!seen) {
+                fresh++;
+                Lf(@"[v3-DIFF] NEW kva[%d]=0x%016llx (post-write — the event "
+                   @"channel surfaced it: the receipt)", i,
+                   (unsigned long long)post[i]);
+            }
+        }
+        for (int j = 0; j < p130_pre_n; j++) {
+            BOOL still = NO;
+            for (int i = 0; i < post_n; i++)
+                if (p130_pre[j] == post[i]) { still = YES; break; }
+            if (!still) gone++;
+        }
+        Lf(@"[v3-DIFF] fresh=%d gone=%d same=%d — any fresh kva = the 3072 "
+           @"neighborhood's post-write state (the write's receipt channel; "
+           @"not kread, not hasKread — the observation step)",
+           fresh, gone, post_n - fresh);
+    }
     unsigned long c1 = atomic_load(&ga_commits), r1 = atomic_load(&ga_rounds);
     Lf(@"  engine done; fence churn during it: commits=%lu rounds=%lu "
        @"recycles=%lu fails=%lu survived=YES in-tap",
