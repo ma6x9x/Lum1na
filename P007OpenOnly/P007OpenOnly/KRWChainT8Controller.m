@@ -198,6 +198,12 @@ static void *t8_closer(void *arg) {
     NSMutableString *out = [NSMutableString string];
     NSString *docs = [NSSearchPathForDirectoriesInDomains(
         NSDocumentDirectory, NSUserDomainMask, YES) firstObject] ?: @"";
+    /* ARC's jump law: the STEP-2 HOLD gotos jump forward to the tail label,
+       so every ObjC pointer must be declared HERE with a constant (nil)
+       initializer — a non-constant strong init in the jumped-over span is
+       "cannot jump from this goto statement to its label" (the CI receipt). */
+    NSFileManager *fm = nil;
+    NSString *bp = nil;
     t8_logfd = open([docs stringByAppendingPathComponent:
                      @"t8_necp_reclaim_log.txt"].fileSystemRepresentation,
                     O_CREAT | O_WRONLY | O_TRUNC, 0644);
@@ -265,7 +271,7 @@ static void *t8_closer(void *arg) {
            t8_req_n);
 
     /* STEP 3 — the arm gate */
-    NSFileManager *fm = [NSFileManager defaultManager];
+    fm = [NSFileManager defaultManager];
     BOOL armed = [fm fileExistsAtPath:
                   [docs stringByAppendingPathComponent:@"t8_race_arm.txt"]];
     if (!armed) {
@@ -291,7 +297,7 @@ static void *t8_closer(void *arg) {
     t8_log("      ONE TAP PER FRESH BOOT. The second put fires at the teardown.");
 
     /* STEP 4 — the race */
-    NSString *bp = [docs stringByAppendingPathComponent:@"t8_aio_backing.bin"];
+    bp = [docs stringByAppendingPathComponent:@"t8_aio_backing.bin"];
     t8_file = open(bp.fileSystemRepresentation, O_CREAT | O_RDWR | O_TRUNC, 0644);
     if (t8_file < 0) {
         t8_log("STEP4 backing open FAIL errno=%d — HOLD", errno);
