@@ -64,6 +64,9 @@ enum ArmGate {
         .init(file: "p132_land.txt",
               title: "P132 landing stage",
               note: "presence gate — arms the p073 landing stage inside the P132 chain frame"),
+        .init(file: "t8_race_arm.txt",
+              title: "T8 aio->NECP race stage",
+              note: "presence gate — arms the T8 (krw8) aio close-race + the same-CPU NECP battery (the 192-class reclaim). PANIC-POSSIBLE at the teardown's second put — fresh boot, ONE tap. Unarmed = the PANIC-FREE dry lane"),
     ]
 
     static var documents: String {
