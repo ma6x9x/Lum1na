@@ -2,6 +2,7 @@
 #import "P063AioKqueueLeak.h"
 #include "A14_23F77_LabOffsets.h"
 #import "LabDeviceProfile.h"
+#import "LabLocalTime.h"
 #import <CoreFoundation/CoreFoundation.h>
 #import <dlfcn.h>
 #import <mach/mach.h>
@@ -11405,7 +11406,12 @@ static void aio_v5_apfs_churn(const char *dir, int files) {
     int logfd = open([lp UTF8String], O_CREAT | O_TRUNC | O_WRONLY, 0644);
     #define ALOG(...) do { if (logfd >= 0) { char _lb[320]; int _n = snprintf(_lb, sizeof(_lb), __VA_ARGS__); write(logfd, _lb, _n); fcntl(logfd, F_FULLFSYNC); } } while (0)
     [out appendFormat:@"logfile: %s (fd=%d)\n", [lp UTF8String], logfd];
-    ALOG("START aio-uaf-v4c\n");
+    /* 2026-11-21 the banner law (the user's receipt: "doesn't show ident and
+       date"): every aio_uaf_log.txt must carry the session stamp + the SKU —
+       the 01:29 panic decode needed the boot provenance and the log had none. */
+    ALOG("=== aio-uaf session %s BUILD aio-uaf-v5b ===\n%s\n",
+         [LabLocalMilitaryNow() UTF8String] ?: "?",
+         [LabDeviceProfile identBlock].UTF8String ?: "");
 
     v4_pin(7);
 
