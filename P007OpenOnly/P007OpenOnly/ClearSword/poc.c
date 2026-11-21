@@ -56,8 +56,26 @@ kern_return_t pe_init(void) {
         free(executable_path);
     }
 
+    /* 2026-11-21 the crash-trio fix (P007OpenOnly-2026-11-20-2057/2100/2105.ips:
+       physical_oob_read_mo SIGSEGV at 0x18/0x30 = g_ctx.shared NULL — the field
+       offsets target_object_sync(+0x18)/race_sync(+0x30) match exactly). Root
+       cause: a prior cs2 run's leaked footprint (22528 sockets + mlocked scans)
+       exhausts the process, this calloc returns NULL, and pe() ignored the
+       return so pe_v1 proceeded into the NULL derefs. Three fixes:
+       (a) check the calloc here; (b) pe() checks pe_init's return; (c) the
+       oob read/write guard shared at entry (defense in depth). */
     g_ctx.shared = calloc(1, sizeof(free_thread_shared_t));
-    pthread_create(&g_ctx.free_thread, NULL, free_thread_worker, g_ctx.shared);
+    if (g_ctx.shared == NULL) {
+        LOG_ERR("pe_init: shared calloc FAILED (memory pressure — a prior run's "
+                "footprint is still held; force-quit and re-tap fresh)");
+        return KERN_FAILURE;
+    }
+    if (pthread_create(&g_ctx.free_thread, NULL, free_thread_worker, g_ctx.shared) != 0) {
+        LOG_ERR("pe_init: free_thread create FAILED");
+        free(g_ctx.shared);
+        g_ctx.shared = NULL;
+        return KERN_FAILURE;
+    }
     g_ctx.free_thread_started = true;
 
     LOG("free_thread_shared: %p", g_ctx.shared);
@@ -264,7 +282,11 @@ kern_return_t pe(void) {
     LOG("running pe_v1 (%s pins: inpcb.socket=0x%x icmp6filt=0x%x usecount=0x%x)",
         LabOff()->tag, LUMINA_INPCB_SOCKET, LUMINA_INPCB_ICMP6FILT, LUMINA_SOCKET_USECOUNT);
     LOG("cluster_*_contig EINVAL unless UPL_PHYS_CONTIG (26.1). Q0!=marker is NOT kread.");
-    pe_init();
+    if (pe_init() != KERN_SUCCESS) {
+        /* the 2026-11-21 fix: pe() previously DISCARDED pe_init's return —
+           a NULL shared sailed straight into pe_v1's NULL derefs */
+        return KERN_FAILURE;
+    }
     // V25.4: single pe_v1() call site (moved below, with bounded teardown)
 
     // V25.4: bounded — no unbounded loops left behind on any exit
@@ -273,8 +295,10 @@ kern_return_t pe(void) {
         // teardown for the non-taken path is handled inside pe()'s failure
         // branch and above; free_thread only leaks if pe_v1 bailed without
         // reaching pe()'s verdict — stop it here too.
-        atomic_store_explicit(&g_ctx.shared->go_sync, 0, memory_order_seq_cst);
-        pthread_join(g_ctx.free_thread, NULL);
+        if (g_ctx.shared != NULL) {
+            atomic_store_explicit(&g_ctx.shared->go_sync, 0, memory_order_seq_cst);
+            pthread_join(g_ctx.free_thread, NULL);
+        }
         return pe_v1_ret;
     }
 

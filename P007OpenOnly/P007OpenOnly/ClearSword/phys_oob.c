@@ -32,6 +32,13 @@ void initialize_physical_read_write(mach_vm_size_t contiguous_mapping_size) {
 }
 
 kern_return_t physical_oob_read_mo(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t size, uint64_t offset, uint8_t* buffer) {
+    /* 2026-11-21 defense in depth (the crash-trio receipt): never deref a
+       NULL shared — HOLD with a receipt instead of SIGSEGV at +0x18/+0x30 */
+    if (g_ctx.shared == NULL) {
+        LOG_ERR("physical_oob_read_mo: g_ctx.shared NULL (setup incomplete — "
+                "force-quit and re-tap fresh)");
+        return KERN_FAILURE;
+    }
     atomic_store_explicit(&g_ctx.shared->target_object_sync, mo, memory_order_seq_cst);
     atomic_store_explicit(&g_ctx.shared->target_object_offset_sync, mo_offset, memory_order_seq_cst);
 
@@ -106,6 +113,10 @@ void physical_oob_read_mo_with_retry(mach_port_t memory_object, mach_vm_offset_t
 }
 
 void physical_oob_write_mo(mach_port_t mo, mach_vm_offset_t mo_offset, uint64_t size, uint64_t offset, uint8_t* buffer) {
+    if (g_ctx.shared == NULL) {   /* the crash-trio guard (see read_mo) */
+        LOG_ERR("physical_oob_write_mo: g_ctx.shared NULL (setup incomplete)");
+        return;
+    }
     atomic_store_explicit(&g_ctx.shared->target_object_sync, mo, memory_order_seq_cst);
     atomic_store_explicit(&g_ctx.shared->target_object_offset_sync, mo_offset, memory_order_seq_cst);
 
