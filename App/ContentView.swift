@@ -2,36 +2,23 @@
 //  ContentView.swift
 //  Lum1na
 //
+//  Entry hosts the v2 TabView shell. Legacy Dummy RootView remains in-tree
+//  but is no longer the primary chrome. Knob editor + Settings live inside V2.
+//
 
 import SwiftUI
 
 struct ContentView: View {
-    @State private var showTerminal = false
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            RootView()
-            Button {
-                showTerminal = true
-            } label: {
-                Image(systemName: "terminal")
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.75))
-                    .frame(width: 40, height: 40)
-                    .background(Circle().fill(Color(.systemGray5).opacity(0.8)))
-            }
-            .buttonStyle(.plain)
-            .padding(.trailing, 14)
-            .padding(.bottom, 16)
-            .accessibilityLabel("Terminal")
-        }
-        .fullScreenCover(isPresented: $showTerminal) { MainTerminalPane() }
+        LuminaRootView()
     }
 }
+
+// MARK: - Legacy sheets kept for any residual call sites / previews
 
 struct AllExploitsSheet: View {
     @ObservedObject var viewModel: ExploitManager
     @Environment(\.dismiss) var dismiss
-    // v3 knob editor: long-press any row to set that test's input value.
     @State private var knobEntryId: String?
     @State private var knobEntryName = ""
     @State private var knobText = ""
@@ -68,35 +55,23 @@ struct AllExploitsSheet: View {
                     ForEach(ExploitManager.catalog) { entry in
                         Button {
                             dismiss()
-                            Task {
-                                await viewModel.executeExploit(entry)
-                            }
+                            Task { await viewModel.executeExploit(entry) }
                         } label: {
                             HStack {
                                 Image(systemName: entry.stage.icon)
                                     .foregroundColor(entry.stage.color)
                                     .frame(width: 24)
-
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(entry.name)
                                         .font(.system(.subheadline, weight: .semibold))
                                         .foregroundColor(.primary)
-
                                     Text(entry.description)
                                         .font(.system(.caption, design: .rounded))
                                         .foregroundColor(.secondary)
                                 }
-
                                 Spacer()
-
-                                if viewModel.isRunning &&
-                                    viewModel.selectedStage == entry.stage {
-                                    ProgressView()
-                                        .scaleEffect(0.7)
-                                } else {
-                                    Image(systemName: "play.circle")
-                                        .foregroundColor(entry.stage.color.opacity(0.7))
-                                }
+                                Image(systemName: "play.circle")
+                                    .foregroundColor(entry.stage.color.opacity(0.7))
                             }
                         }
                         .disabled(viewModel.isRunning)
@@ -111,10 +86,6 @@ struct AllExploitsSheet: View {
                             }
                         }
                     }
-                }
-
-                Section(footer: Text("Every invoke writes a durable TAP marker before running. After a crash, the recovery transcript shows exactly which entry was last attempted.")) {
-                    EmptyView()
                 }
             }
             .navigationTitle("All Exploits")
@@ -194,31 +165,9 @@ struct SettingsSheet: View {
                         value: PersistentLogStore.shared.lastTapId() ?? "none")
                     LabeledContent("SKU", value: LabDeviceProfile.skuName() as String? ?? "?")
                     Button {
-                        if let ident = ExploitManager.catalog.first(where: { $0.id == "ident" }) {
-                            dismiss()
-                            Task { await viewModel.executeExploit(ident) }
-                        }
-                    } label: {
-                        Label("Run Ident", systemImage: "person.crop.rectangle")
-                    }
-                    Button {
                         UIPasteboard.general.string = LabDeviceProfile.identBlock()
                     } label: {
                         Label("Copy Ident Block", systemImage: "doc.on.doc")
-                    }
-                    Button {
-                        UIPasteboard.general.string =
-                            PersistentLogStore.shared.readTapLog() ?? ""
-                    } label: {
-                        Label("Copy TAP Log (p011)", systemImage: "hand.tap")
-                    }
-                    Button {
-                        dismiss()
-                        viewModel.log("=== peek session (in-app SwiftPeek twin) ===")
-                        PeekInspector.dump { viewModel.log($0) }
-                        viewModel.log("=== peek done ===")
-                    } label: {
-                        Label("Peek UI Tree", systemImage: "sparkle.magnifyingglass")
                     }
                     Button {
                         UIPasteboard.general.string = viewModel.exportFullDebugLog()
@@ -234,46 +183,13 @@ struct SettingsSheet: View {
                     LabeledContent("Board leaks", value: boardLeakLabel())
                 }
 
-                Section(header: Text("RECOVERY LOG"),
-                        footer: Text("Recovery packet is the previous session (board + last console session + TAP markers), captured at launch. Console Copy is this session only. Full Disk is everything.")) {
-                    Button {
-                        let packet = viewModel.lastRecoveryTranscript.isEmpty
-                            ? PersistentLogStore.shared.captureRecoveryPacket(
-                                boardJSON: Lum1naBoard.shared().jsonDump(),
-                                sku: LabDeviceProfile.skuName() as String? ?? "?",
-                                unclean: false,
-                                previousSession: true)
-                            : viewModel.lastRecoveryTranscript
-                        UIPasteboard.general.string = packet
-                    } label: {
-                        Label("Copy Recovery Packet",
-                              systemImage: "clock.arrow.circlepath")
-                    }
-
-                    Button {
-                        UIPasteboard.general.string =
-                            PersistentLogStore.shared.readAll() ?? ""
-                    } label: {
-                        Label("Copy Full Disk Log", systemImage: "doc.text")
-                    }
-
-                    Button {
-                        showHour = true
-                    } label: {
+                Section(header: Text("RECOVERY LOG")) {
+                    Button { showHour = true } label: {
                         Label("Logs from the last hour", systemImage: "clock")
-                    }
-
-                    Button {
-                        PersistentLogStore.shared.clear()
-                    } label: {
-                        Label("Clear Disk Logs", systemImage: "trash")
-                            .foregroundColor(.red)
                     }
                 }
             }
-            .sheet(isPresented: $showHour) {
-                HourLogGallery()
-            }
+            .sheet(isPresented: $showHour) { HourLogGallery() }
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
