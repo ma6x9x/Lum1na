@@ -157,6 +157,7 @@ enum LuminaTAP {
         case "p175":        result = P175KamuiCensus.tap()
         case "p177":        result = P177RaceConductor.tap()
         case "p179":        result = P179NecpFlowSpray.tap()
+        case "p180":        result = P180NeonStackAlias.tap()
         case "t8":          result = KRWChainT8Controller.tap()
         case "p173":        result = P173KamuiEscape.tap()
         case "p154":        result = P154IOSurfaceF1Gate.tap()
