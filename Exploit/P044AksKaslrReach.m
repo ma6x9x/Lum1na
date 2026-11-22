@@ -2099,8 +2099,8 @@ static void *watch_worker(void *arg) {
         }
         [out appendFormat:@"  [NEON-v81] %@: live=%d iters=%llu diffs=%llu — %@\n",
             tag, live, (unsigned long long)it, (unsigned long long)df,
-            df ? "CANARY HIT (a restored NEON state differs from canonical — the save-buffer write receipt)" :
-                 "clean (the channel works; no corruption this window)"];
+            df ? @"CANARY HIT (a restored NEON state differs from canonical — the save-buffer write receipt)" :
+                 @"clean (the channel works; no corruption this window)"];
         if (df) {
             for (int k = 0; k < NEON_WITNESS_COUNT; k++) {
                 if (g_witness[k].diffs) {

