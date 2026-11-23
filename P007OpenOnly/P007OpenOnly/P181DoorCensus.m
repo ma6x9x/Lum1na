@@ -225,6 +225,13 @@ static void p181_bundle_roots(void) {
         "/System/Applications",
     };
     for (size_t r = 0; r < sizeof roots / sizeof roots[0]; r++) {
+        /* the ROOT'S OWN service containers FIRST — /System/Library/CoreServices
+           itself carries an XPCServices dir (the 2026-11-23 catch), and probing
+           only each entry's subdirs missed it entirely */
+        p181_probe_dir(roots[r], "XPCServices");
+        p181_probe_dir(roots[r], "PlugIns");
+        p181_probe_dir(roots[r], "Extensions");
+        p181_probe_dir(roots[r], "Drivers");
         DIR *d = opendir(roots[r]);
         if (!d) continue;
         struct dirent *e;
