@@ -552,16 +552,20 @@ enum MachOInspector {
     /// device's private data and are NOT reported.
     static func entitlementKeys(_ data: Data) -> [String] {
         guard data.count > 8 else { return [] }
-        let magicLE: (UInt8, UInt8, UInt8, UInt8) = (0x71, 0x71, 0xDE, 0xFA)   // 0xfade7171 LE
+        // 2026-11-23 law: the entitlement blob magic is BIG-ENDIAN in the file
+        // (fa de 71 71) — the old LE tuple (71 71 de fa) matched NOTHING, which
+        // is why every piggy scan returned zero keys. Proven against
+        // /usr/libexec/runningboardd (40 keys parse). Length is BE too.
+        let magicBE: (UInt8, UInt8, UInt8, UInt8) = (0xFA, 0xDE, 0x71, 0x71)
         var keys: [String] = []
         data.withUnsafeBytes { raw in
             guard let base = raw.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return }
             let n = data.count
             for i in 0..<(n - 8) {
-                if base[i] == magicLE.0 && base[i+1] == magicLE.1 &&
-                   base[i+2] == magicLE.2 && base[i+3] == magicLE.3 {
-                    let len = UInt32(base[i+4]) | (UInt32(base[i+5]) << 8) |
-                              (UInt32(base[i+6]) << 16) | (UInt32(base[i+7]) << 24)
+                if base[i] == magicBE.0 && base[i+1] == magicBE.1 &&
+                   base[i+2] == magicBE.2 && base[i+3] == magicBE.3 {
+                    let len = (UInt32(base[i+4]) << 24) | (UInt32(base[i+5]) << 16) |
+                              (UInt32(base[i+6]) << 8) | UInt32(base[i+7])
                     guard len > 8, Int(len) <= n - i else { continue }
                     let xml = data.subdata(in: (i + 8)..<(i + Int(len)))
                     if let plist = try? PropertyListSerialization.propertyList(

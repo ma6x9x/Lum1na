@@ -51,7 +51,7 @@
 #import <sys/stat.h>
 #import <unistd.h>
 
-#define P181_BUILD @"p181-door-census-v1"
+#define P181_BUILD @"p181-door-census-v2-beblob"
 
 /* bootstrap API (declared locally — no <servers/bootstrap.h> on iOS) */
 extern mach_port_t bootstrap_port;
@@ -69,12 +69,21 @@ extern kern_return_t bootstrap_look_up(mach_port_t bp, char *name,
 #define P181_STR_TOTAL     32768
 
 static NSMutableArray<NSDictionary *> *g_p181_hosts = nil;
+static NSMutableSet<NSString *> *g_p181_seen = nil;
 static int g_p181_walkDirs = 0, g_p181_bundles = 0;
 
 /* ── host row helpers ── */
 static void p181_add_host(NSString *src, NSString *plist, NSString *label,
                           NSString *program, NSArray<NSString *> *mach) {
     if (!g_p181_hosts) g_p181_hosts = [NSMutableArray array];
+    /* dedup by plist path (or label when plistless): the roots pass and the
+       general walk reach the same bundles — one row each (the v1 double-count
+       risk). g_p181_seen is reset at the top of every tap. */
+    if (!g_p181_seen) g_p181_seen = [NSMutableSet set];
+    NSString *key = ([plist length] > 0) ? plist
+        : [NSString stringWithFormat:@"%@|%@", label ?: @"?", program ?: @""];
+    if ([g_p181_seen containsObject:key]) return;
+    [g_p181_seen addObject:key];
     if (g_p181_hosts.count >= P181_MAX_BUNDLES * 4) return;
     if ([mach count] > P181_MAX_MACH_HOST)
         mach = [mach subarrayWithRange:NSMakeRange(0, P181_MAX_MACH_HOST)];
@@ -119,6 +128,122 @@ static int p181_suffix_is(const char *nm, size_t n, const char *suf,
     return n > sufLen && !strcmp(nm + n - sufLen, suf);
 }
 
+/* the bundle-name set (v2: + .app and .bundle — SpringBoard.app/PlugIns and
+   CoreServices powerd.bundle are real hosts; powerd's binary sits at the
+   bundle ROOT, not Contents/MacOS — the exe finder handles both shapes). */
+static int p181_is_bundle_name(const char *nm) {
+    size_t n = strlen(nm);
+    return p181_suffix_is(nm, n, ".xpc", 4) ||
+           p181_suffix_is(nm, n, ".app", 4) ||
+           p181_suffix_is(nm, n, ".dext", 5) ||
+           p181_suffix_is(nm, n, ".appex", 6) ||
+           p181_suffix_is(nm, n, ".agent", 6) ||
+           p181_suffix_is(nm, n, ".bundle", 7) ||
+           p181_suffix_is(nm, n, ".exilet", 7);
+}
+
+/* the bundle executable: Contents/MacOS/<exe>, the bundle ROOT (<bp>/<exe>
+   — the powerd.bundle law), then the first non-dot entry of either dir. */
+static NSString *p181_find_exe(NSString *bp, NSDictionary *pl) {
+    NSString *exe = pl[@"CFBundleExecutable"];
+    if (![exe isKindOfClass:[NSString class]] || [exe length] == 0)
+        exe = [bp.lastPathComponent stringByDeletingPathExtension];
+    NSMutableArray *cands = [NSMutableArray array];
+    if ([exe length] > 0) {
+        [cands addObject:[bp stringByAppendingPathComponent:
+            [NSString stringWithFormat:@"Contents/MacOS/%@", exe]]];
+        [cands addObject:[bp stringByAppendingPathComponent:exe]];
+    }
+    NSArray *dirs = @[[bp stringByAppendingPathComponent:@"Contents/MacOS"], bp];
+    for (NSString *d in dirs) {
+        DIR *m = opendir(d.fileSystemRepresentation);
+        if (!m) continue;
+        struct dirent *me;
+        while ((me = readdir(m)) != NULL) {
+            if (me->d_name[0] == '.') continue;
+            [cands addObject:[d stringByAppendingPathComponent:
+                [NSString stringWithUTF8String:me->d_name]]];
+            break;   /* first non-dot entry is the fallback */
+        }
+        closedir(m);
+    }
+    for (NSString *c in cands) {
+        struct stat st;
+        if (stat(c.fileSystemRepresentation, &st) == 0 &&
+            st.st_size > 64 && !S_ISDIR(st.st_mode))
+            return c;
+    }
+    return @"";
+}
+
+static void p181_ingest_bundle(NSString *bp, NSString *src) {
+    if (g_p181_bundles > P181_MAX_BUNDLES) return;
+    g_p181_bundles++;
+    NSString *info = [bp stringByAppendingPathComponent:@"Contents/Info.plist"];
+    NSDictionary *pl = p181_load_plist(info);
+    if (!pl) {
+        p181_add_host(src, bp, bp.lastPathComponent, @"", @[]);
+        return;
+    }
+    NSString *label = pl[@"CFBundleIdentifier"] ?: pl[@"Label"]
+        ?: bp.lastPathComponent;
+    NSDictionary *ms = pl[@"MachServices"];
+    NSArray *mach = [ms isKindOfClass:[NSDictionary class]]
+        ? [[ms allKeys] sortedArrayUsingSelector:@selector(compare:)] : @[];
+    p181_add_host(src, info, label, p181_find_exe(bp, pl), mach);
+}
+
+/* THE ROOTS PRE-PASS (the v1 failure: the depth-first walk burned the whole
+   30001-dir budget inside the first framework resource trees and reached
+   only 3 appex bundles). Enumerate the KNOWN service-container dirs
+   directly first — coverage can never be starved by resource noise. */
+static void p181_probe_dir(const char *dir, const char *sub) {
+    char path[1024];
+    snprintf(path, sizeof path, "%s/%s", dir, sub);
+    DIR *d = opendir(path);
+    if (!d) return;
+    struct dirent *e;
+    while ((e = readdir(d)) != NULL) {
+        if (e->d_name[0] == '.') continue;
+        if (!p181_is_bundle_name(e->d_name)) continue;
+        char full[1024];
+        snprintf(full, sizeof full, "%s/%s", path, e->d_name);
+        p181_ingest_bundle([NSString stringWithUTF8String:full], @"roots");
+    }
+    closedir(d);
+}
+
+static void p181_bundle_roots(void) {
+    static const char *roots[] = {
+        "/System/Library/Frameworks",
+        "/System/Library/PrivateFrameworks",
+        "/System/Library/CoreServices",
+        "/System/Library/ExtensionKit/Extensions",
+        "/System/Library/XPCServices",
+        "/System/Library/Extensions",
+        "/System/Library/DriverKit",
+        "/System/Applications",
+    };
+    for (size_t r = 0; r < sizeof roots / sizeof roots[0]; r++) {
+        DIR *d = opendir(roots[r]);
+        if (!d) continue;
+        struct dirent *e;
+        while ((e = readdir(d)) != NULL) {
+            if (e->d_name[0] == '.') continue;
+            char ep[1024];
+            snprintf(ep, sizeof ep, "%s/%s", roots[r], e->d_name);
+            if (p181_is_bundle_name(e->d_name))
+                p181_ingest_bundle([NSString stringWithUTF8String:ep], @"roots");
+            /* the nested service containers */
+            p181_probe_dir(ep, "XPCServices");
+            p181_probe_dir(ep, "PlugIns");
+            p181_probe_dir(ep, "Extensions");
+            p181_probe_dir(ep, "Drivers");
+        }
+        closedir(d);
+    }
+}
+
 static void p181_walk(const char *dir, int depth) {
     if (depth > 7 || g_p181_walkDirs > P181_MAX_DIRS ||
         g_p181_bundles > P181_MAX_BUNDLES)
@@ -131,58 +256,20 @@ static void p181_walk(const char *dir, int depth) {
         const char *nm = e->d_name;
         if (nm[0] == '.') continue;
         size_t n = strlen(nm);
-        int bundle = p181_suffix_is(nm, n, ".xpc", 4) ||
-                     p181_suffix_is(nm, n, ".dext", 5) ||
-                     p181_suffix_is(nm, n, ".appex", 6) ||
-                     p181_suffix_is(nm, n, ".agent", 6) ||
-                     p181_suffix_is(nm, n, ".exilet", 7);
+        /* resource noise — do not spend the dir budget on .lproj/.nib/.storyboardc
+           trees (the v1 starvation cause: 30001 dirs burned before any
+           XPCServices dir was reached) */
+        if (p181_suffix_is(nm, n, ".lproj", 6) ||
+            p181_suffix_is(nm, n, ".nib", 4) ||
+            p181_suffix_is(nm, n, ".storyboardc", 11))
+            continue;
         char full[1024];
         snprintf(full, sizeof full, "%s/%s", dir, nm);
         struct stat st;
         if (stat(full, &st) != 0) continue;
         if (!S_ISDIR(st.st_mode)) continue;
-        if (bundle) {
-            g_p181_bundles++;
-            NSString *bp = [NSString stringWithUTF8String:full];
-            NSString *info = [bp stringByAppendingPathComponent:
-                              @"Contents/Info.plist"];
-            NSDictionary *pl = p181_load_plist(info);
-            if (pl) {
-                NSString *label = pl[@"CFBundleIdentifier"]
-                    ?: pl[@"Label"] ?: bp.lastPathComponent;
-                NSString *exe = pl[@"CFBundleExecutable"] ?: @"";
-                NSString *prog = @"";
-                if ([exe length] > 0) {
-                    NSString *md = [bp stringByAppendingPathComponent:
-                                    @"Contents/MacOS"];
-                    NSString *cand = [md stringByAppendingPathComponent:exe];
-                    struct stat cst;
-                    if (stat(cand.fileSystemRepresentation, &cst) == 0)
-                        prog = cand;
-                    else {
-                        /* first entry in MacOS as the fallback */
-                        DIR *m = opendir(md.fileSystemRepresentation);
-                        if (m) {
-                            struct dirent *me;
-                            while ((me = readdir(m)) != NULL) {
-                                if (me->d_name[0] == '.') continue;
-                                prog = [md stringByAppendingPathComponent:
-                                        [NSString stringWithUTF8String:
-                                         me->d_name]];
-                                break;
-                            }
-                            closedir(m);
-                        }
-                    }
-                }
-                NSDictionary *ms = pl[@"MachServices"];
-                NSArray *mach = [ms isKindOfClass:[NSDictionary class]]
-                    ? [[ms allKeys] sortedArrayUsingSelector:
-                       @selector(compare:)] : @[];
-                p181_add_host(@"walk", info, label, prog, mach);
-            } else {
-                p181_add_host(@"walk", bp, bp.lastPathComponent, @"", @[]);
-            }
+        if (p181_is_bundle_name(nm)) {
+            p181_ingest_bundle([NSString stringWithUTF8String:full], @"walk");
             continue;   /* do not descend into bundles */
         }
         p181_walk(full, depth + 1);
@@ -190,11 +277,22 @@ static void p181_walk(const char *dir, int depth) {
     closedir(d);
 }
 
-/* ── entitlement KEYS from the code-signature blob (0xfade7171, tail window) ──
-   Returns nil = unreadable/outside-window; @[] = readable, no blob/keys. */
+/* ── entitlement KEYS from the code-signature blob (0xfade7171, tail window).
+   v2 (2026-11-23, the v1 zero-keys receipt): the blob magic AND length are
+   BIG-ENDIAN in the file — fa de 71 71 / len BE — proven against
+   /usr/libexec/runningboardd on the Mac (40 keys parse cleanly). The v1 scan
+   used the REVERSED tuple (71 71 de fa) and matched nothing; the same LE-tuple
+   bug lived in the rig MachOInspector.entitlementKeys (fixed the same day).
+   Two more v1 bugs fixed here: the bound (i+8+len>n) skipped blobs ending
+   exactly at EOF — the blob is {magic 4B, len 4B, payload} with len counting
+   the whole blob, so the bound is i+len<=n; and DER-only binaries (no XML
+   blob) are now probed (fa de 8c 01) and reported as der-only — keys not
+   parseable in-app, presence is the honest receipt.
+   Returns nil = unreadable; @[] = readable, no XML blob/keys. */
 static NSArray<NSString *> *p181_entitle_keys(NSString *bin,
-                                              int *blobOutside) {
+                                              int *blobOutside, int *derOnly) {
     if (blobOutside) *blobOutside = 0;
+    if (derOnly) *derOnly = 0;
     const char *cpath = bin.fileSystemRepresentation;
     FILE *f = fopen(cpath, "rb");
     if (!f) return nil;
@@ -212,10 +310,11 @@ static NSArray<NSString *> *p181_entitle_keys(NSString *bin,
     const uint8_t *b = (const uint8_t *)data.bytes;
     NSUInteger n = got;
     for (NSUInteger i = 0; i + 12 <= n; i++) {
-        if (b[i] == 0x71 && b[i+1] == 0x71 && b[i+2] == 0xde && b[i+3] == 0xfa) {
-            uint32_t len = (uint32_t)b[i+4] | ((uint32_t)b[i+5] << 8) |
-                           ((uint32_t)b[i+6] << 16) | ((uint32_t)b[i+7] << 24);
-            if (len <= 8 || (uint64_t)i + 8 + len > n) continue;
+        /* 0xfade7171 stored BIG-ENDIAN: fa de 71 71 */
+        if (b[i] == 0xfa && b[i+1] == 0xde && b[i+2] == 0x71 && b[i+3] == 0x71) {
+            uint32_t len = ((uint32_t)b[i+4] << 24) | ((uint32_t)b[i+5] << 16) |
+                           ((uint32_t)b[i+6] << 8) | (uint32_t)b[i+7];
+            if (len <= 8 || (uint64_t)i + len > (uint64_t)n) continue;
             NSData *xml = [data subdataWithRange:
                            NSMakeRange((NSUInteger)i + 8, (NSUInteger)len - 8)];
             id obj = [NSPropertyListSerialization propertyListWithData:xml
@@ -224,6 +323,14 @@ static NSArray<NSString *> *p181_entitle_keys(NSString *bin,
                 return [((NSDictionary *)obj) allKeys];
             }
             return @[];   /* blob present but not a dict — keys none */
+        }
+    }
+    /* DER-entitlements probe (fa de 8c 01): the binary is signed with DER
+       entitlements and no XML blob — record it, keys stay unparsed. */
+    for (NSUInteger i = 0; i + 8 <= n; i++) {
+        if (b[i] == 0xfa && b[i+1] == 0xde && b[i+2] == 0x8c && b[i+3] == 0x01) {
+            if (derOnly) *derOnly = 1;
+            break;
         }
     }
     if (sz > P181_TAIL_WINDOW && blobOutside) *blobOutside = 1;
@@ -268,6 +375,7 @@ static BOOL p181_interesting(NSString *k) {
     L([LabDeviceProfile identBlock] ?: @"ident=?");
 
     g_p181_hosts = [NSMutableArray array];
+    g_p181_seen = [NSMutableSet set];
     g_p181_walkDirs = 0;
     g_p181_bundles = 0;
 
@@ -314,12 +422,20 @@ static BOOL p181_interesting(NSString *k) {
            dir, n, ingested]);
     }
 
-    /* ── P2: the recursive /System/Library bundle walk ── */
+    /* ── P2: THE ROOTS PRE-PASS (XPCServices/PlugIns/Extensions under every
+       known root — coverage cannot be starved), then the general walk ── */
     L(@"");
-    L(@"=== P2: the /System/Library bundle walk (*.xpc *.appex *.exilet *.dext *.agent) ===");
+    L(@"=== P2: the bundle roots pass + the /System/Library walk ===");
+    p181_bundle_roots();
+    int rootsBundles = g_p181_bundles;
+    L([NSString stringWithFormat:@"[roots] %d bundles ingested from the known "
+       @"service containers (XPCServices/PlugIns/Extensions/Drivers)",
+       rootsBundles]);
     p181_walk("/System/Library", 1);
-    L([NSString stringWithFormat:@"[walk] %d dirs visited, %d bundles ingested "
-       @"(cap %d)", g_p181_walkDirs, g_p181_bundles, P181_MAX_BUNDLES]);
+    L([NSString stringWithFormat:@"[walk] +%d dirs visited, +%d more bundles "
+       @"(cap %d) — the roots pass is the coverage guarantee, the walk only "
+       @"adds strays", g_p181_walkDirs, g_p181_bundles - rootsBundles,
+       P181_MAX_BUNDLES]);
     L([NSString stringWithFormat:@"[hosts] %d total host rows",
        (int)g_p181_hosts.count]);
 
@@ -329,6 +445,7 @@ static BOOL p181_interesting(NSString *k) {
     NSMutableDictionary<NSString *, NSArray<NSString *> *> *entByProg =
         [NSMutableDictionary dictionary];
     int binRead = 0, binKeys = 0, binNone = 0, binOutside = 0, binUnread = 0;
+    int binDer = 0;
     NSMutableSet *progs = [NSMutableSet set];
     for (NSDictionary *h in g_p181_hosts) {
         NSString *p = h[@"program"];
@@ -336,8 +453,8 @@ static BOOL p181_interesting(NSString *k) {
         [progs addObject:p];
     }
     for (NSString *p in progs) {
-        int outside = 0;
-        NSArray *keys = p181_entitle_keys(p, &outside);
+        int outside = 0, der = 0;
+        NSArray *keys = p181_entitle_keys(p, &outside, &der);
         if (!keys) { binUnread++; continue; }
         if (outside) { binOutside++; binUnread++; continue; }
         binRead++;
@@ -347,17 +464,20 @@ static BOOL p181_interesting(NSString *k) {
                             @selector(compare:)];
         } else {
             binNone++;
+            if (der) binDer++;   /* DER-only: signed with entitlements, XML absent */
         }
     }
-    L([NSString stringWithFormat:@"[ent] %d distinct binaries: %d with keys, "
-       @"%d keyless, %d unreadable/outside-tail-window (of %d hosts)",
-       (int)progs.count, binKeys, binNone, binUnread, (int)g_p181_hosts.count]);
+    L([NSString stringWithFormat:@"[ent] %d distinct binaries: %d xml-keys, "
+       @"%d der-only, %d keyless, %d unreadable/outside-tail (of %d hosts)",
+       (int)progs.count, binKeys, binDer, binNone - binDer, binUnread,
+       (int)g_p181_hosts.count]);
 
-    /* attach keys to host rows */
+    /* attach keys + the source tag to host rows */
     for (NSUInteger i = 0; i < g_p181_hosts.count; i++) {
         NSMutableDictionary *h = [g_p181_hosts[i] mutableCopy];
         NSArray *k = entByProg[h[@"program"]];
         h[@"entitleKeys"] = k ?: @[];
+        h[@"entitleSrc"] = ([k count] > 0) ? @"xml" : @"none";
         g_p181_hosts[i] = h;
     }
 
@@ -527,6 +647,9 @@ static BOOL p181_interesting(NSString *k) {
             @"bundles": @(g_p181_bundles),
             @"binaries": @(progs.count),
             @"binKeys": @(binKeys),
+            @"binDerOnly": @(binDer),
+            @"binKeyless": @(binNone - binDer),
+            @"binUnread": @(binUnread),
             @"services": @(lookups),
             @"found": @(found),
             @"doors": @(doors),
