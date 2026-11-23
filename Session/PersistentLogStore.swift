@@ -45,6 +45,7 @@ public final class PersistentLogStore {
         "p177": "p177_conductor_log.txt",
         "p179": "p179_necp_flow_log.txt",
         "p180": "p180_neon_stack_alias_log.txt",
+        "p181": "p181_door_census_log.txt",
         "krw8": "t8_necp_reclaim_log.txt",
         "p175": "p175_kamui_census_log.txt",
         "p176": "p176_f1seed_log.txt",
