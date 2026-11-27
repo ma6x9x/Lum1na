@@ -48,7 +48,7 @@
 #import <sys/syscall.h>
 #import <unistd.h>
 
-#define P184_BUILD @"p184-t8-falsify-v1"
+#define P184_BUILD @"p184-t8-falsify-v2-selfstage"
 
 #ifndef SYS_necp_open
 #define SYS_necp_open 463
@@ -218,6 +218,20 @@ static void *p184_t2_racer(void *arg) {
     close(sfd);
     L(@"[P1] control closed clean (the deferred free ran on this thread)");
 
+    /* SELF-STAGING (2026-11-28 law): the PANIC-FREE control closed clean,
+       so the falsifier stages its own arm file. The deliberate act stays:
+       fresh force-quit + ONE re-tap. */
+    {
+        NSString *stagePath = [docs stringByAppendingPathComponent:@"p184_arm.txt"];
+        NSString *stage = [NSString stringWithFormat:
+            @"staged by p184 after the control close OK (ammo=%llu) %@ -- one armed tap per fresh boot\n",
+            (unsigned long long)chosen, LabLocalMilitaryNow() ?: @"?"];
+        [stage writeToFile:stagePath atomically:YES
+                  encoding:NSUTF8StringEncoding error:NULL];
+        L(@"[P1] SELF-STAGED: p184_arm.txt written -- force-quit, then ONE "
+          @"armed tap.");
+    }
+
     /* ── P2: the ARMORY gate ── */
     L(@"");
     L(@"=== P2: the falsification race (Documents/p184_arm.txt -- CONSUMED) ===");
@@ -234,7 +248,8 @@ static void *p184_t2_racer(void *arg) {
             L(@"[P2] ARM FILE PRESENT -- the falsification race runs");
             L(@"    (PANIC-POSSIBLE: a panic IS the falsification receipt).");
         } else {
-            L(@"[P2] no arm file -- the race HOLDS. Write ANY content to:");
+            L(@"[P2] no arm file -- the race HOLDS. It SELF-STAGES after a "
+              @"clean control close (or write ANY content to:)");
             L([NSString stringWithFormat:@"    %@", armPath]);
         }
     }

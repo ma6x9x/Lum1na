@@ -52,7 +52,7 @@
 #import <sys/socket.h>
 #import <unistd.h>
 
-#define P183_BUILD @"p183-necp-sockattr-race-v2-p1disc"
+#define P183_BUILD @"p183-necp-sockattr-race-v3-selfstage"
 
 /* the train-stable ABI number (see the option-number law above) */
 #ifndef P183_SO_NECP_ATTRIBUTES
@@ -282,6 +282,24 @@ static void *p183_getter_thread(void *arg) {
                    : @"absent TLVs clear the slot (the 12377 law)"]);
     }
 
+    /* SELF-STAGING (2026-11-28 law): stage ONLY when the read path proved
+       live (P1b markers came back) -- arming a dead read path is pointless.
+       The deliberate act stays: fresh force-quit + ONE re-tap. */
+    if (roundTrip > 0) {
+        NSString *stagePath = [docs stringByAppendingPathComponent:@"p183_arm.txt"];
+        NSString *stage = [NSString stringWithFormat:
+            @"staged by p183 after P1 round-trip OK (%d/5) %@ -- one armed tap per fresh boot\n",
+            roundTrip, LabLocalMilitaryNow() ?: @"?"];
+        [stage writeToFile:stagePath atomically:YES
+                  encoding:NSUTF8StringEncoding error:NULL];
+        L([NSString stringWithFormat:
+           @"[P1] SELF-STAGED: p183_arm.txt written (round-trip %d/5) -- "
+           @"force-quit, then ONE armed tap.", roundTrip]);
+    } else {
+        L(@"[P1] NOT self-staged: the read path did not prove live -- the "
+          @"13432 get-side decode decides whether the race can open at all.");
+    }
+
     /* ── P2: the ARMORY gate ── */
     L(@"");
     L(@"=== P2: the race (Documents/p183_arm.txt -- CONSUMED) ===");
@@ -298,7 +316,8 @@ static void *p183_getter_thread(void *arg) {
             L(@"[P2] ARM FILE PRESENT -- the race runs (PANIC-POSSIBLE:");
             L(@"    the double-strlen trap; fresh-boot law).");
         } else {
-            L(@"[P2] no arm file -- the race HOLDS. Write ANY content to:");
+            L(@"[P2] no arm file -- the race HOLDS. It SELF-STAGES after a "
+              @"clean P1 round-trip (or write ANY content to:)");
             L([NSString stringWithFormat:@"    %@", armPath]);
         }
     }
