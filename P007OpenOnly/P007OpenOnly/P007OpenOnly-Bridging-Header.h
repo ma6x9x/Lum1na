@@ -179,6 +179,7 @@
 #import "P180NeonStackAlias.h"
 #import "P181DoorCensus.h"
 #import "P182AKSKaslrOob.h"
+#import "P183NecpSockattrRace.h"
 #import "KRWChainT8Controller.h"
 #import "P162IOHIDReach.h"
 #import "SandboxRead.h"
