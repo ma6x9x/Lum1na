@@ -110,7 +110,16 @@ static void p180_fault(int sig, siginfo_t *si, void *uc) {
 
 static void *p180_witness_fn(void *arg) {
     int k = (int)(intptr_t)arg;
-    uint64_t *m = g_p180_magic[k];
+    /* 2026-11-28 fix (the p180_witness_fn KERN_PROTECTION_FAILURE pair: the
+       17 18:39 + the 11-22 14:56, both page-aligned): read the magic from a
+       per-witness HEAP buffer -- the static array is exactly one 16K page
+       and whatever made that page (or its neighbor) PROT_NONE cannot reach
+       a private heap copy. The magic CONTENT is what rides in the
+       registers; its address never matters. */
+    if (k < 0 || k >= P180_WITNESS) return NULL;   /* the clamp (defensive) */
+    static _Thread_local uint64_t tl_copy[64];
+    memcpy(tl_copy, g_p180_magic[k], sizeof tl_copy);
+    uint64_t *m = tl_copy;
     while (!g_p180_quit) {
         __asm__ volatile(
             "ld1 {v0.2d, v1.2d, v2.2d, v3.2d}, [%0], #64   \n"

@@ -169,21 +169,33 @@ final class FileBrowser: ObservableObject {
     }
 
     private func listxattrs(_ path: String) -> [String] {
-        let name = path
-        var size = listxattr(name, nil, 0, 0)
-        guard size > 0 else { return [] }
+        /* 2026-11-28 fix (the 20:41/20:42 EXC_BREAKPOINT pair): the classic
+           listxattr probe/read TOCTOU -- taps running concurrently write
+           xattrs between the size probe and the read; the unbounded array
+           creation from the mutated size is the trap. Cap the buffer, retry
+           once on ERANGE, and parse only the bytes actually written. */
+        let cap = 65_536
+        var size = listxattr(path, nil, 0, 0)
+        guard size > 0, size <= cap else { return [] }
         var buffer = [CChar](repeating: 0, count: size)
-        size = listxattr(name, &buffer, size, 0)
-        guard size > 0 else { return [] }
+        var n = listxattr(path, &buffer, size, 0)
+        if n == -1 && errno == ERANGE {
+            size = listxattr(path, nil, 0, 0)
+            guard size > 0, size <= cap else { return [] }
+            buffer = [CChar](repeating: 0, count: size)
+            n = listxattr(path, &buffer, size, 0)
+        }
+        guard n > 0 else { return [] }
         var out: [String] = []
         var current: [CChar] = []
-        for c in buffer {
+        for c in buffer.prefix(n) {
             if c == 0 {
                 if !current.isEmpty { out.append(String(cString: current)); current = [] }
             } else {
                 current.append(c)
             }
         }
+        if !current.isEmpty { out.append(String(cString: current)) }
         return out
     }
 
