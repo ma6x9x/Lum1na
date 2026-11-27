@@ -52,7 +52,7 @@
 #import <sys/socket.h>
 #import <unistd.h>
 
-#define P183_BUILD @"p183-necp-sockattr-race-v3-selfstage"
+#define P183_BUILD @"p183-necp-sockattr-race-v4-hot"
 
 /* the train-stable ABI number (see the option-number law above) */
 #ifndef P183_SO_NECP_ATTRIBUTES
@@ -282,44 +282,18 @@ static void *p183_getter_thread(void *arg) {
                    : @"absent TLVs clear the slot (the 12377 law)"]);
     }
 
-    /* SELF-STAGING (2026-11-28 law): stage ONLY when the read path proved
-       live (P1b markers came back) -- arming a dead read path is pointless.
-       The deliberate act stays: fresh force-quit + ONE re-tap. */
-    if (roundTrip > 0) {
-        NSString *stagePath = [docs stringByAppendingPathComponent:@"p183_arm.txt"];
-        NSString *stage = [NSString stringWithFormat:
-            @"staged by p183 after P1 round-trip OK (%d/5) %@ -- one armed tap per fresh boot\n",
-            roundTrip, LabLocalMilitaryNow() ?: @"?"];
-        [stage writeToFile:stagePath atomically:YES
-                  encoding:NSUTF8StringEncoding error:NULL];
-        L([NSString stringWithFormat:
-           @"[P1] SELF-STAGED: p183_arm.txt written (round-trip %d/5) -- "
-           @"force-quit, then ONE armed tap.", roundTrip]);
-    } else {
-        L(@"[P1] NOT self-staged: the read path did not prove live -- the "
-          @"13432 get-side decode decides whether the race can open at all.");
-    }
-
-    /* ── P2: the ARMORY gate ── */
+    /* HOT MODE (2026-11-28 -- the owner's mandate: panic-possible tests run
+       with no gating). The race fires in THIS tap when the read path proved
+       live; a dead read path skips honestly (racing a no-op is not a test).
+       A panic ends the boot -- the log survives it per-line. */
+    int armed = (roundTrip > 0) ? 1 : 0;
     L(@"");
-    L(@"=== P2: the race (Documents/p183_arm.txt -- CONSUMED) ===");
-    NSString *armPath = [docs stringByAppendingPathComponent:@"p183_arm.txt"];
-    int armed = 0;
-    {
-        int afd = open([armPath UTF8String], O_RDONLY);
-        if (afd >= 0) {
-            char b[64];
-            ssize_t n = read(afd, b, sizeof b - 1);
-            close(afd);
-            if (n > 0) armed = 1;
-            unlink([armPath UTF8String]);      /* CONSUMED */
-            L(@"[P2] ARM FILE PRESENT -- the race runs (PANIC-POSSIBLE:");
-            L(@"    the double-strlen trap; fresh-boot law).");
-        } else {
-            L(@"[P2] no arm file -- the race HOLDS. It SELF-STAGES after a "
-              @"clean P1 round-trip (or write ANY content to:)");
-            L([NSString stringWithFormat:@"    %@", armPath]);
-        }
+    if (armed) {
+        L(@"=== P2: the race -- HOT (runs NOW; PANIC-POSSIBLE via the trap) ===");
+    } else {
+        L(@"=== P2: the race SKIPPED honestly -- the read path did not prove ");
+        L(@"    live (P1b round-trip 0/5); the 13432 get-side decode owns the ");
+        L(@"    next step. ===");
     }
 
     if (armed) {

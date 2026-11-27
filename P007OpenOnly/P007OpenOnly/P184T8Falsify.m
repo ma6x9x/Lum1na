@@ -48,7 +48,7 @@
 #import <sys/syscall.h>
 #import <unistd.h>
 
-#define P184_BUILD @"p184-t8-falsify-v2-selfstage"
+#define P184_BUILD @"p184-t8-falsify-v3-hot"
 
 #ifndef SYS_necp_open
 #define SYS_necp_open 463
@@ -218,41 +218,13 @@ static void *p184_t2_racer(void *arg) {
     close(sfd);
     L(@"[P1] control closed clean (the deferred free ran on this thread)");
 
-    /* SELF-STAGING (2026-11-28 law): the PANIC-FREE control closed clean,
-       so the falsifier stages its own arm file. The deliberate act stays:
-       fresh force-quit + ONE re-tap. */
-    {
-        NSString *stagePath = [docs stringByAppendingPathComponent:@"p184_arm.txt"];
-        NSString *stage = [NSString stringWithFormat:
-            @"staged by p184 after the control close OK (ammo=%llu) %@ -- one armed tap per fresh boot\n",
-            (unsigned long long)chosen, LabLocalMilitaryNow() ?: @"?"];
-        [stage writeToFile:stagePath atomically:YES
-                  encoding:NSUTF8StringEncoding error:NULL];
-        L(@"[P1] SELF-STAGED: p184_arm.txt written -- force-quit, then ONE "
-          @"armed tap.");
-    }
-
-    /* ── P2: the ARMORY gate ── */
+    /* HOT MODE (2026-11-28 -- the owner's mandate: panic-possible tests run
+       with no gating). The falsification race fires in THIS tap. A panic IS
+       the falsification receipt; the log survives it per-line. */
+    int armed = 1;
     L(@"");
-    L(@"=== P2: the falsification race (Documents/p184_arm.txt -- CONSUMED) ===");
-    NSString *armPath = [docs stringByAppendingPathComponent:@"p184_arm.txt"];
-    int armed = 0;
-    {
-        int afd = open([armPath UTF8String], O_RDONLY);
-        if (afd >= 0) {
-            char b[64];
-            ssize_t n = read(afd, b, sizeof b - 1);
-            close(afd);
-            if (n > 0) armed = 1;
-            unlink([armPath UTF8String]);
-            L(@"[P2] ARM FILE PRESENT -- the falsification race runs");
-            L(@"    (PANIC-POSSIBLE: a panic IS the falsification receipt).");
-        } else {
-            L(@"[P2] no arm file -- the race HOLDS. It SELF-STAGES after a "
-              @"clean control close (or write ANY content to:)");
-            L([NSString stringWithFormat:@"    %@", armPath]);
-        }
-    }
+    L(@"=== P2: the falsification race -- HOT (runs NOW; PANIC-POSSIBLE: a ");
+    L(@"    panic IS the receipt) ===");
 
     if (armed) {
         g_p184_fd = -1;
