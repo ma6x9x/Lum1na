@@ -158,6 +158,7 @@ enum LuminaTAP {
         case "p177":        result = P177RaceConductor.tap()
         case "p179":        result = P179NecpFlowSpray.tap()
         case "p180":        result = P180NeonStackAlias.tap()
+        case "p185":        result = P185SidRegistryCensus.tap()
         case "p184":        result = P184T8Falsify.tap()
         case "p183":        result = P183NecpSockattrRace.tap()
         case "p182":        result = P182AKSKaslrOob.tap()

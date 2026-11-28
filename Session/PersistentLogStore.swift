@@ -49,6 +49,7 @@ public final class PersistentLogStore {
         "p182": "p182_aks_kaslr_log.txt",
         "p183": "p183_necp_sockattr_race_log.txt",
         "p184": "p184_t8_falsify_log.txt",
+        "p185": "p185_sid_census_log.txt",
         "krw8": "t8_necp_reclaim_log.txt",
         "p175": "p175_kamui_census_log.txt",
         "p176": "p176_f1seed_log.txt",
