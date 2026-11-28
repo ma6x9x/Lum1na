@@ -51,6 +51,7 @@ public final class PersistentLogStore {
         "p184": "p184_t8_falsify_log.txt",
         "p185": "p185_sid_census_log.txt",
         "p186": "p186_auto_aim_log.txt",
+        "p187": "p187_target_holder_log.txt",
         "krw8": "t8_necp_reclaim_log.txt",
         "p175": "p175_kamui_census_log.txt",
         "p176": "p176_f1seed_log.txt",

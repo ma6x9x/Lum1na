@@ -183,6 +183,7 @@
 #import "P184T8Falsify.h"
 #import "P185SidRegistryCensus.h"
 #import "P186AutoAimFire.h"
+#import "P187TargetHolder.h"
 #import "KRWChainT8Controller.h"
 #import "P162IOHIDReach.h"
 #import "SandboxRead.h"
