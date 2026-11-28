@@ -181,12 +181,20 @@ static int g_p187_heldValid = 0;
         g_p187_held = s;
         g_p187_heldSid = sid;
         g_p187_heldValid = 1;
-        /* the snapshot bin (the artifact-pair before-half) */
+        /* the snapshot bin (the artifact-pair before-half) + the SID FILE
+           (the USB-mediated route: pull this from the main app's container,
+           push into the debugger's — p188/p044 read it if cross-task
+           lookup fails) */
         {
             NSString *snapPath = [docs stringByAppendingPathComponent:
                                    @"p187_hold_snapshot.bin"];
             [[NSData dataWithBytes:g_p187_snap length:sizeof g_p187_snap]
                 writeToFile:snapPath atomically:YES];
+            NSString *sidPath = [docs stringByAppendingPathComponent:
+                                  @"p187_sid.txt"];
+            [[NSString stringWithFormat:@"%u", sid]
+                writeToFile:sidPath atomically:YES
+                     encoding:NSUTF8StringEncoding error:NULL];
         }
         L([NSString stringWithFormat:
            @"[hold] *** SURFACE HELD: sid=%u (16KB, marker 3c00/4000) ***",
